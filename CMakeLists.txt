@@ -4,12 +4,12 @@ INCLUDE (cmake/subdirs.cmake)
 
 PROJECT (CLICKHOUSE-CLIENT)
 
-	SET (CMAKE_CXX_STANDARD 14)
-	SET (CMAKE_CXX_STANDARD_REQUIRED ON)
+    SET (CMAKE_CXX_STANDARD 11)
+    SET (CMAKE_CXX_STANDARD_REQUIRED ON)
 
-	INCLUDE_DIRECTORIES(.)
+    INCLUDE_DIRECTORIES(.)
 
-	SUBDIRS (
-		clickhouse
-		tests/simple
-	)
+    SUBDIRS (
+        clickhouse
+        tests/simple
+    )
