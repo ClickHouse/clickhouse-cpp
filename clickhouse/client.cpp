@@ -2,19 +2,27 @@
 #include "protocol.h"
 #include "varint.h"
 
+#include "base/platform.h"
+#include "net/socket.h"
+
 #include <system_error>
 #include <vector>
 #include <iostream>
 
-#include <arpa/inet.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <memory.h>
-#include <netdb.h>
-#include <poll.h>
-#include <unistd.h>
+#if defined(_win_)
+#   include <winsock2.h>
+#   include <ws2tcpip.h>
+#else
+#   include <arpa/inet.h>
+#   include <sys/types.h>
+#   include <sys/socket.h>
+#   include <errno.h>
+#   include <fcntl.h>
+#   include <memory.h>
+#   include <netdb.h>
+#   include <poll.h>
+#   include <unistd.h>
+#endif
 
 #define DBMS_NAME               "ClickHouse"
 #define DBMS_VERSION_MAJOR      1
@@ -154,7 +162,7 @@ private:
                     uint64_t blocks;
                     uint64_t bytes;
                     bool applied_limit;
-                    size_t rows_before_limit;
+                    uint64_t rows_before_limit;
                     bool calculated_rows_before_limit;
 
                     //res.info.read(istr);
@@ -233,7 +241,11 @@ private:
 private:
     void Disconnect() {
         if (socket_ != -1) {
+#if defined(_win_)
+            closesocket(socket_);
+#else
             close(socket_);
+#endif
             socket_ = -1;
         }
     }
@@ -256,12 +268,12 @@ private:
                     pollfd fd;
                     fd.fd = s;
                     fd.events = POLLOUT;
-                    int rval = poll(&fd, 1, 1000);
+                    int rval = net::Poll(&fd, 1, 1000);
 
                     if (rval > 0) {
                         int opt;
                         socklen_t len = sizeof(opt);
-                        getsockopt(s, SOL_SOCKET, SO_ERROR, &opt, &len);
+                        getsockopt(s, SOL_SOCKET, SO_ERROR, (char*)&opt, &len);
 
                         socket_ = opt;
                         return true;

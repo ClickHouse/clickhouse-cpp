@@ -1,5 +1,12 @@
 ADD_LIBRARY (clickhouse-cpp-lib STATIC
-    client.cpp
+    base/platform.cpp
+	net/socket.cpp
+	client.cpp
 )
 
-SET_TARGET_PROPERTIES(clickhouse-cpp-lib PROPERTIES LINKER_LANGUAGE CXX)
+TARGET_INCLUDE_DIRECTORIES(clickhouse-cpp-lib
+	PRIVATE .
+)
+
+SET_TARGET_PROPERTIES(clickhouse-cpp-lib 
+	PROPERTIES LINKER_LANGUAGE CXX)
