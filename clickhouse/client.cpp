@@ -29,13 +29,28 @@
 #define DBMS_VERSION_MINOR      1
 #define REVISION                54126
 
-#define DBMS_MIN_REVISION_WITH_TEMPORARY_TABLES 50264
-#define DBMS_MIN_REVISION_WITH_BLOCK_INFO       51903
-#define DBMS_MIN_REVISION_WITH_CLIENT_INFO      54032
-#define DBMS_MIN_REVISION_WITH_SERVER_TIMEZONE  54058
+#define DBMS_MIN_REVISION_WITH_TEMPORARY_TABLES         50264
+#define DBMS_MIN_REVISION_WITH_BLOCK_INFO               51903
+#define DBMS_MIN_REVISION_WITH_CLIENT_INFO              54032
+#define DBMS_MIN_REVISION_WITH_SERVER_TIMEZONE          54058
+#define DBMS_MIN_REVISION_WITH_QUOTA_KEY_IN_CLIENT_INFO 54060
 
 namespace clickhouse {
 
+struct ClientInfo {
+    uint8_t interface = 1; // TCP
+    uint8_t query_kind;
+    std::string initial_user;
+    std::string initial_query_id;
+    std::string quota_key;
+    std::string os_user;
+    std::string client_hostname;
+    std::string client_name;
+    std::string initial_address = "[::ffff:127.0.0.1]:0";
+    uint64_t client_version_major = 0;
+    uint64_t client_version_minor = 0;
+    uint32_t client_revision = 0;
+};
 
 class Client::Impl {
 public:
@@ -84,25 +99,29 @@ public:
         /// Client info.
         if (server_revision_ >= DBMS_MIN_REVISION_WITH_CLIENT_INFO)
         {
-        #if 0
-            ClientInfo client_info_to_send;
+            ClientInfo info;
 
-            if (!client_info)
-            {
-                /// No client info passed - means this query initiated by me.
-                client_info_to_send.query_kind = ClientInfo::QueryKind::INITIAL_QUERY;
-                client_info_to_send.fillOSUserHostNameAndVersionInfo();
-                client_info_to_send.client_name = (DBMS_NAME " ") + client_name;
-            }
-            else
-            {
-                /// This query is initiated by another query.
-                client_info_to_send = *client_info;
-                client_info_to_send.query_kind = ClientInfo::QueryKind::SECONDARY_QUERY;
-            }
+            info.query_kind = 1;
+            info.client_name = "ClickHouse client";
+            info.client_version_major = DBMS_VERSION_MAJOR;
+            info.client_version_minor = DBMS_VERSION_MINOR;
+            info.client_revision = REVISION;
 
-            client_info_to_send.write(*out, server_revision);
-        #endif
+            p = writeBinary(info.query_kind, p);
+            p = writeStringBinary(info.initial_user, p);
+            p = writeStringBinary(info.initial_query_id, p);
+            p = writeStringBinary(info.initial_address, p);
+            p = writeBinary(info.interface, p);
+
+            p = writeStringBinary(info.os_user, p);
+            p = writeStringBinary(info.client_hostname, p);
+            p = writeStringBinary(info.client_name, p);
+            p = writeVarUInt(info.client_version_major, p);
+            p = writeVarUInt(info.client_version_minor, p);
+            p = writeVarUInt(info.client_revision, p);
+
+            if (server_revision_ >= DBMS_MIN_REVISION_WITH_QUOTA_KEY_IN_CLIENT_INFO)
+                p = writeStringBinary(info.quota_key, p);
         }
 
         /// Per query settings.
@@ -138,60 +157,70 @@ public:
         ::send(socket_, data.data(), p - data.data(), 0);
 
 
-        ReceiveQuery();
+        while (ReceiveQuery())
+        { }
     }
 
 private:
-    void ReceiveQuery() {
+    bool ReceiveQuery() {
         uint64_t packet_type;
         readVarUInt(socket_, packet_type);
 
         std::cerr << "receive packet " << packet_type << std::endl;
         switch (packet_type) {
             case ServerCodes::Data: {
-                std::string external_table_name;
-
-                if (server_revision_ >= DBMS_MIN_REVISION_WITH_TEMPORARY_TABLES) {
-                    readStringBinary(socket_, external_table_name);
-
-                    std::cerr << "external_table_name : " << external_table_name << std::endl;
+                if (REVISION >= DBMS_MIN_REVISION_WITH_TEMPORARY_TABLES) {
+                    std::string table_name;
+                    readStringBinary(socket_, table_name);
+                    std::cerr << "temporary_table_name : " << table_name << std::endl;
                 }
                 /// Дополнительная информация о блоке.
-                if (server_revision_ >= DBMS_MIN_REVISION_WITH_BLOCK_INFO) {
-                    uint64_t rows;
-                    uint64_t blocks;
-                    uint64_t bytes;
-                    bool applied_limit;
-                    uint64_t rows_before_limit;
-                    bool calculated_rows_before_limit;
+                if (REVISION >= DBMS_MIN_REVISION_WITH_BLOCK_INFO) {
+                    uint64_t num;
+                    int32_t bucket_num = 0;
+                    uint8_t is_overflows = 0;
 
-                    //res.info.read(istr);
-                    readVarUInt(socket_, rows);
-                    readVarUInt(socket_, blocks);
-                    readVarUInt(socket_, bytes);
-                    readBinary(socket_, applied_limit);
-                    readVarUInt(socket_, rows_before_limit);
-                    readBinary(socket_, calculated_rows_before_limit);
+                    // BlockInfo
+                    readVarUInt(socket_, num);
+                    readBinary(socket_, is_overflows);
+                    readVarUInt(socket_, num);
+                    readBinary(socket_, bucket_num);
+                    readVarUInt(socket_, num);
 
-                    std::cerr << "rows : " << rows << std::endl;
-                    std::cerr << "blocks : " << blocks << std::endl;
-                    std::cerr << "bytes : " << bytes << std::endl;
-                    std::cerr << "applied_limit : " << applied_limit << std::endl;
-                    std::cerr << "rows_before_limit : " << rows_before_limit << std::endl;
-                    std::cerr << "calculated_rows_before_limit : " << calculated_rows_before_limit << std::endl;
+                    std::cerr << "bucket_num : " << bucket_num << std::endl;
+                    std::cerr << "is_overflows : " << bool(is_overflows) << std::endl;
                 }
 
-                uint64_t num_columns;
-                uint64_t num_rows;
+                uint64_t num_columns = 0;
+                uint64_t num_rows = 0;
+                std::string name;
 
                 readVarUInt(socket_, num_columns);
                 readVarUInt(socket_, num_rows);
-
                 std::cerr << "num_columns : " << num_columns << std::endl;
                 std::cerr << "num_rows : " << num_rows << std::endl;
-                break;
+
+                for (size_t i = 0; i < num_columns; ++i) {
+                    readStringBinary(socket_, name);
+                    std::cerr << "name : " << name << std::endl;
+
+                    readStringBinary(socket_, name);
+                    std::cerr << "type : " << name << std::endl;
+
+                    if (num_rows) {
+                        // type.deserializeBinary(column, istr, rows, 0);
+                        throw std::runtime_error("unimplemented");
+                    }
+                }
+                return true;
             }
+
+        default:
+            throw std::runtime_error("unimplemented");
+            break;
         }
+
+        return false;
     }
 
     void sendHello() {
@@ -254,7 +283,7 @@ private:
         const struct addrinfo* addr0 = res;
 
         while (res) {
-            int s(socket(res->ai_family, res->ai_socktype, res->ai_protocol));
+            SOCKET s(socket(res->ai_family, res->ai_socktype, res->ai_protocol));
 
             if (s == -1) {
                 continue;
@@ -291,7 +320,7 @@ private:
     }
 
 private:
-    int socket_;
+    SOCKET socket_;
 
     std::string server_name_;
     std::string server_timezone_;

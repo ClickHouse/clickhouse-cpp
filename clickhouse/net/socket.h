@@ -10,6 +10,7 @@
 #else
 #   include <sys/types.h>
 #   include <sys/socket.h>
+#   include <poll.h>
 
 #   if !defined(SOCKET)
 #       define SOCKET int
@@ -19,7 +20,7 @@
 namespace clickhouse {
 namespace net {
 
-ssize_t Poll(struct pollfd fds[], int nfds, int timeout) noexcept;
+ssize_t Poll(struct pollfd* fds, int nfds, int timeout) noexcept;
 
 }
 }

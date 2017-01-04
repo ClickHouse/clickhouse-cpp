@@ -11,12 +11,12 @@ namespace clickhouse {
 
 #define DEFAULT_MAX_STRING_SIZE 0x00FFFFFFULL
 
-inline void readVarUInt(int s, uint64_t& x) {
+inline void readVarUInt(SOCKET s, uint64_t& x) {
     x = 0;
     for (size_t i = 0; i < 9; ++i)
     {
         uint8_t byte;
-        int ret = recv(s, (char*)&byte, sizeof(byte), 0);
+        int ret = recv(s, (char*)&byte, sizeof(byte), MSG_WAITALL);
 
         if (ret != 1) {
             throw std::runtime_error("fail");
@@ -29,7 +29,7 @@ inline void readVarUInt(int s, uint64_t& x) {
     }
 }
 
-inline void readStringBinary(int s, std::string& str, size_t max_size = DEFAULT_MAX_STRING_SIZE)
+inline void readStringBinary(SOCKET s, std::string& str, size_t max_size = DEFAULT_MAX_STRING_SIZE)
 {
     uint64_t size = 0;
     readVarUInt(s, size);
@@ -39,15 +39,15 @@ inline void readStringBinary(int s, std::string& str, size_t max_size = DEFAULT_
 
     str.resize((size_t)size);
 
-    int ret = recv(s, &str[0], (int)size, 0);
+    int ret = recv(s, &str[0], (int)size, MSG_WAITALL);
     if (ret != size) {
         throw std::runtime_error("can't receive string data");
     }
 }
 
 template <typename T>
-inline void readBinary(int s, T& x) {
-    int ret = recv(s, (char*)&x, sizeof(x), 0);
+inline void readBinary(SOCKET s, T& x) {
+    int ret = recv(s, (char*)&x, sizeof(x), MSG_WAITALL);
     if (ret != sizeof(x)) {
         throw std::runtime_error("can't receive binary data");
     }
@@ -74,6 +74,13 @@ inline char* writeStringBinary(const std::string& s, char* ostr) {
     ostr = writeVarUInt(s.size(), ostr);
     memcpy(ostr, s.data(), s.size());
     ostr += s.size();
+    return ostr;
+}
+
+template <typename T>
+inline char* writeBinary(const T& val, char* ostr) {
+    memcpy(ostr, &val, sizeof(T));
+    ostr += sizeof(T);
     return ostr;
 }
 

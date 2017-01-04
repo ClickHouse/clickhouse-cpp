@@ -5,6 +5,9 @@
 
 namespace clickhouse {
 
+/**
+ *
+ */
 class Client {
 public:
     Client();
