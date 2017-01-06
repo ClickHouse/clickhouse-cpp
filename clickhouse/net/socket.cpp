@@ -1,7 +1,9 @@
 #include "socket.h"
+#include "base/singleton.h"
 
 #include <stdexcept>
 #include <system_error>
+#include <unordered_set>
 #include <memory.h>
 
 #if !defined(_win_)
@@ -12,6 +14,24 @@
 
 namespace clickhouse {
 namespace net {
+namespace {
+
+    class LocalNames : public std::unordered_set<std::string> {
+    public:
+        LocalNames() {
+            emplace("localhost");
+            emplace("localhost.localdomain");
+            emplace("localhost6");
+            emplace("localhost6.localdomain6");
+            emplace("::1");
+            emplace("127.0.0.1");
+        }
+
+        inline bool IsLocalName(const std::string& name) const noexcept {
+            return find(name) != end();
+        }
+    };
+}
 
 NetworkAddress::NetworkAddress(const std::string& host, const std::string& port)
     : info_(nullptr)
@@ -21,7 +41,17 @@ NetworkAddress::NetworkAddress(const std::string& host, const std::string& port)
 
     hints.ai_family = PF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
-    // TODO if not local addr hints.ai_flags |= AI_ADDRCONFIG;
+
+    if (!Singleton<LocalNames>()->IsLocalName(host)) {
+        // https://linux.die.net/man/3/getaddrinfo
+        // If hints.ai_flags includes the AI_ADDRCONFIG flag,
+        // then IPv4 addresses are returned in the list pointed to by res only
+        // if the local system has at least one IPv4 address configured,
+        // and IPv6 addresses are only returned if the local system has at least one IPv6 address configured.
+        // The loopback address is not considered for this case
+        // as valid as a configured address.
+        hints.ai_flags |= AI_ADDRCONFIG;
+    }
 
     const int error = getaddrinfo(host.c_str(), port.c_str(), &hints, &info_);
 
