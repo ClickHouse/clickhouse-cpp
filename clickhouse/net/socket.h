@@ -81,6 +81,7 @@ private:
     SOCKET s_;
 };
 
+
 ///
 SOCKET SocketConnect(const NetworkAddress& addr);
 

@@ -26,4 +26,18 @@ struct QuerySettings {
 };
 
 
+class QueryEvents {
+public:
+    virtual ~QueryEvents()
+    { }
+
+    /// Some data was received.
+    virtual void OnData() = 0;
+
+    virtual void OnException() = 0;
+
+    virtual void OnProgress() = 0;
+};
+
+
 }

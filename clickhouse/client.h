@@ -1,5 +1,7 @@
 #pragma once
 
+#include "query.h"
+
 #include <memory>
 #include <string>
 
@@ -34,7 +36,7 @@ public:
 
     void Connect();
 
-    void SendQuery(const std::string& query);
+    void ExecuteQuery(const std::string& query, QueryEvents* events);
 
 private:
     const std::string host_;

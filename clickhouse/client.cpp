@@ -55,6 +55,7 @@ public:
         , socket_input_(socket_)
         , buffered_(&socket_input_)
         , input_(&buffered_)
+        , events_(nullptr)
     {
         if (socket_.Closed()) {
             throw std::system_error(errno, std::system_category());
@@ -68,6 +69,23 @@ public:
     void Handshake() {
         sendHello();
         receiveHello();
+    }
+
+    void ExecuteQuery(const std::string& query, QueryEvents* events) {
+        events_ = events;
+
+        // Выбрать рабочее соединение
+        try {
+            SendQuery(query);
+
+            while (ReceivePacket())
+            { }
+
+            events_ = nullptr;
+        } catch (...) {
+            events_ = nullptr;
+            throw;
+        }
     }
 
     void SendQuery(const std::string& query) {
@@ -138,14 +156,10 @@ public:
         if (::send(socket_, data.data(), p - data.data(), 0) != p - data.data()) {
             throw std::runtime_error("fail to send hello");
         }
-
-
-        while (ReceiveQuery())
-        { }
     }
 
 private:
-    bool ReceiveQuery() {
+    bool ReceivePacket() {
         uint64_t packet_type = 0;
 
         if (!input_.ReadVarint64(&packet_type)) {
@@ -217,7 +231,7 @@ private:
 
                     if (num_rows) {
                         // type.deserializeBinary(column, istr, rows, 0);
-                        throw std::runtime_error("unimplemented");
+                        throw std::runtime_error("type deserialization is not implemented");
                     }
                 }
                 return true;
@@ -304,6 +318,8 @@ private:
     CodedInputStream input_;
 
     ServerInfo server_info_;
+
+    QueryEvents* events_;
 };
 
 Client::Client()
@@ -333,9 +349,9 @@ void Client::Connect() {
     impl_->Handshake();
 }
 
-void Client::SendQuery(const std::string& query) {
+void Client::ExecuteQuery(const std::string& query, QueryEvents* events) {
     if (impl_) {
-        impl_->SendQuery(query);
+        impl_->ExecuteQuery(query, events);
     }
 }
 
