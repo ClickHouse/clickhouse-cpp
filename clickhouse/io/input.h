@@ -41,7 +41,7 @@ protected:
 
 
 /**
- * A ZeroCopyInputStream backed by an in-memory array of bytes.
+ * A ZeroCopyInput stream backed by an in-memory array of bytes.
  */
 class ArrayInput : public ZeroCopyInput {
 public:
