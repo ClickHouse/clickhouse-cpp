@@ -5,12 +5,30 @@
 
 namespace clickhouse {
 
+struct ClientOptions {
+    /// Hostname of the server.
+    std::string host;
+    /// Service port.
+    int port = 9000;
+
+    ClientOptions& SetHost(const std::string& val) {
+        host = val;
+        return *this;
+    }
+
+    ClientOptions& SetPort(const int val) {
+        port = val;
+        return *this;
+    }
+};
+
 /**
  *
  */
 class Client {
 public:
     Client();
+    explicit Client(const ClientOptions& opts);
     explicit Client(const std::string& host, int port = 9000);
     ~Client();
 

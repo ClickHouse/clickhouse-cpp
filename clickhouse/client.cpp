@@ -2,32 +2,17 @@
 #include "protocol.h"
 #include "varint.h"
 
-#include "base/platform.h"
+#include "io/coded_input.h"
 #include "net/socket.h"
 
 #include <system_error>
 #include <vector>
 #include <iostream>
 
-#if defined(_win_)
-#   include <winsock2.h>
-#   include <ws2tcpip.h>
-#else
-#   include <arpa/inet.h>
-#   include <sys/types.h>
-#   include <sys/socket.h>
-#   include <errno.h>
-#   include <fcntl.h>
-#   include <memory.h>
-#   include <netdb.h>
-#   include <poll.h>
-#   include <unistd.h>
-#endif
-
-#define DBMS_NAME               "ClickHouse"
-#define DBMS_VERSION_MAJOR      1
-#define DBMS_VERSION_MINOR      1
-#define REVISION                54126
+#define DBMS_NAME                                       "ClickHouse"
+#define DBMS_VERSION_MAJOR                              1
+#define DBMS_VERSION_MINOR                              1
+#define REVISION                                        54126
 
 #define DBMS_MIN_REVISION_WITH_TEMPORARY_TABLES         50264
 #define DBMS_MIN_REVISION_WITH_BLOCK_INFO               51903
@@ -36,6 +21,9 @@
 #define DBMS_MIN_REVISION_WITH_QUOTA_KEY_IN_CLIENT_INFO 54060
 
 namespace clickhouse {
+
+using namespace io;
+using namespace net;
 
 struct ClientInfo {
     uint8_t interface = 1; // TCP
@@ -52,32 +40,25 @@ struct ClientInfo {
     uint32_t client_revision = 0;
 };
 
+struct ServerInfo {
+    std::string name;
+    std::string timezone;
+    uint64_t    version_major;
+    uint64_t    version_minor;
+    uint64_t    revision;
+};
+
 class Client::Impl {
 public:
     Impl(const std::string& host, const std::string& port)
-        : socket_(-1)
+        : socket_(SocketConnect(NetworkAddress(host, port)))
+        , socket_input_(socket_)
+        , buffered_(&socket_input_)
+        , input_(&buffered_)
     {
-        struct addrinfo* info;
-        struct addrinfo hints;
-        memset(&hints, 0, sizeof(hints));
-
-        hints.ai_family = PF_UNSPEC;
-        hints.ai_socktype = SOCK_STREAM;
-        // TODO if not local addr hints.ai_flags |= AI_ADDRCONFIG;
-
-        const int error = getaddrinfo(host.c_str(), port.c_str(), &hints, &info);
-
-        if (error) {
+        if (socket_.Closed()) {
             throw std::system_error(errno, std::system_category());
         }
-
-        if (!Connect(info)) {
-            freeaddrinfo(info);
-            throw std::system_error(errno, std::system_category());
-        }
-
-        // TODO use uniqe_ptr
-        freeaddrinfo(info);
     }
 
     ~Impl() {
@@ -97,7 +78,7 @@ public:
         p = writeStringBinary("1"/*query_id*/, p);
 
         /// Client info.
-        if (server_revision_ >= DBMS_MIN_REVISION_WITH_CLIENT_INFO)
+        if (server_info_.revision >= DBMS_MIN_REVISION_WITH_CLIENT_INFO)
         {
             ClientInfo info;
 
@@ -120,7 +101,7 @@ public:
             p = writeVarUInt(info.client_version_minor, p);
             p = writeVarUInt(info.client_revision, p);
 
-            if (server_revision_ >= DBMS_MIN_REVISION_WITH_QUOTA_KEY_IN_CLIENT_INFO)
+            if (server_info_.revision >= DBMS_MIN_REVISION_WITH_QUOTA_KEY_IN_CLIENT_INFO)
                 p = writeStringBinary(info.quota_key, p);
         }
 
@@ -139,11 +120,11 @@ public:
         {
             p = writeVarUInt(ClientCodes::Data, p);
 
-            if (server_revision_ >= DBMS_MIN_REVISION_WITH_TEMPORARY_TABLES) {
+            if (server_info_.revision >= DBMS_MIN_REVISION_WITH_TEMPORARY_TABLES) {
                 p = writeStringBinary("", p);
             }
             /// Дополнительная информация о блоке.
-            //if (client_revision >= DBMS_MIN_REVISION_WITH_BLOCK_INFO) {
+            //if (REVISION >= DBMS_MIN_REVISION_WITH_BLOCK_INFO) {
             //    block.info.write(ostr);
             //}
 
@@ -154,7 +135,9 @@ public:
         }
 
         // TODO result
-        ::send(socket_, data.data(), p - data.data(), 0);
+        if (::send(socket_, data.data(), p - data.data(), 0) != p - data.data()) {
+            throw std::runtime_error("fail to send hello");
+        }
 
 
         while (ReceiveQuery())
@@ -163,15 +146,21 @@ public:
 
 private:
     bool ReceiveQuery() {
-        uint64_t packet_type;
-        readVarUInt(socket_, packet_type);
+        uint64_t packet_type = 0;
+
+        if (!input_.ReadVarint64(&packet_type)) {
+            return false;
+        }
 
         std::cerr << "receive packet " << packet_type << std::endl;
         switch (packet_type) {
             case ServerCodes::Data: {
                 if (REVISION >= DBMS_MIN_REVISION_WITH_TEMPORARY_TABLES) {
                     std::string table_name;
-                    readStringBinary(socket_, table_name);
+
+                    if (!WireFormat::ReadString(&input_, &table_name)) {
+                        return false;
+                    }
                     std::cerr << "temporary_table_name : " << table_name << std::endl;
                 }
                 /// Дополнительная информация о блоке.
@@ -181,11 +170,21 @@ private:
                     uint8_t is_overflows = 0;
 
                     // BlockInfo
-                    readVarUInt(socket_, num);
-                    readBinary(socket_, is_overflows);
-                    readVarUInt(socket_, num);
-                    readBinary(socket_, bucket_num);
-                    readVarUInt(socket_, num);
+                    if (!WireFormat::ReadUInt64(&input_, &num)) {
+                        return false;
+                    }
+                    if (!WireFormat::ReadFixed(&input_, &is_overflows)) {
+                        return false;
+                    }
+                    if (!WireFormat::ReadUInt64(&input_, &num)) {
+                        return false;
+                    }
+                    if (!WireFormat::ReadFixed(&input_, &bucket_num)) {
+                        return false;
+                    }
+                    if (!WireFormat::ReadUInt64(&input_, &num)) {
+                        return false;
+                    }
 
                     std::cerr << "bucket_num : " << bucket_num << std::endl;
                     std::cerr << "is_overflows : " << bool(is_overflows) << std::endl;
@@ -195,16 +194,25 @@ private:
                 uint64_t num_rows = 0;
                 std::string name;
 
-                readVarUInt(socket_, num_columns);
-                readVarUInt(socket_, num_rows);
+                if (!WireFormat::ReadUInt64(&input_, &num_columns)) {
+                    return false;
+                }
+                if (!WireFormat::ReadUInt64(&input_, &num_rows)) {
+                    return false;
+                }
+
                 std::cerr << "num_columns : " << num_columns << std::endl;
                 std::cerr << "num_rows : " << num_rows << std::endl;
 
                 for (size_t i = 0; i < num_columns; ++i) {
-                    readStringBinary(socket_, name);
+                    if (!WireFormat::ReadString(&input_, &name)) {
+                        return false;
+                    }
                     std::cerr << "name : " << name << std::endl;
 
-                    readStringBinary(socket_, name);
+                    if (!WireFormat::ReadString(&input_, &name)) {
+                        return false;
+                    }
                     std::cerr << "type : " << name << std::endl;
 
                     if (num_rows) {
@@ -243,95 +251,70 @@ private:
     void receiveHello() {
         uint64_t packet_type = 0;
 
-        readVarUInt(socket_, packet_type);
+        if (!input_.ReadVarint64(&packet_type)) {
+            goto fail;
+        }
 
-        if (packet_type == (uint64_t)ServerCodes::Hello) {
-            readStringBinary(socket_, server_name_);
-            readVarUInt(socket_, server_version_major_);
-            readVarUInt(socket_, server_version_minor_);
-            readVarUInt(socket_, server_revision_);
-            if (server_revision_ >= DBMS_MIN_REVISION_WITH_SERVER_TIMEZONE) {
-                readStringBinary(socket_, server_timezone_);
+        if (packet_type == ServerCodes::Hello) {
+            if (!WireFormat::ReadString(&input_, &server_info_.name)) {
+                goto fail;
+            }
+            if (!WireFormat::ReadUInt64(&input_, &server_info_.version_major)) {
+                goto fail;
+            }
+            if (!WireFormat::ReadUInt64(&input_, &server_info_.version_minor)) {
+                goto fail;
+            }
+            if (!WireFormat::ReadUInt64(&input_, &server_info_.revision)) {
+                goto fail;
             }
 
-            std::cerr << server_name_ << std::endl;
-            std::cerr << server_revision_ << std::endl;
-            std::cerr << server_timezone_ << std::endl;
+            if (server_info_.revision >= DBMS_MIN_REVISION_WITH_SERVER_TIMEZONE) {
+                if (!WireFormat::ReadString(&input_, &server_info_.timezone)) {
+                    goto fail;
+                }
+            }
+
+            std::cerr << server_info_.name << std::endl;
+            std::cerr << server_info_.revision << std::endl;
+            std::cerr << server_info_.timezone << std::endl;
         } else if (packet_type == ServerCodes::Exception) {
-            std::cerr << "got exception" << std::endl;
             //receiveException()->rethrow();
             Disconnect();
         } else {
             /// Close connection, to not stay in unsynchronised state.
             Disconnect();
         }
+
+        return;
+
+    fail:
+        Disconnect();
     }
 
 private:
     void Disconnect() {
-        if (socket_ != -1) {
-#if defined(_win_)
-            closesocket(socket_);
-#else
-            close(socket_);
-#endif
-            socket_ = -1;
-        }
-    }
-
-    bool Connect(const struct addrinfo* res) {
-        const struct addrinfo* addr0 = res;
-
-        while (res) {
-            SOCKET s(socket(res->ai_family, res->ai_socktype, res->ai_protocol));
-
-            if (s == -1) {
-                continue;
-            }
-
-            if (connect(s, res->ai_addr, (int)res->ai_addrlen)) {
-                if (errno == EINPROGRESS ||
-                    errno == EAGAIN ||
-                    errno == EWOULDBLOCK)
-                {
-                    pollfd fd;
-                    fd.fd = s;
-                    fd.events = POLLOUT;
-                    int rval = net::Poll(&fd, 1, 1000);
-
-                    if (rval > 0) {
-                        int opt;
-                        socklen_t len = sizeof(opt);
-                        getsockopt(s, SOL_SOCKET, SO_ERROR, (char*)&opt, &len);
-
-                        socket_ = opt;
-                        return true;
-                    } else {
-                        continue;
-                    }
-                }
-            }
-
-            socket_ = s;
-            return true;
-        }
-
-        return false;
+        socket_.Close();
     }
 
 private:
-    SOCKET socket_;
+    SocketHolder socket_;
+    SocketInput socket_input_;
+    BufferedInput buffered_;
+    CodedInputStream input_;
 
-    std::string server_name_;
-    std::string server_timezone_;
-    uint64_t server_version_major_;
-    uint64_t server_version_minor_;
-    uint64_t server_revision_;
+    ServerInfo server_info_;
 };
 
 Client::Client()
     : host_()
     , port_(0)
+{
+}
+
+Client::Client(const ClientOptions& opts)
+    : host_(opts.host)
+    , port_(opts.port)
 {
 }
 

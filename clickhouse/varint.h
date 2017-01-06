@@ -1,57 +1,54 @@
 #pragma once
 
-#include "base/platform.h"
-#include "net/socket.h"
+#include "io/coded_input.h"
 
-#include <stdexcept>
 #include <string>
 #include <memory.h>
 
 namespace clickhouse {
 
-#define DEFAULT_MAX_STRING_SIZE 0x00FFFFFFULL
+class WireFormat {
+public:
+    template <typename T>
+    static bool ReadFixed(io::CodedInputStream* input, T* value);
 
-inline void readVarUInt(SOCKET s, uint64_t& x) {
-    x = 0;
-    for (size_t i = 0; i < 9; ++i)
-    {
-        uint8_t byte;
-        int ret = recv(s, (char*)&byte, sizeof(byte), MSG_WAITALL);
+    static bool ReadString(io::CodedInputStream* input, std::string* value);
 
-        if (ret != 1) {
-            throw std::runtime_error("fail");
-        }
-
-        x |= (byte & 0x7F) << (7 * i);
-
-        if (!(byte & 0x80))
-            return;
-    }
-}
-
-inline void readStringBinary(SOCKET s, std::string& str, size_t max_size = DEFAULT_MAX_STRING_SIZE)
-{
-    uint64_t size = 0;
-    readVarUInt(s, size);
-
-    if (size > max_size)
-        throw std::runtime_error("Too large string size.");
-
-    str.resize((size_t)size);
-
-    int ret = recv(s, &str[0], (int)size, MSG_WAITALL);
-    if (ret != size) {
-        throw std::runtime_error("can't receive string data");
-    }
-}
+    static bool ReadUInt64(io::CodedInputStream* input, uint64_t* value);
+};
 
 template <typename T>
-inline void readBinary(SOCKET s, T& x) {
-    int ret = recv(s, (char*)&x, sizeof(x), MSG_WAITALL);
-    if (ret != sizeof(x)) {
-        throw std::runtime_error("can't receive binary data");
-    }
+inline bool WireFormat::ReadFixed(
+    io::CodedInputStream* input,
+    T* value)
+{
+    return input->ReadRaw(value, sizeof(T));
 }
+
+inline bool WireFormat::ReadString(
+    io::CodedInputStream* input,
+    std::string* value)
+{
+    uint64_t len;
+
+    if (input->ReadVarint64(&len)) {
+        if (len > 0x00FFFFFFULL) {
+            return false;
+        }
+        value->resize(len);
+        return input->ReadRaw(&(*value)[0], len);
+    }
+
+    return false;
+}
+
+inline bool WireFormat::ReadUInt64(
+    io::CodedInputStream* input,
+    uint64_t* value)
+{
+    return input->ReadVarint64(value);
+}
+
 
 inline char* writeVarUInt(uint64_t x, char* ostr) {
     for (size_t i = 0; i < 9; ++i) {
