@@ -16,6 +16,8 @@
 #endif
 
 #if defined(_MSC_VER)
+#   undef NOMINMAX
+#   define NOMINMAX
 #   include <basetsd.h>
 #   define ssize_t SSIZE_T
 #   define HAVE_SSIZE_T 1

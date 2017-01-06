@@ -35,8 +35,8 @@ inline bool WireFormat::ReadString(
         if (len > 0x00FFFFFFULL) {
             return false;
         }
-        value->resize(len);
-        return input->ReadRaw(&(*value)[0], len);
+        value->resize((size_t)len);
+        return input->ReadRaw(&(*value)[0], (size_t)len);
     }
 
     return false;
