@@ -28,7 +28,7 @@ using namespace io;
 using namespace net;
 
 struct ClientInfo {
-    uint8_t interface = 1; // TCP
+    uint8_t iface_type = 1; // TCP
     uint8_t query_kind;
     std::string initial_user;
     std::string initial_query_id;
@@ -112,7 +112,7 @@ public:
             p = writeStringBinary(info.initial_user, p);
             p = writeStringBinary(info.initial_query_id, p);
             p = writeStringBinary(info.initial_address, p);
-            p = writeBinary(info.interface, p);
+            p = writeBinary(info.iface_type, p);
 
             p = writeStringBinary(info.os_user, p);
             p = writeStringBinary(info.client_hostname, p);

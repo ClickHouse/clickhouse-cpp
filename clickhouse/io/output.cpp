@@ -1,5 +1,6 @@
 #include "output.h"
 
+#include <algorithm>
 #include <memory.h>
 
 namespace clickhouse {

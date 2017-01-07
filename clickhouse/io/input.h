@@ -19,7 +19,7 @@ public:
 
     /// Reads some data from the stream.
     inline size_t Read(void* buf, size_t len) {
-        DoRead(buf, len);
+        return DoRead(buf, len);
     }
 
 protected:

@@ -130,7 +130,7 @@ SocketInput::SocketInput(SOCKET s)
 SocketInput::~SocketInput() = default;
 
 size_t SocketInput::DoRead(void* buf, size_t len) {
-    const ssize_t ret = recv(s_, buf, (int)len, 0);
+    const ssize_t ret = recv(s_, (char*)buf, (int)len, 0);
 
     if (ret >= 0) {
         return (size_t)ret;
