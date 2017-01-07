@@ -1,6 +1,7 @@
 #include "client.h"
 #include "protocol.h"
 #include "varint.h"
+#include "columns.h"
 
 #include "io/coded_input.h"
 #include "net/socket.h"
@@ -15,6 +16,7 @@
 #define REVISION                                        54126
 
 #define DBMS_MIN_REVISION_WITH_TEMPORARY_TABLES         50264
+#define DBMS_MIN_REVISION_WITH_TOTAL_ROWS_IN_PROGRESS   51554
 #define DBMS_MIN_REVISION_WITH_BLOCK_INFO               51903
 #define DBMS_MIN_REVISION_WITH_CLIENT_INFO              54032
 #define DBMS_MIN_REVISION_WITH_SERVER_TIMEZONE          54058
@@ -230,12 +232,95 @@ private:
                     std::cerr << "type : " << name << std::endl;
 
                     if (num_rows) {
-                        // type.deserializeBinary(column, istr, rows, 0);
-                        throw std::runtime_error("type deserialization is not implemented");
+                        if (name == "UInt64") {
+                            ColumnUInt64 c;
+                            if (c.Load(&input_, num_rows)) {
+                                for (size_t i = 0; i < c.Size(); ++i) {
+                                    std::cerr << c[i] << std::endl;
+                                }
+                            } else {
+                                throw std::runtime_error("can't load");
+                            }
+                        } else if (name == "String") {
+                            ColumnString c;
+                            if (c.Load(&input_, num_rows)) {
+                                for (size_t i = 0; i < c.Size(); ++i) {
+                                    std::cerr << c[i] << std::endl;
+                                }
+                            } else {
+                                throw std::runtime_error("can't load");
+                            }
+                        } else {
+                            // type.deserializeBinary(column, istr, rows);
+                            throw std::runtime_error("type deserialization is not implemented");
+                        }
                     }
                 }
                 return true;
             }
+
+        case ServerCodes::ProfileInfo: {
+            uint64_t rows = 0;
+            uint64_t blocks = 0;
+            uint64_t bytes = 0;
+            uint64_t rows_before_limit = 0;
+            bool applied_limit = false;
+            bool calculated_rows_before_limit = false;
+
+            if (!WireFormat::ReadUInt64(&input_, &rows)) {
+                return false;
+            }
+            if (!WireFormat::ReadUInt64(&input_, &blocks)) {
+                return false;
+            }
+            if (!WireFormat::ReadUInt64(&input_, &bytes)) {
+                return false;
+            }
+            if (!WireFormat::ReadFixed(&input_, &applied_limit)) {
+                return false;
+            }
+            if (!WireFormat::ReadUInt64(&input_, &rows_before_limit)) {
+                return false;
+            }
+            if (!WireFormat::ReadFixed(&input_, &calculated_rows_before_limit)) {
+                return false;
+            }
+
+            std::cerr << "rows : " << rows << std::endl;
+            std::cerr << "blocks : " << blocks << std::endl;
+            std::cerr << "bytes : " << bytes << std::endl;
+            std::cerr << "rows_before_limit : " << rows_before_limit << std::endl;
+            std::cerr << "applied_limit : " << int(applied_limit) << std::endl;
+            std::cerr << "calculated_rows_before_limit : " << int(calculated_rows_before_limit) << std::endl;
+            return true;
+        }
+
+        case ServerCodes::Progress: {
+            Progress info;
+
+            if (!WireFormat::ReadUInt64(&input_, &info.rows)) {
+                return false;
+            }
+            if (!WireFormat::ReadUInt64(&input_, &info.bytes)) {
+                return false;
+            }
+            if (REVISION >= DBMS_MIN_REVISION_WITH_TOTAL_ROWS_IN_PROGRESS) {
+                if (!WireFormat::ReadUInt64(&input_, &info.total_rows)) {
+                    return false;
+                }
+            }
+
+            if (events_) {
+                events_->OnProgress(info);
+            }
+
+            break;
+        }
+
+        case ServerCodes::EndOfStream: {
+            // graceful completion
+            return false;
+        }
 
         default:
             throw std::runtime_error("unimplemented");

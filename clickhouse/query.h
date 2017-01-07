@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 namespace clickhouse {
 
 /**
@@ -26,6 +28,13 @@ struct QuerySettings {
 };
 
 
+struct Progress {
+    uint64_t rows = 0;
+    uint64_t bytes = 0;
+    uint64_t total_rows = 0;
+};
+
+
 class QueryEvents {
 public:
     virtual ~QueryEvents()
@@ -36,7 +45,7 @@ public:
 
     virtual void OnException() = 0;
 
-    virtual void OnProgress() = 0;
+    virtual void OnProgress(const Progress& progress) = 0;
 };
 
 
