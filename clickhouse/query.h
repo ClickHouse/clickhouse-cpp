@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
+#include <string>
 
 namespace clickhouse {
 
@@ -28,6 +30,26 @@ struct QuerySettings {
 };
 
 
+struct Exception {
+    int code = 0;
+    std::string name;
+    std::string display_text;
+    std::string stack_trace;
+    /// Pointer tp nested exception.
+    std::unique_ptr<Exception> nested;
+};
+
+
+struct Profile {
+    uint64_t rows = 0;
+    uint64_t blocks = 0;
+    uint64_t bytes = 0;
+    uint64_t rows_before_limit = 0;
+    bool applied_limit = false;
+    bool calculated_rows_before_limit = false;
+};
+
+
 struct Progress {
     uint64_t rows = 0;
     uint64_t bytes = 0;
@@ -43,7 +65,9 @@ public:
     /// Some data was received.
     virtual void OnData() = 0;
 
-    virtual void OnException() = 0;
+    virtual void OnServerException(const Exception& e) = 0;
+
+    virtual void OnProfile(const Profile& profile) = 0;
 
     virtual void OnProgress(const Progress& progress) = 0;
 };

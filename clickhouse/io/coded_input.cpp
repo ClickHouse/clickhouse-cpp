@@ -35,6 +35,21 @@ bool CodedInputStream::ReadRaw(void* buffer, size_t size) {
     return true;
 }
 
+bool CodedInputStream::Skip(size_t count) {
+    while (count > 0) {
+        const void* ptr;
+        size_t len = input_->Next(&ptr, count);
+
+        if (len == 0) {
+            return false;
+        }
+
+        count -= len;
+    }
+
+    return true;
+}
+
 bool CodedInputStream::ReadVarint64(uint64_t* value) {
     *value = 0;
 

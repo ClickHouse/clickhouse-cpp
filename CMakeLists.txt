@@ -8,7 +8,7 @@ PROJECT (CLICKHOUSE-CLIENT)
     SET (CMAKE_CXX_STANDARD_REQUIRED ON)
 
     IF (UNIX)
-        SET (CMAKE_CXX_FLAGS "-pthread")
+        SET (CMAKE_CXX_FLAGS "-pthread -Wall -Wextra -Werror")
         SET (CMAKE_EXE_LINKER_FLAGS, "-lpthread")
     ENDIF ()
 

@@ -13,15 +13,12 @@ struct ClientOptions {
     /// Service port.
     int port = 9000;
 
-    ClientOptions& SetHost(const std::string& val) {
-        host = val;
-        return *this;
-    }
-
-    ClientOptions& SetPort(const int val) {
-        port = val;
-        return *this;
-    }
+    /// Default database.
+    std::string default_database = "system";
+    /// User name.
+    std::string user = "default";
+    /// Access password.
+    std::string password = "";
 };
 
 /**
@@ -39,8 +36,7 @@ public:
     void ExecuteQuery(const std::string& query, QueryEvents* events);
 
 private:
-    const std::string host_;
-    const int port_;
+    ClientOptions options_;
 
     class Impl;
     std::unique_ptr<Impl> impl_;

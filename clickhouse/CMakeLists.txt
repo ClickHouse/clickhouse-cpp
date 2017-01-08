@@ -8,7 +8,7 @@ ADD_LIBRARY (clickhouse-cpp-lib STATIC
 )
 
 TARGET_INCLUDE_DIRECTORIES(clickhouse-cpp-lib
-	PRIVATE .
+    PRIVATE .
 )
 
 SET_TARGET_PROPERTIES(clickhouse-cpp-lib
