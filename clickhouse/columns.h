@@ -29,6 +29,8 @@ public:
 
             data_.push_back(s);
         }
+
+        return true;
     }
 
     size_t Size() const {
