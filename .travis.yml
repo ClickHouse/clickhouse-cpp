@@ -1,27 +1,24 @@
-# Ubuntu 14.04 Trusty support
-sudo: required
-dist: trusty
 # Enable C++ support
 language: cpp
 
 matrix:
   include:
-    - compiler: gcc
-      addons:
-        apt:
-          packages:
-            - gcc-5
-      env: COMPILER=g++-5.0
-  include:
-    - compiler: clang
-      addons:
-        apt:
-          packages:
-            - clang-3.8
-      env: COMPILER=clang++-3.8
+    - os: linux
+      dist: trusty
+      sudo: required
+      compiler: gcc
+
+    - os: linux
+      dist: trusty
+      sudo: required
+      compiler: clang
+
+    - os: osx
+      osx_image: xcode8.2
+      compiler: clang
 
 # Build steps
 script:
   - mkdir build
   - cd build
-  - cmake -DCMAKE_CXX_COMPILER=$COMPILER .. && make
+  - cmake .. && make
