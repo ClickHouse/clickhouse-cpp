@@ -173,6 +173,14 @@ public:
 };
 
 
+class ColumnDate : public ColumnVector<uint16_t>
+{ };
+
+
+class ColumnDateTime : public ColumnVector<uint32_t>
+{ };
+
+
 using ColumnUInt16  = ColumnVector<uint16_t>;
 using ColumnUInt32  = ColumnVector<uint32_t>;
 using ColumnUInt64  = ColumnVector<uint64_t>;

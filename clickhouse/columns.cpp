@@ -47,9 +47,13 @@ static ColumnRef CreateTerminalColumn(const TypeAst& ast) {
 
     if (ast.name == "String")
         return std::make_shared<ColumnString>();
-
     if (ast.name == "FixedString")
         return std::make_shared<ColumnFixedString>(ast.elements.front().size);
+
+    if (ast.name == "DateTime")
+        return std::make_shared<ColumnDateTime>();
+    if (ast.name == "Date")
+        return std::make_shared<ColumnDate>();
 
     return nullptr;
 }
