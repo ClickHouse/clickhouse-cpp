@@ -9,8 +9,7 @@ namespace clickhouse {
 
 template <typename T>
 inline T FromString(const std::string& s) {
-   std::istringstream iss;
-   iss.str(s);
+   std::istringstream iss(s);
    T result;
    iss >> result;
    return result;
@@ -18,8 +17,7 @@ inline T FromString(const std::string& s) {
 
 template <typename T>
 inline T FromString(const StringView& s) {
-   std::istringstream iss;
-   iss.str(std::string(s));
+   std::istringstream iss((std::string(s)));
    T result;
    iss >> result;
    return result;
