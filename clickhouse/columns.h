@@ -116,7 +116,6 @@ using ColumnInt64   = ColumnVector<int64_t>;
 using ColumnFloat32 = ColumnVector<float>;
 using ColumnFloat64 = ColumnVector<double>;
 
-
-ColumnRef CreateColumnByName(const std::string& name);
+ColumnRef CreateColumnByType(const std::string& type_name);
 
 }

@@ -6,6 +6,7 @@ ADD_LIBRARY (clickhouse-cpp-lib STATIC
     net/socket.cpp
     client.cpp
     columns.cpp
+    type_parser.cpp
 )
 
 TARGET_INCLUDE_DIRECTORIES(clickhouse-cpp-lib

@@ -207,7 +207,7 @@ bool Client::Impl::ReceivePacket() {
             std::cerr << "type : " << name << std::endl;
 
             if (num_rows) {
-                if (ColumnRef col = CreateColumnByName(name)) {
+                if (ColumnRef col = CreateColumnByType(name)) {
                     if (col->Load(&input_, num_rows)) {
                         //for (size_t i = 0; i < c.Size(); ++i) {
                         //    std::cerr << c[i] << std::endl;

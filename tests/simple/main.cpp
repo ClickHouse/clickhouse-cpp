@@ -1,4 +1,5 @@
 #include <clickhouse/client.h>
+#include <clickhouse/type_parser.h>
 
 #include <iostream>
 
@@ -40,10 +41,38 @@ public:
 static const std::string query =
     //"SELECT * FROM system.numbers LIMIT 10";
     //"SELECT number, number / 3.0, toString(number) || 'x' as string FROM system.numbers LIMIT 10";
-    //"SELECT type, user, read_rows, address FROM system.query_log LIMIT 10";
-    "SELECT user, count(*) FROM system.query_log GROUP BY user";
+    "SELECT type, user, read_rows, address FROM system.query_log LIMIT 10";
+    //"SELECT user, count(*) FROM system.query_log GROUP BY user";
+    //"SELECT 1, '1', (1, 1, (1, 'weew', [1, 1], NULL))";
+
+inline void PrintAst(const TypeAst& ast, int level = 0) {
+    std::cout << std::endl;
+    for (int i = 0; i < level * 2; ++i) {
+        std::cout << " ";
+    }
+    std::cout << std::string(ast.name);
+    if (ast.size) {
+        std::cout << "[" << ast.size << "]";
+    }
+    for (const auto& elem : ast.elements) {
+        PrintAst(elem, level + 1);
+    }
+}
 
 int main() {
+#if 0
+    TypeParser parser("Tuple(UInt8, UInt8, Tuple(UInt8, FixedString(16), Array(UInt8), Null))");
+    {
+        TypeAst ast;
+        if (parser.Parse(&ast)) {
+            std::cerr << "OK" << std::endl;
+            PrintAst(ast);
+        } else {
+            std::cerr << "FAIL" << std::endl;
+        }
+    }
+    return 0;
+#endif
     Client client("localhost");
 
     try {
