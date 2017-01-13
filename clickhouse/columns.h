@@ -36,7 +36,7 @@ public:
     {
     }
 
-    bool Print(std::basic_ostream<char>& output, size_t row) {
+    bool Print(std::basic_ostream<char>& output, size_t row) override {
         output << data_.at(row);
         return true;
     }
@@ -63,7 +63,7 @@ private:
 
 class ColumnString : public Column {
 public:
-    bool Print(std::basic_ostream<char>& output, size_t row) {
+    bool Print(std::basic_ostream<char>& output, size_t row) override {
         output << data_.at(row);
         return true;
     }
@@ -102,7 +102,7 @@ public:
     {
     }
 
-    bool Print(std::basic_ostream<char>& output, size_t row) {
+    bool Print(std::basic_ostream<char>& output, size_t row) override {
         for (auto ci = columns_.begin(); ci != columns_.end(); ) {
             if (!(*ci)->Print(output, row)) {
                 return false;
@@ -133,7 +133,7 @@ private:
 template <typename T>
 class ColumnVector : public Column {
 public:
-    bool Print(std::basic_ostream<char>& output, size_t row) {
+    bool Print(std::basic_ostream<char>& output, size_t row) override {
         output << data_.at(row);
         return true;
     }
