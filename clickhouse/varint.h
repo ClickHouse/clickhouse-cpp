@@ -14,6 +14,8 @@ public:
 
     static bool ReadString(io::CodedInputStream* input, std::string* value);
 
+    static bool ReadBytes(io::CodedInputStream* input, void* buf, size_t len);
+
     static bool ReadUInt64(io::CodedInputStream* input, uint64_t* value);
 };
 
@@ -40,6 +42,12 @@ inline bool WireFormat::ReadString(
     }
 
     return false;
+}
+
+inline bool WireFormat::ReadBytes(
+    io::CodedInputStream* input, void* buf, size_t len)
+{
+    return input->ReadRaw(buf, len);
 }
 
 inline bool WireFormat::ReadUInt64(

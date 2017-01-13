@@ -15,7 +15,7 @@ public:
         std::cerr << e.name << std::endl;
         std::cerr << e.display_text << std::endl;
         std::cerr << e.stack_trace << std::endl;
-        std::cerr << int(!e.nested) << std::endl;
+        std::cerr << int(!!e.nested) << std::endl;
     }
 
     void OnProfile(const Profile& profile) override {
@@ -39,7 +39,9 @@ public:
 
 static const std::string query =
     //"SELECT * FROM system.numbers LIMIT 10";
-    "SELECT number, toString(number) || 'x' as string FROM system.numbers LIMIT 10";
+    //"SELECT number, number / 3.0, toString(number) || 'x' as string FROM system.numbers LIMIT 10";
+    //"SELECT type, user, read_rows, address FROM system.query_log LIMIT 10";
+    "SELECT user, count(*) FROM system.query_log GROUP BY user";
 
 int main() {
     Client client("localhost");

@@ -177,8 +177,8 @@ bool Client::Impl::ReceivePacket() {
                 return false;
             }
 
-            std::cerr << "bucket_num : " << bucket_num << std::endl;
-            std::cerr << "is_overflows : " << bool(is_overflows) << std::endl;
+            //std::cerr << "bucket_num : " << bucket_num << std::endl;
+            //std::cerr << "is_overflows : " << bool(is_overflows) << std::endl;
         }
 
         uint64_t num_columns = 0;
@@ -207,27 +207,16 @@ bool Client::Impl::ReceivePacket() {
             std::cerr << "type : " << name << std::endl;
 
             if (num_rows) {
-                if (name == "UInt64") {
-                    ColumnUInt64 c;
-                    if (c.Load(&input_, num_rows)) {
-                        for (size_t i = 0; i < c.Size(); ++i) {
-                            std::cerr << c[i] << std::endl;
-                        }
-                    } else {
-                        throw std::runtime_error("can't load");
-                    }
-                } else if (name == "String") {
-                    ColumnString c;
-                    if (c.Load(&input_, num_rows)) {
-                        for (size_t i = 0; i < c.Size(); ++i) {
-                            std::cerr << c[i] << std::endl;
-                        }
+                if (ColumnRef col = CreateColumnByName(name)) {
+                    if (col->Load(&input_, num_rows)) {
+                        //for (size_t i = 0; i < c.Size(); ++i) {
+                        //    std::cerr << c[i] << std::endl;
+                        //}
                     } else {
                         throw std::runtime_error("can't load");
                     }
                 } else {
-                    // type.deserializeBinary(column, istr, rows);
-                    throw std::runtime_error("type deserialization is not implemented");
+                    throw std::runtime_error(std::string("unsupported column type: ") + name);
                 }
             }
         }
@@ -291,11 +280,12 @@ bool Client::Impl::ReceivePacket() {
             events_->OnProgress(info);
         }
 
-        break;
+        return true;
     }
 
     case ServerCodes::EndOfStream: {
         // graceful completion
+        std::cerr << "EndOfStream" << std::endl;
         return false;
     }
 
