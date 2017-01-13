@@ -5,6 +5,22 @@
 
 namespace clickhouse {
 
+static ColumnRef CreateColumnFromAst(const TypeAst& ast);
+
+static ColumnRef CreateTupleColumn(const TypeAst& ast) {
+    std::vector<ColumnRef> columns;
+
+    for (const auto& elem : ast.elements) {
+        if (auto col = CreateColumnFromAst(elem)) {
+            columns.push_back(col);
+        } else {
+            return nullptr;
+        }
+    }
+
+    return std::make_shared<ColumnTuple>(columns);
+}
+
 static ColumnRef CreateTerminalColumn(const TypeAst& ast) {
     if (ast.name == "UInt8")
         return std::make_shared<ColumnUInt8>();
@@ -38,6 +54,16 @@ static ColumnRef CreateTerminalColumn(const TypeAst& ast) {
     return nullptr;
 }
 
+static ColumnRef CreateColumnFromAst(const TypeAst& ast) {
+    if (ast.meta == TypeAst::Terminal) {
+        return CreateTerminalColumn(ast);
+    }
+    if (ast.meta == TypeAst::Tuple) {
+        return CreateTupleColumn(ast);
+    }
+    return nullptr;
+}
+
 ColumnRef CreateColumnByType(const std::string& type_name) {
     TypeParser parser(type_name);
     TypeAst ast;
@@ -45,6 +71,9 @@ ColumnRef CreateColumnByType(const std::string& type_name) {
     if (parser.Parse(&ast)) {
         if (ast.meta == TypeAst::Terminal) {
             return CreateTerminalColumn(ast);
+        }
+        if (ast.meta == TypeAst::Tuple) {
+            return CreateTupleColumn(ast);
         }
         // TODO
     }

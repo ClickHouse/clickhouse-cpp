@@ -42,7 +42,8 @@ static const std::string query =
     //"SELECT * FROM system.numbers LIMIT 10";
     //"SELECT number, number / 3.0, toString(number) || 'x' as string FROM system.numbers LIMIT 10";
     //"SELECT type, user, read_rows, address FROM system.query_log LIMIT 10";
-    "SELECT user, count(*) FROM system.query_log GROUP BY user";
+    //"SELECT user, count(*) FROM system.query_log GROUP BY user";
+    "SELECT 1000, '1', (1, 1, (1, 'weew'))";
     //"SELECT 1, '1', (1, 1, (1, 'weew', [1, 1], NULL))";
 
 inline void PrintAst(const TypeAst& ast, int level = 0) {

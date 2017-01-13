@@ -26,6 +26,8 @@ public:
     virtual bool Load(io::CodedInputStream* input, size_t rows) = 0;
 };
 
+using ColumnRef = std::shared_ptr<Column>;
+
 
 class ColumnFixedString : public Column {
 public:
@@ -93,6 +95,41 @@ private:
 };
 
 
+class ColumnTuple : public Column {
+public:
+    ColumnTuple(const std::vector<ColumnRef>& columns)
+        : columns_(columns)
+    {
+    }
+
+    bool Print(std::basic_ostream<char>& output, size_t row) {
+        for (auto ci = columns_.begin(); ci != columns_.end(); ) {
+            if (!(*ci)->Print(output, row)) {
+                return false;
+            }
+
+            if (++ci != columns_.end()) {
+                output << ", ";
+            }
+        }
+
+        return true;
+    }
+
+    bool Load(io::CodedInputStream* input, size_t rows) override {
+        for (auto ci = columns_.begin(); ci != columns_.end(); ++ci) {
+            if (!(*ci)->Load(input, rows)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+private:
+    std::vector<ColumnRef> columns_;
+};
+
 template <typename T>
 class ColumnVector : public Column {
 public:
@@ -115,19 +152,31 @@ public:
         return data_[n];
     }
 
-private:
+protected:
     std::vector<T> data_;
 };
 
+class ColumnUInt8 : public ColumnVector<uint8_t> {
+public:
+    bool Print(std::basic_ostream<char>& output, size_t row) override {
+        output << (unsigned int)data_.at(row);
+        return true;
+    }
+};
 
-using ColumnRef     = std::shared_ptr<Column>;
+class ColumnInt8 : public ColumnVector<int8_t> {
+public:
+    bool Print(std::basic_ostream<char>& output, size_t row) override {
+        output << (int)data_.at(row);
+        return true;
+    }
+};
 
-using ColumnUInt8   = ColumnVector<uint8_t>;
+
 using ColumnUInt16  = ColumnVector<uint16_t>;
 using ColumnUInt32  = ColumnVector<uint32_t>;
 using ColumnUInt64  = ColumnVector<uint64_t>;
 
-using ColumnInt8    = ColumnVector<int8_t>;
 using ColumnInt16   = ColumnVector<int16_t>;
 using ColumnInt32   = ColumnVector<int32_t>;
 using ColumnInt64   = ColumnVector<int64_t>;
