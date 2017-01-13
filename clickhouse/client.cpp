@@ -209,9 +209,10 @@ bool Client::Impl::ReceivePacket() {
             if (num_rows) {
                 if (ColumnRef col = CreateColumnByType(name)) {
                     if (col->Load(&input_, num_rows)) {
-                        //for (size_t i = 0; i < c.Size(); ++i) {
-                        //    std::cerr << c[i] << std::endl;
-                        //}
+                        for (size_t i = 0; i < num_rows; ++i) {
+                            col->Print(std::cerr, i);
+                            std::cerr << std::endl;
+                        }
                     } else {
                         throw std::runtime_error("can't load");
                     }

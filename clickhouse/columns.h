@@ -5,6 +5,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <ostream>
 #include <string>
 #include <vector>
 
@@ -18,6 +19,9 @@ public:
     virtual ~Column()
     { }
 
+    /// Write value at the given row to the output.
+    virtual bool Print(std::basic_ostream<char>& output, size_t row) = 0;
+
     /// Loads column data from input stream.
     virtual bool Load(io::CodedInputStream* input, size_t rows) = 0;
 };
@@ -28,6 +32,11 @@ public:
     explicit ColumnFixedString(size_t n)
         : string_size_(n)
     {
+    }
+
+    bool Print(std::basic_ostream<char>& output, size_t row) {
+        output << data_.at(row);
+        return true;
     }
 
     bool Load(io::CodedInputStream* input, size_t rows) override {
@@ -52,6 +61,11 @@ private:
 
 class ColumnString : public Column {
 public:
+    bool Print(std::basic_ostream<char>& output, size_t row) {
+        output << data_.at(row);
+        return true;
+    }
+
     bool Load(io::CodedInputStream* input, size_t rows) override {
         for (size_t i = 0; i < rows; ++i) {
             std::string s;
@@ -82,6 +96,11 @@ private:
 template <typename T>
 class ColumnVector : public Column {
 public:
+    bool Print(std::basic_ostream<char>& output, size_t row) {
+        output << data_.at(row);
+        return true;
+    }
+
     bool Load(io::CodedInputStream* input, size_t rows) override {
         data_.resize(rows);
 
