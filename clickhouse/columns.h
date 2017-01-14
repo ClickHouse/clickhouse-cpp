@@ -19,6 +19,9 @@ public:
     virtual ~Column()
     { }
 
+    /// Count of rows in the column.
+    virtual size_t Size() const = 0;
+
     /// Write value at the given row to the output.
     virtual bool Print(std::basic_ostream<char>& output, size_t row) = 0;
 
@@ -34,6 +37,10 @@ public:
     explicit ColumnFixedString(size_t n)
         : string_size_(n)
     {
+    }
+
+    size_t Size() const override {
+        return data_.size();
     }
 
     bool Print(std::basic_ostream<char>& output, size_t row) override {
@@ -63,6 +70,10 @@ private:
 
 class ColumnString : public Column {
 public:
+    size_t Size() const override {
+        return data_.size();
+    }
+
     bool Print(std::basic_ostream<char>& output, size_t row) override {
         output << data_.at(row);
         return true;
@@ -82,10 +93,6 @@ public:
         return true;
     }
 
-    size_t Size() const {
-        return data_.size();
-    }
-
     const std::string& operator [] (size_t n) const {
         return data_[n];
     }
@@ -100,6 +107,10 @@ public:
     ColumnTuple(const std::vector<ColumnRef>& columns)
         : columns_(columns)
     {
+    }
+
+    size_t Size() const override {
+        return columns_.empty() ? 0 : columns_[0]->Size();
     }
 
     bool Print(std::basic_ostream<char>& output, size_t row) override {
@@ -133,6 +144,10 @@ private:
 template <typename T>
 class ColumnVector : public Column {
 public:
+    size_t Size() const override {
+        return data_.size();
+    }
+
     bool Print(std::basic_ostream<char>& output, size_t row) override {
         output << data_.at(row);
         return true;
@@ -142,10 +157,6 @@ public:
         data_.resize(rows);
 
         return input->ReadRaw(data_.data(), data_.size() * sizeof(T));
-    }
-
-    size_t Size() const {
-        return data_.size();
     }
 
     const T& operator [] (size_t n) const {

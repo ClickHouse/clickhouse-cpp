@@ -4,6 +4,8 @@ ADD_LIBRARY (clickhouse-cpp-lib STATIC
     io/input.cpp
     io/output.cpp
     net/socket.cpp
+
+    block.cpp
     client.cpp
     columns.cpp
     type_parser.cpp

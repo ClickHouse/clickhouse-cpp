@@ -8,8 +8,20 @@ using namespace std;
 
 class EventHandler : public QueryEvents {
 public:
-    void OnData() override
-    { }
+    void OnData(const Block& block) override {
+        for (Block::Iterator bi(block); bi.IsValid(); bi.Next()) {
+            std::cerr << bi.Name() << " ";
+        }
+        std::cerr << std::endl;
+
+        for (size_t i = 0; i < block.Rows(); ++i) {
+            for (Block::Iterator bi(block); bi.IsValid(); bi.Next()) {
+                bi.Column()->Print(std::cerr, i);
+                std::cerr << " ";
+            }
+            std::cerr << std::endl;
+        }
+    }
 
     void OnServerException(const Exception& e) override {
         std::cerr << e.code << std::endl;
@@ -36,15 +48,20 @@ public:
         std::cerr << "bytes : " << progress.bytes << std::endl;
         std::cerr << "total_rows : " << progress.total_rows << std::endl;
     }
+
+    void OnFinish() override {
+        std::cerr << "finish" << std::endl;
+    }
 };
 
 static const std::string query =
     //"SELECT * FROM system.numbers LIMIT 10";
-    //"SELECT number, number / 3.0, toString(number) || 'x' as string FROM system.numbers LIMIT 10";
+    "SELECT number, number / 3.0, toString(number) || 'x' as string FROM system.numbers LIMIT 10";
     //"SELECT type, user, read_rows, address FROM system.query_log LIMIT 10";
     //"SELECT user, count(*) FROM system.query_log GROUP BY user";
-    "SELECT 1000, '1', (1, 1, (1, 'weew'))";
+    //"SELECT 1000, '1', (1, 1, (1, 'weew'))";
     //"SELECT 1, '1', (1, 1, (1, 'weew', [1, 1], NULL))";
+    //"SELECT now()";
 
 inline void PrintAst(const TypeAst& ast, int level = 0) {
     std::cout << std::endl;
@@ -61,19 +78,6 @@ inline void PrintAst(const TypeAst& ast, int level = 0) {
 }
 
 int main() {
-#if 0
-    TypeParser parser("Tuple(UInt8, UInt8, Tuple(UInt8, FixedString(16), Array(UInt8), Null))");
-    {
-        TypeAst ast;
-        if (parser.Parse(&ast)) {
-            std::cerr << "OK" << std::endl;
-            PrintAst(ast);
-        } else {
-            std::cerr << "FAIL" << std::endl;
-        }
-    }
-    return 0;
-#endif
     Client client("localhost");
 
     try {

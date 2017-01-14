@@ -1,5 +1,7 @@
 #pragma once
 
+#include "block.h"
+
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -63,13 +65,15 @@ public:
     { }
 
     /// Some data was received.
-    virtual void OnData() = 0;
+    virtual void OnData(const Block& block) = 0;
 
     virtual void OnServerException(const Exception& e) = 0;
 
     virtual void OnProfile(const Profile& profile) = 0;
 
     virtual void OnProgress(const Progress& progress) = 0;
+
+    virtual void OnFinish() = 0;
 };
 
 

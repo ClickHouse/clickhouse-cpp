@@ -144,7 +144,6 @@ bool Client::Impl::ReceivePacket() {
         return false;
     }
 
-    std::cerr << "receive packet " << packet_type << std::endl;
     switch (packet_type) {
     case ServerCodes::Data: {
         if (REVISION >= DBMS_MIN_REVISION_WITH_TEMPORARY_TABLES) {
@@ -177,13 +176,11 @@ bool Client::Impl::ReceivePacket() {
                 return false;
             }
 
-            //std::cerr << "bucket_num : " << bucket_num << std::endl;
-            //std::cerr << "is_overflows : " << bool(is_overflows) << std::endl;
+            // TODO use data
         }
 
         uint64_t num_columns = 0;
         uint64_t num_rows = 0;
-        std::string name;
 
         if (!WireFormat::ReadUInt64(&input_, &num_columns)) {
             return false;
@@ -192,35 +189,34 @@ bool Client::Impl::ReceivePacket() {
             return false;
         }
 
-        std::cerr << "num_columns : " << num_columns << std::endl;
-        std::cerr << "num_rows : " << num_rows << std::endl;
+        Block block(num_columns, num_rows);
 
         for (size_t i = 0; i < num_columns; ++i) {
-            if (!WireFormat::ReadString(&input_, &name)) {
-                return false;
-            }
-            std::cerr << "name : " << name << std::endl;
+            std::string name;
+            std::string type;
 
             if (!WireFormat::ReadString(&input_, &name)) {
                 return false;
             }
-            std::cerr << "type : " << name << std::endl;
+            if (!WireFormat::ReadString(&input_, &type)) {
+                return false;
+            }
 
-            if (num_rows) {
-                if (ColumnRef col = CreateColumnByType(name)) {
-                    if (col->Load(&input_, num_rows)) {
-                        for (size_t i = 0; i < num_rows; ++i) {
-                            col->Print(std::cerr, i);
-                            std::cerr << std::endl;
-                        }
-                    } else {
-                        throw std::runtime_error("can't load");
-                    }
-                } else {
-                    throw std::runtime_error(std::string("unsupported column type: ") + name);
+            if (ColumnRef col = CreateColumnByType(type)) {
+                if (num_rows && !col->Load(&input_, num_rows)) {
+                    throw std::runtime_error("can't load");
                 }
+
+                block.AppendColumn(name, col);
+            } else {
+                throw std::runtime_error(std::string("unsupported column type: ") + type);
             }
         }
+
+        if (events_) {
+            events_->OnData(block);
+        }
+
         return true;
     }
 
@@ -285,13 +281,14 @@ bool Client::Impl::ReceivePacket() {
     }
 
     case ServerCodes::EndOfStream: {
-        // graceful completion
-        std::cerr << "EndOfStream" << std::endl;
+        if (events_) {
+            events_->OnFinish();
+        }
         return false;
     }
 
     default:
-        throw std::runtime_error("unimplemented");
+        throw std::runtime_error("unimplemented " + std::to_string((int)packet_type));
         break;
     }
 
