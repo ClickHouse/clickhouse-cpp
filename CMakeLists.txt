@@ -20,5 +20,7 @@ PROJECT (CLICKHOUSE-CLIENT)
 
     SUBDIRS (
         clickhouse
+        contrib/gtest
         tests/simple
+        ut
     )
