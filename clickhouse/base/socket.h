@@ -1,7 +1,7 @@
 #pragma once
 
-#include "base/platform.h"
-#include "io/input.h"
+#include "platform.h"
+#include "input.h"
 
 #include <cstddef>
 #include <string>
@@ -24,7 +24,6 @@
 struct addrinfo;
 
 namespace clickhouse {
-namespace net {
 
 /**
  *
@@ -69,7 +68,7 @@ private:
 /**
  *
  */
-class SocketInput : public io::InputStream {
+class SocketInput : public InputStream {
 public:
     explicit SocketInput(SOCKET s);
     ~SocketInput();
@@ -87,5 +86,4 @@ SOCKET SocketConnect(const NetworkAddress& addr);
 
 ssize_t Poll(struct pollfd* fds, int nfds, int timeout) noexcept;
 
-}
 }

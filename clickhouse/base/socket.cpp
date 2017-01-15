@@ -1,5 +1,5 @@
 #include "socket.h"
-#include "base/singleton.h"
+#include "singleton.h"
 
 #include <stdexcept>
 #include <system_error>
@@ -13,7 +13,6 @@
 #endif
 
 namespace clickhouse {
-namespace net {
 namespace {
 
     class LocalNames : public std::unordered_set<std::string> {
@@ -186,5 +185,4 @@ ssize_t Poll(struct pollfd* fds, int nfds, int timeout) noexcept {
     return -1;
 }
 
-}
 }

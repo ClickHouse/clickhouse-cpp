@@ -5,7 +5,6 @@
 #include <string>
 
 namespace clickhouse {
-namespace io {
 
 /**
  * Class which reads and decodes binary data which is composed of varint-
@@ -48,8 +47,6 @@ private:
     const uint8_t* buffer_;
     const uint8_t* buffer_end_;
 };
+
+
 }
-}
-
-
-

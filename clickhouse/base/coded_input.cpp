@@ -3,7 +3,6 @@
 #include <memory.h>
 
 namespace clickhouse {
-namespace io {
 
 CodedInputStream::CodedInputStream(ZeroCopyInput* input)
     : input_(input)
@@ -71,5 +70,4 @@ bool CodedInputStream::ReadVarint64(uint64_t* value) {
     return false;
 }
 
-}
 }

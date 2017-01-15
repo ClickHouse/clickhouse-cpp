@@ -4,7 +4,6 @@
 #include <memory.h>
 
 namespace clickhouse {
-namespace io {
 
 void ZeroCopyOutput::DoWrite(const void* data, size_t len) {
     while (len > 0) {
@@ -82,5 +81,4 @@ void BufferedOutput::DoWrite(const void* data, size_t len) {
     array_output_.Write(data, len);
 }
 
-}
 }

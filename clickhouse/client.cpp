@@ -1,10 +1,10 @@
 #include "client.h"
+#include "columns.h"
 #include "protocol.h"
 #include "varint.h"
-#include "columns.h"
 
-#include "io/coded_input.h"
-#include "net/socket.h"
+#include "base/coded_input.h"
+#include "base/socket.h"
 
 #include <system_error>
 #include <vector>
@@ -23,9 +23,6 @@
 #define DBMS_MIN_REVISION_WITH_QUOTA_KEY_IN_CLIENT_INFO 54060
 
 namespace clickhouse {
-
-using namespace io;
-using namespace net;
 
 struct ClientInfo {
     uint8_t iface_type = 1; // TCP

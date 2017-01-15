@@ -1,9 +1,9 @@
 ADD_LIBRARY (clickhouse-cpp-lib STATIC
+    base/coded_input.cpp
+    base/input.cpp
+    base/output.cpp
     base/platform.cpp
-    io/coded_input.cpp
-    io/input.cpp
-    io/output.cpp
-    net/socket.cpp
+    base/socket.cpp
 
     block.cpp
     client.cpp

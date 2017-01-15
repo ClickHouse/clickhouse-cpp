@@ -1,6 +1,6 @@
 #pragma once
 
-#include "io/input.h"
+#include "base/input.h"
 #include "varint.h"
 
 #include <cstdint>
@@ -26,7 +26,7 @@ public:
     virtual bool Print(std::basic_ostream<char>& output, size_t row) = 0;
 
     /// Loads column data from input stream.
-    virtual bool Load(io::CodedInputStream* input, size_t rows) = 0;
+    virtual bool Load(CodedInputStream* input, size_t rows) = 0;
 };
 
 using ColumnRef = std::shared_ptr<Column>;
@@ -48,7 +48,7 @@ public:
         return true;
     }
 
-    bool Load(io::CodedInputStream* input, size_t rows) override {
+    bool Load(CodedInputStream* input, size_t rows) override {
         for (size_t i = 0; i < rows; ++i) {
             std::string s;
             s.resize(string_size_);
@@ -79,7 +79,7 @@ public:
         return true;
     }
 
-    bool Load(io::CodedInputStream* input, size_t rows) override {
+    bool Load(CodedInputStream* input, size_t rows) override {
         for (size_t i = 0; i < rows; ++i) {
             std::string s;
 
@@ -127,7 +127,7 @@ public:
         return true;
     }
 
-    bool Load(io::CodedInputStream* input, size_t rows) override {
+    bool Load(CodedInputStream* input, size_t rows) override {
         for (auto ci = columns_.begin(); ci != columns_.end(); ++ci) {
             if (!(*ci)->Load(input, rows)) {
                 return false;
@@ -153,7 +153,7 @@ public:
         return true;
     }
 
-    bool Load(io::CodedInputStream* input, size_t rows) override {
+    bool Load(CodedInputStream* input, size_t rows) override {
         data_.resize(rows);
 
         return input->ReadRaw(data_.data(), data_.size() * sizeof(T));

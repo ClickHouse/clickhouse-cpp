@@ -4,7 +4,6 @@
 #include <memory.h>
 
 namespace clickhouse {
-namespace io {
 
 size_t ZeroCopyInput::DoRead(void* buf, size_t len) {
     const void* ptr;
@@ -70,5 +69,4 @@ size_t BufferedInput::DoRead(void* buf, size_t len) {
     return array_input_.Read(buf, len);
 }
 
-}
 }

@@ -5,7 +5,6 @@
 #include <vector>
 
 namespace clickhouse {
-namespace io {
 
 class OutputStream {
 public:
@@ -97,5 +96,4 @@ private:
     std::vector<uint8_t> buffer_;
 };
 
-}
 }
