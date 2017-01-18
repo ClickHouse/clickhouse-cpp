@@ -152,7 +152,7 @@ SocketOutput::SocketOutput(SOCKET s)
 SocketOutput::~SocketOutput() = default;
 
 void SocketOutput::DoWrite(const void* data, size_t len) {
-    if (::send(s_, data, len, 0) != (int)len) {
+    if (::send(s_, (const char*)data, len, 0) != (int)len) {
         throw std::system_error(
             errno, std::system_category(), "fail to send data"
         );
