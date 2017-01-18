@@ -1,6 +1,7 @@
 #pragma once
 
 #include "input.h"
+#include "output.h"
 
 #include <string>
 
@@ -12,7 +13,7 @@ namespace clickhouse {
  */
 class CodedInputStream {
 public:
-    /// Create a CodedInputStream that reads from the given InputStream.
+    /// Create a CodedInputStream that reads from the given ZeroCopyInput.
     explicit CodedInputStream(ZeroCopyInput* input);
 
     // Create a CodedInputStream that reads from the given flat array.
@@ -48,5 +49,22 @@ private:
     const uint8_t* buffer_end_;
 };
 
+
+class CodedOutputStream {
+public:
+    /// Create a CodedInputStream that writes to the given ZeroCopyOutput.
+    explicit CodedOutputStream(ZeroCopyOutput* output);
+
+    void Flush();
+
+    // Write raw bytes, copying them from the given buffer.
+    void WriteRaw(const void* buffer, int size);
+
+    /// Write an unsigned integer with Varint encoding.
+    void WriteVarint64(const uint64_t value);
+
+private:
+    ZeroCopyOutput* output_;
+};
 
 }

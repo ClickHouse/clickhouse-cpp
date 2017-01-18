@@ -12,6 +12,10 @@ const std::string& Block::Iterator::Name() const {
     return block_.columns_[idx_].name;
 }
 
+const std::string& Block::Iterator::Type() const {
+    return block_.columns_[idx_].type;
+}
+
 ColumnRef Block::Iterator::Column() const {
     return block_.columns_[idx_].column;
 }
@@ -38,8 +42,12 @@ Block::Block(size_t cols, size_t rows)
 
 Block::~Block() = default;
 
-void Block::AppendColumn(const std::string& name, const ColumnRef& col) {
-    columns_.push_back(ColumnItem{name, col});
+void Block::AppendColumn(
+    const std::string& name,
+    const std::string& type,
+    const ColumnRef& col)
+{
+    columns_.push_back(ColumnItem{name, type, col});
 }
 
 /// Count of columns in the block.

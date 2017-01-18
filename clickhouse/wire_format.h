@@ -1,9 +1,8 @@
 #pragma once
 
-#include "base/coded_input.h"
+#include "base/coded.h"
 
 #include <string>
-#include <memory.h>
 
 namespace clickhouse {
 
@@ -17,6 +16,16 @@ public:
     static bool ReadBytes(CodedInputStream* input, void* buf, size_t len);
 
     static bool ReadUInt64(CodedInputStream* input, uint64_t* value);
+
+
+    template <typename T>
+    static void WriteFixed(CodedOutputStream* output, const T& value);
+
+    static void WriteBytes(CodedOutputStream* output, const void* buf, size_t len);
+
+    static void WriteString(CodedOutputStream* output, const std::string& value);
+
+    static void WriteUInt64(CodedOutputStream* output, const uint64_t value);
 };
 
 template <typename T>
@@ -58,35 +67,35 @@ inline bool WireFormat::ReadUInt64(
 }
 
 
-inline char* writeVarUInt(uint64_t x, char* ostr) {
-    for (size_t i = 0; i < 9; ++i) {
-        uint8_t byte = x & 0x7F;
-        if (x > 0x7F)
-            byte |= 0x80;
-
-        *ostr = byte;
-        ++ostr;
-
-        x >>= 7;
-        if (!x)
-            return ostr;
-    }
-
-    return ostr;
-}
-
-inline char* writeStringBinary(const std::string& s, char* ostr) {
-    ostr = writeVarUInt(s.size(), ostr);
-    memcpy(ostr, s.data(), s.size());
-    ostr += s.size();
-    return ostr;
-}
-
 template <typename T>
-inline char* writeBinary(const T& val, char* ostr) {
-    memcpy(ostr, &val, sizeof(T));
-    ostr += sizeof(T);
-    return ostr;
+inline void WireFormat::WriteFixed(
+    CodedOutputStream* output,
+    const T& value)
+{
+    output->WriteRaw(&value, sizeof(T));
+}
+
+inline void WireFormat::WriteBytes(
+    CodedOutputStream* output,
+    const void* buf,
+    size_t len)
+{
+    output->WriteRaw(buf, len);
+}
+
+inline void WireFormat::WriteString(
+    CodedOutputStream* output,
+    const std::string& value)
+{
+    output->WriteVarint64(value.size());
+    output->WriteRaw(value.data(), value.size());
+}
+
+inline void WireFormat::WriteUInt64(
+    CodedOutputStream* output,
+    const uint64_t value)
+{
+    output->WriteVarint64(value);
 }
 
 }

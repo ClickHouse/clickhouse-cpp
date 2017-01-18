@@ -41,8 +41,8 @@ size_t ArrayOutput::DoNext(void** data, size_t len) {
 
 BufferedOutput::BufferedOutput(OutputStream* slave, size_t buflen)
     : slave_(slave)
-    , array_output_(nullptr, 0)
     , buffer_(buflen)
+    , array_output_(buffer_.data(), buflen)
 {
 }
 
@@ -52,7 +52,7 @@ BufferedOutput::~BufferedOutput() {
 
 void BufferedOutput::DoFlush() {
     if (array_output_.Data() != buffer_.data()) {
-        slave_->Write(buffer_.data(), buffer_.data() - array_output_.Data());
+        slave_->Write(buffer_.data(), array_output_.Data() - buffer_.data());
         slave_->Flush();
 
         array_output_.Reset(buffer_.data(), buffer_.size());

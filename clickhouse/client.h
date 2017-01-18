@@ -26,17 +26,18 @@ struct ClientOptions {
  */
 class Client {
 public:
-    Client();
-    explicit Client(const ClientOptions& opts);
-    explicit Client(const std::string& host, int port = 9000);
+     Client();
+     Client(const ClientOptions& opts, QueryEvents* events);
     ~Client();
 
-    void Connect();
+    void ExecuteQuery(const std::string& query);
 
-    void ExecuteQuery(const std::string& query, QueryEvents* events);
+    /// Insert block of data to a table \p table_name.
+    void Insert(const std::string& table_name, const Block& block);
 
 private:
     ClientOptions options_;
+    QueryEvents* events_;
 
     class Impl;
     std::unique_ptr<Impl> impl_;

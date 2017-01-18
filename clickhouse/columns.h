@@ -1,7 +1,7 @@
 #pragma once
 
 #include "base/input.h"
-#include "varint.h"
+#include "base/coded.h"
 
 #include <cstdint>
 #include <memory>
@@ -27,6 +27,9 @@ public:
 
     /// Loads column data from input stream.
     virtual bool Load(CodedInputStream* input, size_t rows) = 0;
+
+    /// Save column data to output stream.
+    virtual void Save(CodedOutputStream* output) = 0;
 };
 
 using ColumnRef = std::shared_ptr<Column>;
@@ -34,34 +37,15 @@ using ColumnRef = std::shared_ptr<Column>;
 
 class ColumnFixedString : public Column {
 public:
-    explicit ColumnFixedString(size_t n)
-        : string_size_(n)
-    {
-    }
+    explicit ColumnFixedString(size_t n);
 
-    size_t Size() const override {
-        return data_.size();
-    }
+    size_t Size() const override;
 
-    bool Print(std::basic_ostream<char>& output, size_t row) override {
-        output << data_.at(row);
-        return true;
-    }
+    bool Print(std::basic_ostream<char>& output, size_t row) override;
 
-    bool Load(CodedInputStream* input, size_t rows) override {
-        for (size_t i = 0; i < rows; ++i) {
-            std::string s;
-            s.resize(string_size_);
+    bool Load(CodedInputStream* input, size_t rows) override;
 
-            if (!WireFormat::ReadBytes(input, &s[0], s.size())) {
-                return false;
-            }
-
-            data_.push_back(s);
-        }
-
-        return true;
-    }
+    void Save(CodedOutputStream* output) override;
 
 private:
     const size_t string_size_;
@@ -70,32 +54,13 @@ private:
 
 class ColumnString : public Column {
 public:
-    size_t Size() const override {
-        return data_.size();
-    }
+    size_t Size() const override;
 
-    bool Print(std::basic_ostream<char>& output, size_t row) override {
-        output << data_.at(row);
-        return true;
-    }
+    bool Print(std::basic_ostream<char>& output, size_t row) override;
 
-    bool Load(CodedInputStream* input, size_t rows) override {
-        for (size_t i = 0; i < rows; ++i) {
-            std::string s;
+    bool Load(CodedInputStream* input, size_t rows) override;
 
-            if (!WireFormat::ReadString(input, &s)) {
-                return false;
-            }
-
-            data_.push_back(s);
-        }
-
-        return true;
-    }
-
-    const std::string& operator [] (size_t n) const {
-        return data_[n];
-    }
+    void Save(CodedOutputStream* output) override;
 
 private:
     std::vector<std::string> data_;
@@ -104,42 +69,20 @@ private:
 
 class ColumnTuple : public Column {
 public:
-    ColumnTuple(const std::vector<ColumnRef>& columns)
-        : columns_(columns)
-    {
-    }
+    ColumnTuple(const std::vector<ColumnRef>& columns);
 
-    size_t Size() const override {
-        return columns_.empty() ? 0 : columns_[0]->Size();
-    }
+    size_t Size() const override;
 
-    bool Print(std::basic_ostream<char>& output, size_t row) override {
-        for (auto ci = columns_.begin(); ci != columns_.end(); ) {
-            if (!(*ci)->Print(output, row)) {
-                return false;
-            }
+    bool Print(std::basic_ostream<char>& output, size_t row) override;
 
-            if (++ci != columns_.end()) {
-                output << ", ";
-            }
-        }
+    bool Load(CodedInputStream* input, size_t rows) override;
 
-        return true;
-    }
-
-    bool Load(CodedInputStream* input, size_t rows) override {
-        for (auto ci = columns_.begin(); ci != columns_.end(); ++ci) {
-            if (!(*ci)->Load(input, rows)) {
-                return false;
-            }
-        }
-
-        return true;
-    }
+    void Save(CodedOutputStream* output) override;
 
 private:
     std::vector<ColumnRef> columns_;
 };
+
 
 template <typename T>
 class ColumnVector : public Column {
@@ -157,6 +100,10 @@ public:
         data_.resize(rows);
 
         return input->ReadRaw(data_.data(), data_.size() * sizeof(T));
+    }
+
+    void Save(CodedOutputStream* output) override {
+        output->WriteRaw(data_.data(), data_.size() * sizeof(T));
     }
 
     const T& operator [] (size_t n) const {

@@ -21,6 +21,8 @@ public:
 
         const std::string& Name() const;
 
+        const std::string& Type() const;
+
         ColumnRef Column() const;
 
         void Next();
@@ -40,7 +42,9 @@ public:
     ~Block();
 
     /// Append named column to the block.
-    void AppendColumn(const std::string& name, const ColumnRef& col);
+    void AppendColumn(const std::string& name,
+                      const std::string& type,
+                      const ColumnRef& col);
 
     /// Count of columns in the block.
     size_t Columns() const;
@@ -51,6 +55,7 @@ public:
 private:
     struct ColumnItem {
         std::string name;
+        std::string type;
         ColumnRef   column;
     };
 

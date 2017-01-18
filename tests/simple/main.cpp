@@ -6,6 +6,8 @@
 using namespace clickhouse;
 using namespace std;
 
+std::unique_ptr<Block> b;
+
 class EventHandler : public QueryEvents {
 public:
     void OnData(const Block& block) override {
@@ -20,6 +22,10 @@ public:
                 std::cerr << " ";
             }
             std::cerr << std::endl;
+        }
+
+        if (block.Rows() > 0 && !b) {
+            b.reset(new Block(block));
         }
     }
 
@@ -55,8 +61,11 @@ public:
 };
 
 static const std::string query =
+    //"CREATE TABLE test.client (id UInt64, name String) ENGINE = Memory";
+    "SELECT id, name FROM test.client";
+
     //"SELECT * FROM system.numbers LIMIT 10";
-    "SELECT number, number / 3.0, toString(number) || 'x' as string FROM system.numbers LIMIT 10";
+    //"SELECT number, number / 3.0, toString(number) || 'x' as string FROM system.numbers LIMIT 10";
     //"SELECT type, user, read_rows, address FROM system.query_log LIMIT 10";
     //"SELECT user, count(*) FROM system.query_log GROUP BY user";
     //"SELECT 1000, '1', (1, 1, (1, 'weew'))";
@@ -78,12 +87,16 @@ inline void PrintAst(const TypeAst& ast, int level = 0) {
 }
 
 int main() {
-    Client client("localhost");
+    EventHandler h;
+    ClientOptions opts;
+    opts.host = "localhost";
+    Client client(opts, &h);
 
     try {
-        EventHandler h;
-
-        client.ExecuteQuery(query, &h);
+        client.ExecuteQuery(query);
+        if (b) {
+            client.Insert("test.client", *b);
+        }
     } catch (const std::exception& e) {
         std::cerr << "exception : " << e.what() << std::endl;
     }

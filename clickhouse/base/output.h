@@ -92,8 +92,8 @@ protected:
 
 private:
     OutputStream* const slave_;
-    ArrayOutput array_output_;
     std::vector<uint8_t> buffer_;
+    ArrayOutput array_output_;
 };
 
 }

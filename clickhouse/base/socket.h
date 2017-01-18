@@ -1,7 +1,8 @@
 #pragma once
 
-#include "platform.h"
 #include "input.h"
+#include "output.h"
+#include "platform.h"
 
 #include <cstddef>
 #include <string>
@@ -80,6 +81,17 @@ private:
     SOCKET s_;
 };
 
+class SocketOutput : public OutputStream {
+public:
+    explicit SocketOutput(SOCKET s);
+    ~SocketOutput();
+
+protected:
+    void DoWrite(const void* data, size_t len) override;
+
+private:
+    SOCKET s_;
+};
 
 ///
 SOCKET SocketConnect(const NetworkAddress& addr);

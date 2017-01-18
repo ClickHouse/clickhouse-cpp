@@ -1,5 +1,5 @@
 ADD_LIBRARY (clickhouse-cpp-lib STATIC
-    base/coded_input.cpp
+    base/coded.cpp
     base/input.cpp
     base/output.cpp
     base/platform.cpp

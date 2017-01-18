@@ -1,8 +1,10 @@
-#include "coded_input.h"
+#include "coded.h"
 
 #include <memory.h>
 
 namespace clickhouse {
+
+static const int MAX_VARINT_BYTES = 10;
 
 CodedInputStream::CodedInputStream(ZeroCopyInput* input)
     : input_(input)
@@ -68,6 +70,40 @@ bool CodedInputStream::ReadVarint64(uint64_t* value) {
 
     // TODO skip invalid
     return false;
+}
+
+
+CodedOutputStream::CodedOutputStream(ZeroCopyOutput* output)
+    : output_(output)
+{
+}
+
+void CodedOutputStream::Flush() {
+    output_->Flush();
+}
+
+void CodedOutputStream::WriteRaw(const void* buffer, int size) {
+    output_->Write(buffer, size);
+}
+
+void CodedOutputStream::WriteVarint64(uint64_t value) {
+    uint8_t bytes[MAX_VARINT_BYTES];
+    int size = 0;
+
+    for (size_t i = 0; i < 9; ++i) {
+        uint8_t byte = value & 0x7F;
+        if (value > 0x7F)
+            byte |= 0x80;
+
+        bytes[size++] = byte;
+
+        value >>= 7;
+        if (!value) {
+            break;
+        }
+    }
+
+    WriteRaw(bytes, size);
 }
 
 }

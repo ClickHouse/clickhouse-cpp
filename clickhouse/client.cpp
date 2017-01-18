@@ -1,11 +1,12 @@
 #include "client.h"
 #include "columns.h"
 #include "protocol.h"
-#include "varint.h"
+#include "wire_format.h"
 
-#include "base/coded_input.h"
+#include "base/coded.h"
 #include "base/socket.h"
 
+#include <atomic>
 #include <system_error>
 #include <vector>
 #include <iostream>
@@ -54,12 +55,16 @@ public:
 
     void ExecuteQuery(const std::string& query);
 
+    void Insert(const std::string& table_name, const Block& block);
+
 private:
     bool Handshake();
 
     bool ReceivePacket();
 
     void SendQuery(const std::string& query);
+
+    void SendData(const Block& block);
 
     bool SendHello();
 
@@ -76,25 +81,40 @@ private:
 private:
     const ClientOptions options_;
     QueryEvents* const events_;
+    uint64_t query_id_;
 
     SocketHolder socket_;
+
     SocketInput socket_input_;
-    BufferedInput buffered_;
+    BufferedInput buffered_input_;
     CodedInputStream input_;
+
+    SocketOutput socket_output_;
+    BufferedOutput buffered_output_;
+    CodedOutputStream output_;
 
     ServerInfo server_info_;
 
     bool has_exception_;
 };
 
+static uint64_t GenerateQueryId() {
+    static std::atomic<uint64_t> counter;
+
+    return ++counter;
+}
 
 Client::Impl::Impl(const ClientOptions& opts, QueryEvents* events)
     : options_(opts)
     , events_(events)
+    , query_id_(GenerateQueryId())
     , socket_(SocketConnect(NetworkAddress(opts.host, std::to_string(opts.port))))
     , socket_input_(socket_)
-    , buffered_(&socket_input_)
-    , input_(&buffered_)
+    , buffered_input_(&socket_input_)
+    , input_(&buffered_input_)
+    , socket_output_(socket_)
+    , buffered_output_(&socket_output_)
+    , output_(&buffered_output_)
     , has_exception_(false)
 {
     if (socket_.Closed()) {
@@ -121,6 +141,32 @@ void Client::Impl::ExecuteQuery(const std::string& query) {
         if (has_exception_) {
             break;
         }
+    }
+}
+
+void Client::Impl::Insert(const std::string& table_name, const Block& block) {
+    if (!Handshake()) {
+        // events_->Fail
+        throw std::runtime_error("fail to connect to " + options_.host);
+    }
+    if (has_exception_) {
+        return;
+    }
+
+    SendQuery("INSERT INTO " + table_name + " VALUES");
+
+    if (ReceivePacket()) {
+        if (has_exception_) {
+            std::cerr << "has_exception_" << std::endl;
+            return;
+        }
+
+        SendData(block);
+        // Send empty block as marker of
+        // end of data.
+        SendData(Block());
+    } else {
+        std::cerr << "no packet" << std::endl;
     }
 }
 
@@ -204,7 +250,7 @@ bool Client::Impl::ReceivePacket() {
                     throw std::runtime_error("can't load");
                 }
 
-                block.AppendColumn(name, col);
+                block.AppendColumn(name, type, col);
             } else {
                 throw std::runtime_error(std::string("unsupported column type: ") + type);
             }
@@ -331,15 +377,11 @@ bool Client::Impl::ReceiveException() {
 }
 
 void Client::Impl::SendQuery(const std::string& query) {
-    std::vector<char> data(64 << 10);
-    char* p = data.data();
-
-    p = writeVarUInt(ClientCodes::Query, p);
-    p = writeStringBinary("1"/*query_id*/, p);
+    WireFormat::WriteUInt64(&output_, ClientCodes::Query);
+    WireFormat::WriteString(&output_, std::to_string(query_id_));
 
     /// Client info.
-    if (server_info_.revision >= DBMS_MIN_REVISION_WITH_CLIENT_INFO)
-    {
+    if (server_info_.revision >= DBMS_MIN_REVISION_WITH_CLIENT_INFO) {
         ClientInfo info;
 
         info.query_kind = 1;
@@ -348,74 +390,84 @@ void Client::Impl::SendQuery(const std::string& query) {
         info.client_version_minor = DBMS_VERSION_MINOR;
         info.client_revision = REVISION;
 
-        p = writeBinary(info.query_kind, p);
-        p = writeStringBinary(info.initial_user, p);
-        p = writeStringBinary(info.initial_query_id, p);
-        p = writeStringBinary(info.initial_address, p);
-        p = writeBinary(info.iface_type, p);
 
-        p = writeStringBinary(info.os_user, p);
-        p = writeStringBinary(info.client_hostname, p);
-        p = writeStringBinary(info.client_name, p);
-        p = writeVarUInt(info.client_version_major, p);
-        p = writeVarUInt(info.client_version_minor, p);
-        p = writeVarUInt(info.client_revision, p);
+        WireFormat::WriteFixed(&output_, info.query_kind);
+        WireFormat::WriteString(&output_, info.initial_user);
+        WireFormat::WriteString(&output_, info.initial_query_id);
+        WireFormat::WriteString(&output_, info.initial_address);
+        WireFormat::WriteFixed(&output_, info.iface_type);
+
+        WireFormat::WriteString(&output_, info.os_user);
+        WireFormat::WriteString(&output_, info.client_hostname);
+        WireFormat::WriteString(&output_, info.client_name);
+        WireFormat::WriteUInt64(&output_, info.client_version_major);
+        WireFormat::WriteUInt64(&output_, info.client_version_minor);
+        WireFormat::WriteUInt64(&output_, info.client_revision);
 
         if (server_info_.revision >= DBMS_MIN_REVISION_WITH_QUOTA_KEY_IN_CLIENT_INFO)
-            p = writeStringBinary(info.quota_key, p);
+            WireFormat::WriteString(&output_, info.quota_key);
     }
 
     /// Per query settings.
     //if (settings)
     //    settings->serialize(*out);
     //else
-    p = writeStringBinary("", p);
+    WireFormat::WriteString(&output_, std::string());
 
     uint64_t stage = 2; // Complete
-    p = writeVarUInt(stage, p);
-    p = writeVarUInt(CompressionState::Disable, p);
-    p = writeStringBinary(query, p);
+    WireFormat::WriteUInt64(&output_, stage);
+    WireFormat::WriteUInt64(&output_, CompressionState::Disable);
+    WireFormat::WriteString(&output_, query);
+    // Send empty block as marker of
+    // end of data
+    SendData(Block());
 
-    // Empty block
-    {
-        p = writeVarUInt(ClientCodes::Data, p);
+    output_.Flush();
+}
 
-        if (server_info_.revision >= DBMS_MIN_REVISION_WITH_TEMPORARY_TABLES) {
-            p = writeStringBinary("", p);
-        }
-        /// Дополнительная информация о блоке.
-        //if (REVISION >= DBMS_MIN_REVISION_WITH_BLOCK_INFO) {
-        //    block.info.write(ostr);
-        //}
+void Client::Impl::SendData(const Block& block) {
+    WireFormat::WriteUInt64(&output_, ClientCodes::Data);
 
-        /// Размеры
-        p = writeVarUInt(0, p);
-        p = writeVarUInt(0, p);
-        p = writeVarUInt(0, p);
+    if (server_info_.revision >= DBMS_MIN_REVISION_WITH_TEMPORARY_TABLES) {
+        WireFormat::WriteString(&output_, std::string());
     }
 
-    // TODO result
-    if (::send(socket_, data.data(), p - data.data(), 0) != p - data.data()) {
-        throw std::runtime_error("fail to send hello");
+    /// Дополнительная информация о блоке.
+    if (server_info_.revision >= DBMS_MIN_REVISION_WITH_BLOCK_INFO) {
+        int32_t bucket_num = -1;
+        uint8_t is_overflows = 0;
+
+        WireFormat::WriteUInt64(&output_, 1);
+        WireFormat::WriteFixed (&output_, is_overflows);
+        WireFormat::WriteUInt64(&output_, 2);
+        WireFormat::WriteFixed (&output_, bucket_num);
+        WireFormat::WriteUInt64(&output_, 0);
     }
+
+    WireFormat::WriteUInt64(&output_, block.Columns());
+    WireFormat::WriteUInt64(&output_, block.Rows());
+
+    for (Block::Iterator bi(block); bi.IsValid(); bi.Next()) {
+        WireFormat::WriteString(&output_, bi.Name());
+        WireFormat::WriteString(&output_, bi.Type());
+
+        bi.Column()->Save(&output_);
+    }
+
+    output_.Flush();
 }
 
 bool Client::Impl::SendHello() {
-    std::vector<char> data(64 << 10);
-    char* p = data.data();
+    WireFormat::WriteUInt64(&output_, ClientCodes::Hello);
+    WireFormat::WriteString(&output_, std::string(DBMS_NAME) + " client");
+    WireFormat::WriteUInt64(&output_, DBMS_VERSION_MAJOR);
+    WireFormat::WriteUInt64(&output_, DBMS_VERSION_MINOR);
+    WireFormat::WriteUInt64(&output_, REVISION);
+    WireFormat::WriteString(&output_, options_.default_database);
+    WireFormat::WriteString(&output_, options_.user);
+    WireFormat::WriteString(&output_, options_.password);
 
-    p = writeVarUInt((int)ClientCodes::Hello, p);
-    p = writeStringBinary(std::string(DBMS_NAME) + " client", p);
-    p = writeVarUInt(DBMS_VERSION_MAJOR, p);
-    p = writeVarUInt(DBMS_VERSION_MINOR, p);
-    p = writeVarUInt(REVISION, p);
-    p = writeStringBinary(options_.default_database, p);
-    p = writeStringBinary(options_.user, p);
-    p = writeStringBinary(options_.password, p);
-
-    if (::send(socket_, data.data(), p - data.data(), 0) != p - data.data()) {
-        return false;
-    }
+    output_.Flush();
 
     return true;
 }
@@ -447,10 +499,6 @@ bool Client::Impl::ReceiveHello() {
             }
         }
 
-        std::cerr << server_info_.name << std::endl;
-        std::cerr << server_info_.revision << std::endl;
-        std::cerr << server_info_.timezone << std::endl;
-
         return true;
     } else if (packet_type == ServerCodes::Exception) {
         if (ReceiveException()) {
@@ -468,21 +516,21 @@ bool Client::Impl::ReceiveHello() {
 Client::Client()
 { }
 
-Client::Client(const ClientOptions& opts)
+Client::Client(const ClientOptions& opts, QueryEvents* events)
     : options_(opts)
+    , events_(events)
 {
-}
-
-Client::Client(const std::string& host, int port) {
-    options_.host = host;
-    options_.port = port;
 }
 
 Client::~Client()
 { }
 
-void Client::ExecuteQuery(const std::string& query, QueryEvents* events) {
-    Impl(options_, events).ExecuteQuery(query);
+void Client::ExecuteQuery(const std::string& query) {
+    Impl(options_, events_).ExecuteQuery(query);
+}
+
+void Client::Insert(const std::string& table_name, const Block& block) {
+    Impl(options_, events_).Insert(table_name, block);
 }
 
 }

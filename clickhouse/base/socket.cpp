@@ -12,6 +12,8 @@
 #   include <unistd.h>
 #endif
 
+#include <iostream>
+
 namespace clickhouse {
 namespace {
 
@@ -46,7 +48,8 @@ NetworkAddress::NetworkAddress(const std::string& host, const std::string& port)
         // If hints.ai_flags includes the AI_ADDRCONFIG flag,
         // then IPv4 addresses are returned in the list pointed to by res only
         // if the local system has at least one IPv4 address configured,
-        // and IPv6 addresses are only returned if the local system has at least one IPv6 address configured.
+        // and IPv6 addresses are only returned if the local system
+        // has at least one IPv6 address configured.
         // The loopback address is not considered for this case
         // as valid as a configured address.
         hints.ai_flags |= AI_ADDRCONFIG;
@@ -129,13 +132,31 @@ SocketInput::SocketInput(SOCKET s)
 SocketInput::~SocketInput() = default;
 
 size_t SocketInput::DoRead(void* buf, size_t len) {
-    const ssize_t ret = recv(s_, (char*)buf, (int)len, 0);
+    const ssize_t ret = ::recv(s_, (char*)buf, (int)len, 0);
 
     if (ret >= 0) {
         return (size_t)ret;
     }
 
-    throw std::runtime_error("can't receive string data");
+    throw std::system_error(
+        errno, std::system_category(), "can't receive string data"
+    );
+}
+
+
+SocketOutput::SocketOutput(SOCKET s)
+    : s_(s)
+{
+}
+
+SocketOutput::~SocketOutput() = default;
+
+void SocketOutput::DoWrite(const void* data, size_t len) {
+    if (::send(s_, data, len, 0) != (int)len) {
+        throw std::system_error(
+            errno, std::system_category(), "fail to send data"
+        );
+    }
 }
 
 
