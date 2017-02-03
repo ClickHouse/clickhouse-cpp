@@ -1,7 +1,5 @@
-ClickHouse C++ client
+ClickHouse C++ client [![Build Status](https://travis-ci.org/artpaul/clickhouse-cpp.svg?branch=master)](https://travis-ci.org/artpaul/clickhouse-cpp)
 =====
-
-[![Build Status](https://travis-ci.org/artpaul/clickhouse-cpp.svg?branch=master)](https://travis-ci.org/artpaul/clickhouse-cpp)
 
 C++ client for [Yandex ClickHouse](https://clickhouse.yandex/)
 
