@@ -11,6 +11,11 @@ ColumnFixedString::ColumnFixedString(size_t n)
 {
 }
 
+void ColumnFixedString::Append(const std::string& str) {
+    data_.push_back(str);
+    data_.back().resize(string_size_);
+}
+
 size_t ColumnFixedString::Size() const {
     return data_.size();
 }
@@ -41,6 +46,10 @@ void ColumnFixedString::Save(CodedOutputStream* output) {
     }
 }
 
+
+void ColumnString::Append(const std::string& str) {
+    data_.push_back(str);
+}
 
 size_t ColumnString::Size() const {
     return data_.size();

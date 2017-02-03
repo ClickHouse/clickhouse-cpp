@@ -39,6 +39,9 @@ class ColumnFixedString : public Column {
 public:
     explicit ColumnFixedString(size_t n);
 
+    /// Append one element to the column.
+    void Append(const std::string& str);
+
     size_t Size() const override;
 
     bool Print(std::basic_ostream<char>& output, size_t row) override;
@@ -54,6 +57,9 @@ private:
 
 class ColumnString : public Column {
 public:
+    /// Append one element to the column.
+    void Append(const std::string& str);
+
     size_t Size() const override;
 
     bool Print(std::basic_ostream<char>& output, size_t row) override;
@@ -87,6 +93,15 @@ private:
 template <typename T>
 class ColumnVector : public Column {
 public:
+    /// Append one element to the column.
+    void Append(const T& value) {
+        data_.push_back(value);
+    }
+
+    const T& operator [] (size_t n) const {
+        return data_[n];
+    }
+
     size_t Size() const override {
         return data_.size();
     }
@@ -104,10 +119,6 @@ public:
 
     void Save(CodedOutputStream* output) override {
         output->WriteRaw(data_.data(), data_.size() * sizeof(T));
-    }
-
-    const T& operator [] (size_t n) const {
-        return data_[n];
     }
 
 protected:

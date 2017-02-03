@@ -47,6 +47,14 @@ void Block::AppendColumn(
     const std::string& type,
     const ColumnRef& col)
 {
+    if (columns_.empty()) {
+        rows_ = col->Size();
+    } else if (col->Size() != rows_) {
+        throw std::runtime_error(
+            "all clumns in block must have same count of rows"
+        );
+    }
+
     columns_.push_back(ColumnItem{name, type, col});
 }
 
