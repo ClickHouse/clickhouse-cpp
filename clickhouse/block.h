@@ -13,6 +13,11 @@ public:
     size_t Size() const;
 };
 
+struct BlockInfo {
+    uint8_t is_overflows = 0;
+    int32_t bucket_num = -1;
+};
+
 class Block {
 public:
     class Iterator {
@@ -49,6 +54,8 @@ public:
     /// Count of columns in the block.
     size_t Columns() const;
 
+    const BlockInfo& Info() const;
+
     /// Count of rows in the block.
     size_t Rows() const;
 
@@ -59,6 +66,7 @@ private:
         ColumnRef   column;
     };
 
+    BlockInfo info_;
     std::vector<ColumnItem> columns_;
     /// Count of rows in the block.
     size_t rows_;

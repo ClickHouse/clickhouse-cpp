@@ -3,6 +3,7 @@
 #include "block.h"
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
 
@@ -37,7 +38,7 @@ struct Exception {
     std::string name;
     std::string display_text;
     std::string stack_trace;
-    /// Pointer tp nested exception.
+    /// Pointer to nested exception.
     std::unique_ptr<Exception> nested;
 };
 
@@ -76,5 +77,74 @@ public:
     virtual void OnFinish() = 0;
 };
 
+
+using ExceptionCallback = std::function<void(const Exception& e)>;
+using ProgressCallback  = std::function<void(const Progress& progress)>;
+using SelectCallback    = std::function<void(const Block& block)>;
+
+
+class Query : public QueryEvents {
+public:
+     Query();
+     Query(const char* query);
+     Query(const std::string& query);
+    ~Query();
+
+    ///
+    inline std::string GetText() const {
+        return query_;
+    }
+
+    /// Set handler for receiving result data.
+    inline Query& OnData(SelectCallback cb) {
+        select_cb_ = cb;
+        return *this;
+    }
+
+    /// Set handler for receiving server's exception.
+    inline Query& OnException(ExceptionCallback cb) {
+        exception_cb_ = cb;
+        return *this;
+    }
+
+
+    /// Set handler for receiving a progress of query exceution.
+    inline Query& OnProgress(ProgressCallback cb) {
+        progress_cb_ = cb;
+        return *this;
+    }
+
+private:
+    void OnData(const Block& block) override {
+        if (select_cb_) {
+            select_cb_(block);
+        }
+    }
+
+    void OnServerException(const Exception& e) override {
+        if (exception_cb_) {
+            exception_cb_(e);
+        }
+    }
+
+    void OnProfile(const Profile& profile) override {
+        (void)profile;
+    }
+
+    void OnProgress(const Progress& progress) override {
+        if (progress_cb_) {
+            progress_cb_(progress);
+        }
+    }
+
+    void OnFinish() override {
+    }
+
+private:
+    std::string query_;
+    ExceptionCallback exception_cb_;
+    ProgressCallback progress_cb_;
+    SelectCallback select_cb_;
+};
 
 }

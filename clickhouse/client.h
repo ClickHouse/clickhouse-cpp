@@ -14,7 +14,7 @@ struct ClientOptions {
     int port = 9000;
 
     /// Default database.
-    std::string default_database = "system";
+    std::string default_database = "default";
     /// User name.
     std::string user = "default";
     /// Access password.
@@ -27,17 +27,24 @@ struct ClientOptions {
 class Client {
 public:
      Client();
-     Client(const ClientOptions& opts, QueryEvents* events);
+     Client(const ClientOptions& opts);
     ~Client();
 
-    void ExecuteQuery(const std::string& query);
+    /// Intends for execute arbitrary queries.
+    void Execute(const Query& query);
 
-    /// Insert block of data to a table \p table_name.
+    /// Intends for execute select queries.  Data will be returned with
+    /// one or more call of \p cb.
+    void Select(const std::string& query, SelectCallback cb);
+
+    /// Intends for insert block of data into a table \p table_name.
     void Insert(const std::string& table_name, const Block& block);
+
+    /// Ping server for aliveness.
+    void Ping();
 
 private:
     ClientOptions options_;
-    QueryEvents* events_;
 
     class Impl;
     std::unique_ptr<Impl> impl_;

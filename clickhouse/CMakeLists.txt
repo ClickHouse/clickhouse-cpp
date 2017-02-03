@@ -8,6 +8,7 @@ ADD_LIBRARY (clickhouse-cpp-lib STATIC
     block.cpp
     client.cpp
     columns.cpp
+    query.cpp
     type_parser.cpp
 )
 

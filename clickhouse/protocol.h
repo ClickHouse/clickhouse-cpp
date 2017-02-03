@@ -33,10 +33,15 @@ namespace clickhouse {
 
     /// Использовать ли сжатие.
     namespace CompressionState {
-            enum {
+        enum {
             Disable     = 0,
             Enable      = 1,
+        };
+    }
 
+    namespace Stages {
+        enum {
+            Complete    = 2,
         };
     }
 }

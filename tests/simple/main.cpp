@@ -60,10 +60,7 @@ public:
     }
 };
 
-static const std::string query =
-    //"CREATE TABLE test.client (id UInt64, name String) ENGINE = Memory";
-    "SELECT id, name FROM test.client";
-
+//static const std::string query =
     //"SELECT * FROM system.numbers LIMIT 10";
     //"SELECT number, number / 3.0, toString(number) || 'x' as string FROM system.numbers LIMIT 10";
     //"SELECT type, user, read_rows, address FROM system.query_log LIMIT 10";
@@ -87,16 +84,21 @@ inline void PrintAst(const TypeAst& ast, int level = 0) {
 }
 
 int main() {
-    EventHandler h;
     ClientOptions opts;
     opts.host = "localhost";
-    Client client(opts, &h);
+    Client client(opts);
 
     try {
-        client.ExecuteQuery(query);
-        if (b) {
-            client.Insert("test.client", *b);
-        }
+        client.Execute("CREATE TABLE IF NOT EXISTS test.client (id UInt64, name String) ENGINE = Memory");
+        client.Execute("SELECT id, name FROM test.client");
+
+
+        // TODO Insert
+        //if (b) {
+        //    client.Insert("test.client", *b);
+        //}
+        client.Execute("DROP TABLE test.client");
+
     } catch (const std::exception& e) {
         std::cerr << "exception : " << e.what() << std::endl;
     }

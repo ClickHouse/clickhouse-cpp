@@ -48,12 +48,13 @@ struct ServerInfo {
     uint64_t    revision;
 };
 
+
 class Client::Impl {
 public:
-     Impl(const ClientOptions& opts, QueryEvents* events);
+     Impl(const ClientOptions& opts);
     ~Impl();
 
-    void ExecuteQuery(const std::string& query);
+    void ExecuteQuery(Query query);
 
     void Insert(const std::string& table_name, const Block& block);
 
@@ -79,8 +80,30 @@ private:
     }
 
 private:
+    class EnsureNull {
+    public:
+        inline EnsureNull(QueryEvents* ev, QueryEvents** ptr)
+            : ptr_(ptr)
+        {
+            if (ptr_) {
+                *ptr_ = ev;
+            }
+        }
+
+        inline ~EnsureNull() {
+            if (ptr_) {
+                *ptr_ = nullptr;
+            }
+        }
+
+    private:
+        QueryEvents** ptr_;
+
+    };
+
+
     const ClientOptions options_;
-    QueryEvents* const events_;
+    QueryEvents* events_;
     uint64_t query_id_;
 
     SocketHolder socket_;
@@ -104,9 +127,9 @@ static uint64_t GenerateQueryId() {
     return ++counter;
 }
 
-Client::Impl::Impl(const ClientOptions& opts, QueryEvents* events)
+Client::Impl::Impl(const ClientOptions& opts)
     : options_(opts)
-    , events_(events)
+    , events_(nullptr)
     , query_id_(GenerateQueryId())
     , socket_(SocketConnect(NetworkAddress(opts.host, std::to_string(opts.port))))
     , socket_input_(socket_)
@@ -126,7 +149,9 @@ Client::Impl::~Impl() {
     Disconnect();
 }
 
-void Client::Impl::ExecuteQuery(const std::string& query) {
+void Client::Impl::ExecuteQuery(Query query) {
+    EnsureNull en(static_cast<QueryEvents*>(&query), &events_);
+
     if (!Handshake()) {
         // events_->Fail
         throw std::runtime_error("fail to connect to " + options_.host);
@@ -135,7 +160,7 @@ void Client::Impl::ExecuteQuery(const std::string& query) {
         return;
     }
 
-    SendQuery(query);
+    SendQuery(query.GetText());
 
     while (ReceivePacket()) {
         if (has_exception_) {
@@ -145,6 +170,8 @@ void Client::Impl::ExecuteQuery(const std::string& query) {
 }
 
 void Client::Impl::Insert(const std::string& table_name, const Block& block) {
+    //EnsureNull en(&query, &events_);
+
     if (!Handshake()) {
         // events_->Fail
         throw std::runtime_error("fail to connect to " + options_.host);
@@ -196,23 +223,22 @@ bool Client::Impl::ReceivePacket() {
                 return false;
             }
         }
-        /// Дополнительная информация о блоке.
+        // Additional information about block.
         if (REVISION >= DBMS_MIN_REVISION_WITH_BLOCK_INFO) {
             uint64_t num;
-            int32_t bucket_num = 0;
-            uint8_t is_overflows = 0;
+            BlockInfo info;
 
             // BlockInfo
             if (!WireFormat::ReadUInt64(&input_, &num)) {
                 return false;
             }
-            if (!WireFormat::ReadFixed(&input_, &is_overflows)) {
+            if (!WireFormat::ReadFixed(&input_, &info.is_overflows)) {
                 return false;
             }
             if (!WireFormat::ReadUInt64(&input_, &num)) {
                 return false;
             }
-            if (!WireFormat::ReadFixed(&input_, &bucket_num)) {
+            if (!WireFormat::ReadFixed(&input_, &info.bucket_num)) {
                 return false;
             }
             if (!WireFormat::ReadUInt64(&input_, &num)) {
@@ -414,8 +440,7 @@ void Client::Impl::SendQuery(const std::string& query) {
     //else
     WireFormat::WriteString(&output_, std::string());
 
-    uint64_t stage = 2; // Complete
-    WireFormat::WriteUInt64(&output_, stage);
+    WireFormat::WriteUInt64(&output_, Stages::Complete);
     WireFormat::WriteUInt64(&output_, CompressionState::Disable);
     WireFormat::WriteString(&output_, query);
     // Send empty block as marker of
@@ -434,13 +459,10 @@ void Client::Impl::SendData(const Block& block) {
 
     /// Дополнительная информация о блоке.
     if (server_info_.revision >= DBMS_MIN_REVISION_WITH_BLOCK_INFO) {
-        int32_t bucket_num = -1;
-        uint8_t is_overflows = 0;
-
         WireFormat::WriteUInt64(&output_, 1);
-        WireFormat::WriteFixed (&output_, is_overflows);
+        WireFormat::WriteFixed (&output_, block.Info().is_overflows);
         WireFormat::WriteUInt64(&output_, 2);
-        WireFormat::WriteFixed (&output_, bucket_num);
+        WireFormat::WriteFixed (&output_, block.Info().bucket_num);
         WireFormat::WriteUInt64(&output_, 0);
     }
 
@@ -516,21 +538,24 @@ bool Client::Impl::ReceiveHello() {
 Client::Client()
 { }
 
-Client::Client(const ClientOptions& opts, QueryEvents* events)
+Client::Client(const ClientOptions& opts)
     : options_(opts)
-    , events_(events)
 {
 }
 
 Client::~Client()
 { }
 
-void Client::ExecuteQuery(const std::string& query) {
-    Impl(options_, events_).ExecuteQuery(query);
+void Client::Execute(const Query& query) {
+    Impl(options_).ExecuteQuery(query);
+}
+
+void Client::Select(const std::string& query, SelectCallback cb) {
+    Execute(Query(query).OnData(cb));
 }
 
 void Client::Insert(const std::string& table_name, const Block& block) {
-    Impl(options_, events_).Insert(table_name, block);
+    Impl(options_).Insert(table_name, block);
 }
 
 }

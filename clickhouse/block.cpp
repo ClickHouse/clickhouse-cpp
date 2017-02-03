@@ -55,6 +55,10 @@ size_t Block::Columns() const {
     return columns_.size();
 }
 
+const BlockInfo& Block::Info() const {
+    return info_;
+}
+
 /// Count of rows in the block.
 size_t Block::Rows() const {
     return rows_;
