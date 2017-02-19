@@ -22,6 +22,5 @@ PROJECT (CLICKHOUSE-CLIENT)
         clickhouse
         contrib/gtest
         tests/simple
-        tests/types
         ut
     )
