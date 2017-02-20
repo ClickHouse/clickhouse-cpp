@@ -27,7 +27,7 @@ int main() {
 
         /// Insert some values.
         {
-            Block b;
+            Block block;
 
             auto id = std::make_shared<ColumnUInt64>();
             id->Append(1);
@@ -37,10 +37,10 @@ int main() {
             name->Append("one");
             name->Append("seven");
 
-            b.AppendColumn("id"  , id);
-            b.AppendColumn("name", name);
+            block.AppendColumn("id"  , id);
+            block.AppendColumn("name", name);
 
-            client.Insert("test.client", b);
+            client.Insert("test.client", block);
         }
 
         /// Select values inserted in the previous step.

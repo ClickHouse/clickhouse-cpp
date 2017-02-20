@@ -37,7 +37,7 @@ client.Execute("CREATE TABLE IF NOT EXISTS test.numbers (id UInt64, name String)
 
 /// Insert some values.
 {
-    Block b;
+    Block block;
 
     auto id = std::make_shared<ColumnUInt64>();
     id->Append(1);
@@ -47,10 +47,10 @@ client.Execute("CREATE TABLE IF NOT EXISTS test.numbers (id UInt64, name String)
     name->Append("one");
     name->Append("seven");
 
-    b.AppendColumn("id"  , id);
-    b.AppendColumn("name", name);
+    block.AppendColumn("id"  , id);
+    block.AppendColumn("name", name);
 
-    client.Insert("test.numbers", CreateBlock());
+    client.Insert("test.client", block);
 }
 
 /// Select values inserted in the previous step.
