@@ -4,15 +4,6 @@
 
 namespace clickhouse {
 
-/**
- * Represents one row of a block.
- */
-class Row {
-public:
-    /// Number of fields in the row.
-    size_t Size() const;
-};
-
 struct BlockInfo {
     uint8_t is_overflows = 0;
     int32_t bucket_num = -1;
@@ -20,18 +11,24 @@ struct BlockInfo {
 
 class Block {
 public:
+    /// Allow to iterate over block's columns.
     class Iterator {
     public:
         Iterator(const Block& block);
 
+        /// Name of column.
         const std::string& Name() const;
 
-        const std::string& Type() const;
+        /// Type of column.
+        TypeRef Type() const;
 
+        /// Reference to column object.
         ColumnRef Column() const;
 
+        /// Move to next column.
         void Next();
 
+        /// Is the iterator still valid.
         bool IsValid() const;
 
     private:
@@ -47,22 +44,22 @@ public:
     ~Block();
 
     /// Append named column to the block.
-    void AppendColumn(const std::string& name,
-                      const std::string& type,
-                      const ColumnRef& col);
+    void AppendColumn(const std::string& name, const ColumnRef& col);
 
     /// Count of columns in the block.
-    size_t Columns() const;
+    size_t GetColumnCount() const;
 
     const BlockInfo& Info() const;
 
     /// Count of rows in the block.
-    size_t Rows() const;
+    size_t GetRowCount() const;
+
+    /// Reference to column by index in the block.
+    ColumnRef operator [] (size_t idx) const;
 
 private:
     struct ColumnItem {
         std::string name;
-        std::string type;
         ColumnRef   column;
     };
 

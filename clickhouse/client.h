@@ -19,6 +19,16 @@ struct ClientOptions {
     std::string user = "default";
     /// Access password.
     std::string password = "";
+
+    inline ClientOptions& SetHost(const std::string& value) {
+        host = value;
+        return *this;
+    }
+
+    inline ClientOptions& SetPort(const int value) {
+        port = value;
+        return *this;
+    }
 };
 
 /**

@@ -2,6 +2,7 @@
 
 #include "base/input.h"
 #include "base/coded.h"
+#include "types.h"
 
 #include <cstdint>
 #include <memory>
@@ -18,6 +19,19 @@ class Column {
 public:
     virtual ~Column()
     { }
+
+    template <typename T>
+    inline T* As() {
+        return dynamic_cast<T*>(this);
+    }
+
+    template <typename T>
+    inline const T* As() const {
+        return dynamic_cast<const T*>(this);
+    }
+
+    /// Get type object of the column.
+    virtual TypeRef Type() const = 0;
 
     /// Count of rows in the column.
     virtual size_t Size() const = 0;
@@ -42,6 +56,12 @@ public:
     /// Append one element to the column.
     void Append(const std::string& str);
 
+    const std::string& operator [] (size_t n) const {
+        return data_[n];
+    }
+
+    TypeRef Type() const override;
+
     size_t Size() const override;
 
     bool Print(std::basic_ostream<char>& output, size_t row) override;
@@ -53,12 +73,19 @@ public:
 private:
     const size_t string_size_;
     std::vector<std::string> data_;
+    TypeRef type_;
 };
 
 class ColumnString : public Column {
 public:
     /// Append one element to the column.
     void Append(const std::string& str);
+
+    const std::string& operator [] (size_t n) const {
+        return data_[n];
+    }
+
+    TypeRef Type() const override;
 
     size_t Size() const override;
 
@@ -77,6 +104,12 @@ class ColumnTuple : public Column {
 public:
     ColumnTuple(const std::vector<ColumnRef>& columns);
 
+    ColumnRef operator [] (size_t n) const {
+        return columns_[n];
+    }
+
+    TypeRef Type() const override;
+
     size_t Size() const override;
 
     bool Print(std::basic_ostream<char>& output, size_t row) override;
@@ -87,6 +120,7 @@ public:
 
 private:
     std::vector<ColumnRef> columns_;
+    TypeRef type_;
 };
 
 
@@ -100,6 +134,10 @@ public:
 
     const T& operator [] (size_t n) const {
         return data_[n];
+    }
+
+    TypeRef Type() const override {
+        return type_;
     }
 
     size_t Size() const override {
@@ -123,6 +161,7 @@ public:
 
 protected:
     std::vector<T> data_;
+    TypeRef type_ = Type::CreateSimple<T>();
 };
 
 class ColumnUInt8 : public ColumnVector<uint8_t> {
@@ -142,12 +181,20 @@ public:
 };
 
 
-class ColumnDate : public ColumnVector<uint16_t>
-{ };
+class ColumnDate : public ColumnVector<uint16_t> {
+public:
+    ColumnDate() {
+        type_ = Type::CreateDate();
+    }
+};
 
 
-class ColumnDateTime : public ColumnVector<uint32_t>
-{ };
+class ColumnDateTime : public ColumnVector<uint32_t> {
+public:
+    ColumnDateTime() {
+        type_ = Type::CreateDateTime();
+    }
+};
 
 
 using ColumnUInt16  = ColumnVector<uint16_t>;

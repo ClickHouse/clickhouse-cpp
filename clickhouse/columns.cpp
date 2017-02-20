@@ -1,6 +1,6 @@
 #include "columns.h"
-#include "type_parser.h"
 #include "wire_format.h"
+#include "type_parser.h"
 
 #include <iostream>
 
@@ -8,12 +8,17 @@ namespace clickhouse {
 
 ColumnFixedString::ColumnFixedString(size_t n)
     : string_size_(n)
+    , type_(Type::CreateString(n))
 {
 }
 
 void ColumnFixedString::Append(const std::string& str) {
     data_.push_back(str);
     data_.back().resize(string_size_);
+}
+
+TypeRef ColumnFixedString::Type() const {
+    return type_;
 }
 
 size_t ColumnFixedString::Size() const {
@@ -51,6 +56,11 @@ void ColumnString::Append(const std::string& str) {
     data_.push_back(str);
 }
 
+TypeRef ColumnString::Type() const {
+    static const TypeRef type(Type::CreateString());
+    return type;
+}
+
 size_t ColumnString::Size() const {
     return data_.size();
 }
@@ -84,6 +94,10 @@ void ColumnString::Save(CodedOutputStream* output) {
 ColumnTuple::ColumnTuple(const std::vector<ColumnRef>& columns)
     : columns_(columns)
 {
+}
+
+TypeRef ColumnTuple::Type() const {
+    return type_;
 }
 
 size_t ColumnTuple::Size() const {
@@ -195,7 +209,9 @@ ColumnRef CreateColumnByType(const std::string& type_name) {
         if (ast.meta == TypeAst::Tuple) {
             return CreateTupleColumn(ast);
         }
-        // TODO
+        if (ast.meta == TypeAst::Array) {
+            // TODO
+        }
     }
 
     return nullptr;

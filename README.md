@@ -15,9 +15,58 @@ C++ client for [Yandex ClickHouse](https://clickhouse.yandex/)
 
 ## BUILDING
 
-```
+```sh
 $ mkdir build .
 $ cd build
 $ cmake ..
 $ make
 ```
+
+## EXAMPLE
+
+```cpp
+#include <clickhouse/client.h>
+
+using namespace clickhouse;
+
+/// Initialize client connection.
+Client client(ClientOptions().SetHost("localhost"));
+
+/// Create a table.
+client.Execute("CREATE TABLE IF NOT EXISTS test.numbers (id UInt64, name String) ENGINE = Memory");
+
+/// Insert some values.
+{
+    Block b;
+
+    auto id = std::make_shared<ColumnUInt64>();
+    id->Append(1);
+    id->Append(7);
+
+    auto name = std::make_shared<ColumnString>();
+    name->Append("one");
+    name->Append("seven");
+
+    b.AppendColumn("id"  , id);
+    b.AppendColumn("name", name);
+
+    client.Insert("test.numbers", CreateBlock());
+}
+
+/// Select values inserted in the previous step.
+client.Select("SELECT id, name FROM test.numbers", [] (const Block& block)
+    {
+        for (size_t i = 0; i < block.GetRowCount(); ++i) {
+            std::cout << (*block[0]->As<ColumnUInt64>())[i] << " "
+                      << (*block[1]->As<ColumnString>())[i] << "\n";
+        }
+    }
+);
+
+/// Delete table.
+client.Execute("DROP TABLE test.numbers");
+```
+
+## DISCLAIMER
+
+Library currently is under development and it interface is subject to change.

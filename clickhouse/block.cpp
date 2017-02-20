@@ -1,5 +1,7 @@
 #include "block.h"
 
+#include <stdexcept>
+
 namespace clickhouse {
 
 Block::Iterator::Iterator(const Block& block)
@@ -12,8 +14,8 @@ const std::string& Block::Iterator::Name() const {
     return block_.columns_[idx_].name;
 }
 
-const std::string& Block::Iterator::Type() const {
-    return block_.columns_[idx_].type;
+TypeRef Block::Iterator::Type() const {
+    return block_.columns_[idx_].column->Type();
 }
 
 ColumnRef Block::Iterator::Column() const {
@@ -42,11 +44,7 @@ Block::Block(size_t cols, size_t rows)
 
 Block::~Block() = default;
 
-void Block::AppendColumn(
-    const std::string& name,
-    const std::string& type,
-    const ColumnRef& col)
-{
+void Block::AppendColumn(const std::string& name, const ColumnRef& col) {
     if (columns_.empty()) {
         rows_ = col->Size();
     } else if (col->Size() != rows_) {
@@ -55,11 +53,11 @@ void Block::AppendColumn(
         );
     }
 
-    columns_.push_back(ColumnItem{name, type, col});
+    columns_.push_back(ColumnItem{name, col});
 }
 
 /// Count of columns in the block.
-size_t Block::Columns() const {
+size_t Block::GetColumnCount() const {
     return columns_.size();
 }
 
@@ -68,8 +66,16 @@ const BlockInfo& Block::Info() const {
 }
 
 /// Count of rows in the block.
-size_t Block::Rows() const {
+size_t Block::GetRowCount() const {
     return rows_;
+}
+
+ColumnRef Block::operator [] (size_t idx) const {
+    if (idx < columns_.size()) {
+        return columns_[idx].column;
+    }
+
+    throw std::out_of_range("column index is out of range");
 }
 
 }

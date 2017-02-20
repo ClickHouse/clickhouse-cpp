@@ -276,7 +276,7 @@ bool Client::Impl::ReceivePacket() {
                     throw std::runtime_error("can't load");
                 }
 
-                block.AppendColumn(name, type, col);
+                block.AppendColumn(name, col);
             } else {
                 throw std::runtime_error(std::string("unsupported column type: ") + type);
             }
@@ -466,12 +466,12 @@ void Client::Impl::SendData(const Block& block) {
         WireFormat::WriteUInt64(&output_, 0);
     }
 
-    WireFormat::WriteUInt64(&output_, block.Columns());
-    WireFormat::WriteUInt64(&output_, block.Rows());
+    WireFormat::WriteUInt64(&output_, block.GetColumnCount());
+    WireFormat::WriteUInt64(&output_, block.GetRowCount());
 
     for (Block::Iterator bi(block); bi.IsValid(); bi.Next()) {
         WireFormat::WriteString(&output_, bi.Name());
-        WireFormat::WriteString(&output_, bi.Type());
+        WireFormat::WriteString(&output_, bi.Type()->GetName());
 
         bi.Column()->Save(&output_);
     }
