@@ -13,7 +13,7 @@ C++ client for [Yandex ClickHouse](https://clickhouse.yandex/)
 * Date
 * Tuple
 
-## BUILDING
+## Building
 
 ```sh
 $ mkdir build .
@@ -22,7 +22,7 @@ $ cmake ..
 $ make
 ```
 
-## EXAMPLE
+## Example
 
 ```cpp
 #include <clickhouse/client.h>
@@ -67,6 +67,6 @@ client.Select("SELECT id, name FROM test.numbers", [] (const Block& block)
 client.Execute("DROP TABLE test.numbers");
 ```
 
-## DISCLAIMER
+## Disclaimer
 
 Library currently is under development and it interface is subject to change.
