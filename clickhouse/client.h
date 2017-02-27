@@ -1,6 +1,7 @@
 #pragma once
 
 #include "query.h"
+#include "exceptions.h"
 
 #include <memory>
 #include <string>

@@ -74,7 +74,7 @@ private:
     bool ReceiveHello();
 
     /// Reads exception packet form input stream.
-    bool ReceiveException();
+    bool ReceiveException(bool rethrow = false);
 
 private:
     void Disconnect() {
@@ -155,7 +155,6 @@ void Client::Impl::ExecuteQuery(Query query) {
     EnsureNull en(static_cast<QueryEvents*>(&query), &events_);
 
     if (!Handshake()) {
-        // events_->Fail
         throw std::runtime_error("fail to connect to " + options_.host);
     }
     if (has_exception_) {
@@ -186,7 +185,6 @@ void Client::Impl::Insert(const std::string& table_name, const Block& block) {
 
     if (ReceivePacket()) {
         if (has_exception_) {
-            std::cerr << "has_exception_" << std::endl;
             return;
         }
 
@@ -387,9 +385,9 @@ bool Client::Impl::ReceivePacket() {
     return false;
 }
 
-bool Client::Impl::ReceiveException() {
-    Exception e;
-    Exception* current = &e;
+bool Client::Impl::ReceiveException(bool rethrow) {
+    std::unique_ptr<Exception> e(new Exception);
+    Exception* current = e.get();
 
     do {
         bool has_nested = false;
@@ -419,7 +417,11 @@ bool Client::Impl::ReceiveException() {
     } while (true);
 
     if (events_) {
-        events_->OnServerException(e);
+        events_->OnServerException(*e);
+    }
+
+    if (rethrow) {
+        throw ServerException(std::move(e));
     }
 
     return true;
@@ -546,7 +548,7 @@ bool Client::Impl::ReceiveHello() {
 
         return true;
     } else if (packet_type == ServerCodes::Exception) {
-        if (ReceiveException()) {
+        if (ReceiveException(true)) {
             has_exception_ = true;
             return true;
         }

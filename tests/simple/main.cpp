@@ -2,6 +2,7 @@
 #include <clickhouse/type_parser.h>
 
 #include <iostream>
+#include <signal.h>
 
 using namespace clickhouse;
 using namespace std;
@@ -19,6 +20,8 @@ inline void PrintBlock(const Block& block) {
 }
 
 int main() {
+    signal(SIGPIPE, SIG_IGN);
+
     Client client(ClientOptions().SetHost("localhost"));
 
     try {
