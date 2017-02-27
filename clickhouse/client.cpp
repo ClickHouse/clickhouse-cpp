@@ -58,6 +58,8 @@ public:
 
     void Insert(const std::string& table_name, const Block& block);
 
+    void Ping();
+
 private:
     bool Handshake();
 
@@ -195,6 +197,23 @@ void Client::Impl::Insert(const std::string& table_name, const Block& block) {
     } else {
         std::cerr << "no packet" << std::endl;
     }
+}
+
+void Client::Impl::Ping() {
+    if (!Handshake()) {
+        // events_->Fail
+        throw std::runtime_error("fail to connect to " + options_.host);
+    }
+    if (has_exception_) {
+        return;
+    }
+
+    {
+        WireFormat::WriteUInt64(&output_, ClientCodes::Ping);
+        output_.Flush();
+    }
+
+    ReceivePacket();
 }
 
 bool Client::Impl::Handshake() {
@@ -346,6 +365,10 @@ bool Client::Impl::ReceivePacket() {
             events_->OnProgress(info);
         }
 
+        return true;
+    }
+
+    case ServerCodes::Pong: {
         return true;
     }
 
@@ -554,8 +577,16 @@ void Client::Select(const std::string& query, SelectCallback cb) {
     Execute(Query(query).OnData(cb));
 }
 
+void Client::Select(const Query& query) {
+    Execute(query);
+}
+
 void Client::Insert(const std::string& table_name, const Block& block) {
     Impl(options_).Insert(table_name, block);
+}
+
+void Client::Ping() {
+    Impl(options_).Ping();
 }
 
 }

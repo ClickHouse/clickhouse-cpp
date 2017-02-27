@@ -47,6 +47,9 @@ public:
     /// one or more call of \p cb.
     void Select(const std::string& query, SelectCallback cb);
 
+    /// Alias for Execute.
+    void Select(const Query& query);
+
     /// Intends for insert block of data into a table \p table_name.
     void Insert(const std::string& table_name, const Block& block);
 
