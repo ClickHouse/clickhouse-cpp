@@ -420,7 +420,7 @@ bool Client::Impl::ReceiveException(bool rethrow) {
         events_->OnServerException(*e);
     }
 
-    if (rethrow) {
+    if (rethrow || options_.rethrow_exceptions) {
         throw ServerException(std::move(e));
     }
 

@@ -9,27 +9,31 @@
 namespace clickhouse {
 
 struct ClientOptions {
+#define DECLARE_FIELD(name, type, setter, default) \
+    type name = default; \
+    inline ClientOptions& setter(const type& value) { \
+        name = value; \
+        return *this; \
+    }
+
     /// Hostname of the server.
-    std::string host;
+    DECLARE_FIELD(host, std::string, SetHost, std::string());
     /// Service port.
-    int port = 9000;
+    DECLARE_FIELD(port, int, SetPort, 9000);
 
     /// Default database.
-    std::string default_database = "default";
+    DECLARE_FIELD(default_database, std::string, SetDefaultDatabase, "default");
     /// User name.
-    std::string user = "default";
+    DECLARE_FIELD(user, std::string, SetUser, "default");
     /// Access password.
-    std::string password = "";
+    DECLARE_FIELD(password, std::string, SetPassword, std::string());
 
-    inline ClientOptions& SetHost(const std::string& value) {
-        host = value;
-        return *this;
-    }
+    /// By default all exceptions received during query execution will be
+    /// passed to OnException handler.  Set rethrow_exceptions to true to
+    /// enable throwing exceptions with standard c++ exception mechanism.
+    DECLARE_FIELD(rethrow_exceptions, bool, SetRethrowException, false);
 
-    inline ClientOptions& SetPort(const int value) {
-        port = value;
-        return *this;
-    }
+#undef DECLARE_FIELD
 };
 
 /**
