@@ -50,7 +50,7 @@ client.Execute("CREATE TABLE IF NOT EXISTS test.numbers (id UInt64, name String)
     block.AppendColumn("id"  , id);
     block.AppendColumn("name", name);
 
-    client.Insert("test.client", block);
+    client.Insert("test.numbers", block);
 }
 
 /// Select values inserted in the previous step.
