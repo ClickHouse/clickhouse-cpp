@@ -1,4 +1,4 @@
-ADD_LIBRARY (clickhouse-cpp-lib STATIC
+ADD_LIBRARY (clickhouse-cpp-lib
     base/coded.cpp
     base/input.cpp
     base/output.cpp
