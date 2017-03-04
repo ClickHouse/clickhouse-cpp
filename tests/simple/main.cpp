@@ -2,7 +2,9 @@
 #include <clickhouse/type_parser.h>
 
 #include <iostream>
-#include <signal.h>
+#if defined(_unix_)
+#   include <signal.h>
+#endif
 
 using namespace clickhouse;
 using namespace std;
@@ -20,7 +22,9 @@ inline void PrintBlock(const Block& block) {
 }
 
 int main() {
+#if defined (_unix_)
     signal(SIGPIPE, SIG_IGN);
+#endif
 
     Client client(ClientOptions().SetHost("localhost"));
 
