@@ -31,7 +31,7 @@ struct ClientOptions {
     /// By default all exceptions received during query execution will be
     /// passed to OnException handler.  Set rethrow_exceptions to true to
     /// enable throwing exceptions with standard c++ exception mechanism.
-    DECLARE_FIELD(rethrow_exceptions, bool, SetRethrowException, false);
+    DECLARE_FIELD(rethrow_exceptions, bool, SetRethrowException, true);
 
 #undef DECLARE_FIELD
 };
@@ -41,7 +41,6 @@ struct ClientOptions {
  */
 class Client {
 public:
-     Client();
      Client(const ClientOptions& opts);
     ~Client();
 

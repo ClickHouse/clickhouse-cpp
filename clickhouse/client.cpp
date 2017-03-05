@@ -63,7 +63,7 @@ public:
 private:
     bool Handshake();
 
-    bool ReceivePacket();
+    bool ReceivePacket(uint64_t* server_packet = nullptr);
 
     void SendQuery(const std::string& query);
 
@@ -72,6 +72,9 @@ private:
     bool SendHello();
 
     bool ReceiveHello();
+
+    /// Reads data packet form input stream.
+    bool ReceiveData();
 
     /// Reads exception packet form input stream.
     bool ReceiveException(bool rethrow = false);
@@ -119,8 +122,6 @@ private:
     CodedOutputStream output_;
 
     ServerInfo server_info_;
-
-    bool has_exception_;
 };
 
 static uint64_t GenerateQueryId() {
@@ -140,10 +141,12 @@ Client::Impl::Impl(const ClientOptions& opts)
     , socket_output_(socket_)
     , buffered_output_(&socket_output_)
     , output_(&buffered_output_)
-    , has_exception_(false)
 {
     if (socket_.Closed()) {
         throw std::system_error(errno, std::system_category());
+    }
+    if (!Handshake()) {
+        throw std::runtime_error("fail to connect to " + options_.host);
     }
 }
 
@@ -154,62 +157,51 @@ Client::Impl::~Impl() {
 void Client::Impl::ExecuteQuery(Query query) {
     EnsureNull en(static_cast<QueryEvents*>(&query), &events_);
 
-    if (!Handshake()) {
-        throw std::runtime_error("fail to connect to " + options_.host);
-    }
-    if (has_exception_) {
-        return;
-    }
+    // TODO check connection
 
     SendQuery(query.GetText());
 
     while (ReceivePacket()) {
-        if (has_exception_) {
-            break;
-        }
+        ;
     }
 }
 
 void Client::Impl::Insert(const std::string& table_name, const Block& block) {
-    //EnsureNull en(&query, &events_);
-
-    if (!Handshake()) {
-        // events_->Fail
-        throw std::runtime_error("fail to connect to " + options_.host);
-    }
-    if (has_exception_) {
-        return;
-    }
+    // TODO check connection
 
     SendQuery("INSERT INTO " + table_name + " VALUES");
 
-    if (ReceivePacket()) {
-        if (has_exception_) {
-            return;
-        }
+    uint64_t server_packet;
+    // Receive data packet.
+    while (true) {
+        bool ret = ReceivePacket(&server_packet);
 
-        SendData(block);
-        // Send empty block as marker of
-        // end of data.
-        SendData(Block());
-    } else {
-        std::cerr << "no packet" << std::endl;
+        if (!ret) {
+            std::runtime_error("fail to receive data packet");
+        }
+        if (server_packet == ServerCodes::Data) {
+            break;
+        }
+        if (server_packet == ServerCodes::Progress) {
+            continue;
+        }
+    }
+
+    // Send data.
+    SendData(block);
+    // Send empty block as marker of
+    // end of data.
+    SendData(Block());
+
+    // Wait for EOS.
+    while (ReceivePacket()) {
+        ;
     }
 }
 
 void Client::Impl::Ping() {
-    if (!Handshake()) {
-        // events_->Fail
-        throw std::runtime_error("fail to connect to " + options_.host);
-    }
-    if (has_exception_) {
-        return;
-    }
-
-    {
-        WireFormat::WriteUInt64(&output_, ClientCodes::Ping);
-        output_.Flush();
-    }
+    WireFormat::WriteUInt64(&output_, ClientCodes::Ping);
+    output_.Flush();
 
     ReceivePacket();
 }
@@ -224,94 +216,26 @@ bool Client::Impl::Handshake() {
     return true;
 }
 
-bool Client::Impl::ReceivePacket() {
+bool Client::Impl::ReceivePacket(uint64_t* server_packet) {
     uint64_t packet_type = 0;
 
     if (!input_.ReadVarint64(&packet_type)) {
         return false;
     }
+    if (server_packet) {
+        *server_packet = packet_type;
+    }
 
     switch (packet_type) {
     case ServerCodes::Data: {
-        if (REVISION >= DBMS_MIN_REVISION_WITH_TEMPORARY_TABLES) {
-            std::string table_name;
-
-            if (!WireFormat::ReadString(&input_, &table_name)) {
-                return false;
-            }
+        if (!ReceiveData()) {
+            std::runtime_error("can't read data packet from input stream");
         }
-        // Additional information about block.
-        if (REVISION >= DBMS_MIN_REVISION_WITH_BLOCK_INFO) {
-            uint64_t num;
-            BlockInfo info;
-
-            // BlockInfo
-            if (!WireFormat::ReadUInt64(&input_, &num)) {
-                return false;
-            }
-            if (!WireFormat::ReadFixed(&input_, &info.is_overflows)) {
-                return false;
-            }
-            if (!WireFormat::ReadUInt64(&input_, &num)) {
-                return false;
-            }
-            if (!WireFormat::ReadFixed(&input_, &info.bucket_num)) {
-                return false;
-            }
-            if (!WireFormat::ReadUInt64(&input_, &num)) {
-                return false;
-            }
-
-            // TODO use data
-        }
-
-        uint64_t num_columns = 0;
-        uint64_t num_rows = 0;
-
-        if (!WireFormat::ReadUInt64(&input_, &num_columns)) {
-            return false;
-        }
-        if (!WireFormat::ReadUInt64(&input_, &num_rows)) {
-            return false;
-        }
-
-        Block block(num_columns, num_rows);
-
-        for (size_t i = 0; i < num_columns; ++i) {
-            std::string name;
-            std::string type;
-
-            if (!WireFormat::ReadString(&input_, &name)) {
-                return false;
-            }
-            if (!WireFormat::ReadString(&input_, &type)) {
-                return false;
-            }
-
-            if (ColumnRef col = CreateColumnByType(type)) {
-                if (num_rows && !col->Load(&input_, num_rows)) {
-                    throw std::runtime_error("can't load");
-                }
-
-                block.AppendColumn(name, col);
-            } else {
-                throw std::runtime_error(std::string("unsupported column type: ") + type);
-            }
-        }
-
-        if (events_) {
-            events_->OnData(block);
-        }
-
         return true;
     }
 
     case ServerCodes::Exception: {
-        if (ReceiveException()) {
-            has_exception_ = true;
-            return true;
-        }
-
+        ReceiveException();
         return false;
     }
 
@@ -380,6 +304,80 @@ bool Client::Impl::ReceivePacket() {
     default:
         throw std::runtime_error("unimplemented " + std::to_string((int)packet_type));
         break;
+    }
+
+    return false;
+}
+
+bool Client::Impl::ReceiveData() {
+    if (REVISION >= DBMS_MIN_REVISION_WITH_TEMPORARY_TABLES) {
+        std::string table_name;
+
+        if (!WireFormat::ReadString(&input_, &table_name)) {
+            return false;
+        }
+    }
+    // Additional information about block.
+    if (REVISION >= DBMS_MIN_REVISION_WITH_BLOCK_INFO) {
+        uint64_t num;
+        BlockInfo info;
+
+        // BlockInfo
+        if (!WireFormat::ReadUInt64(&input_, &num)) {
+            return false;
+        }
+        if (!WireFormat::ReadFixed(&input_, &info.is_overflows)) {
+            return false;
+        }
+        if (!WireFormat::ReadUInt64(&input_, &num)) {
+            return false;
+        }
+        if (!WireFormat::ReadFixed(&input_, &info.bucket_num)) {
+            return false;
+        }
+        if (!WireFormat::ReadUInt64(&input_, &num)) {
+            return false;
+        }
+
+        // TODO use data
+    }
+
+    uint64_t num_columns = 0;
+    uint64_t num_rows = 0;
+
+    if (!WireFormat::ReadUInt64(&input_, &num_columns)) {
+        return false;
+    }
+    if (!WireFormat::ReadUInt64(&input_, &num_rows)) {
+        return false;
+    }
+
+    Block block(num_columns, num_rows);
+
+    for (size_t i = 0; i < num_columns; ++i) {
+        std::string name;
+        std::string type;
+
+        if (!WireFormat::ReadString(&input_, &name)) {
+            return false;
+        }
+        if (!WireFormat::ReadString(&input_, &type)) {
+            return false;
+        }
+
+        if (ColumnRef col = CreateColumnByType(type)) {
+            if (num_rows && !col->Load(&input_, num_rows)) {
+                throw std::runtime_error("can't load");
+            }
+
+            block.AppendColumn(name, col);
+        } else {
+            throw std::runtime_error(std::string("unsupported column type: ") + type);
+        }
+    }
+
+    if (events_) {
+        events_->OnData(block);
     }
 
     return false;
@@ -548,11 +546,7 @@ bool Client::Impl::ReceiveHello() {
 
         return true;
     } else if (packet_type == ServerCodes::Exception) {
-        if (ReceiveException(true)) {
-            has_exception_ = true;
-            return true;
-        }
-
+        ReceiveException(true);
         return false;
     }
 
@@ -560,11 +554,9 @@ bool Client::Impl::ReceiveHello() {
 }
 
 
-Client::Client()
-{ }
-
 Client::Client(const ClientOptions& opts)
     : options_(opts)
+    , impl_(new Impl(opts))
 {
 }
 
@@ -572,7 +564,7 @@ Client::~Client()
 { }
 
 void Client::Execute(const Query& query) {
-    Impl(options_).ExecuteQuery(query);
+    impl_->ExecuteQuery(query);
 }
 
 void Client::Select(const std::string& query, SelectCallback cb) {
@@ -584,11 +576,11 @@ void Client::Select(const Query& query) {
 }
 
 void Client::Insert(const std::string& table_name, const Block& block) {
-    Impl(options_).Insert(table_name, block);
+    impl_->Insert(table_name, block);
 }
 
 void Client::Ping() {
-    Impl(options_).Ping();
+    impl_->Ping();
 }
 
 }
