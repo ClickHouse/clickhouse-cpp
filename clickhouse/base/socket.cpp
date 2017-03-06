@@ -188,12 +188,14 @@ SOCKET SocketConnect(const NetworkAddress& addr) {
                     continue;
                 }
             }
+        } else {
+            return s;
         }
-
-        return s;
     }
 
-    return -1;
+    throw std::system_error(
+        errno, std::system_category(), "fail to connect"
+    );
 }
 
 
