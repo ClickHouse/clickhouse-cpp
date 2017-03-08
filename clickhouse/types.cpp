@@ -69,7 +69,7 @@ std::string Type::GetName() const {
         case String:
             return "String";
         case FixedString:
-            return "FixedString()";
+            return "FixedString(" + std::to_string(string_size_) + ")";
         case DateTime:
             return "DateTime";
         case Date:
