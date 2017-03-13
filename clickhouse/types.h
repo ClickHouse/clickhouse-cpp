@@ -36,10 +36,15 @@ public:
     /// Type's code.
     Code GetCode() const;
 
+    /// Type of array's elements.
+    TypeRef GetItemType() const;
+
     /// String representation of the type.
     std::string GetName() const;
 
 public:
+    static TypeRef CreateArray(TypeRef item_type);
+
     static TypeRef CreateDate();
 
     static TypeRef CreateDateTime();

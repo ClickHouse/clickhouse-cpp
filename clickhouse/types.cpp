@@ -20,6 +20,12 @@ Type::~Type() {
     }
 }
 
+TypeRef Type::CreateArray(TypeRef item_type) {
+    TypeRef type(new Type(Type::Array));
+    type->array_->item_type = item_type;
+    return type;
+}
+
 TypeRef Type::CreateDate() {
     return TypeRef(new Type(Type::Date));
 }
@@ -40,6 +46,13 @@ TypeRef Type::CreateString(size_t n) {
 
 Type::Code Type::GetCode() const {
     return code_;
+}
+
+TypeRef Type::GetItemType() const {
+    if (code_ == Array) {
+        return array_->item_type;
+    }
+    return TypeRef();
 }
 
 std::string Type::GetName() const {
@@ -75,7 +88,7 @@ std::string Type::GetName() const {
         case Date:
             return "Date";
         case Array:
-            return "Array()";
+            return std::string("Array(") + array_->item_type->GetName() +")";
         case Tuple:
             return "Tuple()";
     }

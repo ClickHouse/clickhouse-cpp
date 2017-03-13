@@ -2,8 +2,6 @@
 #include "wire_format.h"
 #include "type_parser.h"
 
-#include <iostream>
-
 namespace clickhouse {
 
 ColumnFixedString::ColumnFixedString(size_t n)
@@ -91,6 +89,41 @@ void ColumnString::Save(CodedOutputStream* output) {
 }
 
 
+ColumnArray::ColumnArray(ColumnRef data)
+    : data_(data)
+    , offsets_(std::make_shared<ColumnUInt64>())
+{
+}
+
+TypeRef ColumnArray::Type() const {
+    return Type::CreateArray(data_->Type());
+}
+
+size_t ColumnArray::Size() const {
+    return offsets_->Size();
+}
+
+bool ColumnArray::Print(std::basic_ostream<char>& output, size_t row) {
+    (void)output;
+    (void)row;
+    return false;
+}
+
+bool ColumnArray::Load(CodedInputStream* input, size_t rows) {
+    if (!offsets_->Load(input, rows)) {
+        return false;
+    }
+    if (!data_->Load(input, (*offsets_)[rows - 1])) {
+        return false;
+    }
+    return true;
+}
+
+void ColumnArray::Save(CodedOutputStream* output) {
+    (void)output;
+}
+
+
 ColumnTuple::ColumnTuple(const std::vector<ColumnRef>& columns)
     : columns_(columns)
 {
@@ -136,6 +169,12 @@ void ColumnTuple::Save(CodedOutputStream* output) {
 
 
 static ColumnRef CreateColumnFromAst(const TypeAst& ast);
+
+static ColumnRef CreateArrayColumn(const TypeAst& ast) {
+    return std::make_shared<ColumnArray>(
+        CreateColumnFromAst(ast.elements.front())
+    );
+}
 
 static ColumnRef CreateTupleColumn(const TypeAst& ast) {
     std::vector<ColumnRef> columns;
@@ -195,23 +234,17 @@ static ColumnRef CreateColumnFromAst(const TypeAst& ast) {
     if (ast.meta == TypeAst::Tuple) {
         return CreateTupleColumn(ast);
     }
+    if (ast.meta == TypeAst::Array) {
+        return CreateArrayColumn(ast);
+    }
     return nullptr;
 }
 
 ColumnRef CreateColumnByType(const std::string& type_name) {
-    TypeParser parser(type_name);
     TypeAst ast;
 
-    if (parser.Parse(&ast)) {
-        if (ast.meta == TypeAst::Terminal) {
-            return CreateTerminalColumn(ast);
-        }
-        if (ast.meta == TypeAst::Tuple) {
-            return CreateTupleColumn(ast);
-        }
-        if (ast.meta == TypeAst::Array) {
-            // TODO
-        }
+    if (TypeParser(type_name).Parse(&ast)) {
+        return CreateColumnFromAst(ast);
     }
 
     return nullptr;
