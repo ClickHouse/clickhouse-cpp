@@ -44,6 +44,13 @@ TypeRef Type::CreateString(size_t n) {
     return type;
 }
 
+TypeRef Type::CreateTuple(const std::vector<TypeRef>& item_types) {
+    TypeRef type(new Type(Type::Tuple));
+    type->tuple_->item_types.assign(item_types.begin(), item_types.end());
+    return type;
+
+}
+
 Type::Code Type::GetCode() const {
     return code_;
 }

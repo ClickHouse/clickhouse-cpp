@@ -2,13 +2,18 @@
 
 namespace clickhouse {
 
-ColumnTuple::ColumnTuple(const std::vector<ColumnRef>& columns)
-    : columns_(columns)
-{
+static std::vector<TypeRef> CollectTypes(const std::vector<ColumnRef>& columns) {
+    std::vector<TypeRef> types;
+    for (const auto& col : columns) {
+        types.push_back(col->Type());
+    }
+    return types;
 }
 
-TypeRef ColumnTuple::Type() const {
-    return type_;
+ColumnTuple::ColumnTuple(const std::vector<ColumnRef>& columns)
+    : Column(Type::CreateTuple(CollectTypes(columns)))
+    , columns_(columns)
+{
 }
 
 size_t ColumnTuple::Size() const {

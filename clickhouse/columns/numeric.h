@@ -8,6 +8,11 @@ namespace clickhouse {
 template <typename T>
 class ColumnVector : public Column {
 public:
+    ColumnVector()
+        : Column(Type::CreateSimple<T>())
+    {
+    }
+
     /// Append one element to the column.
     void Append(const T& value) {
         data_.push_back(value);
@@ -15,10 +20,6 @@ public:
 
     const T& operator [] (size_t n) const {
         return data_[n];
-    }
-
-    TypeRef Type() const override {
-        return type_;
     }
 
     size_t Size() const override {
@@ -37,7 +38,6 @@ public:
 
 protected:
     std::vector<T> data_;
-    TypeRef type_ = Type::CreateSimple<T>();
 };
 
 using ColumnUInt8   = ColumnVector<uint8_t>;

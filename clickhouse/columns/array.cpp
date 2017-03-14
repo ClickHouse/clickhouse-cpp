@@ -3,13 +3,10 @@
 namespace clickhouse {
 
 ColumnArray::ColumnArray(ColumnRef data)
-    : data_(data)
+    : Column(Type::CreateArray(data->Type()))
+    , data_(data)
     , offsets_(std::make_shared<ColumnUInt64>())
 {
-}
-
-TypeRef ColumnArray::Type() const {
-    return Type::CreateArray(data_->Type());
 }
 
 size_t ColumnArray::Size() const {

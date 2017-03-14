@@ -5,18 +5,14 @@
 namespace clickhouse {
 
 ColumnFixedString::ColumnFixedString(size_t n)
-    : string_size_(n)
-    , type_(Type::CreateString(n))
+    : Column(Type::CreateString(n))
+    , string_size_(n)
 {
 }
 
 void ColumnFixedString::Append(const std::string& str) {
     data_.push_back(str);
     data_.back().resize(string_size_);
-}
-
-TypeRef ColumnFixedString::Type() const {
-    return type_;
 }
 
 size_t ColumnFixedString::Size() const {
@@ -45,13 +41,13 @@ void ColumnFixedString::Save(CodedOutputStream* output) {
 }
 
 
-void ColumnString::Append(const std::string& str) {
-    data_.push_back(str);
+ColumnString::ColumnString()
+    : Column(Type::CreateString())
+{
 }
 
-TypeRef ColumnString::Type() const {
-    static const TypeRef type(Type::CreateString());
-    return type;
+void ColumnString::Append(const std::string& str) {
+    data_.push_back(str);
 }
 
 size_t ColumnString::Size() const {

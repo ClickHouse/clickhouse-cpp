@@ -13,6 +13,11 @@ using ColumnRef = std::shared_ptr<class Column>;
  */
 class Column {
 public:
+    explicit inline Column(TypeRef type)
+        : type_(type)
+    {
+    }
+
     virtual ~Column()
     { }
 
@@ -27,7 +32,7 @@ public:
     }
 
     /// Get type object of the column.
-    virtual TypeRef Type() const = 0;
+    inline TypeRef Type() const { return type_; }
 
     /// Count of rows in the column.
     virtual size_t Size() const = 0;
@@ -37,6 +42,9 @@ public:
 
     /// Save column data to output stream.
     virtual void Save(CodedOutputStream* output) = 0;
+
+protected:
+    TypeRef type_ = nullptr;
 };
 
 }

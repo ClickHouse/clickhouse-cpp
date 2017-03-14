@@ -56,6 +56,8 @@ public:
 
     static TypeRef CreateString(size_t n);
 
+    static TypeRef CreateTuple(const std::vector<TypeRef>& item_types);
+
 private:
     Type(const Code code);
 

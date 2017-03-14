@@ -15,8 +15,6 @@ public:
         return columns_[n];
     }
 
-    TypeRef Type() const override;
-
     size_t Size() const override;
 
     bool Load(CodedInputStream* input, size_t rows) override;
@@ -25,7 +23,6 @@ public:
 
 private:
     std::vector<ColumnRef> columns_;
-    TypeRef type_;
 };
 
 }
