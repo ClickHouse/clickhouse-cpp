@@ -12,7 +12,7 @@ public:
     }
 
     /// Appends content of given column to the end of current one.
-    void AppendFromColumn(ColumnRef) { }
+    void Append(ColumnRef) { }
 
     ColumnRef Slice(size_t, size_t) override { return ColumnRef(); }
 };
@@ -25,7 +25,7 @@ public:
     }
 
     /// Appends content of given column to the end of current one.
-    void AppendFromColumn(ColumnRef) { }
+    void Append(ColumnRef) { }
 
     ColumnRef Slice(size_t, size_t) override { return ColumnRef(); }
 };

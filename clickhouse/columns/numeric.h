@@ -18,7 +18,7 @@ public:
         data_.push_back(value);
     }
 
-    void AppendFromColumn(ColumnRef column) override {
+    void Append(ColumnRef column) override {
         if (auto col = column->As<ColumnVector<T>>()) {
             data_.insert(data_.end(), col->data_.begin(), col->data_.end());
         }
