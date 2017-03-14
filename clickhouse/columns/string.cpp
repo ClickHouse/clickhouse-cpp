@@ -52,6 +52,20 @@ void ColumnFixedString::Save(CodedOutputStream* output) {
     }
 }
 
+ColumnRef ColumnFixedString::Slice(size_t begin, size_t len) {
+    if (begin >= data_.size()) {
+        return ColumnRef();
+    }
+
+    len = std::min(len, data_.size() - begin);
+
+    auto result = std::make_shared<ColumnFixedString>(string_size_);
+    result->data_.assign(
+        data_.begin() + begin, data_.begin() + (begin + len)
+    );
+    return result;
+}
+
 
 ColumnString::ColumnString()
     : Column(Type::CreateString())
@@ -94,6 +108,20 @@ void ColumnString::Save(CodedOutputStream* output) {
     for (size_t i = 0; i < data_.size(); ++i) {
         WireFormat::WriteString(output, data_[i]);
     }
+}
+
+ColumnRef ColumnString::Slice(size_t begin, size_t len) {
+    if (begin >= data_.size()) {
+        return ColumnRef();
+    }
+
+    len = std::min(len, data_.size() - begin);
+
+    auto result = std::make_shared<ColumnString>();
+    result->data_.assign(
+        data_.begin() + begin, data_.begin() + (begin + len)
+    );
+    return result;
 }
 
 }

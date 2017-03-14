@@ -23,12 +23,11 @@ public:
 
     void Save(CodedOutputStream* output) override;
 
-    ColumnRef Slice(size_t, size_t) override { return ColumnRef(); }
+    ColumnRef Slice(size_t, size_t) override;
 
 private:
     const size_t string_size_;
     std::vector<std::string> data_;
-    TypeRef type_;
 };
 
 /** */
@@ -50,7 +49,7 @@ public:
 
     void Save(CodedOutputStream* output) override;
 
-    ColumnRef Slice(size_t, size_t) override { return ColumnRef(); }
+    ColumnRef Slice(size_t, size_t) override;
 
 private:
     std::vector<std::string> data_;
