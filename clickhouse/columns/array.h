@@ -1,7 +1,6 @@
 #pragma once
 
 #include "clickhouse/columns/numeric.h"
-#include "clickhouse/columns/traits.h"
 
 namespace clickhouse {
 
@@ -10,24 +9,24 @@ class ColumnArray : public Column {
 public:
     ColumnArray(ColumnRef data);
 
+    /// Converts input column to array and appends
+    /// as one row to the current column.
+    void AppendAsColumn(ColumnRef array);
+
+    /// Appends content of given column to the end of current one.
+    void Append(ColumnRef) { }
+
     size_t Size() const override;
 
     bool Load(CodedInputStream* input, size_t rows) override;
 
     void Save(CodedOutputStream* output) override;
 
-    template <typename T>
-    std::vector<T> GetArray(size_t n) const {
-        size_t offset = GetOffset(n);
-        size_t size = GetSize(n);
-        std::vector<T> result;
+    ColumnRef Slice(size_t, size_t) override { return ColumnRef(); }
 
-        for (size_t i = offset; i < offset + size; ++i) {
-            result.push_back((*data_->As<typename TypeToColumn<T>::Column>())[i]);
-        }
-
-        return result;
-    }
+    /// Convets array at pos n to column.
+    /// Element's type of result column same as type of array element.
+    ColumnRef GetAsColumn(size_t n) const;
 
 private:
     inline size_t GetOffset(size_t n) const {

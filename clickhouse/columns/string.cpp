@@ -15,6 +15,18 @@ void ColumnFixedString::Append(const std::string& str) {
     data_.back().resize(string_size_);
 }
 
+void ColumnFixedString::Append(ColumnRef column) {
+    if (auto col = column->As<ColumnFixedString>()) {
+        if (string_size_ == col->string_size_) {
+            data_.insert(data_.end(), col->data_.begin(), col->data_.end());
+        }
+    }
+}
+
+const std::string& ColumnFixedString::operator [] (size_t n) const {
+    return data_[n];
+}
+
 size_t ColumnFixedString::Size() const {
     return data_.size();
 }
@@ -48,6 +60,16 @@ ColumnString::ColumnString()
 
 void ColumnString::Append(const std::string& str) {
     data_.push_back(str);
+}
+
+void ColumnString::Append(ColumnRef column) {
+    if (auto col = column->As<ColumnString>()) {
+        data_.insert(data_.end(), col->data_.begin(), col->data_.end());
+    }
+}
+
+const std::string& ColumnString::operator [] (size_t n) const {
+    return data_[n];
 }
 
 size_t ColumnString::Size() const {

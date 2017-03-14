@@ -1,5 +1,7 @@
 #include "array.h"
 
+#include <stdexcept>
+
 namespace clickhouse {
 
 ColumnArray::ColumnArray(ColumnRef data)
@@ -7,6 +9,26 @@ ColumnArray::ColumnArray(ColumnRef data)
     , data_(data)
     , offsets_(std::make_shared<ColumnUInt64>())
 {
+}
+
+void ColumnArray::AppendAsColumn(ColumnRef array) {
+    if (!data_->Type()->IsEqual(array->Type())) {
+        throw std::runtime_error(
+            "can't append column of type " + array->Type()->GetName() + " "
+            "to column type " + data_->Type()->GetName());
+    }
+
+    if (offsets_->Size() == 0) {
+        offsets_->Append(array->Size());
+    } else {
+        offsets_->Append((*offsets_)[offsets_->Size() - 1] + array->Size());
+    }
+
+    data_->Append(array);
+}
+
+ColumnRef ColumnArray::GetAsColumn(size_t n) const {
+    return data_->Slice(GetOffset(n), GetSize(n));
 }
 
 size_t ColumnArray::Size() const {

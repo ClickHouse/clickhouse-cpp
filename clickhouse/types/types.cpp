@@ -20,37 +20,6 @@ Type::~Type() {
     }
 }
 
-TypeRef Type::CreateArray(TypeRef item_type) {
-    TypeRef type(new Type(Type::Array));
-    type->array_->item_type = item_type;
-    return type;
-}
-
-TypeRef Type::CreateDate() {
-    return TypeRef(new Type(Type::Date));
-}
-
-TypeRef Type::CreateDateTime() {
-    return TypeRef(new Type(Type::DateTime));
-}
-
-TypeRef Type::CreateString() {
-    return TypeRef(new Type(Type::String));
-}
-
-TypeRef Type::CreateString(size_t n) {
-    TypeRef type(new Type(Type::FixedString));
-    type->string_size_ = n;
-    return type;
-}
-
-TypeRef Type::CreateTuple(const std::vector<TypeRef>& item_types) {
-    TypeRef type(new Type(Type::Tuple));
-    type->tuple_->item_types.assign(item_types.begin(), item_types.end());
-    return type;
-
-}
-
 Type::Code Type::GetCode() const {
     return code_;
 }
@@ -102,5 +71,42 @@ std::string Type::GetName() const {
 
     return std::string();
 }
+
+bool Type::IsEqual(const TypeRef& other) const {
+    return this->GetName() == other->GetName();
+}
+
+TypeRef Type::CreateArray(TypeRef item_type) {
+    TypeRef type(new Type(Type::Array));
+    type->array_->item_type = item_type;
+    return type;
+}
+
+TypeRef Type::CreateDate() {
+    return TypeRef(new Type(Type::Date));
+}
+
+TypeRef Type::CreateDateTime() {
+    return TypeRef(new Type(Type::DateTime));
+}
+
+TypeRef Type::CreateString() {
+    return TypeRef(new Type(Type::String));
+}
+
+TypeRef Type::CreateString(size_t n) {
+    TypeRef type(new Type(Type::FixedString));
+    type->string_size_ = n;
+    return type;
+}
+
+TypeRef Type::CreateTuple(const std::vector<TypeRef>& item_types) {
+    TypeRef type(new Type(Type::Tuple));
+    type->tuple_->item_types.assign(item_types.begin(), item_types.end());
+    return type;
+
+}
+
+
 
 }

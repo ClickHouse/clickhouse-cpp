@@ -10,6 +10,11 @@ public:
     ColumnDate() {
         type_ = Type::CreateDate();
     }
+
+    /// Appends content of given column to the end of current one.
+    void Append(ColumnRef) { }
+
+    ColumnRef Slice(size_t, size_t) override { return ColumnRef(); }
 };
 
 /** */
@@ -18,6 +23,11 @@ public:
     ColumnDateTime() {
         type_ = Type::CreateDateTime();
     }
+
+    /// Appends content of given column to the end of current one.
+    void Append(ColumnRef) { }
+
+    ColumnRef Slice(size_t, size_t) override { return ColumnRef(); }
 };
 
 }

@@ -34,14 +34,20 @@ public:
     /// Get type object of the column.
     inline TypeRef Type() const { return type_; }
 
-    /// Count of rows in the column.
-    virtual size_t Size() const = 0;
+    /// Appends content of given column to the end of current one.
+    virtual void Append(ColumnRef column) = 0;
 
     /// Loads column data from input stream.
     virtual bool Load(CodedInputStream* input, size_t rows) = 0;
 
     /// Save column data to output stream.
     virtual void Save(CodedOutputStream* output) = 0;
+
+    /// Count of rows in the column.
+    virtual size_t Size() const = 0;
+
+    /// Makes slice of the current column.
+    virtual ColumnRef Slice(size_t begin, size_t len) = 0;
 
 protected:
     TypeRef type_ = nullptr;

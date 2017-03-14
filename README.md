@@ -12,6 +12,7 @@ C++ client for [Yandex ClickHouse](https://clickhouse.yandex/)
 * DateTime
 * Date
 * Tuple
+* Array(T)
 
 ## Building
 

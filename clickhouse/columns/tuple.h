@@ -15,11 +15,16 @@ public:
         return columns_[n];
     }
 
+    /// Appends content of given column to the end of current one.
+    void Append(ColumnRef) { }
+
     size_t Size() const override;
 
     bool Load(CodedInputStream* input, size_t rows) override;
 
     void Save(CodedOutputStream* output) override;
+
+    ColumnRef Slice(size_t, size_t) override { return ColumnRef(); }
 
 private:
     std::vector<ColumnRef> columns_;

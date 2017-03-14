@@ -42,6 +42,9 @@ public:
     /// String representation of the type.
     std::string GetName() const;
 
+    /// Is given type same as current one.
+    bool IsEqual(const TypeRef& other) const;
+
 public:
     static TypeRef CreateArray(TypeRef item_type);
 

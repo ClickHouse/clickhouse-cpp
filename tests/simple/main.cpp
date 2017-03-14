@@ -21,6 +21,47 @@ inline void PrintBlock(const Block& block) {
     }
 }
 
+inline void ArrayExample(Client& client) {
+    Block b;
+
+    /// Create a table.
+    client.Execute("CREATE TABLE IF NOT EXISTS test.array (arr Array(UInt64)) ENGINE = Memory");
+
+    auto arr = std::make_shared<ColumnArray>(std::make_shared<ColumnUInt64>());
+
+    auto id = std::make_shared<ColumnUInt64>();
+    id->Append(1);
+    arr->AppendAsColumn(id);
+
+    id->Append(3);
+    arr->AppendAsColumn(id);
+
+    id->Append(7);
+    arr->AppendAsColumn(id);
+
+    id->Append(9);
+    arr->AppendAsColumn(id);
+
+    b.AppendColumn("arr", arr);
+    client.Insert("test.array", b);
+
+
+    client.Select("SELECT arr FROM test.array", [](const Block& block)
+        {
+            for (size_t c = 0; c < block.GetRowCount(); ++c) {
+                auto col = block[0]->As<ColumnArray>()->GetAsColumn(c);
+                for (size_t i = 0; i < col->Size(); ++i) {
+                    std::cerr << (int)(*col->As<ColumnUInt64>())[i] << " ";
+                }
+                std::cerr << std::endl;
+            }
+        }
+    );
+
+    /// Delete table.
+    client.Execute("DROP TABLE test.array");
+}
+
 int main() {
 #if defined (_unix_)
     signal(SIGPIPE, SIG_IGN);

@@ -18,6 +18,12 @@ public:
         data_.push_back(value);
     }
 
+    void Append(ColumnRef column) override {
+        if (auto col = column->As<ColumnVector<T>>()) {
+            data_.insert(data_.end(), col->data_.begin(), col->data_.end());
+        }
+    }
+
     const T& operator [] (size_t n) const {
         return data_[n];
     }
@@ -34,6 +40,20 @@ public:
 
     void Save(CodedOutputStream* output) override {
         output->WriteRaw(data_.data(), data_.size() * sizeof(T));
+    }
+
+    ColumnRef Slice(size_t begin, size_t len) override {
+        if (begin >= data_.size()) {
+            return ColumnRef();
+        }
+
+        len = std::min(len, data_.size() - begin);
+
+        auto result = std::make_shared<ColumnVector<T>>();
+        result->data_.assign(
+            data_.begin() + begin, data_.begin() + (begin + len)
+        );
+        return result;
     }
 
 protected:
