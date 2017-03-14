@@ -23,11 +23,6 @@ size_t ColumnFixedString::Size() const {
     return data_.size();
 }
 
-bool ColumnFixedString::Print(std::basic_ostream<char>& output, size_t row) {
-    output << data_.at(row);
-    return true;
-}
-
 bool ColumnFixedString::Load(CodedInputStream* input, size_t rows) {
     for (size_t i = 0; i < rows; ++i) {
         std::string s;
@@ -61,11 +56,6 @@ TypeRef ColumnString::Type() const {
 
 size_t ColumnString::Size() const {
     return data_.size();
-}
-
-bool ColumnString::Print(std::basic_ostream<char>& output, size_t row) {
-    output << data_.at(row);
-    return true;
 }
 
 bool ColumnString::Load(CodedInputStream* input, size_t rows) {
@@ -103,12 +93,6 @@ size_t ColumnArray::Size() const {
     return offsets_->Size();
 }
 
-bool ColumnArray::Print(std::basic_ostream<char>& output, size_t row) {
-    (void)output;
-    (void)row;
-    return false;
-}
-
 bool ColumnArray::Load(CodedInputStream* input, size_t rows) {
     if (!offsets_->Load(input, rows)) {
         return false;
@@ -136,20 +120,6 @@ TypeRef ColumnTuple::Type() const {
 
 size_t ColumnTuple::Size() const {
     return columns_.empty() ? 0 : columns_[0]->Size();
-}
-
-bool ColumnTuple::Print(std::basic_ostream<char>& output, size_t row) {
-    for (auto ci = columns_.begin(); ci != columns_.end(); ) {
-        if (!(*ci)->Print(output, row)) {
-            return false;
-        }
-
-        if (++ci != columns_.end()) {
-            output << ", ";
-        }
-    }
-
-    return true;
 }
 
 bool ColumnTuple::Load(CodedInputStream* input, size_t rows) {

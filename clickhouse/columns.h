@@ -6,7 +6,6 @@
 
 #include <cstdint>
 #include <memory>
-#include <ostream>
 #include <string>
 #include <vector>
 
@@ -36,9 +35,6 @@ public:
     /// Count of rows in the column.
     virtual size_t Size() const = 0;
 
-    /// Write value at the given row to the output.
-    virtual bool Print(std::basic_ostream<char>& output, size_t row) = 0;
-
     /// Loads column data from input stream.
     virtual bool Load(CodedInputStream* input, size_t rows) = 0;
 
@@ -64,8 +60,6 @@ public:
 
     size_t Size() const override;
 
-    bool Print(std::basic_ostream<char>& output, size_t row) override;
-
     bool Load(CodedInputStream* input, size_t rows) override;
 
     void Save(CodedOutputStream* output) override;
@@ -90,8 +84,6 @@ public:
 
     size_t Size() const override;
 
-    bool Print(std::basic_ostream<char>& output, size_t row) override;
-
     bool Load(CodedInputStream* input, size_t rows) override;
 
     void Save(CodedOutputStream* output) override;
@@ -112,8 +104,6 @@ public:
     TypeRef Type() const override;
 
     size_t Size() const override;
-
-    bool Print(std::basic_ostream<char>& output, size_t row) override;
 
     bool Load(CodedInputStream* input, size_t rows) override;
 
@@ -145,11 +135,6 @@ public:
         return data_.size();
     }
 
-    bool Print(std::basic_ostream<char>& output, size_t row) override {
-        output << data_.at(row);
-        return true;
-    }
-
     bool Load(CodedInputStream* input, size_t rows) override {
         data_.resize(rows);
 
@@ -163,24 +148,6 @@ public:
 protected:
     std::vector<T> data_;
     TypeRef type_ = Type::CreateSimple<T>();
-};
-
-/** */
-class ColumnUInt8 : public ColumnVector<uint8_t> {
-public:
-    bool Print(std::basic_ostream<char>& output, size_t row) override {
-        output << (unsigned int)data_.at(row);
-        return true;
-    }
-};
-
-/** */
-class ColumnInt8 : public ColumnVector<int8_t> {
-public:
-    bool Print(std::basic_ostream<char>& output, size_t row) override {
-        output << (int)data_.at(row);
-        return true;
-    }
 };
 
 /** */
@@ -199,11 +166,12 @@ public:
     }
 };
 
-
+using ColumnUInt8   = ColumnVector<uint8_t>;
 using ColumnUInt16  = ColumnVector<uint16_t>;
 using ColumnUInt32  = ColumnVector<uint32_t>;
 using ColumnUInt64  = ColumnVector<uint64_t>;
 
+using ColumnInt8    = ColumnVector<int8_t>;
 using ColumnInt16   = ColumnVector<int16_t>;
 using ColumnInt32   = ColumnVector<int32_t>;
 using ColumnInt64   = ColumnVector<int64_t>;
@@ -222,8 +190,6 @@ public:
     TypeRef Type() const override;
 
     size_t Size() const override;
-
-    bool Print(std::basic_ostream<char>& output, size_t row) override;
 
     bool Load(CodedInputStream* input, size_t rows) override;
 
