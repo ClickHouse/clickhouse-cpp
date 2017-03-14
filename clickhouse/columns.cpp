@@ -120,7 +120,8 @@ bool ColumnArray::Load(CodedInputStream* input, size_t rows) {
 }
 
 void ColumnArray::Save(CodedOutputStream* output) {
-    (void)output;
+    offsets_->Save(output);
+    data_->Save(output);
 }
 
 
