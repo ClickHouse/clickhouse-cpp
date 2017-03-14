@@ -24,7 +24,7 @@ void ColumnArray::AppendAsColumn(ColumnRef array) {
         offsets_->Append((*offsets_)[offsets_->Size() - 1] + array->Size());
     }
 
-    data_->Append(array);
+    data_->AppendFromColumn(array);
 }
 
 ColumnRef ColumnArray::GetAsColumn(size_t n) const {

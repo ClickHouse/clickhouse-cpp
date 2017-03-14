@@ -35,7 +35,7 @@ public:
     inline TypeRef Type() const { return type_; }
 
     /// Appends content of given column to the end of current one.
-    virtual void Append(ColumnRef column) = 0;
+    virtual void AppendFromColumn(ColumnRef column) = 0;
 
     /// Loads column data from input stream.
     virtual bool Load(CodedInputStream* input, size_t rows) = 0;

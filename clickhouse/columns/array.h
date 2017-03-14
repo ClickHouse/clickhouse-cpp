@@ -14,7 +14,7 @@ public:
     void AppendAsColumn(ColumnRef array);
 
     /// Appends content of given column to the end of current one.
-    void Append(ColumnRef) { }
+    void AppendFromColumn(ColumnRef) { }
 
     size_t Size() const override;
 

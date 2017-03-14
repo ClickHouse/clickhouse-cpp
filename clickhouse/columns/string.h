@@ -13,7 +13,7 @@ public:
     void Append(const std::string& str);
 
     /// Appends content of given column to the end of current one.
-    void Append(ColumnRef column) override;
+    void AppendFromColumn(ColumnRef column) override;
 
     const std::string& operator [] (size_t n) const;
 
@@ -39,7 +39,7 @@ public:
     void Append(const std::string& str);
 
     /// Appends content of given column to the end of current one.
-    void Append(ColumnRef column) override;
+    void AppendFromColumn(ColumnRef column) override;
 
     const std::string& operator [] (size_t n) const;
 
