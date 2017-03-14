@@ -4,12 +4,18 @@ ADD_LIBRARY (clickhouse-cpp-lib
     base/output.cpp
     base/platform.cpp
     base/socket.cpp
+
+    columns/array.cpp
+    columns/factory.cpp
+    columns/string.cpp
+    columns/tuple.cpp
+
+    types/type_parser.cpp
+    types/types.cpp
+
     block.cpp
     client.cpp
-    columns.cpp
     query.cpp
-    type_parser.cpp
-    types.cpp
 )
 
 SET_TARGET_PROPERTIES(clickhouse-cpp-lib

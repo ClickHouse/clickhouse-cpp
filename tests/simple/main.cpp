@@ -1,5 +1,5 @@
 #include <clickhouse/client.h>
-#include <clickhouse/type_parser.h>
+#include <clickhouse/types/type_parser.h>
 
 #include <iostream>
 #if defined(_unix_)

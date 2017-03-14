@@ -1,4 +1,4 @@
-#include <clickhouse/type_parser.h>
+#include <clickhouse/types/type_parser.h>
 #include <contrib/gtest/gtest.h>
 
 using namespace clickhouse;

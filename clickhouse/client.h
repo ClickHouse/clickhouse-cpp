@@ -3,6 +3,12 @@
 #include "query.h"
 #include "exceptions.h"
 
+#include "clickhouse/columns/array.h"
+#include "clickhouse/columns/date.h"
+#include "clickhouse/columns/numeric.h"
+#include "clickhouse/columns/string.h"
+#include "clickhouse/columns/tuple.h"
+
 #include <memory>
 #include <string>
 
