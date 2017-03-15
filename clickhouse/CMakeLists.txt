@@ -6,6 +6,7 @@ ADD_LIBRARY (clickhouse-cpp-lib
     base/socket.cpp
 
     columns/array.cpp
+    columns/date.cpp
     columns/factory.cpp
     columns/numeric.cpp
     columns/string.cpp

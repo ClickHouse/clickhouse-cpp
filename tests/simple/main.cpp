@@ -62,6 +62,32 @@ inline void ArrayExample(Client& client) {
     client.Execute("DROP TABLE test.array");
 }
 
+inline void DateExample(Client& client) {
+    Block b;
+
+    /// Create a table.
+    client.Execute("CREATE TABLE IF NOT EXISTS test.date (d Date) ENGINE = Memory");
+
+    auto d = std::make_shared<ColumnDate>();
+    d->Append(std::time(nullptr));
+    b.AppendColumn("d", d);
+    client.Insert("test.date", b);
+
+
+    client.Select("SELECT d FROM test.date", [](const Block& block)
+        {
+            for (size_t c = 0; c < block.GetRowCount(); ++c) {
+                auto col = block[0]->As<ColumnDate>();
+                std::time_t t = col->As<ColumnDate>()->At(c);
+                std::cerr << std::asctime(std::localtime(&t)) << " " << std::endl;
+            }
+        }
+    );
+
+    /// Delete table.
+    client.Execute("DROP TABLE test.date");
+}
+
 inline void GenericExample(Client& client) {
     /// Create a table.
     client.Execute("CREATE TABLE IF NOT EXISTS test.client (id UInt64, name String) ENGINE = Memory");
@@ -104,6 +130,7 @@ int main() {
 
     try {
         ArrayExample(client);
+        DateExample(client);
         GenericExample(client);
     } catch (const std::exception& e) {
         std::cerr << "exception : " << e.what() << std::endl;
