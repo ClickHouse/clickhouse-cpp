@@ -11,7 +11,8 @@ using ColumnRef = std::shared_ptr<class Column>;
 /**
  * An abstract base of all columns classes.
  */
-class Column {
+class Column : public std::enable_shared_from_this<Column>
+{
 public:
     explicit inline Column(TypeRef type)
         : type_(type)
@@ -21,14 +22,16 @@ public:
     virtual ~Column()
     { }
 
+    /// Downcast pointer to the specific culumn's subtype.
     template <typename T>
-    inline T* As() {
-        return dynamic_cast<T*>(this);
+    inline std::shared_ptr<T> As() {
+        return std::dynamic_pointer_cast<T>(shared_from_this());
     }
 
+    /// Downcast pointer to the specific culumn's subtype.
     template <typename T>
-    inline const T* As() const {
-        return dynamic_cast<const T*>(this);
+    inline std::shared_ptr<const T> As() const {
+        return std::dynamic_pointer_cast<const T>(shared_from_this());
     }
 
     /// Get type object of the column.
@@ -40,17 +43,17 @@ public:
     /// Loads column data from input stream.
     virtual bool Load(CodedInputStream* input, size_t rows) = 0;
 
-    /// Save column data to output stream.
+    /// Saves column data to output stream.
     virtual void Save(CodedOutputStream* output) = 0;
 
-    /// Count of rows in the column.
+    /// Returns count of rows in the column.
     virtual size_t Size() const = 0;
 
     /// Makes slice of the current column.
     virtual ColumnRef Slice(size_t begin, size_t len) = 0;
 
 protected:
-    TypeRef type_ = nullptr;
+    TypeRef type_;
 };
 
 }
