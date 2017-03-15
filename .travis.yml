@@ -21,4 +21,4 @@ matrix:
 script:
   - mkdir build
   - cd build
-  - cmake .. && make
+  - cmake .. && make && ./ut/clickhouse-cpp-ut
