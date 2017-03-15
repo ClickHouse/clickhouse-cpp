@@ -4,20 +4,6 @@
 
 namespace clickhouse {
 
-template class ColumnVector<int8_t>;
-template class ColumnVector<int16_t>;
-template class ColumnVector<int32_t>;
-template class ColumnVector<int64_t>;
-
-template class ColumnVector<uint8_t>;
-template class ColumnVector<uint16_t>;
-template class ColumnVector<uint32_t>;
-template class ColumnVector<uint64_t>;
-
-template class ColumnVector<float>;
-template class ColumnVector<double>;
-
-
 template <typename T>
 ColumnVector<T>::ColumnVector()
     : Column(Type::CreateSimple<T>())
@@ -74,6 +60,19 @@ template <typename T>
 ColumnRef ColumnVector<T>::Slice(size_t begin, size_t len) {
     return std::make_shared<ColumnVector<T>>(SliceVector(data_, begin, len));
 }
+
+template class ColumnVector<int8_t>;
+template class ColumnVector<int16_t>;
+template class ColumnVector<int32_t>;
+template class ColumnVector<int64_t>;
+
+template class ColumnVector<uint8_t>;
+template class ColumnVector<uint16_t>;
+template class ColumnVector<uint32_t>;
+template class ColumnVector<uint64_t>;
+
+template class ColumnVector<float>;
+template class ColumnVector<double>;
 
 }
 
