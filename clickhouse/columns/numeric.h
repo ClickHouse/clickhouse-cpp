@@ -1,10 +1,13 @@
 #pragma once
 
 #include "clickhouse/columns/column.h"
+#include "clickhouse/columns/utils.h"
 
 namespace clickhouse {
 
-/** */
+/**
+ * Represents various numeric columns.
+ */
 template <typename T>
 class ColumnVector : public Column {
 public:
@@ -13,50 +16,58 @@ public:
     {
     }
 
-    /// Append one element to the column.
+    explicit ColumnVector(const std::vector<T>& data)
+        : Column(Type::CreateSimple<T>())
+        , data_(data)
+    {
+    }
+
+    /// Appends one element to the end of column.
     void Append(const T& value) {
         data_.push_back(value);
     }
 
+    /// Returns element at given row number.
+    const T& At(size_t n) const {
+        return data_.at(n);
+    }
+
+    /// Returns element at given row number.
+    const T& operator [] (size_t n) const {
+        return data_[n];
+    }
+
+public:
+    /// Appends content of given column to the end of current one.
     void Append(ColumnRef column) override {
         if (auto col = column->As<ColumnVector<T>>()) {
             data_.insert(data_.end(), col->data_.begin(), col->data_.end());
         }
     }
 
-    const T& operator [] (size_t n) const {
-        return data_[n];
-    }
-
-    size_t Size() const override {
-        return data_.size();
-    }
-
+    /// Loads column data from input stream.
     bool Load(CodedInputStream* input, size_t rows) override {
         data_.resize(rows);
 
         return input->ReadRaw(data_.data(), data_.size() * sizeof(T));
     }
 
+    /// Saves column data to output stream.
     void Save(CodedOutputStream* output) override {
         output->WriteRaw(data_.data(), data_.size() * sizeof(T));
     }
 
-    ColumnRef Slice(size_t begin, size_t len) override {
-        if (begin >= data_.size()) {
-            return ColumnRef();
-        }
-
-        len = std::min(len, data_.size() - begin);
-
-        auto result = std::make_shared<ColumnVector<T>>();
-        result->data_.assign(
-            data_.begin() + begin, data_.begin() + (begin + len)
-        );
-        return result;
+    /// Returns count of rows in the column.
+    size_t Size() const override {
+        return data_.size();
     }
 
-protected:
+    /// Makes slice of the current column.
+    ColumnRef Slice(size_t begin, size_t len) override {
+        return std::make_shared<ColumnVector<T>>(SliceVector(data_, begin, len));
+    }
+
+private:
     std::vector<T> data_;
 };
 
