@@ -31,10 +31,6 @@ ColumnRef ColumnArray::GetAsColumn(size_t n) const {
     return data_->Slice(GetOffset(n), GetSize(n));
 }
 
-size_t ColumnArray::Size() const {
-    return offsets_->Size();
-}
-
 bool ColumnArray::Load(CodedInputStream* input, size_t rows) {
     if (!offsets_->Load(input, rows)) {
         return false;
@@ -48,6 +44,18 @@ bool ColumnArray::Load(CodedInputStream* input, size_t rows) {
 void ColumnArray::Save(CodedOutputStream* output) {
     offsets_->Save(output);
     data_->Save(output);
+}
+
+size_t ColumnArray::Size() const {
+    return offsets_->Size();
+}
+
+size_t ColumnArray::GetOffset(size_t n) const {
+    return (n == 0) ? 0 : (*offsets_)[n - 1];
+}
+
+size_t ColumnArray::GetSize(size_t n) const {
+    return (n == 0) ? (*offsets_)[n] : ((*offsets_)[n] - (*offsets_)[n - 1]);
 }
 
 }

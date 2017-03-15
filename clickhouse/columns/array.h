@@ -4,7 +4,9 @@
 
 namespace clickhouse {
 
-/** */
+/**
+ * Represents column of Array(T).
+ */
 class ColumnArray : public Column {
 public:
     ColumnArray(ColumnRef data);
@@ -13,29 +15,30 @@ public:
     /// as one row to the current column.
     void AppendAsColumn(ColumnRef array);
 
+    /// Convets array at pos n to column.
+    /// Type of element of result column same as type of array element.
+    ColumnRef GetAsColumn(size_t n) const;
+
+public:
     /// Appends content of given column to the end of current one.
     void Append(ColumnRef) override { }
 
-    size_t Size() const override;
-
+    /// Loads column data from input stream.
     bool Load(CodedInputStream* input, size_t rows) override;
 
+    /// Saves column data to output stream.
     void Save(CodedOutputStream* output) override;
 
+    /// Returns count of rows in the column.
+    size_t Size() const override;
+
+    /// Makes slice of the current column.
     ColumnRef Slice(size_t, size_t) override { return ColumnRef(); }
 
-    /// Convets array at pos n to column.
-    /// Element's type of result column same as type of array element.
-    ColumnRef GetAsColumn(size_t n) const;
-
 private:
-    inline size_t GetOffset(size_t n) const {
-        return (n == 0) ? 0 : (*offsets_)[n - 1];
-    }
+    size_t GetOffset(size_t n) const;
 
-    inline size_t GetSize(size_t n) const {
-        return (n == 0) ? (*offsets_)[n] : ((*offsets_)[n] - (*offsets_)[n - 1]);
-    }
+    size_t GetSize(size_t n) const;
 
 private:
     ColumnRef data_;
