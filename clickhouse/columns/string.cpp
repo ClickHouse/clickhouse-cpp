@@ -1,5 +1,6 @@
 #include "string.h"
 
+#include "clickhouse/columns/utils.h"
 #include "clickhouse/wire_format.h"
 
 namespace clickhouse {
@@ -15,20 +16,20 @@ void ColumnFixedString::Append(const std::string& str) {
     data_.back().resize(string_size_);
 }
 
-void ColumnFixedString::Append(ColumnRef column) {
-    if (auto col = column->As<ColumnFixedString>()) {
-        if (string_size_ == col->string_size_) {
-            data_.insert(data_.end(), col->data_.begin(), col->data_.end());
-        }
-    }
+const std::string& ColumnFixedString::At(size_t n) const {
+    return data_.at(n);
 }
 
 const std::string& ColumnFixedString::operator [] (size_t n) const {
     return data_[n];
 }
 
-size_t ColumnFixedString::Size() const {
-    return data_.size();
+void ColumnFixedString::Append(ColumnRef column) {
+    if (auto col = column->As<ColumnFixedString>()) {
+        if (string_size_ == col->string_size_) {
+            data_.insert(data_.end(), col->data_.begin(), col->data_.end());
+        }
+    }
 }
 
 bool ColumnFixedString::Load(CodedInputStream* input, size_t rows) {
@@ -52,17 +53,17 @@ void ColumnFixedString::Save(CodedOutputStream* output) {
     }
 }
 
+size_t ColumnFixedString::Size() const {
+    return data_.size();
+}
+
 ColumnRef ColumnFixedString::Slice(size_t begin, size_t len) {
-    if (begin >= data_.size()) {
-        return ColumnRef();
+    auto result = std::make_shared<ColumnFixedString>(string_size_);
+
+    if (begin < data_.size()) {
+        result->data_ = SliceVector(data_, begin, len);
     }
 
-    len = std::min(len, data_.size() - begin);
-
-    auto result = std::make_shared<ColumnFixedString>(string_size_);
-    result->data_.assign(
-        data_.begin() + begin, data_.begin() + (begin + len)
-    );
     return result;
 }
 
@@ -72,22 +73,28 @@ ColumnString::ColumnString()
 {
 }
 
+ColumnString::ColumnString(const std::vector<std::string>& data)
+    : Column(Type::CreateString())
+    , data_(data)
+{
+}
+
 void ColumnString::Append(const std::string& str) {
     data_.push_back(str);
 }
 
-void ColumnString::Append(ColumnRef column) {
-    if (auto col = column->As<ColumnString>()) {
-        data_.insert(data_.end(), col->data_.begin(), col->data_.end());
-    }
+const std::string& ColumnString::At(size_t n) const {
+    return data_.at(n);
 }
 
 const std::string& ColumnString::operator [] (size_t n) const {
     return data_[n];
 }
 
-size_t ColumnString::Size() const {
-    return data_.size();
+void ColumnString::Append(ColumnRef column) {
+    if (auto col = column->As<ColumnString>()) {
+        data_.insert(data_.end(), col->data_.begin(), col->data_.end());
+    }
 }
 
 bool ColumnString::Load(CodedInputStream* input, size_t rows) {
@@ -105,23 +112,17 @@ bool ColumnString::Load(CodedInputStream* input, size_t rows) {
 }
 
 void ColumnString::Save(CodedOutputStream* output) {
-    for (size_t i = 0; i < data_.size(); ++i) {
-        WireFormat::WriteString(output, data_[i]);
+    for (auto si = data_.begin(); si != data_.end(); ++si) {
+        WireFormat::WriteString(output, *si);
     }
 }
 
+size_t ColumnString::Size() const {
+    return data_.size();
+}
+
 ColumnRef ColumnString::Slice(size_t begin, size_t len) {
-    if (begin >= data_.size()) {
-        return ColumnRef();
-    }
-
-    len = std::min(len, data_.size() - begin);
-
-    auto result = std::make_shared<ColumnString>();
-    result->data_.assign(
-        data_.begin() + begin, data_.begin() + (begin + len)
-    );
-    return result;
+    return std::make_shared<ColumnString>(SliceVector(data_, begin, len));
 }
 
 }
