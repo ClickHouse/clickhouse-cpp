@@ -1,3 +1,4 @@
+#include <clickhouse/columns/date.h>
 #include <clickhouse/columns/numeric.h>
 #include <clickhouse/columns/string.h>
 
@@ -40,6 +41,7 @@ TEST(ColumnsCase, NumericSlice) {
     ASSERT_EQ(sub->At(2), 13u);
 }
 
+
 TEST(ColumnsCase, FixedStringInit) {
     auto col = std::make_shared<ColumnFixedString>(3);
     for (const auto& s : MakeFixedStrings()) {
@@ -57,4 +59,17 @@ TEST(ColumnsCase, StringInit) {
     ASSERT_EQ(col->Size(), 4u);
     ASSERT_EQ(col->At(1), "ab");
     ASSERT_EQ(col->At(3), "abcd");
+}
+
+
+TEST(ColumnsCase, DateAppend) {
+    auto col1 = std::make_shared<ColumnDate>();
+    auto col2 = std::make_shared<ColumnDate>();
+    auto now  = std::time(nullptr);
+
+    col1->Append(now);
+    col2->Append(col1);
+
+    ASSERT_EQ(col2->Size(), 1u);
+    ASSERT_EQ(col2->At(0), (now / 86400) * 86400);
 }

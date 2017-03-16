@@ -66,9 +66,9 @@ inline void DateExample(Client& client) {
     Block b;
 
     /// Create a table.
-    client.Execute("CREATE TABLE IF NOT EXISTS test.date (d Date) ENGINE = Memory");
+    client.Execute("CREATE TABLE IF NOT EXISTS test.date (d DateTime) ENGINE = Memory");
 
-    auto d = std::make_shared<ColumnDate>();
+    auto d = std::make_shared<ColumnDateTime>();
     d->Append(std::time(nullptr));
     b.AppendColumn("d", d);
     client.Insert("test.date", b);
@@ -77,8 +77,8 @@ inline void DateExample(Client& client) {
     client.Select("SELECT d FROM test.date", [](const Block& block)
         {
             for (size_t c = 0; c < block.GetRowCount(); ++c) {
-                auto col = block[0]->As<ColumnDate>();
-                std::time_t t = col->As<ColumnDate>()->At(c);
+                auto col = block[0]->As<ColumnDateTime>();
+                std::time_t t = col->As<ColumnDateTime>()->At(c);
                 std::cerr << std::asctime(std::localtime(&t)) << " " << std::endl;
             }
         }

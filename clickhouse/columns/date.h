@@ -38,16 +38,34 @@ private:
 };
 
 /** */
-class ColumnDateTime : public ColumnVector<uint32_t> {
+class ColumnDateTime : public Column {
 public:
-    ColumnDateTime() {
-        type_ = Type::CreateDateTime();
-    }
+    ColumnDateTime();
 
+    /// Appends one element to the end of column.
+    void Append(const std::time_t& value);
+
+    /// Returns element at given row number.
+    std::time_t At(size_t n) const;
+
+public:
     /// Appends content of given column to the end of current one.
-    void Append(ColumnRef) override { }
+    void Append(ColumnRef column) override;
 
-    ColumnRef Slice(size_t, size_t) override { return ColumnRef(); }
+    /// Loads column data from input stream.
+    bool Load(CodedInputStream* input, size_t rows) override;
+
+    /// Saves column data to output stream.
+    void Save(CodedOutputStream* output) override;
+
+    /// Returns count of rows in the column.
+    size_t Size() const override;
+
+    /// Makes slice of the current column.
+    ColumnRef Slice(size_t begin, size_t len) override;
+
+private:
+    std::shared_ptr<ColumnUInt32> data_;
 };
 
 }
