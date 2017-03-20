@@ -6,6 +6,10 @@
 #   include <signal.h>
 #endif
 
+#if defined(_MSC_VER)
+#	pragma warning(disable : 4996)
+#endif
+
 using namespace clickhouse;
 using namespace std;
 
