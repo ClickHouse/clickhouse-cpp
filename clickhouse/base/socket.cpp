@@ -10,8 +10,8 @@
 #if !defined(_win_)
 #   include <errno.h>
 #   include <netdb.h>
-#	include <signal.h>   
-#	include <unistd.h>
+#   include <signal.h>
+#   include <unistd.h>
 #endif
 
 namespace clickhouse {
@@ -161,24 +161,23 @@ void SocketOutput::DoWrite(const void* data, size_t len) {
 
 
 NetrworkInitializer::NetrworkInitializer() {
-	struct NetrworkInitializerImpl {
-		NetrworkInitializerImpl() {
+    struct NetrworkInitializerImpl {
+        NetrworkInitializerImpl() {
 #if defined (_win_)
-#pragma comment(lib, "ws2_32.lib")
-			WSADATA data;
-			const int result = WSAStartup(MAKEWORD(2, 2), &data);
-			if (result) {
-				assert(false);
-				exit(-1);
-		}
+            WSADATA data;
+            const int result = WSAStartup(MAKEWORD(2, 2), &data);
+            if (result) {
+                assert(false);
+                exit(-1);
+            }
 #elif defined(_unix_)
-			signal(SIGPIPE, SIG_IGN);
-#endif		
-		}
-	};
+            signal(SIGPIPE, SIG_IGN);
+#endif
+        }
+    };
 
 
-	(void)Singleton<NetrworkInitializerImpl>();
+    (void)Singleton<NetrworkInitializerImpl>();
 }
 
 

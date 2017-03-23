@@ -94,7 +94,7 @@ private:
 };
 
 static struct NetrworkInitializer {
-	NetrworkInitializer();
+    NetrworkInitializer();
 } gNetrworkInitializer;
 
 ///
