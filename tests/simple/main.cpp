@@ -2,9 +2,6 @@
 #include <clickhouse/types/type_parser.h>
 
 #include <iostream>
-#if defined(_unix_)
-#   include <signal.h>
-#endif
 
 #if defined(_MSC_VER)
 #	pragma warning(disable : 4996)
@@ -126,10 +123,6 @@ inline void GenericExample(Client& client) {
 }
 
 int main() {
-#if defined (_unix_)
-    signal(SIGPIPE, SIG_IGN);
-#endif
-
     Client client(ClientOptions().SetHost("localhost"));
 
     try {

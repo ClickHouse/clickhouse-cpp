@@ -93,6 +93,10 @@ private:
     SOCKET s_;
 };
 
+static struct NetrworkInitializer {
+	NetrworkInitializer();
+} gNetrworkInitializer;
+
 ///
 SOCKET SocketConnect(const NetworkAddress& addr);
 

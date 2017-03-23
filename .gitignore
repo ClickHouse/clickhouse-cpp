@@ -9,6 +9,8 @@
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
+# Temporary solution for VS 2015
+vs/
 
 # Build results
 [Dd]ebug/

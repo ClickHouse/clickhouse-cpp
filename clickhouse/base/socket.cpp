@@ -1,6 +1,7 @@
 #include "socket.h"
 #include "singleton.h"
 
+#include <assert.h>
 #include <stdexcept>
 #include <system_error>
 #include <unordered_set>
@@ -9,10 +10,9 @@
 #if !defined(_win_)
 #   include <errno.h>
 #   include <netdb.h>
-#   include <unistd.h>
+#	include <signal.h>   
+#	include <unistd.h>
 #endif
-
-#include <iostream>
 
 namespace clickhouse {
 namespace {
@@ -157,6 +157,28 @@ void SocketOutput::DoWrite(const void* data, size_t len) {
             errno, std::system_category(), "fail to send data"
         );
     }
+}
+
+
+NetrworkInitializer::NetrworkInitializer() {
+	struct NetrworkInitializerImpl {
+		NetrworkInitializerImpl() {
+#if defined (_win_)
+#pragma comment(lib, "ws2_32.lib")
+			WSADATA data;
+			const int result = WSAStartup(MAKEWORD(2, 2), &data);
+			if (result) {
+				assert(false);
+				exit(-1);
+		}
+#elif defined(_unix_)
+			signal(SIGPIPE, SIG_IGN);
+#endif		
+		}
+	};
+
+
+	(void)Singleton<NetrworkInitializerImpl>();
 }
 
 
