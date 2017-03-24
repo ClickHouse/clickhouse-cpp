@@ -1,6 +1,6 @@
 #pragma once
 
-#include "clickhouse/base/coded.h"
+#include "base/coded.h"
 
 #include <string>
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "clickhouse/base/string_view.h"
+#include "../base/string_view.h"
 
 #include <list>
 #include <stack>

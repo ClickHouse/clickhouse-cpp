@@ -1,8 +1,8 @@
 #pragma once
 
-#include "clickhouse/base/input.h"
-#include "clickhouse/base/coded.h"
-#include "clickhouse/types/types.h"
+#include "../base/input.h"
+#include "../base/coded.h"
+#include "../types/types.h"
 
 namespace clickhouse {
 

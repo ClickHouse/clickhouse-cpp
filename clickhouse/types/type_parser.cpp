@@ -1,5 +1,5 @@
 #include "type_parser.h"
-#include "clickhouse/base/string_utils.h"
+#include "../base/string_utils.h"
 
 #include <iostream>
 

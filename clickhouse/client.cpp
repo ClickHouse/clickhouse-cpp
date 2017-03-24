@@ -2,9 +2,9 @@
 #include "protocol.h"
 #include "wire_format.h"
 
-#include "clickhouse/base/coded.h"
-#include "clickhouse/base/socket.h"
-#include "clickhouse/columns/factory.h"
+#include "base/coded.h"
+#include "base/socket.h"
+#include "columns/factory.h"
 
 #include <atomic>
 #include <system_error>

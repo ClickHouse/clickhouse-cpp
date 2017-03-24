@@ -1,6 +1,5 @@
 #include "numeric.h"
-
-#include "clickhouse/columns/utils.h"
+#include "utils.h"
 
 namespace clickhouse {
 

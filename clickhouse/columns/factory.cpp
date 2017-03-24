@@ -6,7 +6,7 @@
 #include "string.h"
 #include "tuple.h"
 
-#include "clickhouse/types/type_parser.h"
+#include "../types/type_parser.h"
 
 namespace clickhouse {
 namespace {

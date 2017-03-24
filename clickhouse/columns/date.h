@@ -1,6 +1,6 @@
 #pragma once
 
-#include "clickhouse/columns/numeric.h"
+#include "numeric.h"
 
 #include <ctime>
 

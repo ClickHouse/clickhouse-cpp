@@ -1,6 +1,6 @@
 #pragma once
 
-#include "clickhouse/columns/column.h"
+#include "column.h"
 
 #include <vector>
 
