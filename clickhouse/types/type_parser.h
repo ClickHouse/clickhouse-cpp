@@ -12,6 +12,7 @@ struct TypeAst {
     enum Meta {
         Array,
         Null,
+        Nullable,
         Number,
         Terminal,
         Tuple,

@@ -9,6 +9,8 @@ Type::Type(const Code code)
         array_ = new ArrayImpl;
     } else if (code_ == Tuple) {
         tuple_ = new TupleImpl;
+    } else if (code_ == Nullable) {
+        nullable_ = new NullableImpl;
     }
 }
 
@@ -17,6 +19,8 @@ Type::~Type() {
         delete array_;
     } else if (code_ == Tuple) {
         delete tuple_;
+    } else if (code_ == Nullable) {
+        delete nullable_;
     }
 }
 
@@ -65,6 +69,8 @@ std::string Type::GetName() const {
             return "Date";
         case Array:
             return std::string("Array(") + array_->item_type->GetName() +")";
+        case Nullable:
+            return std::string("Nullable(") + nullable_->nested_type->GetName() + ")";
         case Tuple:
             return "Tuple()";
     }
@@ -90,6 +96,12 @@ TypeRef Type::CreateDateTime() {
     return TypeRef(new Type(Type::DateTime));
 }
 
+TypeRef Type::CreateNullable(TypeRef nested_type) {
+    TypeRef type(new Type(Type::Nullable));
+    type->nullable_->nested_type = nested_type;
+    return type;
+}
+
 TypeRef Type::CreateString() {
     return TypeRef(new Type(Type::String));
 }
@@ -104,9 +116,6 @@ TypeRef Type::CreateTuple(const std::vector<TypeRef>& item_types) {
     TypeRef type(new Type(Type::Tuple));
     type->tuple_->item_types.assign(item_types.begin(), item_types.end());
     return type;
-
 }
-
-
 
 }

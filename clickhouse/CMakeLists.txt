@@ -8,6 +8,7 @@ ADD_LIBRARY (clickhouse-cpp-lib
     columns/array.cpp
     columns/date.cpp
     columns/factory.cpp
+    columns/nullable.cpp
     columns/numeric.cpp
     columns/string.cpp
     columns/tuple.cpp
