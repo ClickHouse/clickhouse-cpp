@@ -27,7 +27,8 @@ public:
         DateTime,
         Date,
         Array,
-        Tuple
+        Nullable,
+        Tuple,
     };
 
     /// Destructor
@@ -52,6 +53,8 @@ public:
 
     static TypeRef CreateDateTime();
 
+    static TypeRef CreateNullable(TypeRef nested_type);
+
     template <typename T>
     static TypeRef CreateSimple();
 
@@ -68,6 +71,10 @@ private:
         TypeRef item_type;
     };
 
+    struct NullableImpl {
+        TypeRef nested_type;
+    };
+
     struct TupleImpl {
         std::vector<TypeRef> item_types;
     };
@@ -76,6 +83,7 @@ private:
     const Code code_;
     union {
         ArrayImpl* array_;
+        NullableImpl* nullable_;
         TupleImpl* tuple_;
         int string_size_;
     };

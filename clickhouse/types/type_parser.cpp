@@ -14,6 +14,10 @@ static TypeAst::Meta GetTypeMeta(const StringView& name) {
         return TypeAst::Null;
     }
 
+    if (name == "Nullable") {
+        return TypeAst::Nullable;
+    }
+
     if (name == "Tuple") {
         return TypeAst::Tuple;
     }

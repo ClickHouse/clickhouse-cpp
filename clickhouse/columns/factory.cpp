@@ -2,6 +2,7 @@
 
 #include "array.h"
 #include "date.h"
+#include "nullable.h"
 #include "numeric.h"
 #include "string.h"
 #include "tuple.h"
@@ -10,28 +11,6 @@
 
 namespace clickhouse {
 namespace {
-
-static ColumnRef CreateColumnFromAst(const TypeAst& ast);
-
-static ColumnRef CreateArrayColumn(const TypeAst& ast) {
-    return std::make_shared<ColumnArray>(
-        CreateColumnFromAst(ast.elements.front())
-    );
-}
-
-static ColumnRef CreateTupleColumn(const TypeAst& ast) {
-    std::vector<ColumnRef> columns;
-
-    for (const auto& elem : ast.elements) {
-        if (auto col = CreateColumnFromAst(elem)) {
-            columns.push_back(col);
-        } else {
-            return nullptr;
-        }
-    }
-
-    return std::make_shared<ColumnTuple>(columns);
-}
 
 static ColumnRef CreateTerminalColumn(const TypeAst& ast) {
     if (ast.name == "UInt8")
@@ -71,15 +50,43 @@ static ColumnRef CreateTerminalColumn(const TypeAst& ast) {
 }
 
 static ColumnRef CreateColumnFromAst(const TypeAst& ast) {
-    if (ast.meta == TypeAst::Terminal) {
-        return CreateTerminalColumn(ast);
+    switch (ast.meta) {
+        case TypeAst::Array: {
+            return std::make_shared<ColumnArray>(
+                CreateColumnFromAst(ast.elements.front())
+            );
+        }
+
+        case TypeAst::Nullable: {
+            return std::make_shared<ColumnNullable>(
+                CreateColumnFromAst(ast.elements.front()),
+                std::make_shared<ColumnUInt8>()
+            );
+        }
+
+        case TypeAst::Terminal: {
+            return CreateTerminalColumn(ast);
+        }
+
+        case TypeAst::Tuple: {
+            std::vector<ColumnRef> columns;
+
+            for (const auto& elem : ast.elements) {
+                if (auto col = CreateColumnFromAst(elem)) {
+                    columns.push_back(col);
+                } else {
+                    return nullptr;
+                }
+            }
+
+            return std::make_shared<ColumnTuple>(columns);
+        }
+
+        case TypeAst::Null:
+        case TypeAst::Number:
+            break;
     }
-    if (ast.meta == TypeAst::Tuple) {
-        return CreateTupleColumn(ast);
-    }
-    if (ast.meta == TypeAst::Array) {
-        return CreateArrayColumn(ast);
-    }
+
     return nullptr;
 }
 

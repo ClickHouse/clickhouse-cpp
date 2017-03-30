@@ -29,3 +29,13 @@ TEST(TypeParserCase, ParseArray) {
     ASSERT_EQ(ast.elements.front().meta, TypeAst::Terminal);
     ASSERT_EQ(ast.elements.front().name, "Int32");
 }
+
+TEST(TypeParserCase, ParseNullable) {
+    TypeAst ast;
+    TypeParser("Nullable(Date)").Parse(&ast);
+
+    ASSERT_EQ(ast.meta, TypeAst::Nullable);
+    ASSERT_EQ(ast.name, "Nullable");
+    ASSERT_EQ(ast.elements.front().meta, TypeAst::Terminal);
+    ASSERT_EQ(ast.elements.front().name, "Date");
+}

@@ -122,6 +122,70 @@ inline void GenericExample(Client& client) {
     client.Execute("DROP TABLE test.client");
 }
 
+inline void NullableExample(Client& client) {
+    /// Create a table.
+    client.Execute("CREATE TABLE IF NOT EXISTS test.client (id Nullable(UInt64), date Nullable(Date)) ENGINE = Memory");
+
+    /// Insert some values.
+    {
+        Block block;
+
+        {
+            auto id = std::make_shared<ColumnUInt64>();
+            id->Append(1);
+            id->Append(2);
+
+            auto nulls = std::make_shared<ColumnUInt8>();
+            nulls->Append(0);
+            nulls->Append(0);
+
+            block.AppendColumn("id", std::make_shared<ColumnNullable>(id, nulls));
+        }
+
+        {
+            auto date = std::make_shared<ColumnDate>();
+            date->Append(std::time(nullptr));
+            date->Append(std::time(nullptr));
+
+            auto nulls = std::make_shared<ColumnUInt8>();
+            nulls->Append(0);
+            nulls->Append(1);
+
+            block.AppendColumn("date", std::make_shared<ColumnNullable>(date, nulls));
+        }
+
+        client.Insert("test.client", block);
+    }
+
+    /// Select values inserted in the previous step.
+    client.Select("SELECT id, date FROM test.client", [](const Block& block)
+        {
+            for (size_t c = 0; c < block.GetRowCount(); ++c) {
+                auto col_id   = block[0]->As<ColumnNullable>();
+                auto col_date = block[1]->As<ColumnNullable>();
+
+                if (col_id->IsNull(c)) {
+                    std::cerr << "\\N ";
+                } else {
+                    std::cerr << col_id->Nested()->As<ColumnUInt64>()->At(c)
+                              << " ";
+                }
+
+                if (col_date->IsNull(c)) {
+                    std::cerr << "\\N\n";
+                } else {
+                    std::time_t t = col_date->Nested()->As<ColumnDate>()->At(c);
+                    std::cerr << std::asctime(std::localtime(&t))
+                              << "\n";
+                }
+            }
+        }
+    );
+
+    /// Delete table.
+    client.Execute("DROP TABLE test.client");
+}
+
 int main() {
     Client client(ClientOptions().SetHost("localhost"));
 
@@ -129,6 +193,7 @@ int main() {
         ArrayExample(client);
         DateExample(client);
         GenericExample(client);
+        NullableExample(client);
     } catch (const std::exception& e) {
         std::cerr << "exception : " << e.what() << std::endl;
     }

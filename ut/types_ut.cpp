@@ -15,6 +15,11 @@ TEST(TypesCase, TypeName) {
     );
 
     ASSERT_EQ(
+        Type::CreateNullable(Type::CreateSimple<int32_t>())->GetName(),
+        "Nullable(Int32)"
+    );
+
+    ASSERT_EQ(
         Type::CreateArray(Type::CreateSimple<int32_t>())->GetItemType()->GetCode(),
         Type::Int32
     );
