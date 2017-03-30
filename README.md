@@ -11,8 +11,9 @@ C++ client for [Yandex ClickHouse](https://clickhouse.yandex/)
 * FixedString(N)
 * DateTime
 * Date
-* Tuple
 * Array(T)
+* Nullable(T)
+* Tuple
 
 ## Building
 
@@ -58,8 +59,8 @@ client.Execute("CREATE TABLE IF NOT EXISTS test.numbers (id UInt64, name String)
 client.Select("SELECT id, name FROM test.numbers", [] (const Block& block)
     {
         for (size_t i = 0; i < block.GetRowCount(); ++i) {
-            std::cout << (*block[0]->As<ColumnUInt64>())[i] << " "
-                      << (*block[1]->As<ColumnString>())[i] << "\n";
+            std::cout << block[0]->As<ColumnUInt64>()->At(i) << " "
+                      << block[1]->As<ColumnString>()->At(i) << "\n";
         }
     }
 );
