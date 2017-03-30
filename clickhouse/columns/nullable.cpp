@@ -4,12 +4,6 @@
 
 namespace clickhouse {
 
-ColumnNullable::ColumnNullable(TypeRef nested)
-    : Column(Type::CreateNullable(nested))
-    , nulls_(std::make_shared<ColumnUInt8>())
-{
-}
-
 ColumnNullable::ColumnNullable(ColumnRef nested, ColumnRef nulls)
     : Column(Type::CreateNullable(nested->Type()))
     , nested_(nested)
@@ -20,18 +14,23 @@ ColumnNullable::ColumnNullable(ColumnRef nested, ColumnRef nulls)
     }
 }
 
-/// Returns null flag at given row number.
 bool ColumnNullable::IsNull(size_t n) const {
     return nulls_->At(n) != 0;
 }
 
-/// Returns nested column.
 ColumnRef ColumnNullable::Nested() const {
     return nested_;
 }
 
 void ColumnNullable::Append(ColumnRef column) {
-    (void)column;
+    if (auto col = column->As<ColumnNullable>()) {
+        if (!col->nested_->Type()->IsEqual(nested_->Type())) {
+            return;
+        }
+
+        nested_->Append(col->nested_);
+        nulls_->Append(col->nulls_);
+    }
 }
 
 bool ColumnNullable::Load(CodedInputStream* input, size_t rows) {

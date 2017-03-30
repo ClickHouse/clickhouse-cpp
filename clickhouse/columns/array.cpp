@@ -31,6 +31,18 @@ ColumnRef ColumnArray::GetAsColumn(size_t n) const {
     return data_->Slice(GetOffset(n), GetSize(n));
 }
 
+void ColumnArray::Append(ColumnRef column) {
+    if (auto col = column->As<ColumnArray>()) {
+        if (!col->data_->Type()->IsEqual(data_->Type())) {
+            return;
+        }
+
+        for (size_t i = 0; i < col->Size(); ++i) {
+            AppendAsColumn(col->GetAsColumn(i));
+        }
+    }
+}
+
 bool ColumnArray::Load(CodedInputStream* input, size_t rows) {
     if (!offsets_->Load(input, rows)) {
         return false;

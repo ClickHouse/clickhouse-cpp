@@ -10,7 +10,6 @@ namespace clickhouse {
  */
 class ColumnNullable : public Column {
 public:
-    ColumnNullable(TypeRef nested);
     ColumnNullable(ColumnRef nested, ColumnRef nulls);
 
     /// Returns null flag at given row number.

@@ -1,3 +1,4 @@
+#include <clickhouse/columns/array.h>
 #include <clickhouse/columns/date.h>
 #include <clickhouse/columns/numeric.h>
 #include <clickhouse/columns/string.h>
@@ -61,6 +62,26 @@ TEST(ColumnsCase, StringInit) {
     ASSERT_EQ(col->At(3), "abcd");
 }
 
+
+TEST(ColumnsCase, ArrayAppend) {
+    auto arr1 = std::make_shared<ColumnArray>(std::make_shared<ColumnUInt64>());
+    auto arr2 = std::make_shared<ColumnArray>(std::make_shared<ColumnUInt64>());
+
+    auto id = std::make_shared<ColumnUInt64>();
+    id->Append(1);
+    arr1->AppendAsColumn(id);
+
+    id->Append(3);
+    arr2->AppendAsColumn(id);
+
+    arr1->Append(arr2);
+
+    auto col = arr1->GetAsColumn(1);
+
+    ASSERT_EQ(arr1->Size(), 2u);
+    //ASSERT_EQ(col->As<ColumnUInt64>()->At(0), 1u);
+    //ASSERT_EQ(col->As<ColumnUInt64>()->At(1), 3u);
+}
 
 TEST(ColumnsCase, DateAppend) {
     auto col1 = std::make_shared<ColumnDate>();
