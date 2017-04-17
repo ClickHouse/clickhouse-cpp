@@ -71,8 +71,18 @@ std::string Type::GetName() const {
             return std::string("Array(") + array_->item_type->GetName() +")";
         case Nullable:
             return std::string("Nullable(") + nullable_->nested_type->GetName() + ")";
-        case Tuple:
-            return "Tuple()";
+        case Tuple: {
+            std::string result("Tuple(");
+            for (size_t i = 0; i < tuple_->item_types.size(); ++i) {
+                result += tuple_->item_types[i]->GetName();
+
+                if (i + 1 != tuple_->item_types.size()) {
+                    result += ", ";
+                }
+            }
+            result += ")";
+            return result;
+        }
     }
 
     return std::string();
