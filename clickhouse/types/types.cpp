@@ -35,6 +35,13 @@ TypeRef Type::GetItemType() const {
     return TypeRef();
 }
 
+TypeRef Type::GetNestedType() const {
+    if (code_ == Nullable) {
+        return nullable_->nested_type;
+    }
+    return TypeRef();
+}
+
 std::string Type::GetName() const {
     switch (code_) {
         case Void:
