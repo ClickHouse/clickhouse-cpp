@@ -229,7 +229,7 @@ bool Client::Impl::ReceivePacket(uint64_t* server_packet) {
     switch (packet_type) {
     case ServerCodes::Data: {
         if (!ReceiveData()) {
-            std::runtime_error("can't read data packet from input stream");
+            throw std::runtime_error("can't read data packet from input stream");
         }
         return true;
     }
@@ -380,7 +380,7 @@ bool Client::Impl::ReceiveData() {
         events_->OnData(block);
     }
 
-    return false;
+    return true;
 }
 
 bool Client::Impl::ReceiveException(bool rethrow) {
