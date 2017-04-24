@@ -20,11 +20,13 @@ PROJECT (CLICKHOUSE-CLIENT)
 
     INCLUDE_DIRECTORIES(.)
     INCLUDE_DIRECTORIES(contrib/cityhash)
+    INCLUDE_DIRECTORIES(contrib/lz4)
 
     SUBDIRS (
         clickhouse
         contrib/cityhash
         contrib/gtest
+        contrib/lz4
         tests/simple
         ut
     )
