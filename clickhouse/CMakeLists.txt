@@ -23,3 +23,7 @@ ADD_LIBRARY (clickhouse-cpp-lib
 
 SET_TARGET_PROPERTIES(clickhouse-cpp-lib
     PROPERTIES LINKER_LANGUAGE CXX)
+
+TARGET_LINK_LIBRARIES (clickhouse-cpp-lib
+    cityhash-lib
+)

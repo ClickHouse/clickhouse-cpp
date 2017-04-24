@@ -19,9 +19,11 @@ PROJECT (CLICKHOUSE-CLIENT)
     ENDIF ()
 
     INCLUDE_DIRECTORIES(.)
+    INCLUDE_DIRECTORIES(contrib/cityhash)
 
     SUBDIRS (
         clickhouse
+        contrib/cityhash
         contrib/gtest
         tests/simple
         ut
