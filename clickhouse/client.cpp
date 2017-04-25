@@ -6,6 +6,10 @@
 #include "base/socket.h"
 #include "columns/factory.h"
 
+#include <cityhash/city.h>
+#include <lz4/lz4.h>
+
+#include <assert.h>
 #include <atomic>
 #include <system_error>
 #include <vector>
@@ -71,6 +75,8 @@ private:
 
     bool SendHello();
 
+    bool ReadBlock(Block* block, CodedInputStream* input);
+
     bool ReceiveHello();
 
     /// Reads data packet form input stream.
@@ -78,6 +84,8 @@ private:
 
     /// Reads exception packet form input stream.
     bool ReceiveException(bool rethrow = false);
+
+    void WriteBlock(const Block& block, CodedOutputStream* output);
 
 private:
     void Disconnect() {
@@ -110,6 +118,7 @@ private:
     const ClientOptions options_;
     QueryEvents* events_;
     uint64_t query_id_;
+    int compression_ = CompressionState::Disable;
 
     SocketHolder socket_;
 
@@ -145,8 +154,13 @@ Client::Impl::Impl(const ClientOptions& opts)
     if (socket_.Closed()) {
         throw std::system_error(errno, std::system_category());
     }
+
     if (!Handshake()) {
         throw std::runtime_error("fail to connect to " + options_.host);
+    }
+
+    if (options_.compression_method != CompressionMethod::None) {
+        compression_ = CompressionState::Enable;
     }
 }
 
@@ -309,33 +323,26 @@ bool Client::Impl::ReceivePacket(uint64_t* server_packet) {
     return false;
 }
 
-bool Client::Impl::ReceiveData() {
-    if (REVISION >= DBMS_MIN_REVISION_WITH_TEMPORARY_TABLES) {
-        std::string table_name;
-
-        if (!WireFormat::ReadString(&input_, &table_name)) {
-            return false;
-        }
-    }
+bool Client::Impl::ReadBlock(Block* block, CodedInputStream* input) {
     // Additional information about block.
     if (REVISION >= DBMS_MIN_REVISION_WITH_BLOCK_INFO) {
         uint64_t num;
         BlockInfo info;
 
         // BlockInfo
-        if (!WireFormat::ReadUInt64(&input_, &num)) {
+        if (!WireFormat::ReadUInt64(input, &num)) {
             return false;
         }
-        if (!WireFormat::ReadFixed(&input_, &info.is_overflows)) {
+        if (!WireFormat::ReadFixed(input, &info.is_overflows)) {
             return false;
         }
-        if (!WireFormat::ReadUInt64(&input_, &num)) {
+        if (!WireFormat::ReadUInt64(input, &num)) {
             return false;
         }
-        if (!WireFormat::ReadFixed(&input_, &info.bucket_num)) {
+        if (!WireFormat::ReadFixed(input, &info.bucket_num)) {
             return false;
         }
-        if (!WireFormat::ReadUInt64(&input_, &num)) {
+        if (!WireFormat::ReadUInt64(input, &num)) {
             return false;
         }
 
@@ -345,34 +352,55 @@ bool Client::Impl::ReceiveData() {
     uint64_t num_columns = 0;
     uint64_t num_rows = 0;
 
-    if (!WireFormat::ReadUInt64(&input_, &num_columns)) {
+    if (!WireFormat::ReadUInt64(input, &num_columns)) {
         return false;
     }
-    if (!WireFormat::ReadUInt64(&input_, &num_rows)) {
+    if (!WireFormat::ReadUInt64(input, &num_rows)) {
         return false;
     }
-
-    Block block(num_columns, num_rows);
 
     for (size_t i = 0; i < num_columns; ++i) {
         std::string name;
         std::string type;
 
-        if (!WireFormat::ReadString(&input_, &name)) {
+        if (!WireFormat::ReadString(input, &name)) {
             return false;
         }
-        if (!WireFormat::ReadString(&input_, &type)) {
+        if (!WireFormat::ReadString(input, &type)) {
             return false;
         }
 
         if (ColumnRef col = CreateColumnByType(type)) {
-            if (num_rows && !col->Load(&input_, num_rows)) {
+            if (num_rows && !col->Load(input, num_rows)) {
                 throw std::runtime_error("can't load");
             }
 
-            block.AppendColumn(name, col);
+            block->AppendColumn(name, col);
         } else {
             throw std::runtime_error(std::string("unsupported column type: ") + type);
+        }
+    }
+
+    return true;
+}
+
+bool Client::Impl::ReceiveData() {
+    Block block;
+
+    if (REVISION >= DBMS_MIN_REVISION_WITH_TEMPORARY_TABLES) {
+        std::string table_name;
+
+        if (!WireFormat::ReadString(&input_, &table_name)) {
+            return false;
+        }
+    }
+
+    if (compression_ == CompressionState::Enable) {
+        // TODO
+        assert(false);
+    } else {
+        if (!ReadBlock(&block, &input_)) {
+            return false;
         }
     }
 
@@ -464,13 +492,35 @@ void Client::Impl::SendQuery(const std::string& query) {
     WireFormat::WriteString(&output_, std::string());
 
     WireFormat::WriteUInt64(&output_, Stages::Complete);
-    WireFormat::WriteUInt64(&output_, CompressionState::Disable);
+    WireFormat::WriteUInt64(&output_, compression_);
     WireFormat::WriteString(&output_, query);
     // Send empty block as marker of
     // end of data
     SendData(Block());
 
     output_.Flush();
+}
+
+
+void Client::Impl::WriteBlock(const Block& block, CodedOutputStream* output) {
+    // Additional information about block.
+    if (server_info_.revision >= DBMS_MIN_REVISION_WITH_BLOCK_INFO) {
+        WireFormat::WriteUInt64(output, 1);
+        WireFormat::WriteFixed (output, block.Info().is_overflows);
+        WireFormat::WriteUInt64(output, 2);
+        WireFormat::WriteFixed (output, block.Info().bucket_num);
+        WireFormat::WriteUInt64(output, 0);
+    }
+
+    WireFormat::WriteUInt64(output, block.GetColumnCount());
+    WireFormat::WriteUInt64(output, block.GetRowCount());
+
+    for (Block::Iterator bi(block); bi.IsValid(); bi.Next()) {
+        WireFormat::WriteString(output, bi.Name());
+        WireFormat::WriteString(output, bi.Type()->GetName());
+
+        bi.Column()->Save(output);
+    }
 }
 
 void Client::Impl::SendData(const Block& block) {
@@ -480,23 +530,11 @@ void Client::Impl::SendData(const Block& block) {
         WireFormat::WriteString(&output_, std::string());
     }
 
-    /// Дополнительная информация о блоке.
-    if (server_info_.revision >= DBMS_MIN_REVISION_WITH_BLOCK_INFO) {
-        WireFormat::WriteUInt64(&output_, 1);
-        WireFormat::WriteFixed (&output_, block.Info().is_overflows);
-        WireFormat::WriteUInt64(&output_, 2);
-        WireFormat::WriteFixed (&output_, block.Info().bucket_num);
-        WireFormat::WriteUInt64(&output_, 0);
-    }
-
-    WireFormat::WriteUInt64(&output_, block.GetColumnCount());
-    WireFormat::WriteUInt64(&output_, block.GetRowCount());
-
-    for (Block::Iterator bi(block); bi.IsValid(); bi.Next()) {
-        WireFormat::WriteString(&output_, bi.Name());
-        WireFormat::WriteString(&output_, bi.Type()->GetName());
-
-        bi.Column()->Save(&output_);
+    if (compression_ == CompressionState::Enable) {
+        // TODO
+        assert(false);
+    } else {
+        WriteBlock(block, &output_);
     }
 
     output_.Flush();

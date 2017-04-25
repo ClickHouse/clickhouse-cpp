@@ -1,7 +1,7 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 3.0.2)
 
-INCLUDE (cmake/subdirs.cmake)
 INCLUDE (cmake/cpp11.cmake)
+INCLUDE (cmake/subdirs.cmake)
 
 PROJECT (CLICKHOUSE-CLIENT)
 
@@ -17,8 +17,7 @@ PROJECT (CLICKHOUSE-CLIENT)
     ENDIF ()
 
     INCLUDE_DIRECTORIES(.)
-    INCLUDE_DIRECTORIES(contrib/cityhash)
-    INCLUDE_DIRECTORIES(contrib/lz4)
+    INCLUDE_DIRECTORIES(contrib)
 
     SUBDIRS (
         clickhouse

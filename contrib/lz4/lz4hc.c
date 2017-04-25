@@ -43,7 +43,7 @@ static const int LZ4HC_compressionLevel_default = 9;
 /**************************************
 *  Includes
 **************************************/
-#include <lz4hc.h>
+#include "lz4hc.h"
 
 
 /**************************************
