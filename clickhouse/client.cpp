@@ -27,6 +27,8 @@
 #define DBMS_MIN_REVISION_WITH_SERVER_TIMEZONE          54058
 #define DBMS_MIN_REVISION_WITH_QUOTA_KEY_IN_CLIENT_INFO 54060
 
+#define DBMS_MAX_COMPRESSED_SIZE                        0x40000000ULL   // 1GB
+
 namespace clickhouse {
 
 struct ClientInfo {
@@ -396,8 +398,63 @@ bool Client::Impl::ReceiveData() {
     }
 
     if (compression_ == CompressionState::Enable) {
-        // TODO
-        assert(false);
+        uint128 hash;
+        uint32_t compressed = 0;
+        uint32_t original = 0;
+        uint8_t method = 0;
+
+        if (!WireFormat::ReadFixed(&input_, &hash)) {
+            return false;
+        }
+        if (!WireFormat::ReadFixed(&input_, &method)) {
+            return false;
+        }
+
+        if (method != 0x82) {
+            throw std::runtime_error("unsupported compression method " +
+                                     std::to_string(int(method)));
+        } else {
+            if (!WireFormat::ReadFixed(&input_, &compressed)) {
+                return false;
+            }
+            if (!WireFormat::ReadFixed(&input_, &original)) {
+                return false;
+            }
+
+            if (compressed > DBMS_MAX_COMPRESSED_SIZE) {
+                throw std::runtime_error("compressed data too big");
+            }
+
+            Buffer buf(original);
+            Buffer tmp(compressed);
+
+            // Заполнить заголовок сжатых данных.
+            {
+                BufferOutput out(&tmp);
+                out.Write(&method,     sizeof(method));
+                out.Write(&compressed, sizeof(compressed));
+                out.Write(&original,   sizeof(original));
+            }
+
+            if (!WireFormat::ReadBytes(&input_, tmp.data() + 9, compressed - 9)) {
+                return false;
+            } else {
+                if (hash != CityHash128((const char*)tmp.data(), compressed)) {
+                    throw std::runtime_error("data was corrupted");
+                }
+            }
+
+            if (LZ4_decompress_fast((const char*)tmp.data() + 9, (char*)buf.data(), original) < 0) {
+                throw std::runtime_error("can't decompress data");
+            } else {
+                ArrayInput mem(buf.data(), original);
+                CodedInputStream coded(&mem);
+
+                if (!ReadBlock(&block, &coded)) {
+                    return false;
+                }
+            }
+        }
     } else {
         if (!ReadBlock(&block, &input_)) {
             return false;
@@ -531,8 +588,47 @@ void Client::Impl::SendData(const Block& block) {
     }
 
     if (compression_ == CompressionState::Enable) {
-        // TODO
-        assert(false);
+        switch (options_.compression_method) {
+            case CompressionMethod::None: {
+                assert(false);
+                break;
+            }
+
+            case CompressionMethod::LZ4: {
+                Buffer tmp;
+                // Serialize block's data
+                {
+                    BufferOutput out(&tmp);
+                    CodedOutputStream coded(&out);
+                    WriteBlock(block, &coded);
+                }
+                // Reserver space for data
+                Buffer buf;
+                buf.resize(9 + LZ4_compressBound(tmp.size()));
+
+                // Compress data
+                int size = LZ4_compress((const char*)tmp.data(), (char*)buf.data() + 9, tmp.size());
+                buf.resize(9 + size);
+
+                std::cerr << "tmp.size : " << tmp.size() << std::endl;
+                std::cerr << "buf.size : " << buf.size() << std::endl;
+                std::cerr << "size     : " << size << std::endl;
+
+                // Fill header
+                uint8_t* p = buf.data();
+                // Compression method
+                WriteUnaligned(p, (uint8_t)0x82); p += 1;
+                // Compressed data size with header
+                WriteUnaligned(p, (uint32_t)buf.size()); p += 4;
+                // Original data size
+                WriteUnaligned(p, (uint32_t)tmp.size());
+
+                WireFormat::WriteFixed(&output_, CityHash128(
+                                    (const char*)buf.data(), buf.size()));
+                WireFormat::WriteBytes(&output_, buf.data(), buf.size());
+                break;
+            }
+        }
     } else {
         WriteBlock(block, &output_);
     }

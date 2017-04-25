@@ -1,8 +1,11 @@
 #pragma once
 
+#include "buffer.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <vector>
+#include <memory.h>
 
 namespace clickhouse {
 
@@ -80,6 +83,23 @@ private:
 };
 
 
+/**
+ * A ZeroCopyOutput stream backed by an vector of bytes.
+ */
+class BufferOutput : public ZeroCopyOutput {
+public:
+     BufferOutput(Buffer* buf);
+    ~BufferOutput();
+
+protected:
+    size_t DoNext(void** data, size_t len) override;
+
+private:
+    Buffer* buf_;
+    size_t pos_;
+};
+
+
 class BufferedOutput : public ZeroCopyOutput {
 public:
      BufferedOutput(OutputStream* slave, size_t buflen = 8192);
@@ -92,8 +112,13 @@ protected:
 
 private:
     OutputStream* const slave_;
-    std::vector<uint8_t> buffer_;
+    Buffer buffer_;
     ArrayOutput array_output_;
 };
+
+template <typename T>
+void WriteUnaligned(void* buf, const T& value) {
+    memcpy(buf, &value, sizeof(value));
+}
 
 }
