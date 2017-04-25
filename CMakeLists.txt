@@ -1,13 +1,11 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 3.0.2)
 
+INCLUDE (cmake/cpp11.cmake)
 INCLUDE (cmake/subdirs.cmake)
 
 PROJECT (CLICKHOUSE-CLIENT)
 
-    SET (CMAKE_CXX_STANDARD 11)
-    SET (CMAKE_CXX_STANDARD_REQUIRED ON)
-
-    ADD_COMPILE_OPTIONS(-std=c++11)
+    USE_CXX11()
 
     IF (UNIX)
         IF (APPLE)
@@ -19,10 +17,13 @@ PROJECT (CLICKHOUSE-CLIENT)
     ENDIF ()
 
     INCLUDE_DIRECTORIES(.)
+    INCLUDE_DIRECTORIES(contrib)
 
     SUBDIRS (
         clickhouse
+        contrib/cityhash
         contrib/gtest
+        contrib/lz4
         tests/simple
         ut
     )

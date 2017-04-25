@@ -1,6 +1,7 @@
 #include "output.h"
 
 #include <algorithm>
+#include <assert.h>
 #include <memory.h>
 
 namespace clickhouse {
@@ -34,6 +35,28 @@ size_t ArrayOutput::DoNext(void** data, size_t len) {
 
     *data = buf_;
     buf_ += len;
+
+    return len;
+}
+
+
+BufferOutput::BufferOutput(Buffer* buf)
+    : buf_(buf)
+    , pos_(0)
+{
+    assert(buf_);
+}
+
+BufferOutput::~BufferOutput()
+{ }
+
+size_t BufferOutput::DoNext(void** data, size_t len) {
+    if (pos_ + len > buf_->size()) {
+        buf_->resize(pos_ + len);
+    }
+
+    *data = buf_->data() + pos_;
+    pos_ += len;
 
     return len;
 }

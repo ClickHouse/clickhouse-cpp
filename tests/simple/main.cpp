@@ -186,14 +186,27 @@ inline void NullableExample(Client& client) {
     client.Execute("DROP TABLE test.client");
 }
 
-int main() {
-    Client client(ClientOptions().SetHost("localhost"));
+static void RunTests(Client& client) {
+    ArrayExample(client);
+    DateExample(client);
+    GenericExample(client);
+    NullableExample(client);
+}
 
+int main() {
     try {
-        ArrayExample(client);
-        DateExample(client);
-        GenericExample(client);
-        NullableExample(client);
+        {
+            Client client(ClientOptions()
+                            .SetHost("localhost"));
+            RunTests(client);
+        }
+
+        {
+            Client client(ClientOptions()
+                            .SetHost("localhost")
+                            .SetCompressionMethod(CompressionMethod::LZ4));
+            RunTests(client);
+        }
     } catch (const std::exception& e) {
         std::cerr << "exception : " << e.what() << std::endl;
     }

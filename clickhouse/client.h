@@ -15,6 +15,12 @@
 
 namespace clickhouse {
 
+/// Methods of block compression.
+enum class CompressionMethod {
+    None    = -1,
+    LZ4     =  1,
+};
+
 struct ClientOptions {
 #define DECLARE_FIELD(name, type, setter, default) \
     type name = default; \
@@ -39,6 +45,9 @@ struct ClientOptions {
     /// passed to OnException handler.  Set rethrow_exceptions to true to
     /// enable throwing exceptions with standard c++ exception mechanism.
     DECLARE_FIELD(rethrow_exceptions, bool, SetRethrowException, true);
+
+    /// Compression method.
+    DECLARE_FIELD(compression_method, CompressionMethod, SetCompressionMethod, CompressionMethod::None);
 
 #undef DECLARE_FIELD
 };
