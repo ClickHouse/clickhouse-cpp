@@ -610,10 +610,6 @@ void Client::Impl::SendData(const Block& block) {
                 int size = LZ4_compress((const char*)tmp.data(), (char*)buf.data() + 9, tmp.size());
                 buf.resize(9 + size);
 
-                std::cerr << "tmp.size : " << tmp.size() << std::endl;
-                std::cerr << "buf.size : " << buf.size() << std::endl;
-                std::cerr << "size     : " << size << std::endl;
-
                 // Fill header
                 uint8_t* p = buf.data();
                 // Compression method
