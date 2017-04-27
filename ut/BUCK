@@ -1,0 +1,12 @@
+cxx_test(
+  name = 'ut',
+  srcs = glob([
+    '*.cpp',
+  ]),
+  compiler_flags = [
+    '-std=c++11',
+  ],
+  deps = [
+    '//:clickhouse-cpp',
+  ],
+)

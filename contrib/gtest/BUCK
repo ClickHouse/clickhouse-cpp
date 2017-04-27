@@ -1,0 +1,14 @@
+cxx_library(
+  name = 'gtest',
+  # This is a bit weird, but this is how the tests use the headers... 
+  header_namespace = 'contrib/gtest',
+  exported_headers = subdir_glob([
+    ('', '*.h'),
+  ]),
+  srcs = glob([
+    '*.cc',
+  ]),
+  visibility = [
+    '//...',
+  ],
+)
