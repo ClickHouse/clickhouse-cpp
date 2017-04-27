@@ -1,0 +1,13 @@
+cxx_library(
+  name = 'lz4',
+  header_namespace = 'lz4',
+  exported_headers = subdir_glob([
+    ('', '*.h'),
+  ]),
+  srcs = glob([
+    '*.c',
+  ]),
+  visibility = [
+    '//...',
+  ],
+)

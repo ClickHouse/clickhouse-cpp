@@ -1,0 +1,13 @@
+cxx_library(
+  name = 'cityhash',
+  header_namespace = 'cityhash',
+  exported_headers = subdir_glob([
+    ('', '*.h'),
+  ]),
+  srcs = glob([
+    '*.cc',
+  ]),
+  visibility = [
+    '//...',
+  ],
+)

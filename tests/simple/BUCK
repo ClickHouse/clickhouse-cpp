@@ -1,0 +1,12 @@
+cxx_binary(
+  name = 'simple',
+  srcs = [
+    'main.cpp',
+  ],
+  compiler_flags = [
+    '-std=c++11',
+  ],
+  deps = [
+    '//:clickhouse-cpp',
+  ],
+)
