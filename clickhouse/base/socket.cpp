@@ -134,8 +134,14 @@ SocketInput::~SocketInput() = default;
 size_t SocketInput::DoRead(void* buf, size_t len) {
     const ssize_t ret = ::recv(s_, (char*)buf, (int)len, 0);
 
-    if (ret >= 0) {
+    if (ret > 0) {
         return (size_t)ret;
+    }
+
+    if (ret == 0) {
+        throw std::system_error(
+            errno, std::system_category(), "closed"
+        );
     }
 
     throw std::system_error(

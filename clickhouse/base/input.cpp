@@ -45,6 +45,10 @@ BufferedInput::BufferedInput(InputStream* slave, size_t buflen)
 
 BufferedInput::~BufferedInput() = default;
 
+void BufferedInput::Reset() {
+    array_input_.Reset(nullptr, 0);
+}
+
 size_t BufferedInput::DoNext(const void** ptr, size_t len)  {
     if (array_input_.Exhausted()) {
         array_input_.Reset(

@@ -12,8 +12,8 @@
 #include <assert.h>
 #include <atomic>
 #include <system_error>
+#include <thread>
 #include <vector>
-#include <iostream>
 
 #define DBMS_NAME                                       "ClickHouse"
 #define DBMS_VERSION_MAJOR                              1
@@ -66,6 +66,8 @@ public:
 
     void Ping();
 
+    void ResetConnection();
+
 private:
     bool Handshake();
 
@@ -93,6 +95,10 @@ private:
     void Disconnect() {
         socket_.Close();
     }
+
+    /// In case of network errors tries to reconnect to server and
+    /// call fuc several times.
+    void RetryGuard(std::function<void()> fuc);
 
 private:
     class EnsureNull {
@@ -173,7 +179,9 @@ Client::Impl::~Impl() {
 void Client::Impl::ExecuteQuery(Query query) {
     EnsureNull en(static_cast<QueryEvents*>(&query), &events_);
 
-    // TODO check connection
+    if (options_.ping_before_query) {
+        RetryGuard([this]() { Ping(); });
+    }
 
     SendQuery(query.GetText());
 
@@ -183,7 +191,9 @@ void Client::Impl::ExecuteQuery(Query query) {
 }
 
 void Client::Impl::Insert(const std::string& table_name, const Block& block) {
-    // TODO check connection
+    if (options_.ping_before_query) {
+        RetryGuard([this]() { Ping(); });
+    }
 
     SendQuery("INSERT INTO " + table_name + " VALUES");
 
@@ -219,7 +229,30 @@ void Client::Impl::Ping() {
     WireFormat::WriteUInt64(&output_, ClientCodes::Ping);
     output_.Flush();
 
-    ReceivePacket();
+    uint64_t server_packet;
+    const bool ret = ReceivePacket(&server_packet);
+
+    if (!ret || server_packet != ServerCodes::Pong) {
+        std::runtime_error("fail to ping server");
+    }
+}
+
+void Client::Impl::ResetConnection() {
+    SocketHolder s(SocketConnect(NetworkAddress(options_.host, std::to_string(options_.port))));
+
+    if (s.Closed()) {
+        throw std::system_error(errno, std::system_category());
+    }
+
+    socket_ = std::move(s);
+    socket_input_ = SocketInput(socket_);
+    socket_output_ = SocketOutput(socket_);
+    buffered_input_.Reset();
+    buffered_output_.Reset();
+
+    if (!Handshake()) {
+        throw std::runtime_error("fail to connect to " + options_.host);
+    }
 }
 
 bool Client::Impl::Handshake() {
@@ -683,6 +716,27 @@ bool Client::Impl::ReceiveHello() {
     return false;
 }
 
+void Client::Impl::RetryGuard(std::function<void()> func) {
+    for (int i = 0; i <= options_.send_retries; ++i) {
+        try {
+            func();
+            return;
+        } catch (const std::system_error&) {
+            bool ok = true;
+
+            try {
+                std::this_thread::sleep_for(options_.retry_timeout);
+                ResetConnection();
+            } catch (...) {
+                ok = false;
+            }
+
+            if (!ok) {
+                throw;
+            }
+        }
+    }
+}
 
 Client::Client(const ClientOptions& opts)
     : options_(opts)
@@ -711,6 +765,10 @@ void Client::Insert(const std::string& table_name, const Block& block) {
 
 void Client::Ping() {
     impl_->Ping();
+}
+
+void Client::ResetConnection() {
+    impl_->ResetConnection();
 }
 
 }

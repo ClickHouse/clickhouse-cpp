@@ -105,6 +105,8 @@ public:
      BufferedOutput(OutputStream* slave, size_t buflen = 8192);
     ~BufferedOutput() override;
 
+    void Reset();
+
 protected:
     void DoFlush() override;
     size_t DoNext(void** data, size_t len) override;

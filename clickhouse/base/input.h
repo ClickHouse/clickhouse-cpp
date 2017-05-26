@@ -81,6 +81,8 @@ public:
      BufferedInput(InputStream* slave, size_t buflen = 8192);
     ~BufferedInput() override;
 
+    void Reset();
+
 protected:
     size_t DoRead(void* buf, size_t len) override;
     size_t DoNext(const void** ptr, size_t len) override;
