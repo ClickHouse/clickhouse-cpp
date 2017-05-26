@@ -73,6 +73,10 @@ BufferedOutput::~BufferedOutput() {
     Flush();
 }
 
+void BufferedOutput::Reset() {
+    array_output_.Reset(buffer_.data(), buffer_.size());
+}
+
 void BufferedOutput::DoFlush() {
     if (array_output_.Data() != buffer_.data()) {
         slave_->Write(buffer_.data(), array_output_.Data() - buffer_.data());

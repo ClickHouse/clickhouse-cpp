@@ -4,7 +4,7 @@
 #include <iostream>
 
 #if defined(_MSC_VER)
-#	pragma warning(disable : 4996)
+#   pragma warning(disable : 4996)
 #endif
 
 using namespace clickhouse;
@@ -197,13 +197,15 @@ int main() {
     try {
         {
             Client client(ClientOptions()
-                            .SetHost("localhost"));
+                            .SetHost("localhost")
+                            .SetPingBeforeQuery(true));
             RunTests(client);
         }
 
         {
             Client client(ClientOptions()
                             .SetHost("localhost")
+                            .SetPingBeforeQuery(true)
                             .SetCompressionMethod(CompressionMethod::LZ4));
             RunTests(client);
         }

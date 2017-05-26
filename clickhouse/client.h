@@ -10,6 +10,7 @@
 #include "columns/string.h"
 #include "columns/tuple.h"
 
+#include <chrono>
 #include <memory>
 #include <string>
 
@@ -46,6 +47,13 @@ struct ClientOptions {
     /// enable throwing exceptions with standard c++ exception mechanism.
     DECLARE_FIELD(rethrow_exceptions, bool, SetRethrowException, true);
 
+    /// Ping server every time before execute any query.
+    DECLARE_FIELD(ping_before_query, bool, SetPingBeforeQuery, false);
+    /// Count of retry to send request to server.
+    DECLARE_FIELD(send_retries, int, SetSendRetries, 1);
+    /// Amount of time to wait before next retry.
+    DECLARE_FIELD(retry_timeout, std::chrono::seconds, SetRetryTimeout, std::chrono::seconds(5));
+
     /// Compression method.
     DECLARE_FIELD(compression_method, CompressionMethod, SetCompressionMethod, CompressionMethod::None);
 
@@ -75,6 +83,9 @@ public:
 
     /// Ping server for aliveness.
     void Ping();
+
+    /// Reset connection with initial params.
+    void ResetConnection();
 
 private:
     ClientOptions options_;
