@@ -125,7 +125,6 @@ private:
 
     const ClientOptions options_;
     QueryEvents* events_;
-    uint64_t query_id_;
     int compression_ = CompressionState::Disable;
 
     SocketHolder socket_;
@@ -150,7 +149,6 @@ static uint64_t GenerateQueryId() {
 Client::Impl::Impl(const ClientOptions& opts)
     : options_(opts)
     , events_(nullptr)
-    , query_id_(GenerateQueryId())
     , socket_(SocketConnect(NetworkAddress(opts.host, std::to_string(opts.port))))
     , socket_input_(socket_)
     , buffered_input_(&socket_input_)
@@ -545,7 +543,7 @@ bool Client::Impl::ReceiveException(bool rethrow) {
 
 void Client::Impl::SendQuery(const std::string& query) {
     WireFormat::WriteUInt64(&output_, ClientCodes::Query);
-    WireFormat::WriteString(&output_, std::to_string(query_id_));
+    WireFormat::WriteString(&output_, std::to_string(GenerateQueryId()));
 
     /// Client info.
     if (server_info_.revision >= DBMS_MIN_REVISION_WITH_CLIENT_INFO) {
