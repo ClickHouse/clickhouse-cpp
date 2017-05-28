@@ -158,7 +158,13 @@ SocketOutput::SocketOutput(SOCKET s)
 SocketOutput::~SocketOutput() = default;
 
 void SocketOutput::DoWrite(const void* data, size_t len) {
-    if (::send(s_, (const char*)data, len, 0) != (int)len) {
+#if defined (_linux_)
+    static const int flags = MSG_NOSIGNAL;
+#else
+    static const int flags = 0;
+#endif
+
+    if (::send(s_, (const char*)data, len, flags) != (int)len) {
         throw std::system_error(
             errno, std::system_category(), "fail to send data"
         );
