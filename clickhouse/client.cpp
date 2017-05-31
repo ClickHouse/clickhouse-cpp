@@ -231,7 +231,7 @@ void Client::Impl::Ping() {
     const bool ret = ReceivePacket(&server_packet);
 
     if (!ret || server_packet != ServerCodes::Pong) {
-        std::runtime_error("fail to ping server");
+        throw std::runtime_error("fail to ping server");
     }
 }
 
