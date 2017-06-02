@@ -44,6 +44,7 @@ protected:
  */
 class ArrayInput : public ZeroCopyInput {
 public:
+     ArrayInput() noexcept;
      ArrayInput(const void* buf, size_t len) noexcept;
     ~ArrayInput() override;
 

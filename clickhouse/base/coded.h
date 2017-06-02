@@ -16,9 +16,6 @@ public:
     /// Create a CodedInputStream that reads from the given ZeroCopyInput.
     explicit CodedInputStream(ZeroCopyInput* input);
 
-    // Create a CodedInputStream that reads from the given flat array.
-    explicit CodedInputStream(const uint8_t* buffer, size_t size);
-
     // Read an unsigned integer with Varint encoding, truncating to 32 bits.
     // Reading a 32-bit value is equivalent to reading a 64-bit one and casting
     // it to uint32, but may be more efficient.
@@ -45,8 +42,6 @@ public:
 
 private:
     ZeroCopyInput* input_;
-    const uint8_t* buffer_;
-    const uint8_t* buffer_end_;
 };
 
 

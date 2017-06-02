@@ -1,5 +1,6 @@
 ADD_LIBRARY (clickhouse-cpp-lib
     base/coded.cpp
+    base/compressed.cpp
     base/input.cpp
     base/output.cpp
     base/platform.cpp

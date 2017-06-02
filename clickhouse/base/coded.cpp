@@ -8,15 +8,6 @@ static const int MAX_VARINT_BYTES = 10;
 
 CodedInputStream::CodedInputStream(ZeroCopyInput* input)
     : input_(input)
-    , buffer_(nullptr)
-    , buffer_end_(nullptr)
-{
-}
-
-CodedInputStream::CodedInputStream(const uint8_t* buffer, size_t size)
-    : input_(nullptr)
-    , buffer_(buffer)
-    , buffer_end_(buffer + size)
 {
 }
 

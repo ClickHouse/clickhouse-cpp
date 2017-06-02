@@ -1,7 +1,7 @@
 #include "string.h"
 #include "utils.h"
 
-#include "../wire_format.h"
+#include "../base/wire_format.h"
 
 namespace clickhouse {
 
