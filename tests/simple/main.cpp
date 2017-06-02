@@ -186,11 +186,32 @@ inline void NullableExample(Client& client) {
     client.Execute("DROP TABLE test.client");
 }
 
+inline void NumbersExample(Client& client) {
+    size_t num = 0;
+
+    client.Select("SELECT number, number FROM system.numbers LIMIT 100000", [&num](const Block& block)
+        {
+            if (Block::Iterator(block).IsValid()) {
+                auto col = block[0]->As<ColumnUInt64>();
+
+                for (size_t i = 0; i < col->Size(); ++i) {
+                    if (col->At(i) < num) {
+                        throw std::runtime_error("invalid sequence of numbers");
+                    }
+
+                    num = col->At(i);
+                }
+            }
+        }
+    );
+}
+
 static void RunTests(Client& client) {
     ArrayExample(client);
     DateExample(client);
     GenericExample(client);
     NullableExample(client);
+    NumbersExample(client);
 }
 
 int main() {

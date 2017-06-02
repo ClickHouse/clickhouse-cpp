@@ -1,9 +1,11 @@
 #include "client.h"
 #include "protocol.h"
-#include "wire_format.h"
 
 #include "base/coded.h"
+#include "base/compressed.h"
 #include "base/socket.h"
+#include "base/wire_format.h"
+
 #include "columns/factory.h"
 
 #include <cityhash/city.h>
@@ -26,8 +28,6 @@
 #define DBMS_MIN_REVISION_WITH_CLIENT_INFO              54032
 #define DBMS_MIN_REVISION_WITH_SERVER_TIMEZONE          54058
 #define DBMS_MIN_REVISION_WITH_QUOTA_KEY_IN_CLIENT_INFO 54060
-
-#define DBMS_MAX_COMPRESSED_SIZE                        0x40000000ULL   // 1GB
 
 namespace clickhouse {
 
@@ -429,62 +429,11 @@ bool Client::Impl::ReceiveData() {
     }
 
     if (compression_ == CompressionState::Enable) {
-        uint128 hash;
-        uint32_t compressed = 0;
-        uint32_t original = 0;
-        uint8_t method = 0;
+        CompressedInput compressed(&input_);
+        CodedInputStream coded(&compressed);
 
-        if (!WireFormat::ReadFixed(&input_, &hash)) {
+        if (!ReadBlock(&block, &coded)) {
             return false;
-        }
-        if (!WireFormat::ReadFixed(&input_, &method)) {
-            return false;
-        }
-
-        if (method != 0x82) {
-            throw std::runtime_error("unsupported compression method " +
-                                     std::to_string(int(method)));
-        } else {
-            if (!WireFormat::ReadFixed(&input_, &compressed)) {
-                return false;
-            }
-            if (!WireFormat::ReadFixed(&input_, &original)) {
-                return false;
-            }
-
-            if (compressed > DBMS_MAX_COMPRESSED_SIZE) {
-                throw std::runtime_error("compressed data too big");
-            }
-
-            Buffer buf(original);
-            Buffer tmp(compressed);
-
-            // Заполнить заголовок сжатых данных.
-            {
-                BufferOutput out(&tmp);
-                out.Write(&method,     sizeof(method));
-                out.Write(&compressed, sizeof(compressed));
-                out.Write(&original,   sizeof(original));
-            }
-
-            if (!WireFormat::ReadBytes(&input_, tmp.data() + 9, compressed - 9)) {
-                return false;
-            } else {
-                if (hash != CityHash128((const char*)tmp.data(), compressed)) {
-                    throw std::runtime_error("data was corrupted");
-                }
-            }
-
-            if (LZ4_decompress_fast((const char*)tmp.data() + 9, (char*)buf.data(), original) < 0) {
-                throw std::runtime_error("can't decompress data");
-            } else {
-                ArrayInput mem(buf.data(), original);
-                CodedInputStream coded(&mem);
-
-                if (!ReadBlock(&block, &coded)) {
-                    return false;
-                }
-            }
         }
     } else {
         if (!ReadBlock(&block, &input_)) {
