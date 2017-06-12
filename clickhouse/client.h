@@ -75,6 +75,10 @@ public:
     /// one or more call of \p cb.
     void Select(const std::string& query, SelectCallback cb);
 
+    /// Executes a select query which can be canceled by returning false from
+    /// the data handler function \p cb.
+    void SelectCancelable(const std::string& query, SelectCancelableCallback cb);
+
     /// Alias for Execute.
     void Select(const Query& query);
 
