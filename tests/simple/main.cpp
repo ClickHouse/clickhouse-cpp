@@ -1,4 +1,5 @@
 #include <clickhouse/client.h>
+#include <clickhouse/error_codes.h>
 #include <clickhouse/types/type_parser.h>
 
 #include <iostream>
@@ -206,12 +207,31 @@ inline void NumbersExample(Client& client) {
     );
 }
 
+inline void ExecptionExample(Client& client) {
+    /// Create a table.
+    client.Execute("CREATE TABLE IF NOT EXISTS test.exceptions (id UInt64, name String) ENGINE = Memory");
+    /// Expect failing on table creation.
+    try {
+        client.Execute("CREATE TABLE test.exceptions (id UInt64, name String) ENGINE = Memory");
+    } catch (const ServerException& e) {
+        if (e.GetCode() == ErrorCodes::TABLE_ALREADY_EXISTS) {
+            // OK
+        } else {
+            throw;
+        }
+    }
+
+    /// Delete table.
+    client.Execute("DROP TABLE test.exceptions");
+}
+
 static void RunTests(Client& client) {
     ArrayExample(client);
     DateExample(client);
     GenericExample(client);
     NullableExample(client);
     NumbersExample(client);
+    ExecptionExample(client);
 }
 
 int main() {
