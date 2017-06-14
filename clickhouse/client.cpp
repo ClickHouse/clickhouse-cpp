@@ -62,6 +62,8 @@ public:
 
     void ExecuteQuery(Query query);
 
+    void SendCancel();
+
     void Insert(const std::string& table_name, const Block& block);
 
     void Ping();
@@ -443,6 +445,9 @@ bool Client::Impl::ReceiveData() {
 
     if (events_) {
         events_->OnData(block);
+        if (!events_->OnDataCancelable(block)) {
+            SendCancel();
+        }
     }
 
     return true;
@@ -488,6 +493,11 @@ bool Client::Impl::ReceiveException(bool rethrow) {
     }
 
     return true;
+}
+
+void Client::Impl::SendCancel() {
+    WireFormat::WriteUInt64(&output_, ClientCodes::Cancel);
+    output_.Flush();
 }
 
 void Client::Impl::SendQuery(const std::string& query) {
@@ -700,6 +710,10 @@ void Client::Execute(const Query& query) {
 
 void Client::Select(const std::string& query, SelectCallback cb) {
     Execute(Query(query).OnData(cb));
+}
+
+void Client::SelectCancelable(const std::string& query, SelectCancelableCallback cb) {
+    Execute(Query(query).OnDataCancelable(cb));
 }
 
 void Client::Select(const Query& query) {

@@ -207,6 +207,37 @@ inline void NumbersExample(Client& client) {
     );
 }
 
+inline void CancelableExample(Client& client) {
+
+    /// Create a table.
+    client.Execute("CREATE TABLE IF NOT EXISTS test.client (x UInt64) ENGINE = Memory");
+
+    /// Insert a few blocks.
+    for (unsigned j = 0; j < 10; j++) {
+        Block b;
+
+        auto x = std::make_shared<ColumnUInt64>();
+        for (uint64_t i = 0; i < 1000; i++) {
+            x->Append(i);
+        }
+
+        b.AppendColumn("x", x);
+        client.Insert("test.client", b);
+    }
+
+    /// Send a query which is canceled after receiving the first block (note:
+    /// due to the low number of rows in this test, this will not actually have
+    /// any effect, it just tests for errors)
+    client.SelectCancelable("SELECT * FROM test.client", [](const Block&)
+        {
+            return false;
+        }
+    );
+
+    /// Delete table.
+    client.Execute("DROP TABLE test.client");
+}
+
 inline void ExecptionExample(Client& client) {
     /// Create a table.
     client.Execute("CREATE TABLE IF NOT EXISTS test.exceptions (id UInt64, name String) ENGINE = Memory");
@@ -231,6 +262,7 @@ static void RunTests(Client& client) {
     GenericExample(client);
     NullableExample(client);
     NumbersExample(client);
+    CancelableExample(client);
     ExecptionExample(client);
 }
 
