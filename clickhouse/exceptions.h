@@ -14,6 +14,10 @@ public:
     {
     }
 
+    int GetCode() const {
+        return exception_->code;
+    }
+
     const Exception& GetException() const {
         return *exception_;
     }
