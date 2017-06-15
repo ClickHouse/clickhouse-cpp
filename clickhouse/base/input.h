@@ -8,7 +8,7 @@ namespace clickhouse {
 
 class InputStream {
 public:
-    virtual ~InputStream()
+    virtual ~InputStream() noexcept (false)
     { }
 
     /// Reads one byte from the stream.
