@@ -142,11 +142,6 @@ private:
     ServerInfo server_info_;
 };
 
-static uint64_t GenerateQueryId() {
-    static std::atomic<uint64_t> counter;
-
-    return ++counter;
-}
 
 Client::Impl::Impl(const ClientOptions& opts)
     : options_(opts)
@@ -502,7 +497,7 @@ void Client::Impl::SendCancel() {
 
 void Client::Impl::SendQuery(const std::string& query) {
     WireFormat::WriteUInt64(&output_, ClientCodes::Query);
-    WireFormat::WriteString(&output_, std::to_string(GenerateQueryId()));
+    WireFormat::WriteString(&output_, std::string());
 
     /// Client info.
     if (server_info_.revision >= DBMS_MIN_REVISION_WITH_CLIENT_INFO) {
