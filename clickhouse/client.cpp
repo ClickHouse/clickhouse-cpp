@@ -146,7 +146,7 @@ private:
 Client::Impl::Impl(const ClientOptions& opts)
     : options_(opts)
     , events_(nullptr)
-    , socket_(SocketConnect(NetworkAddress(opts.host, std::to_string(opts.port))))
+    , socket_(-1)
     , socket_input_(socket_)
     , buffered_input_(&socket_input_)
     , input_(&buffered_input_)
@@ -154,12 +154,17 @@ Client::Impl::Impl(const ClientOptions& opts)
     , buffered_output_(&socket_output_)
     , output_(&buffered_output_)
 {
-    if (socket_.Closed()) {
-        throw std::system_error(errno, std::system_category());
-    }
+    for (int i = 0; ; ) {
+        try {
+            ResetConnection();
+            break;
+        } catch (const std::system_error&) {
+            if (++i > options_.send_retries) {
+                throw;
+            }
 
-    if (!Handshake()) {
-        throw std::runtime_error("fail to connect to " + options_.host);
+            std::this_thread::sleep_for(options_.retry_timeout);
+        }
     }
 
     if (options_.compression_method != CompressionMethod::None) {
