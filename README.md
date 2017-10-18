@@ -5,15 +5,16 @@ C++ client for [Yandex ClickHouse](https://clickhouse.yandex/)
 
 ## Supported data types
 
-* UInt8, UInt16, UInt32, UInt64, Int8, Int16, Int32, Int64
-* Float32, Float64
-* String
-* FixedString(N)
-* DateTime
-* Date
 * Array(T)
+* Date
+* DateTime
+* Enum8, Enum16
+* FixedString(N)
+* Float32, Float64
 * Nullable(T)
+* String
 * Tuple
+* UInt8, UInt16, UInt32, UInt64, Int8, Int16, Int32, Int64
 
 ## Building
 
@@ -68,7 +69,3 @@ client.Select("SELECT id, name FROM test.numbers", [] (const Block& block)
 /// Delete table.
 client.Execute("DROP TABLE test.numbers");
 ```
-
-## Disclaimer
-
-Library currently is under development and it interface is subject to change.

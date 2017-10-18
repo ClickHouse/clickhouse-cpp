@@ -2,6 +2,7 @@
 
 #include "array.h"
 #include "date.h"
+#include "enum.h"
 #include "nullable.h"
 #include "numeric.h"
 #include "string.h"
@@ -39,7 +40,7 @@ static ColumnRef CreateTerminalColumn(const TypeAst& ast) {
     if (ast.name == "String")
         return std::make_shared<ColumnString>();
     if (ast.name == "FixedString")
-        return std::make_shared<ColumnFixedString>(ast.elements.front().size);
+        return std::make_shared<ColumnFixedString>(ast.elements.front().value);
 
     if (ast.name == "DateTime")
         return std::make_shared<ColumnDateTime>();
@@ -80,6 +81,26 @@ static ColumnRef CreateColumnFromAst(const TypeAst& ast) {
             }
 
             return std::make_shared<ColumnTuple>(columns);
+        }
+
+        case TypeAst::Enum: {
+            std::vector<Type::EnumItem> enum_items;
+
+            for (const auto& elem : ast.elements) {
+                enum_items.push_back(
+                    Type::EnumItem{elem.name.to_string(), (int16_t)elem.value});
+            }
+
+            if (ast.name == "Enum8") {
+                return std::make_shared<ColumnEnum8>(
+                    Type::CreateEnum8(enum_items)
+                );
+            } else if (ast.name == "Enum16") {
+                return std::make_shared<ColumnEnum16>(
+                    Type::CreateEnum16(enum_items)
+                );
+            }
+            break;
         }
 
         case TypeAst::Null:

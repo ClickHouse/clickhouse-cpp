@@ -22,6 +22,10 @@ static TypeAst::Meta GetTypeMeta(const StringView& name) {
         return TypeAst::Tuple;
     }
 
+    if (name == "Enum8" || name == "Enum16") {
+        return TypeAst::Enum;
+    }
+
     return TypeAst::Terminal;
 }
 
@@ -49,7 +53,7 @@ bool TypeParser::Parse(TypeAst* type) {
                 break;
             case Token::Number:
                 type_->meta = TypeAst::Number;
-                type_->size = FromString<int>(token.value);
+                type_->value = FromString<int>(token.value);
                 break;
             case Token::LPar:
                 type_->elements.emplace_back(TypeAst());
@@ -84,6 +88,10 @@ TypeParser::Token TypeParser::NextToken() {
             case '\0':
                 continue;
 
+            case '=':
+            case '\'':
+                continue;
+
             case '(':
                 return Token{Token::LPar, StringView(cur_++, 1)};
             case ')':
@@ -94,9 +102,9 @@ TypeParser::Token TypeParser::NextToken() {
             default: {
                 const char* st = cur_;
 
-                if (isalpha(*cur_)) {
+                if (isalpha(*cur_) || *cur_ == '_') {
                     for (; cur_ < end_; ++cur_) {
-                        if (!isalpha(*cur_) && !isdigit(*cur_)) {
+                        if (!isalpha(*cur_) && !isdigit(*cur_) && *cur_ != '_') {
                             break;
                         }
                     }
@@ -104,8 +112,8 @@ TypeParser::Token TypeParser::NextToken() {
                     return Token{Token::Name, StringView(st, cur_)};
                 }
 
-                if (isdigit(*cur_)) {
-                    for (; cur_ < end_; ++cur_) {
+                if (isdigit(*cur_) || *cur_ == '-') {
+                    for (++cur_; cur_ < end_; ++cur_) {
                         if (!isdigit(*cur_)) {
                             break;
                         }

@@ -39,3 +39,23 @@ TEST(TypesCase, NullableType) {
         nested
     );
 }
+
+TEST(TypesCase, EnumTypes) {
+    EnumType enum8(Type::CreateEnum8({{"One", 1}, {"Two", 2}}));
+    ASSERT_EQ(enum8.GetName(), "Enum8('One' = 1, 'Two' = 2)");
+    ASSERT_TRUE(enum8.HasEnumValue(1));
+    ASSERT_TRUE(enum8.HasEnumName("Two"));
+    ASSERT_FALSE(enum8.HasEnumValue(10));
+    ASSERT_FALSE(enum8.HasEnumName("Ten"));
+    ASSERT_EQ(enum8.GetEnumName(2), "Two");
+    ASSERT_EQ(enum8.GetEnumValue("Two"), 2);
+
+    EnumType enum16(Type::CreateEnum16({{"Green", 1}, {"Red", 2}, {"Yellow", 3}}));
+    ASSERT_EQ(enum16.GetName(), "Enum16('Green' = 1, 'Red' = 2, 'Yellow' = 3)");
+    ASSERT_TRUE(enum16.HasEnumValue(3));
+    ASSERT_TRUE(enum16.HasEnumName("Green"));
+    ASSERT_FALSE(enum16.HasEnumValue(10));
+    ASSERT_FALSE(enum16.HasEnumName("Black"));
+    ASSERT_EQ(enum16.GetEnumName(2), "Red");
+    ASSERT_EQ(enum16.GetEnumValue("Green"), 1);
+}
