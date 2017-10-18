@@ -1,5 +1,6 @@
 #include <clickhouse/columns/array.h>
 #include <clickhouse/columns/date.h>
+#include <clickhouse/columns/enum.h>
 #include <clickhouse/columns/numeric.h>
 #include <clickhouse/columns/string.h>
 
@@ -93,4 +94,24 @@ TEST(ColumnsCase, DateAppend) {
 
     ASSERT_EQ(col2->Size(), 1u);
     ASSERT_EQ(col2->At(0), (now / 86400) * 86400);
+}
+
+TEST(ColumnsCase, EnumTest) {
+    std::vector<Type::EnumItem> enum_items = {{"Hi", 1}, {"Hello", 2}};
+
+    auto col = std::make_shared<ColumnEnum8>(Type::CreateEnum8(enum_items));
+    ASSERT_TRUE(col->Type()->IsEqual(Type::CreateEnum8(enum_items)));
+
+    col->Append(1);
+    ASSERT_EQ(col->Size(), 1u);
+    ASSERT_EQ(col->At(0), 1);
+    ASSERT_EQ(col->NameAt(0), "Hi");
+
+    col->Append("Hello");
+    ASSERT_EQ(col->Size(), 2u);
+    ASSERT_EQ(col->At(1), 2);
+    ASSERT_EQ(col->NameAt(1), "Hello");
+
+    auto col16 = std::make_shared<ColumnEnum16>(Type::CreateEnum16(enum_items));
+    ASSERT_TRUE(col16->Type()->IsEqual(Type::CreateEnum16(enum_items)));
 }

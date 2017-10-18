@@ -208,7 +208,6 @@ inline void NumbersExample(Client& client) {
 }
 
 inline void CancelableExample(Client& client) {
-
     /// Create a table.
     client.Execute("CREATE TABLE IF NOT EXISTS test.client (x UInt64) ENGINE = Memory");
 
@@ -256,6 +255,48 @@ inline void ExecptionExample(Client& client) {
     client.Execute("DROP TABLE test.exceptions");
 }
 
+inline void EnumExample(Client& client) {
+    /// Create a table.
+    client.Execute("CREATE TABLE IF NOT EXISTS test.enums (id UInt64, e Enum8('One' = 1, 'Two' = 2)) ENGINE = Memory");
+
+    /// Insert some values.
+    {
+        Block block;
+
+        auto id = std::make_shared<ColumnUInt64>();
+        id->Append(1);
+        id->Append(2);
+
+        auto e = std::make_shared<ColumnEnum8>(Type::CreateEnum8({{"One", 1}, {"Two", 2}}));
+        e->Append(1);
+        e->Append("Two");
+
+        block.AppendColumn("id", id);
+        block.AppendColumn("e", e);
+
+        client.Insert("test.enums", block);
+    }
+
+    /// Select values inserted in the previous step.
+    client.Select("SELECT id, e FROM test.enums", [](const Block& block)
+        {
+            for (Block::Iterator bi(block); bi.IsValid(); bi.Next()) {
+                std::cout << bi.Name() << " ";
+            }
+            std::cout << std::endl;
+
+            for (size_t i = 0; i < block.GetRowCount(); ++i) {
+                std::cout << (*block[0]->As<ColumnUInt64>())[i] << " "
+                          << (*block[1]->As<ColumnEnum8>()).NameAt(i) << "\n";
+            }
+        }
+    );
+
+
+    /// Delete table.
+    client.Execute("DROP TABLE test.enums");
+}
+
 static void RunTests(Client& client) {
     ArrayExample(client);
     DateExample(client);
@@ -264,6 +305,7 @@ static void RunTests(Client& client) {
     NumbersExample(client);
     CancelableExample(client);
     ExecptionExample(client);
+    EnumExample(client);
 }
 
 int main() {

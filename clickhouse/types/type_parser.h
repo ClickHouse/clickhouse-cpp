@@ -16,15 +16,18 @@ struct TypeAst {
         Number,
         Terminal,
         Tuple,
+        Enum
     };
 
     /// Type's category.
     Meta meta;
     /// Type's name.
     StringView name;
-    /// Size of type's instance.  For fixed-width types only.
-    size_t size = 0;
+    /// Value associated with the node,
+    /// used for fixed-width types and enum values.
+    int64_t value = 0;
     /// Subelements of the type.
+    /// Used to store enum's names and values as well.
     std::list<TypeAst> elements;
 };
 

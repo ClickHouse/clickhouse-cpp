@@ -88,13 +88,17 @@ public:
             return StringViewImpl(data_ + pos, count);
     }
 
+    inline const std::basic_string<TChar> to_string() const {
+        return std::basic_string<TChar>(data_, size_);
+    }
+
 public:
     inline operator bool () const noexcept {
         return !empty();
     }
 
     inline explicit operator const std::basic_string<TChar> () const {
-        return std::basic_string<TChar>(data_, size_);
+        return to_string();
     }
 
     inline TChar operator [] (size_type pos) const noexcept {

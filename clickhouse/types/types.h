@@ -1,5 +1,6 @@
 #pragma once
 
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -29,6 +30,13 @@ public:
         Array,
         Nullable,
         Tuple,
+        Enum8,
+        Enum16,
+    };
+
+    struct EnumItem {
+        std::string name;
+        int16_t value;
     };
 
     /// Destructor
@@ -67,6 +75,10 @@ public:
 
     static TypeRef CreateTuple(const std::vector<TypeRef>& item_types);
 
+    static TypeRef CreateEnum8(const std::vector<EnumItem>& enum_items);
+
+    static TypeRef CreateEnum16(const std::vector<EnumItem>& enum_items);
+
 private:
     Type(const Code code);
 
@@ -82,14 +94,39 @@ private:
         std::vector<TypeRef> item_types;
     };
 
+    struct EnumImpl {
+        std::map<int16_t, std::string> value_to_name;
+        std::map<std::string, int16_t> name_to_value;
+    };
+
+    friend class EnumType;
+
 
     const Code code_;
     union {
         ArrayImpl* array_;
         NullableImpl* nullable_;
         TupleImpl* tuple_;
+        EnumImpl* enum_;
         int string_size_;
     };
+};
+
+class EnumType {
+public:
+    explicit EnumType(const TypeRef& type);
+
+    std::string GetName() const {
+        return type_->GetName();
+    }
+    /// Methods to work with enum types.
+    const std::string& GetEnumName(int16_t value) const;
+    int16_t GetEnumValue(const std::string& name) const;
+    bool HasEnumName(const std::string& name) const;
+    bool HasEnumValue(int16_t value) const;
+
+private:
+    TypeRef type_;
 };
 
 template <>

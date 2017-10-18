@@ -1,5 +1,7 @@
 #include "types.h"
 
+#include <assert.h>
+
 namespace clickhouse {
 
 Type::Type(const Code code)
@@ -11,6 +13,8 @@ Type::Type(const Code code)
         tuple_ = new TupleImpl;
     } else if (code_ == Nullable) {
         nullable_ = new NullableImpl;
+    } else if (code_ == Enum8 || code_ == Enum16) {
+        enum_ = new EnumImpl;
     }
 }
 
@@ -21,6 +25,8 @@ Type::~Type() {
         delete tuple_;
     } else if (code_ == Nullable) {
         delete nullable_;
+    } else if (code_ == Enum8 || code_ == Enum16) {
+        delete enum_;
     }
 }
 
@@ -90,6 +96,29 @@ std::string Type::GetName() const {
             result += ")";
             return result;
         }
+        case Enum8:
+        case Enum16: {
+            std::string result;
+            if (code_ == Enum8) {
+                result = "Enum8(";
+            } else {
+                result = "Enum16(";
+            }
+            for (auto ei = enum_->value_to_name.begin(); ; ) {
+                result += "'";
+                result += ei->second;
+                result += "' = ";
+                result += std::to_string(ei->first);
+
+                if (++ei != enum_->value_to_name.end()) {
+                    result += ", ";
+                } else {
+                    break;
+                }
+            }
+            result += ")";
+            return result;
+        }
     }
 
     return std::string();
@@ -133,6 +162,48 @@ TypeRef Type::CreateTuple(const std::vector<TypeRef>& item_types) {
     TypeRef type(new Type(Type::Tuple));
     type->tuple_->item_types.assign(item_types.begin(), item_types.end());
     return type;
+}
+
+TypeRef Type::CreateEnum8(const std::vector<EnumItem>& enum_items) {
+    TypeRef type(new Type(Type::Enum8));
+    for (const auto& item : enum_items) {
+        type->enum_->value_to_name[item.value] = item.name;
+        type->enum_->name_to_value[item.name] = item.value;
+    }
+    return type;
+}
+
+TypeRef Type::CreateEnum16(const std::vector<EnumItem>& enum_items) {
+    TypeRef type(new Type(Type::Enum16));
+    for (const auto& item : enum_items) {
+        type->enum_->value_to_name[item.value] = item.name;
+        type->enum_->name_to_value[item.name] = item.value;
+    }
+    return type;
+}
+
+
+EnumType::EnumType(const TypeRef& type)
+    : type_(type)
+{
+    assert(type_->GetCode() == Type::Enum8 ||
+           type_->GetCode() == Type::Enum16);
+}
+
+const std::string& EnumType::GetEnumName(int16_t value) const {
+    return type_->enum_->value_to_name[value];
+}
+
+int16_t EnumType::GetEnumValue(const std::string& name) const {
+    return type_->enum_->name_to_value[name];
+}
+
+bool EnumType::HasEnumName(const std::string& name) const {
+    return type_->enum_->name_to_value.find(name) != type_->enum_->name_to_value.end();
+}
+
+bool EnumType::HasEnumValue(int16_t value) const {
+    return type_->enum_->value_to_name.find(value) != type_->enum_->value_to_name.end();
 }
 
 }
