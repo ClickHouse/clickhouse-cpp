@@ -203,7 +203,7 @@ void Client::Impl::Insert(const std::string& table_name, const Block& block) {
         bool ret = ReceivePacket(&server_packet);
 
         if (!ret) {
-            std::runtime_error("fail to receive data packet");
+            throw std::runtime_error("fail to receive data packet");
         }
         if (server_packet == ServerCodes::Data) {
             break;
