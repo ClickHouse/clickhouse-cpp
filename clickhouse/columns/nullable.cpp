@@ -54,9 +54,7 @@ size_t ColumnNullable::Size() const {
 }
 
 ColumnRef ColumnNullable::Slice(size_t begin, size_t len) {
-    (void)begin;
-    (void)len;
-    return ColumnRef();
+    return std::make_shared<ColumnNullable>(nested_->Slice(begin, len), nulls_->Slice(begin, len));
 }
 
 }
