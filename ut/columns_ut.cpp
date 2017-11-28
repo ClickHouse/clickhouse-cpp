@@ -1,6 +1,7 @@
 #include <clickhouse/columns/array.h>
 #include <clickhouse/columns/date.h>
 #include <clickhouse/columns/enum.h>
+#include <clickhouse/columns/nullable.h>
 #include <clickhouse/columns/numeric.h>
 #include <clickhouse/columns/string.h>
 
@@ -11,6 +12,11 @@ using namespace clickhouse;
 static std::vector<uint32_t> MakeNumbers() {
     return std::vector<uint32_t>
         {1, 2, 3, 7, 11, 13, 17, 19, 23, 29, 31};
+}
+
+static std::vector<uint8_t> MakeBools() {
+    return std::vector<uint8_t>
+        {1, 0, 0, 0, 1, 1, 0, 1, 1, 1, 0};
 }
 
 static std::vector<std::string> MakeFixedStrings() {
@@ -114,4 +120,19 @@ TEST(ColumnsCase, EnumTest) {
 
     auto col16 = std::make_shared<ColumnEnum16>(Type::CreateEnum16(enum_items));
     ASSERT_TRUE(col16->Type()->IsEqual(Type::CreateEnum16(enum_items)));
+}
+
+TEST(ColumnsCase, NullableSlice) {
+    auto data = std::make_shared<ColumnUInt32>(MakeNumbers());
+    auto nulls = std::make_shared<ColumnUInt8>(MakeBools());
+    auto col = std::make_shared<ColumnNullable>(data, nulls);
+    auto sub = col->Slice(3, 4)->As<ColumnNullable>();
+    auto subData = sub->Nested()->As<ColumnUInt32>();
+
+    ASSERT_EQ(sub->Size(), 4u);
+    ASSERT_FALSE(sub->IsNull(0));
+    ASSERT_EQ(subData->At(0),  7u);
+    ASSERT_TRUE(sub->IsNull(1));
+    ASSERT_FALSE(sub->IsNull(3));
+    ASSERT_EQ(subData->At(3), 17u);
 }
