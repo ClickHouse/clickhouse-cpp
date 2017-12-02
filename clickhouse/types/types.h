@@ -32,6 +32,7 @@ public:
         Tuple,
         Enum8,
         Enum16,
+        UUID,
     };
 
     struct EnumItem {
@@ -78,6 +79,8 @@ public:
     static TypeRef CreateEnum8(const std::vector<EnumItem>& enum_items);
 
     static TypeRef CreateEnum16(const std::vector<EnumItem>& enum_items);
+
+    static TypeRef CreateUUID();
 
 private:
     Type(const Code code);

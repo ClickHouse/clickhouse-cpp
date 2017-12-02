@@ -4,6 +4,7 @@
 #include <clickhouse/columns/nullable.h>
 #include <clickhouse/columns/numeric.h>
 #include <clickhouse/columns/string.h>
+#include <clickhouse/columns/uuid.h>
 
 #include <contrib/gtest/gtest.h>
 
@@ -27,6 +28,13 @@ static std::vector<std::string> MakeFixedStrings() {
 static std::vector<std::string> MakeStrings() {
     return std::vector<std::string>
         {"a", "ab", "abc", "abcd"};
+}
+
+static std::vector<uint64_t> MakeUUIDs() {
+    return std::vector<uint64_t>
+        {0xbb6a8c699ab2414cllu, 0x86697b7fd27f0825llu,
+         0x84b9f24bc26b49c6llu, 0xa03b4ab723341951llu,
+         0x3507213c178649f9llu, 0x9faf035d662f60aellu};
 }
 
 
@@ -135,4 +143,21 @@ TEST(ColumnsCase, NullableSlice) {
     ASSERT_TRUE(sub->IsNull(1));
     ASSERT_FALSE(sub->IsNull(3));
     ASSERT_EQ(subData->At(3), 17u);
+}
+
+TEST(ColumnsCase, UUIDInit) {
+    auto col = std::make_shared<ColumnUUID>(std::make_shared<ColumnUInt64>(MakeUUIDs()));
+
+    ASSERT_EQ(col->Size(), 3u);
+    ASSERT_EQ(col->At(0), UInt128(0xbb6a8c699ab2414cllu, 0x86697b7fd27f0825llu));
+    ASSERT_EQ(col->At(2), UInt128(0x3507213c178649f9llu, 0x9faf035d662f60aellu));
+}
+
+TEST(ColumnsCase, UUIDSlice) {
+    auto col = std::make_shared<ColumnUUID>(std::make_shared<ColumnUInt64>(MakeUUIDs()));
+    auto sub = col->Slice(1, 2)->As<ColumnUUID>();
+
+    ASSERT_EQ(sub->Size(), 2u);
+    ASSERT_EQ(sub->At(0), UInt128(0x84b9f24bc26b49c6llu, 0xa03b4ab723341951llu));
+    ASSERT_EQ(sub->At(1), UInt128(0x3507213c178649f9llu, 0x9faf035d662f60aellu));
 }

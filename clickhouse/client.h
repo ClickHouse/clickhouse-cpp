@@ -10,6 +10,7 @@
 #include "columns/numeric.h"
 #include "columns/string.h"
 #include "columns/tuple.h"
+#include "columns/uuid.h"
 
 #include <chrono>
 #include <memory>
