@@ -98,8 +98,10 @@ private:
     };
 
     struct EnumImpl {
-        std::map<int16_t, std::string> value_to_name;
-        std::map<std::string, int16_t> name_to_value;
+        using ValueToNameType = std::map<int16_t, std::string>;
+        using NameToValueType = std::map<std::string, int16_t>;
+        ValueToNameType value_to_name;
+        NameToValueType name_to_value;
     };
 
     friend class EnumType;
@@ -127,6 +129,11 @@ public:
     int16_t GetEnumValue(const std::string& name) const;
     bool HasEnumName(const std::string& name) const;
     bool HasEnumValue(int16_t value) const;
+
+    /// Iterator for enum elements.
+    using ValueToNameIterator = Type::EnumImpl::ValueToNameType::const_iterator;
+    ValueToNameIterator BeginValueToName() const;
+    ValueToNameIterator EndValueToName() const;
 
 private:
     TypeRef type_;

@@ -212,4 +212,12 @@ bool EnumType::HasEnumValue(int16_t value) const {
     return type_->enum_->value_to_name.find(value) != type_->enum_->value_to_name.end();
 }
 
+EnumType::ValueToNameIterator EnumType::BeginValueToName() const {
+    return type_->enum_->value_to_name.begin();
+}
+
+EnumType::ValueToNameIterator EnumType::EndValueToName() const {
+    return type_->enum_->value_to_name.end();
+}
+
 }
