@@ -68,6 +68,8 @@ std::string Type::GetName() const {
             return "UInt32";
         case UInt64:
             return "UInt64";
+        case UUID:
+            return "UUID";
         case Float32:
             return "Float32";
         case Float64:
@@ -180,6 +182,10 @@ TypeRef Type::CreateEnum16(const std::vector<EnumItem>& enum_items) {
         type->enum_->name_to_value[item.name] = item.value;
     }
     return type;
+}
+
+TypeRef Type::CreateUUID() {
+    return TypeRef(new Type(Type::UUID));
 }
 
 

@@ -14,6 +14,7 @@ ADD_LIBRARY (clickhouse-cpp-lib
     columns/numeric.cpp
     columns/string.cpp
     columns/tuple.cpp
+    columns/uuid.cpp
 
     types/type_parser.cpp
     types/types.cpp

@@ -7,6 +7,7 @@
 #include "numeric.h"
 #include "string.h"
 #include "tuple.h"
+#include "uuid.h"
 
 #include "../types/type_parser.h"
 
@@ -31,6 +32,9 @@ static ColumnRef CreateTerminalColumn(const TypeAst& ast) {
         return std::make_shared<ColumnInt32>();
     if (ast.name == "Int64")
         return std::make_shared<ColumnInt64>();
+
+    if (ast.name == "UUID")
+        return std::make_shared<ColumnUUID>();
 
     if (ast.name == "Float32")
         return std::make_shared<ColumnFloat32>();
