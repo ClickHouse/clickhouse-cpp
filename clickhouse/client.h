@@ -14,6 +14,7 @@
 
 #include <chrono>
 #include <memory>
+#include <ostream>
 #include <string>
 
 namespace clickhouse {
@@ -61,6 +62,8 @@ struct ClientOptions {
 
 #undef DECLARE_FIELD
 };
+
+std::ostream& operator<<(std::ostream& os, const ClientOptions& options);
 
 /**
  *

@@ -17,8 +17,16 @@ matrix:
       osx_image: xcode8.2
       compiler: clang
 
+before_install:
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then echo 'deb http://repo.yandex.ru/clickhouse/trusty stable main' | sudo tee /etc/apt/sources.list.d/clickhouse.list ; fi
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then sudo apt-key adv --keyserver keyserver.ubuntu.com --recv E0C56BD4 ; fi
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then sudo apt-get update -q && sudo apt-get install -q -y clickhouse-server-common ; fi
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then sudo service clickhouse-server start ; fi
+
 # Build steps
 script:
   - mkdir build
   - cd build
-  - cmake .. && make && ./ut/clickhouse-cpp-ut
+  - cmake .. && make
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then ./ut/clickhouse-cpp-ut ; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then ./ut/clickhouse-cpp-ut --gtest_filter='-Client/*' ; fi

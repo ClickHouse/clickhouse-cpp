@@ -54,6 +54,16 @@ struct ServerInfo {
     uint64_t    revision;
 };
 
+std::ostream& operator<<(std::ostream& os, const ClientOptions& opt) {
+    os << "Client(" << opt.user << '@' << opt.host << ":" << opt.port
+       << " ping_before_query:" << opt.ping_before_query
+       << " send_retries:" << opt.send_retries
+       << " retry_timeout:" << opt.retry_timeout.count()
+       << " compression_method:"
+       << (opt.compression_method == CompressionMethod::LZ4 ? "LZ4" : "None")
+       << ")";
+    return os;
+}
 
 class Client::Impl {
 public:
