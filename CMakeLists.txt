@@ -3,15 +3,17 @@ CMAKE_MINIMUM_REQUIRED(VERSION 3.0.2)
 INCLUDE (cmake/cpp11.cmake)
 INCLUDE (cmake/subdirs.cmake)
 
+OPTION(BUILD_BENCHMARK "Build benchmark" OFF)
+
 PROJECT (CLICKHOUSE-CLIENT)
 
     USE_CXX11()
 
     IF (UNIX)
         IF (APPLE)
-            SET (CMAKE_CXX_FLAGS "-Wall -Wextra -Werror")
+            SET (CMAKE_CXX_FLAGS "-O2 -Wall -Wextra -Werror")
         ELSE ()
-            SET (CMAKE_CXX_FLAGS "-pthread -Wall -Wextra -Werror")
+            SET (CMAKE_CXX_FLAGS "-O2 -pthread -Wall -Wextra -Werror")
         ENDIF ()
         SET (CMAKE_EXE_LINKER_FLAGS, "-lpthread")
     ENDIF ()
@@ -27,3 +29,7 @@ PROJECT (CLICKHOUSE-CLIENT)
         tests/simple
         ut
     )
+
+    IF (BUILD_BENCHMARK)
+        SUBDIRS(bench)
+    ENDIF (BUILD_BENCHMARK)

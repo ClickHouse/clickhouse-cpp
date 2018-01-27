@@ -15,43 +15,46 @@ namespace clickhouse {
 namespace {
 
 static ColumnRef CreateTerminalColumn(const TypeAst& ast) {
-    if (ast.name == "UInt8")
+    switch (ast.code) {
+    case Type::UInt8:
         return std::make_shared<ColumnUInt8>();
-    if (ast.name == "UInt16")
+    case Type::UInt16:
         return std::make_shared<ColumnUInt16>();
-    if (ast.name == "UInt32")
+    case Type::UInt32:
         return std::make_shared<ColumnUInt32>();
-    if (ast.name == "UInt64")
+    case Type::UInt64:
         return std::make_shared<ColumnUInt64>();
 
-    if (ast.name == "Int8")
+    case Type::Int8:
         return std::make_shared<ColumnInt8>();
-    if (ast.name == "Int16")
+    case Type::Int16:
         return std::make_shared<ColumnInt16>();
-    if (ast.name == "Int32")
+    case Type::Int32:
         return std::make_shared<ColumnInt32>();
-    if (ast.name == "Int64")
+    case Type::Int64:
         return std::make_shared<ColumnInt64>();
 
-    if (ast.name == "UUID")
+    case Type::UUID:
         return std::make_shared<ColumnUUID>();
 
-    if (ast.name == "Float32")
+    case Type::Float32:
         return std::make_shared<ColumnFloat32>();
-    if (ast.name == "Float64")
+    case Type::Float64:
         return std::make_shared<ColumnFloat64>();
 
-    if (ast.name == "String")
+    case Type::String:
         return std::make_shared<ColumnString>();
-    if (ast.name == "FixedString")
+    case Type::FixedString:
         return std::make_shared<ColumnFixedString>(ast.elements.front().value);
 
-    if (ast.name == "DateTime")
+    case Type::DateTime:
         return std::make_shared<ColumnDateTime>();
-    if (ast.name == "Date")
+    case Type::Date:
         return std::make_shared<ColumnDate>();
 
-    return nullptr;
+    default:
+        return nullptr;
+    }
 }
 
 static ColumnRef CreateColumnFromAst(const TypeAst& ast) {
@@ -92,7 +95,7 @@ static ColumnRef CreateColumnFromAst(const TypeAst& ast) {
 
             for (const auto& elem : ast.elements) {
                 enum_items.push_back(
-                    Type::EnumItem{elem.name.to_string(), (int16_t)elem.value});
+                    Type::EnumItem{elem.name, (int16_t)elem.value});
             }
 
             if (ast.name == "Enum8") {
@@ -117,11 +120,11 @@ static ColumnRef CreateColumnFromAst(const TypeAst& ast) {
 
 } // namespace
 
-ColumnRef CreateColumnByType(const std::string& type_name) {
-    TypeAst ast;
 
-    if (TypeParser(type_name).Parse(&ast)) {
-        return CreateColumnFromAst(ast);
+ColumnRef CreateColumnByType(const std::string& type_name) {
+    auto ast = ParseTypeName(type_name);
+    if (ast != nullptr) {
+        return CreateColumnFromAst(*ast);
     }
 
     return nullptr;
