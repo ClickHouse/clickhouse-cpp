@@ -5,7 +5,7 @@
 
 namespace clickhouse {
 
-static std::unordered_map<std::string, Type::Code> g_type_code = {
+static const std::unordered_map<std::string, Type::Code> kTypeCode = {
     { "Int8",        Type::Int8 },
     { "Int16",       Type::Int16 },
     { "Int32",       Type::Int32 },
@@ -28,10 +28,9 @@ static std::unordered_map<std::string, Type::Code> g_type_code = {
     { "UUID",        Type::UUID },
 };
 
-static Type::Code GetTypeCode(const StringView& name) {
-    std::string n = name.to_string();
-    auto it = g_type_code.find(n);
-    if (it != g_type_code.end()) {
+static Type::Code GetTypeCode(const std::string& name) {
+    auto it = kTypeCode.find(name);
+    if (it != kTypeCode.end()) {
         return it->second;
     }
     return Type::Void;
@@ -82,7 +81,7 @@ bool TypeParser::Parse(TypeAst* type) {
             case Token::Name:
                 type_->meta = GetTypeMeta(token.value);
                 type_->name = token.value.to_string();
-                type_->code = GetTypeCode(token.value.to_string());
+                type_->code = GetTypeCode(type_->name);
                 break;
             case Token::Number:
                 type_->meta = TypeAst::Number;
