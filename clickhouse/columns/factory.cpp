@@ -98,11 +98,11 @@ static ColumnRef CreateColumnFromAst(const TypeAst& ast) {
                     Type::EnumItem{elem.name, (int16_t)elem.value});
             }
 
-            if (ast.name == "Enum8") {
+            if (ast.code == Type::Enum8) {
                 return std::make_shared<ColumnEnum8>(
                     Type::CreateEnum8(enum_items)
                 );
-            } else if (ast.name == "Enum16") {
+            } else if (ast.code == Type::Enum16) {
                 return std::make_shared<ColumnEnum16>(
                     Type::CreateEnum16(enum_items)
                 );
