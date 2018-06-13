@@ -12,6 +12,10 @@ void ColumnDate::Append(const std::time_t& value) {
     data_->Append(static_cast<uint16_t>(value / 86400));
 }
 
+void ColumnDate::Clear() {
+    data_->Clear();
+}
+
 std::time_t ColumnDate::At(size_t n) const {
     return data_->At(n) * 86400;
 }
@@ -74,6 +78,10 @@ void ColumnDateTime::Save(CodedOutputStream* output) {
 
 size_t ColumnDateTime::Size() const {
     return data_->Size();
+}
+
+void ColumnDateTime::Clear() {
+    data_->Clear();
 }
 
 ColumnRef ColumnDateTime::Slice(size_t begin, size_t len) {

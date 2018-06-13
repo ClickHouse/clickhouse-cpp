@@ -28,7 +28,10 @@ public:
 
     /// Saves column data to output stream.
     void Save(CodedOutputStream* output) override;
-
+    
+    /// Clear column data .
+    void Clear() override;
+    
     /// Returns count of rows in the column.
     size_t Size() const override;
 

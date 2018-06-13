@@ -30,6 +30,11 @@ void ColumnEnum<T>::Append(const std::string& name) {
 }
 
 template <typename T>
+void ColumnEnum<T>::Clear() {
+    data_.clear();
+}
+
+template <typename T>
 const T& ColumnEnum<T>::At(size_t n) const {
     return data_.at(n);
 }

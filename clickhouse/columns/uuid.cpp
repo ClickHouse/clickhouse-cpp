@@ -23,6 +23,10 @@ void ColumnUUID::Append(const UInt128& value) {
     data_->Append(value.second);
 }
 
+void ColumnUUID::Clear() {
+    data_->Clear();
+}
+
 const UInt128 ColumnUUID::At(size_t n) const {
     return UInt128(data_->At(n * 2), data_->At(n * 2 + 1));
 }

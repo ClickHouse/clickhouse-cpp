@@ -27,6 +27,9 @@ public:
     /// Saves column data to output stream.
     void Save(CodedOutputStream* output) override;
 
+    /// Clear column data .
+    void Clear() override;
+    
     /// Returns count of rows in the column.
     size_t Size() const override;
 
@@ -54,6 +57,9 @@ public:
 
     /// Loads column data from input stream.
     bool Load(CodedInputStream* input, size_t rows) override;
+
+    /// Clear column data .
+    void Clear() override;
 
     /// Saves column data to output stream.
     void Save(CodedOutputStream* output) override;

@@ -36,4 +36,8 @@ void ColumnTuple::Save(CodedOutputStream* output) {
     }
 }
 
+void ColumnTuple::Clear() {
+    columns_.clear();
+}
+
 }

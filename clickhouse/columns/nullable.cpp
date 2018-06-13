@@ -33,6 +33,11 @@ void ColumnNullable::Append(ColumnRef column) {
     }
 }
 
+void ColumnNullable::Clear() {
+    nested_->Clear();
+    nulls_->Clear();
+}
+
 bool ColumnNullable::Load(CodedInputStream* input, size_t rows) {
     if (!nulls_->Load(input, rows)) {
         return false;

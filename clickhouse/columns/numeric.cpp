@@ -22,6 +22,11 @@ void ColumnVector<T>::Append(const T& value) {
 }
 
 template <typename T>
+void ColumnVector<T>::Clear() {
+    data_.clear();
+}
+
+template <typename T>
 const T& ColumnVector<T>::At(size_t n) const {
     return data_.at(n);
 }

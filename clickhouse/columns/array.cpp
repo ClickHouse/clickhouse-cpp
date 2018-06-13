@@ -58,6 +58,11 @@ void ColumnArray::Save(CodedOutputStream* output) {
     data_->Save(output);
 }
 
+void ColumnArray::Clear() {
+    offsets_->Clear();
+    data_->Clear();
+}
+
 size_t ColumnArray::Size() const {
     return offsets_->Size();
 }
