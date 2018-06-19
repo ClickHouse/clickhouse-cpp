@@ -48,9 +48,7 @@ void Block::AppendColumn(const std::string& name, const ColumnRef& col) {
     if (columns_.empty()) {
         rows_ = col->Size();
     } else if (col->Size() != rows_) {
-        throw std::runtime_error(
-            "all clumns in block must have same count of rows"
-        );
+        throw std::runtime_error("all columns in block must have same count of rows. Name: ["+name+"], rows: ["+std::to_string(rows_)+"], columns: [" + std::to_string(col->Size())+"]");
     }
 
     columns_.push_back(ColumnItem{name, col});
@@ -75,7 +73,7 @@ ColumnRef Block::operator [] (size_t idx) const {
         return columns_[idx].column;
     }
 
-    throw std::out_of_range("column index is out of range");
+    throw std::out_of_range("column index is out of range. Index: ["+std::to_string(idx)+"], columns: [" + std::to_string(columns_.size())+"]");
 }
 
 }
