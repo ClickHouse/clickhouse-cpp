@@ -16,6 +16,7 @@
 #include <system_error>
 #include <thread>
 #include <vector>
+#include <sstream>
 
 #define DBMS_NAME                                       "ClickHouse"
 #define DBMS_VERSION_MAJOR                              1
@@ -205,7 +206,25 @@ void Client::Impl::Insert(const std::string& table_name, const Block& block) {
         RetryGuard([this]() { Ping(); });
     }
 
-    SendQuery("INSERT INTO " + table_name + " VALUES");
+    std::vector<std::string> fields;
+    fields.reserve(block.GetColumnCount());
+
+    // Enumerate all fields
+    for (unsigned int i = 0; i < block.GetColumnCount(); i++) {
+        fields.push_back(block.GetColumnName(i));
+    }
+
+    std::stringstream fields_section;
+
+    for (auto elem = fields.begin(); elem != fields.end(); ++elem) {
+        if (std::distance(elem, fields.end()) == 1) {
+            fields_section << *elem;
+        } else {
+            fields_section << *elem << ",";
+        }
+    }
+
+    SendQuery("INSERT INTO " + table_name + " ( " + fields_section.str() + " ) VALUES");
 
     uint64_t server_packet;
     // Receive data packet.
