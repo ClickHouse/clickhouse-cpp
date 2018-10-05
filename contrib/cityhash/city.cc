@@ -254,8 +254,7 @@ static uint128 CityMurmur(const char *s, size_t len, uint128 seed) {
   uint64 b = Uint128High64(seed);
   uint64 c = 0;
   uint64 d = 0;
-  ssize_t l = len - 16;
-  if (l <= 0) {  // len <= 16
+  if (len <= 16) {  // len <= 16
     a = ShiftMix(a * k1) * k1;
     c = b * k1 + HashLen0to16(s, len);
     d = ShiftMix(a + (len >= 8 ? Fetch64(s) : c));
@@ -271,8 +270,8 @@ static uint128 CityMurmur(const char *s, size_t len, uint128 seed) {
       c *= k1;
       d ^= c;
       s += 16;
-      l -= 16;
-    } while (l > 0);
+      len -= 16;
+    } while (len > 16);
   }
   a = HashLen16(a, c);
   b = HashLen16(d, b);
