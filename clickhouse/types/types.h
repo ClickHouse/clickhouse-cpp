@@ -40,23 +40,33 @@ public:
         int16_t value;
     };
 
-    /// Destructor
+protected:
+    Type(const Code code);
+
+public:
     ~Type();
 
+    template <typename Derived>
+    auto* As() {
+        return static_cast<Derived*>(this);
+    }
+
+    template <typename Derived>
+    const auto* As() const {
+        return static_cast<const Derived*>(this);
+    }
+
     /// Type's code.
-    Code GetCode() const;
-
-    /// Type of array's elements.
-    TypeRef GetItemType() const;
-
-    /// Type of nested nullable element.
-    TypeRef GetNestedType() const;
+    Code GetCode() const { return code_; }
 
     /// String representation of the type.
     std::string GetName() const;
 
     /// Is given type same as current one.
     bool IsEqual(const TypeRef& other) const;
+
+    /// Type of nested nullable element.
+    TypeRef GetNestedType() const;
 
 public:
     static TypeRef CreateArray(TypeRef item_type);
@@ -83,12 +93,6 @@ public:
     static TypeRef CreateUUID();
 
 private:
-    Type(const Code code);
-
-    struct ArrayImpl {
-        TypeRef item_type;
-    };
-
     struct NullableImpl {
         TypeRef nested_type;
     };
@@ -106,10 +110,8 @@ private:
 
     friend class EnumType;
 
-
     const Code code_;
     union {
-        ArrayImpl* array_;
         NullableImpl* nullable_;
         TupleImpl* tuple_;
         EnumImpl* enum_;
@@ -117,13 +119,24 @@ private:
     };
 };
 
+class ArrayType : public Type {
+public:
+    explicit ArrayType(TypeRef item_type);
+
+    std::string GetName() const { return std::string("Array(") + item_type_->GetName() + ")"; }
+
+    /// Type of array's elements.
+    inline TypeRef GetItemType() const { return item_type_; }
+
+private:
+    TypeRef item_type_;
+};
+
 class EnumType {
 public:
     explicit EnumType(const TypeRef& type);
 
-    std::string GetName() const {
-        return type_->GetName();
-    }
+    std::string GetName() const { return type_->GetName(); }
     /// Methods to work with enum types.
     const std::string& GetEnumName(int16_t value) const;
     int16_t GetEnumValue(const std::string& name) const;
@@ -189,4 +202,4 @@ inline TypeRef Type::CreateSimple<double>() {
     return TypeRef(new Type(Float64));
 }
 
-}
+}  // namespace clickhouse

@@ -1,0 +1,8 @@
+Language: Cpp
+BasedOnStyle: Google
+
+AccessModifierOffset: -4
+AlignConsecutiveAssignments: true
+ColumnLimit: 140
+FixNamespaceComments: true
+IndentWidth: 4

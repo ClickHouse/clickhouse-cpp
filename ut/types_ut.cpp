@@ -20,7 +20,7 @@ TEST(TypesCase, TypeName) {
     );
 
     ASSERT_EQ(
-        Type::CreateArray(Type::CreateSimple<int32_t>())->GetItemType()->GetCode(),
+        Type::CreateArray(Type::CreateSimple<int32_t>())->As<ArrayType>()->GetItemType()->GetCode(),
         Type::Int32
     );
 

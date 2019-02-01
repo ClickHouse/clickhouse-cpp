@@ -1,13 +1,13 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 3.0.2)
 
-INCLUDE (cmake/cpp11.cmake)
+INCLUDE (cmake/cpp17.cmake)
 INCLUDE (cmake/subdirs.cmake)
 
 OPTION(BUILD_BENCHMARK "Build benchmark" OFF)
 
 PROJECT (CLICKHOUSE-CLIENT)
 
-    USE_CXX11()
+    USE_CXX17()
 
     IF (UNIX)
         IF (APPLE)
