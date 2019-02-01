@@ -45,7 +45,7 @@ std::string Type::GetName() const {
         case String:
             return "String";
         case FixedString:
-            return "FixedString(" + std::to_string(string_size_) + ")";
+            return As<FixedStringType>()->GetName();
         case DateTime:
             return "DateTime";
         case Date:
@@ -106,9 +106,7 @@ TypeRef Type::CreateString() {
 }
 
 TypeRef Type::CreateString(size_t n) {
-    TypeRef type(new Type(Type::FixedString));
-    type->string_size_ = n;
-    return type;
+    return TypeRef(new FixedStringType(n));
 }
 
 TypeRef Type::CreateTuple(const std::vector<TypeRef>& item_types) {
@@ -138,6 +136,9 @@ TypeRef Type::CreateUUID() {
 }
 
 ArrayType::ArrayType(TypeRef item_type) : Type(Array), item_type_(item_type) {
+}
+
+FixedStringType::FixedStringType(size_t n) : Type(FixedString), size_(n) {
 }
 
 NullableType::NullableType(TypeRef nested_type) : Type(Nullable), nested_type_(nested_type) {

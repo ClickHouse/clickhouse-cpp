@@ -100,10 +100,7 @@ private:
     friend class EnumType;
 
     const Code code_;
-    union {
-        EnumImpl* enum_;
-        int string_size_;
-    };
+    EnumImpl* enum_;
 };
 
 class ArrayType : public Type {
@@ -117,6 +114,16 @@ public:
 
 private:
     TypeRef item_type_;
+};
+
+class FixedStringType : public Type {
+public:
+    explicit FixedStringType(size_t n);
+
+    std::string GetName() const { return std::string("FixedString(") + std::to_string(size_) + ")"; }
+
+private:
+    size_t size_;
 };
 
 class NullableType : public Type {
