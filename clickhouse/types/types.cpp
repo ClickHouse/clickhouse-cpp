@@ -5,15 +5,6 @@
 namespace clickhouse {
 
 Type::Type(const Code code) : code_(code) {
-    if (code_ == Enum8 || code_ == Enum16) {
-        enum_ = new EnumImpl;
-    }
-}
-
-Type::~Type() {
-    if (code_ == Enum8 || code_ == Enum16) {
-        delete enum_;
-    }
 }
 
 std::string Type::GetName() const {
@@ -54,34 +45,14 @@ std::string Type::GetName() const {
             return As<ArrayType>()->GetName();
         case Nullable:
             return As<NullableType>()->GetName();
-        case Tuple: {
+        case Tuple:
             return As<TupleType>()->GetName();
-        }
         case Enum8:
-        case Enum16: {
-            std::string result;
-            if (code_ == Enum8) {
-                result = "Enum8(";
-            } else {
-                result = "Enum16(";
-            }
-            for (auto ei = enum_->value_to_name.begin();;) {
-                result += "'";
-                result += ei->second;
-                result += "' = ";
-                result += std::to_string(ei->first);
-
-                if (++ei != enum_->value_to_name.end()) {
-                    result += ", ";
-                } else {
-                    break;
-                }
-            }
-            result += ")";
-            return result;
-        }
+        case Enum16:
+            return As<EnumType>()->GetName();
     }
 
+    // XXX: NOT REACHED!
     return std::string();
 }
 
@@ -114,21 +85,11 @@ TypeRef Type::CreateTuple(const std::vector<TypeRef>& item_types) {
 }
 
 TypeRef Type::CreateEnum8(const std::vector<EnumItem>& enum_items) {
-    TypeRef type(new Type(Type::Enum8));
-    for (const auto& item : enum_items) {
-        type->enum_->value_to_name[item.value] = item.name;
-        type->enum_->name_to_value[item.name]  = item.value;
-    }
-    return type;
+    return TypeRef(new EnumType(Type::Enum8, enum_items));
 }
 
 TypeRef Type::CreateEnum16(const std::vector<EnumItem>& enum_items) {
-    TypeRef type(new Type(Type::Enum16));
-    for (const auto& item : enum_items) {
-        type->enum_->value_to_name[item.value] = item.name;
-        type->enum_->name_to_value[item.name]  = item.value;
-    }
-    return type;
+    return TypeRef(new EnumType(Type::Enum16, enum_items));
 }
 
 TypeRef Type::CreateUUID() {
@@ -136,6 +97,40 @@ TypeRef Type::CreateUUID() {
 }
 
 ArrayType::ArrayType(TypeRef item_type) : Type(Array), item_type_(item_type) {
+}
+
+EnumType::EnumType(Type::Code type, const std::vector<EnumItem>& items) : Type(type) {
+    for (const auto& item : items) {
+        value_to_name_[item.second] = item.first;
+        name_to_value_[item.first]  = item.second;
+    }
+}
+
+std::string EnumType::GetName() const {
+    std::string result;
+
+    if (GetCode() == Enum8) {
+        result = "Enum8(";
+    } else {
+        result = "Enum16(";
+    }
+
+    for (auto ei = value_to_name_.begin();;) {
+        result += "'";
+        result += ei->second;
+        result += "' = ";
+        result += std::to_string(ei->first);
+
+        if (++ei != value_to_name_.end()) {
+            result += ", ";
+        } else {
+            break;
+        }
+    }
+
+    result += ")";
+
+    return result;
 }
 
 FixedStringType::FixedStringType(size_t n) : Type(FixedString), size_(n) {
@@ -163,32 +158,28 @@ std::string TupleType::GetName() const {
     return result;
 }
 
-EnumType::EnumType(const TypeRef& type) : type_(type) {
-    assert(type_->GetCode() == Type::Enum8 || type_->GetCode() == Type::Enum16);
-}
-
 const std::string& EnumType::GetEnumName(int16_t value) const {
-    return type_->enum_->value_to_name[value];
+    return value_to_name_.at(value);
 }
 
 int16_t EnumType::GetEnumValue(const std::string& name) const {
-    return type_->enum_->name_to_value[name];
+    return name_to_value_.at(name);
 }
 
 bool EnumType::HasEnumName(const std::string& name) const {
-    return type_->enum_->name_to_value.find(name) != type_->enum_->name_to_value.end();
+    return name_to_value_.find(name) != name_to_value_.end();
 }
 
 bool EnumType::HasEnumValue(int16_t value) const {
-    return type_->enum_->value_to_name.find(value) != type_->enum_->value_to_name.end();
+    return value_to_name_.find(value) != value_to_name_.end();
 }
 
 EnumType::ValueToNameIterator EnumType::BeginValueToName() const {
-    return type_->enum_->value_to_name.begin();
+    return value_to_name_.begin();
 }
 
 EnumType::ValueToNameIterator EnumType::EndValueToName() const {
-    return type_->enum_->value_to_name.end();
+    return value_to_name_.end();
 }
 
 }  // namespace clickhouse

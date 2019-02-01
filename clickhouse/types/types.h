@@ -35,17 +35,12 @@ public:
         UUID,
     };
 
-    struct EnumItem {
-        std::string name;
-        int16_t value;
-    };
+    using EnumItem = std::pair<std::string /* name */, int16_t /* value */>;
 
 protected:
     Type(const Code code);
 
 public:
-    ~Type();
-
     template <typename Derived>
     auto* As() {
         return static_cast<Derived*>(this);
@@ -90,17 +85,7 @@ public:
     static TypeRef CreateUUID();
 
 private:
-    struct EnumImpl {
-        using ValueToNameType = std::map<int16_t, std::string>;
-        using NameToValueType = std::map<std::string, int16_t>;
-        ValueToNameType value_to_name;
-        NameToValueType name_to_value;
-    };
-
-    friend class EnumType;
-
     const Code code_;
-    EnumImpl* enum_;
 };
 
 class ArrayType : public Type {
@@ -114,6 +99,31 @@ public:
 
 private:
     TypeRef item_type_;
+};
+
+class EnumType : public Type {
+public:
+    EnumType(Type::Code type, const std::vector<EnumItem>& items);
+
+    std::string GetName() const;
+
+    /// Methods to work with enum types.
+    const std::string& GetEnumName(int16_t value) const;
+    int16_t GetEnumValue(const std::string& name) const;
+    bool HasEnumName(const std::string& name) const;
+    bool HasEnumValue(int16_t value) const;
+
+private:
+    using ValueToNameType     = std::map<int16_t, std::string>;
+    using NameToValueType     = std::map<std::string, int16_t>;
+    using ValueToNameIterator = ValueToNameType::const_iterator;
+
+    ValueToNameType value_to_name_;
+    NameToValueType name_to_value_;
+
+public:
+    ValueToNameIterator BeginValueToName() const;
+    ValueToNameIterator EndValueToName() const;
 };
 
 class FixedStringType : public Type {
@@ -147,26 +157,6 @@ public:
 
 private:
     std::vector<TypeRef> item_types_;
-};
-
-class EnumType {
-public:
-    explicit EnumType(const TypeRef& type);
-
-    std::string GetName() const { return type_->GetName(); }
-    /// Methods to work with enum types.
-    const std::string& GetEnumName(int16_t value) const;
-    int16_t GetEnumValue(const std::string& name) const;
-    bool HasEnumName(const std::string& name) const;
-    bool HasEnumValue(int16_t value) const;
-
-    /// Iterator for enum elements.
-    using ValueToNameIterator = Type::EnumImpl::ValueToNameType::const_iterator;
-    ValueToNameIterator BeginValueToName() const;
-    ValueToNameIterator EndValueToName() const;
-
-private:
-    TypeRef type_;
 };
 
 template <>
