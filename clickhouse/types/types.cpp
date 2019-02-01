@@ -5,17 +5,13 @@
 namespace clickhouse {
 
 Type::Type(const Code code) : code_(code) {
-    if (code_ == Tuple) {
-        tuple_ = new TupleImpl;
-    } else if (code_ == Enum8 || code_ == Enum16) {
+    if (code_ == Enum8 || code_ == Enum16) {
         enum_ = new EnumImpl;
     }
 }
 
 Type::~Type() {
-    if (code_ == Tuple) {
-        delete tuple_;
-    } else if (code_ == Enum8 || code_ == Enum16) {
+    if (code_ == Enum8 || code_ == Enum16) {
         delete enum_;
     }
 }
@@ -59,16 +55,7 @@ std::string Type::GetName() const {
         case Nullable:
             return As<NullableType>()->GetName();
         case Tuple: {
-            std::string result("Tuple(");
-            for (size_t i = 0; i < tuple_->item_types.size(); ++i) {
-                result += tuple_->item_types[i]->GetName();
-
-                if (i + 1 != tuple_->item_types.size()) {
-                    result += ", ";
-                }
-            }
-            result += ")";
-            return result;
+            return As<TupleType>()->GetName();
         }
         case Enum8:
         case Enum16: {
@@ -98,15 +85,25 @@ std::string Type::GetName() const {
     return std::string();
 }
 
-TypeRef Type::CreateArray(TypeRef item_type) { return TypeRef(new ArrayType(item_type)); }
+TypeRef Type::CreateArray(TypeRef item_type) {
+    return TypeRef(new ArrayType(item_type));
+}
 
-TypeRef Type::CreateDate() { return TypeRef(new Type(Type::Date)); }
+TypeRef Type::CreateDate() {
+    return TypeRef(new Type(Type::Date));
+}
 
-TypeRef Type::CreateDateTime() { return TypeRef(new Type(Type::DateTime)); }
+TypeRef Type::CreateDateTime() {
+    return TypeRef(new Type(Type::DateTime));
+}
 
-TypeRef Type::CreateNullable(TypeRef nested_type) { return TypeRef(new NullableType(nested_type)); }
+TypeRef Type::CreateNullable(TypeRef nested_type) {
+    return TypeRef(new NullableType(nested_type));
+}
 
-TypeRef Type::CreateString() { return TypeRef(new Type(Type::String)); }
+TypeRef Type::CreateString() {
+    return TypeRef(new Type(Type::String));
+}
 
 TypeRef Type::CreateString(size_t n) {
     TypeRef type(new Type(Type::FixedString));
@@ -115,9 +112,7 @@ TypeRef Type::CreateString(size_t n) {
 }
 
 TypeRef Type::CreateTuple(const std::vector<TypeRef>& item_types) {
-    TypeRef type(new Type(Type::Tuple));
-    type->tuple_->item_types.assign(item_types.begin(), item_types.end());
-    return type;
+    return TypeRef(new TupleType(item_types));
 }
 
 TypeRef Type::CreateEnum8(const std::vector<EnumItem>& enum_items) {
@@ -138,26 +133,61 @@ TypeRef Type::CreateEnum16(const std::vector<EnumItem>& enum_items) {
     return type;
 }
 
-TypeRef Type::CreateUUID() { return TypeRef(new Type(Type::UUID)); }
+TypeRef Type::CreateUUID() {
+    return TypeRef(new Type(Type::UUID));
+}
 
-ArrayType::ArrayType(TypeRef item_type) : Type(Array), item_type_(item_type) {}
+ArrayType::ArrayType(TypeRef item_type) : Type(Array), item_type_(item_type) {
+}
 
-NullableType::NullableType(TypeRef nested_type) : Type(Nullable), nested_type_(nested_type) {}
+NullableType::NullableType(TypeRef nested_type) : Type(Nullable), nested_type_(nested_type) {
+}
 
-EnumType::EnumType(const TypeRef& type) : type_(type) { assert(type_->GetCode() == Type::Enum8 || type_->GetCode() == Type::Enum16); }
+TupleType::TupleType(const std::vector<TypeRef>& item_types) : Type(Tuple), item_types_(item_types) {
+}
 
-const std::string& EnumType::GetEnumName(int16_t value) const { return type_->enum_->value_to_name[value]; }
+std::string TupleType::GetName() const {
+    std::string result("Tuple(");
 
-int16_t EnumType::GetEnumValue(const std::string& name) const { return type_->enum_->name_to_value[name]; }
+    if (!item_types_.empty()) {
+        result += item_types_[0]->GetName();
+    }
+
+    for (size_t i = 1; i < item_types_.size(); ++i) {
+        result += ", " + item_types_[i]->GetName();
+    }
+
+    result += ")";
+
+    return result;
+}
+
+EnumType::EnumType(const TypeRef& type) : type_(type) {
+    assert(type_->GetCode() == Type::Enum8 || type_->GetCode() == Type::Enum16);
+}
+
+const std::string& EnumType::GetEnumName(int16_t value) const {
+    return type_->enum_->value_to_name[value];
+}
+
+int16_t EnumType::GetEnumValue(const std::string& name) const {
+    return type_->enum_->name_to_value[name];
+}
 
 bool EnumType::HasEnumName(const std::string& name) const {
     return type_->enum_->name_to_value.find(name) != type_->enum_->name_to_value.end();
 }
 
-bool EnumType::HasEnumValue(int16_t value) const { return type_->enum_->value_to_name.find(value) != type_->enum_->value_to_name.end(); }
+bool EnumType::HasEnumValue(int16_t value) const {
+    return type_->enum_->value_to_name.find(value) != type_->enum_->value_to_name.end();
+}
 
-EnumType::ValueToNameIterator EnumType::BeginValueToName() const { return type_->enum_->value_to_name.begin(); }
+EnumType::ValueToNameIterator EnumType::BeginValueToName() const {
+    return type_->enum_->value_to_name.begin();
+}
 
-EnumType::ValueToNameIterator EnumType::EndValueToName() const { return type_->enum_->value_to_name.end(); }
+EnumType::ValueToNameIterator EnumType::EndValueToName() const {
+    return type_->enum_->value_to_name.end();
+}
 
 }  // namespace clickhouse

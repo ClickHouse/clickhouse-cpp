@@ -90,10 +90,6 @@ public:
     static TypeRef CreateUUID();
 
 private:
-    struct TupleImpl {
-        std::vector<TypeRef> item_types;
-    };
-
     struct EnumImpl {
         using ValueToNameType = std::map<int16_t, std::string>;
         using NameToValueType = std::map<std::string, int16_t>;
@@ -105,7 +101,6 @@ private:
 
     const Code code_;
     union {
-        TupleImpl* tuple_;
         EnumImpl* enum_;
         int string_size_;
     };
@@ -135,6 +130,16 @@ public:
 
 private:
     TypeRef nested_type_;
+};
+
+class TupleType : public Type {
+public:
+    explicit TupleType(const std::vector<TypeRef>& item_types);
+
+    std::string GetName() const;
+
+private:
+    std::vector<TypeRef> item_types_;
 };
 
 class EnumType {

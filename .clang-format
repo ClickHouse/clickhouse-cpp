@@ -3,6 +3,7 @@ BasedOnStyle: Google
 
 AccessModifierOffset: -4
 AlignConsecutiveAssignments: true
+AllowShortFunctionsOnASingleLine: InlineOnly
 ColumnLimit: 140
 FixNamespaceComments: true
 IndentWidth: 4
