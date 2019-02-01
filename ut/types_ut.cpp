@@ -35,7 +35,7 @@ TEST(TypesCase, TypeName) {
 TEST(TypesCase, NullableType) {
     TypeRef nested = Type::CreateSimple<int32_t>();
     ASSERT_EQ(
-        Type::CreateNullable(nested)->GetNestedType(),
+        Type::CreateNullable(nested)->As<NullableType>()->GetNestedType(),
         nested
     );
 }

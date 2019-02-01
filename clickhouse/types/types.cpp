@@ -7,8 +7,6 @@ namespace clickhouse {
 Type::Type(const Code code) : code_(code) {
     if (code_ == Tuple) {
         tuple_ = new TupleImpl;
-    } else if (code_ == Nullable) {
-        nullable_ = new NullableImpl;
     } else if (code_ == Enum8 || code_ == Enum16) {
         enum_ = new EnumImpl;
     }
@@ -17,8 +15,6 @@ Type::Type(const Code code) : code_(code) {
 Type::~Type() {
     if (code_ == Tuple) {
         delete tuple_;
-    } else if (code_ == Nullable) {
-        delete nullable_;
     } else if (code_ == Enum8 || code_ == Enum16) {
         delete enum_;
     }
@@ -60,9 +56,8 @@ std::string Type::GetName() const {
             return "Date";
         case Array:
             return As<ArrayType>()->GetName();
-            // return std::string("Array(") + array_->item_type->GetName() +")";
         case Nullable:
-            return std::string("Nullable(") + nullable_->nested_type->GetName() + ")";
+            return As<NullableType>()->GetName();
         case Tuple: {
             std::string result("Tuple(");
             for (size_t i = 0; i < tuple_->item_types.size(); ++i) {
@@ -103,26 +98,13 @@ std::string Type::GetName() const {
     return std::string();
 }
 
-bool Type::IsEqual(const TypeRef& other) const { return this->GetName() == other->GetName(); }
-
-TypeRef Type::GetNestedType() const {
-    if (code_ == Nullable) {
-        return nullable_->nested_type;
-    }
-    return TypeRef();
-}
-
 TypeRef Type::CreateArray(TypeRef item_type) { return TypeRef(new ArrayType(item_type)); }
 
 TypeRef Type::CreateDate() { return TypeRef(new Type(Type::Date)); }
 
 TypeRef Type::CreateDateTime() { return TypeRef(new Type(Type::DateTime)); }
 
-TypeRef Type::CreateNullable(TypeRef nested_type) {
-    TypeRef type(new Type(Type::Nullable));
-    type->nullable_->nested_type = nested_type;
-    return type;
-}
+TypeRef Type::CreateNullable(TypeRef nested_type) { return TypeRef(new NullableType(nested_type)); }
 
 TypeRef Type::CreateString() { return TypeRef(new Type(Type::String)); }
 
@@ -159,6 +141,8 @@ TypeRef Type::CreateEnum16(const std::vector<EnumItem>& enum_items) {
 TypeRef Type::CreateUUID() { return TypeRef(new Type(Type::UUID)); }
 
 ArrayType::ArrayType(TypeRef item_type) : Type(Array), item_type_(item_type) {}
+
+NullableType::NullableType(TypeRef nested_type) : Type(Nullable), nested_type_(nested_type) {}
 
 EnumType::EnumType(const TypeRef& type) : type_(type) { assert(type_->GetCode() == Type::Enum8 || type_->GetCode() == Type::Enum16); }
 

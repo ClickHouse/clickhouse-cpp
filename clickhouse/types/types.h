@@ -63,10 +63,7 @@ public:
     std::string GetName() const;
 
     /// Is given type same as current one.
-    bool IsEqual(const TypeRef& other) const;
-
-    /// Type of nested nullable element.
-    TypeRef GetNestedType() const;
+    bool IsEqual(const TypeRef& other) const { return this->GetName() == other->GetName(); }
 
 public:
     static TypeRef CreateArray(TypeRef item_type);
@@ -93,10 +90,6 @@ public:
     static TypeRef CreateUUID();
 
 private:
-    struct NullableImpl {
-        TypeRef nested_type;
-    };
-
     struct TupleImpl {
         std::vector<TypeRef> item_types;
     };
@@ -112,7 +105,6 @@ private:
 
     const Code code_;
     union {
-        NullableImpl* nullable_;
         TupleImpl* tuple_;
         EnumImpl* enum_;
         int string_size_;
@@ -130,6 +122,19 @@ public:
 
 private:
     TypeRef item_type_;
+};
+
+class NullableType : public Type {
+public:
+    explicit NullableType(TypeRef nested_type);
+
+    std::string GetName() const { return std::string("Nullable(") + nested_type_->GetName() + ")"; }
+
+    /// Type of nested nullable element.
+    TypeRef GetNestedType() const { return nested_type_; }
+
+private:
+    TypeRef nested_type_;
 };
 
 class EnumType {
