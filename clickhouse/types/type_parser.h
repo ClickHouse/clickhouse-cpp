@@ -17,7 +17,7 @@ struct TypeAst {
         Number,
         Terminal,
         Tuple,
-        Enum
+        Enum,
     };
 
     /// Type's category.

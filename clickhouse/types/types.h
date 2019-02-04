@@ -17,6 +17,7 @@ public:
         Int16,
         Int32,
         Int64,
+        Int128,
         UInt8,
         UInt16,
         UInt32,
@@ -33,6 +34,9 @@ public:
         Enum8,
         Enum16,
         UUID,
+        Decimal32,
+        Decimal64,
+        Decimal128,
     };
 
     using EnumItem = std::pair<std::string /* name */, int16_t /* value */>;
@@ -84,6 +88,8 @@ public:
 
     static TypeRef CreateUUID();
 
+    static TypeRef CreateDecimal(size_t precision, size_t scale);
+
 private:
     const Code code_;
 };
@@ -99,6 +105,18 @@ public:
 
 private:
     TypeRef item_type_;
+};
+
+class DecimalType : public Type {
+public:
+    DecimalType(size_t precision, size_t scale);
+
+    std::string GetName() const;
+
+    inline size_t GetScale() const { return scale_; }
+
+private:
+    const size_t precision_, scale_;
 };
 
 class EnumType : public Type {
@@ -177,6 +195,11 @@ inline TypeRef Type::CreateSimple<int32_t>() {
 template <>
 inline TypeRef Type::CreateSimple<int64_t>() {
     return TypeRef(new Type(Int64));
+}
+
+template <>
+inline TypeRef Type::CreateSimple<__int128>() {
+    return TypeRef(new Type(Int128));
 }
 
 template <>

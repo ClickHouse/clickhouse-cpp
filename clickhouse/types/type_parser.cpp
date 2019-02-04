@@ -26,6 +26,10 @@ static const std::unordered_map<std::string, Type::Code> kTypeCode = {
     { "Enum8",       Type::Enum8 },
     { "Enum16",      Type::Enum16 },
     { "UUID",        Type::UUID },
+    { "Decimal32",   Type::Decimal32 },
+    { "Decimal64",   Type::Decimal64 },
+    { "Decimal128",  Type::Decimal128 },
+    { "Decimal",     Type::Decimal128 },
 };
 
 static Type::Code GetTypeCode(const std::string& name) {

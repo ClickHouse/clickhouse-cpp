@@ -5,5 +5,7 @@ AccessModifierOffset: -4
 AlignConsecutiveAssignments: true
 AllowShortFunctionsOnASingleLine: InlineOnly
 ColumnLimit: 140
+DerivePointerAlignment: false
 FixNamespaceComments: true
 IndentWidth: 4
+PointerAlignment: Left

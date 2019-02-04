@@ -38,6 +38,8 @@ static std::vector<uint64_t> MakeUUIDs() {
 }
 
 
+// TODO: add tests for ColumnDecimal.
+
 TEST(ColumnsCase, NumericInit) {
     auto col = std::make_shared<ColumnUInt32>(MakeNumbers());
 

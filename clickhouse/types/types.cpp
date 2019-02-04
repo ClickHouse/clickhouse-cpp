@@ -19,6 +19,8 @@ std::string Type::GetName() const {
             return "Int32";
         case Int64:
             return "Int64";
+        case Int128:
+            return "Int128";
         case UInt8:
             return "UInt8";
         case UInt16:
@@ -50,6 +52,10 @@ std::string Type::GetName() const {
         case Enum8:
         case Enum16:
             return As<EnumType>()->GetName();
+        case Decimal32:
+        case Decimal64:
+        case Decimal128:
+            return As<DecimalType>()->GetName();
     }
 
     // XXX: NOT REACHED!
@@ -96,8 +102,49 @@ TypeRef Type::CreateUUID() {
     return TypeRef(new Type(Type::UUID));
 }
 
+TypeRef Type::CreateDecimal(size_t precision, size_t scale) {
+    return TypeRef(new DecimalType(precision, scale));
+}
+
+/// class ArrayType
+
 ArrayType::ArrayType(TypeRef item_type) : Type(Array), item_type_(item_type) {
 }
+
+/// class DecimalType
+
+DecimalType::DecimalType(size_t precision, size_t scale)
+    : Type([&] {
+          if (precision <= 9) {
+              return Type::Decimal32;
+          } else if (precision <= 18) {
+              return Type::Decimal64;
+          } else {
+              return Type::Decimal128;
+          }
+      }()),
+      precision_(precision),
+      scale_(scale) {
+    // TODO: assert(precision <= 38 && precision > 0);
+}
+
+std::string DecimalType::GetName() const {
+    std::string result = "Decimal";
+
+    if (precision_ <= 9) {
+        result += "32";
+    } else if (precision_ <= 18) {
+        result += "64";
+    } else {
+        result += "128";
+    }
+
+    result += "(" + std::to_string(scale_) + ")";
+
+    return result;
+}
+
+/// class EnumType
 
 EnumType::EnumType(Type::Code type, const std::vector<EnumItem>& items) : Type(type) {
     for (const auto& item : items) {
@@ -133,31 +180,6 @@ std::string EnumType::GetName() const {
     return result;
 }
 
-FixedStringType::FixedStringType(size_t n) : Type(FixedString), size_(n) {
-}
-
-NullableType::NullableType(TypeRef nested_type) : Type(Nullable), nested_type_(nested_type) {
-}
-
-TupleType::TupleType(const std::vector<TypeRef>& item_types) : Type(Tuple), item_types_(item_types) {
-}
-
-std::string TupleType::GetName() const {
-    std::string result("Tuple(");
-
-    if (!item_types_.empty()) {
-        result += item_types_[0]->GetName();
-    }
-
-    for (size_t i = 1; i < item_types_.size(); ++i) {
-        result += ", " + item_types_[i]->GetName();
-    }
-
-    result += ")";
-
-    return result;
-}
-
 const std::string& EnumType::GetEnumName(int16_t value) const {
     return value_to_name_.at(value);
 }
@@ -180,6 +202,37 @@ EnumType::ValueToNameIterator EnumType::BeginValueToName() const {
 
 EnumType::ValueToNameIterator EnumType::EndValueToName() const {
     return value_to_name_.end();
+}
+
+/// class FixedStringType
+
+FixedStringType::FixedStringType(size_t n) : Type(FixedString), size_(n) {
+}
+
+/// class NullableType
+
+NullableType::NullableType(TypeRef nested_type) : Type(Nullable), nested_type_(nested_type) {
+}
+
+/// class TupleType
+
+TupleType::TupleType(const std::vector<TypeRef>& item_types) : Type(Tuple), item_types_(item_types) {
+}
+
+std::string TupleType::GetName() const {
+    std::string result("Tuple(");
+
+    if (!item_types_.empty()) {
+        result += item_types_[0]->GetName();
+    }
+
+    for (size_t i = 1; i < item_types_.size(); ++i) {
+        result += ", " + item_types_[i]->GetName();
+    }
+
+    result += ")";
+
+    return result;
 }
 
 }  // namespace clickhouse
