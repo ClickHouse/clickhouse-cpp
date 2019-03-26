@@ -11,6 +11,8 @@
 *.userprefs
 # Temporary solution for VS 2015
 vs/
+# Visual Studio Code
+.vscode/
 
 # Build results
 [Dd]ebug/

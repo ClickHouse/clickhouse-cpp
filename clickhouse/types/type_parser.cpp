@@ -36,7 +36,7 @@ static Type::Code GetTypeCode(const std::string& name) {
     return Type::Void;
 }
 
-static TypeAst::Meta GetTypeMeta(const StringView& name) {
+static TypeAst::Meta GetTypeMeta(const std::string_view name) {
     if (name == "Array") {
         return TypeAst::Array;
     }
@@ -61,7 +61,7 @@ static TypeAst::Meta GetTypeMeta(const StringView& name) {
 }
 
 
-TypeParser::TypeParser(const StringView& name)
+TypeParser::TypeParser(const std::string_view name)
     : cur_(name.data())
     , end_(name.data() + name.size())
     , type_(nullptr)
@@ -80,12 +80,12 @@ bool TypeParser::Parse(TypeAst* type) {
         switch (token.type) {
             case Token::Name:
                 type_->meta = GetTypeMeta(token.value);
-                type_->name = token.value.to_string();
+                type_->name = std::string(token.value);
                 type_->code = GetTypeCode(type_->name);
                 break;
             case Token::Number:
                 type_->meta = TypeAst::Number;
-                type_->value = std::stol(token.value.to_string());
+                type_->value = std::stol(std::string(token.value));
                 break;
             case Token::LPar:
                 type_->elements.emplace_back(TypeAst());
@@ -125,11 +125,11 @@ TypeParser::Token TypeParser::NextToken() {
                 continue;
 
             case '(':
-                return Token{Token::LPar, StringView(cur_++, 1)};
+                return Token{Token::LPar, std::string_view(cur_++, 1)};
             case ')':
-                return Token{Token::RPar, StringView(cur_++, 1)};
+                return Token{Token::RPar, std::string_view(cur_++, 1)};
             case ',':
-                return Token{Token::Comma, StringView(cur_++, 1)};
+                return Token{Token::Comma, std::string_view(cur_++, 1)};
 
             default: {
                 const char* st = cur_;
@@ -141,7 +141,7 @@ TypeParser::Token TypeParser::NextToken() {
                         }
                     }
 
-                    return Token{Token::Name, StringView(st, cur_)};
+                    return Token{Token::Name, std::string_view(st, cur_ - st)};
                 }
 
                 if (isdigit(*cur_) || *cur_ == '-') {
@@ -151,15 +151,15 @@ TypeParser::Token TypeParser::NextToken() {
                         }
                     }
 
-                    return Token{Token::Number, StringView(st, cur_)};
+                    return Token{Token::Number, std::string_view(st, cur_ - st)};
                 }
 
-                return Token{Token::Invalid, StringView()};
+                return Token{Token::Invalid, std::string_view()};
             }
         }
     }
 
-    return Token{Token::EOS, StringView()};
+    return Token{Token::EOS, std::string_view()};
 }
 
 
