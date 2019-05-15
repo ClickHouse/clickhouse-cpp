@@ -1,11 +1,11 @@
 #pragma once
 
+#include "../base/string_view.h"
 #include "types.h"
 
 #include <list>
 #include <stack>
 #include <string>
-#include <string_view>
 
 namespace clickhouse {
 
@@ -24,7 +24,7 @@ struct TypeAst {
     Meta meta;
     Type::Code code;
     /// Type's name.
-    /// Need to cache TypeAst, so can't use std::string_view for name.
+    /// Need to cache TypeAst, so can't use StringView for name.
     std::string name;
     /// Value associated with the node,
     /// used for fixed-width types and enum values.
@@ -49,11 +49,11 @@ class TypeParser {
         };
 
         Type type;
-        std::string_view value;
+        StringView value;
     };
 
 public:
-    explicit TypeParser(const std::string_view name);
+    explicit TypeParser(const StringView& name);
     ~TypeParser();
 
     bool Parse(TypeAst* type);
