@@ -1,4 +1,4 @@
-ADD_LIBRARY (clickhouse-cpp-lib
+SET ( clickhouse-cpp-lib-src
     base/coded.cpp
     base/compressed.cpp
     base/input.cpp
@@ -24,10 +24,18 @@ ADD_LIBRARY (clickhouse-cpp-lib
     query.cpp
 )
 
+ADD_LIBRARY (clickhouse-cpp-lib SHARED ${clickhouse-cpp-lib-src})
+
 SET_TARGET_PROPERTIES(clickhouse-cpp-lib
     PROPERTIES LINKER_LANGUAGE CXX)
 
 TARGET_LINK_LIBRARIES (clickhouse-cpp-lib
+    cityhash-lib
+    lz4-lib
+)
+
+ADD_LIBRARY (clickhouse-cpp-lib-static STATIC ${clickhouse-cpp-lib-src})
+TARGET_LINK_LIBRARIES (clickhouse-cpp-lib-static
     cityhash-lib
     lz4-lib
 )
