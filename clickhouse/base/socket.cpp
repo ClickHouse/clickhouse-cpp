@@ -9,6 +9,7 @@
 
 #if !defined(_win_)
 #   include <errno.h>
+#   include <fcntl.h>
 #   include <netdb.h>
 #   include <signal.h>
 #   include <unistd.h>
@@ -17,22 +18,49 @@
 namespace clickhouse {
 namespace {
 
-    class LocalNames : public std::unordered_set<std::string> {
-    public:
-        LocalNames() {
-            emplace("localhost");
-            emplace("localhost.localdomain");
-            emplace("localhost6");
-            emplace("localhost6.localdomain6");
-            emplace("::1");
-            emplace("127.0.0.1");
-        }
+class LocalNames : public std::unordered_set<std::string> {
+public:
+    LocalNames() {
+        emplace("localhost");
+        emplace("localhost.localdomain");
+        emplace("localhost6");
+        emplace("localhost6.localdomain6");
+        emplace("::1");
+        emplace("127.0.0.1");
+    }
 
-        inline bool IsLocalName(const std::string& name) const noexcept {
-            return find(name) != end();
+    inline bool IsLocalName(const std::string& name) const noexcept {
+        return find(name) != end();
+    }
+};
+
+void SetNonBlock(SOCKET fd, bool value) {
+#if defined(_unix_)
+    int flags;
+    int ret;
+    #if defined(O_NONBLOCK)
+        if ((flags = fcntl(fd, F_GETFL, 0)) == -1)
+            flags = 0;
+        if (value) {
+            flags |= O_NONBLOCK;
+        } else {
+            flags &= ~O_NONBLOCK;
         }
-    };
+        ret = fcntl(fd, F_SETFL, flags);
+    #else
+        flags = value;
+        return ioctl(fd, FIOBIO, &flags);
+    #endif
+    if (ret == -1) {
+        throw std::system_error(
+            errno, std::system_category(), "fail to set nonblocking mode");
+    }
+#elif defined(_win_)
+    SetNonBlockSocket(fd, 1);
+#endif
 }
+
+} // namespace
 
 NetworkAddress::NetworkAddress(const std::string& host, const std::string& port)
     : info_(nullptr)
@@ -201,27 +229,32 @@ SOCKET SocketConnect(const NetworkAddress& addr) {
             continue;
         }
 
-        if (connect(s, res->ai_addr, (int)res->ai_addrlen)) {
-            if (errno == EINPROGRESS ||
-                errno == EAGAIN ||
-                errno == EWOULDBLOCK)
-            {
+        SetNonBlock(s, true);
+
+        if (connect(s, res->ai_addr, (int)res->ai_addrlen) != 0) {
+            int err = errno;
+            if (err == EINPROGRESS || err == EAGAIN || err == EWOULDBLOCK) {
                 pollfd fd;
                 fd.fd = s;
                 fd.events = POLLOUT;
-                int rval = Poll(&fd, 1, 1000);
+                fd.revents = 0;
+                int rval = Poll(&fd, 1, 5000);
 
+                if (rval == -1) {
+                    throw std::system_error(errno, std::system_category(), "fail to connect");
+                }
                 if (rval > 0) {
-                    int opt;
-                    socklen_t len = sizeof(opt);
-                    getsockopt(s, SOL_SOCKET, SO_ERROR, (char*)&opt, &len);
+                    socklen_t len = sizeof(err);
+                    getsockopt(s, SOL_SOCKET, SO_ERROR, (char*)&err, &len);
 
-                    return opt;
-                } else {
-                    continue;
+                    if (!err) {
+                        SetNonBlock(s, false);
+                        return s;
+                    }
                 }
             }
         } else {
+            SetNonBlock(s, false);
             return s;
         }
     }

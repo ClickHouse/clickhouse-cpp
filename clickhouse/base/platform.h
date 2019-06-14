@@ -15,7 +15,7 @@
 #   define _win_
 #endif
 
-#if defined(_linux_)
+#if defined(_linux_) || defined (_darwin_)
 #   define _unix_
 #endif
 
