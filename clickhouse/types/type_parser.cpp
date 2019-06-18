@@ -1,6 +1,8 @@
 #include "type_parser.h"
 #include "../base/string_utils.h"
 
+#include <map>
+#include <mutex>
 #include <unordered_map>
 
 namespace clickhouse {
@@ -167,8 +169,10 @@ const TypeAst* ParseTypeName(const std::string& type_name) {
     // Cache for type_name.
     // Usually we won't have too many type names in the cache, so do not try to
     // limit cache size.
-    static std::unordered_map<std::string, TypeAst> ast_cache;
+    static std::map<std::string, TypeAst> ast_cache;
+    static std::mutex lock;
 
+    std::lock_guard<std::mutex> guard(lock);
     auto it = ast_cache.find(type_name);
     if (it != ast_cache.end()) {
         return &it->second;
