@@ -36,7 +36,9 @@ public:
     size_t Size() const override;
 
     /// Makes slice of the current column.
-    ColumnRef Slice(size_t, size_t) override { return ColumnRef(); }
+    ColumnRef Slice(size_t, size_t) override;
+    
+    void OffsetsIncrease(size_t);
 
 private:
     size_t GetOffset(size_t n) const;
