@@ -19,14 +19,14 @@ ColumnEnum<T>::ColumnEnum(TypeRef type, const std::vector<T>& data)
 template <typename T>
 void ColumnEnum<T>::Append(const T& value, bool checkValue) {
     if  (checkValue) {
-        // TODO type_->HasEnumValue(value), "Enum type doesn't have value " + std::to_string(value);
+        // TODO: type_->HasEnumValue(value), "Enum type doesn't have value " + std::to_string(value);
     }
     data_.push_back(value);
 }
 
 template <typename T>
 void ColumnEnum<T>::Append(const std::string& name) {
-    data_.push_back(EnumType(type_).GetEnumValue(name));
+    data_.push_back(type_->As<EnumType>()->GetEnumValue(name));
 }
 
 template <typename T>
@@ -41,7 +41,7 @@ const T& ColumnEnum<T>::At(size_t n) const {
 
 template <typename T>
 const std::string ColumnEnum<T>::NameAt(size_t n) const {
-    return EnumType(type_).GetEnumName(data_.at(n));
+    return type_->As<EnumType>()->GetEnumName(data_.at(n));
 }
 
 template <typename T>
@@ -59,7 +59,7 @@ void ColumnEnum<T>::SetAt(size_t n, const T& value, bool checkValue) {
 
 template <typename T>
 void ColumnEnum<T>::SetNameAt(size_t n, const std::string& name) {
-    data_.at(n) = EnumType(type_).GetEnumValue(name);
+    data_.at(n) = type_->As<EnumType>()->GetEnumValue(name);
 }
 
 template <typename T>

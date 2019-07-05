@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../base/input.h"
 #include "../base/coded.h"
+#include "../base/input.h"
 #include "../types/types.h"
 
 namespace clickhouse {
@@ -11,24 +11,19 @@ using ColumnRef = std::shared_ptr<class Column>;
 /**
  * An abstract base of all columns classes.
  */
-class Column : public std::enable_shared_from_this<Column>
-{
+class Column : public std::enable_shared_from_this<Column> {
 public:
-    explicit inline Column(TypeRef type)
-        : type_(type)
-    {
-    }
+    explicit inline Column(TypeRef type) : type_(type) {}
 
-    virtual ~Column()
-    { }
+    virtual ~Column() {}
 
-    /// Downcast pointer to the specific culumn's subtype.
+    /// Downcast pointer to the specific column's subtype.
     template <typename T>
     inline std::shared_ptr<T> As() {
         return std::dynamic_pointer_cast<T>(shared_from_this());
     }
 
-    /// Downcast pointer to the specific culumn's subtype.
+    /// Downcast pointer to the specific column's subtype.
     template <typename T>
     inline std::shared_ptr<const T> As() const {
         return std::dynamic_pointer_cast<const T>(shared_from_this());
@@ -45,7 +40,7 @@ public:
 
     /// Saves column data to output stream.
     virtual void Save(CodedOutputStream* output) = 0;
-    
+
     /// Clear column data .
     virtual void Clear() = 0;
 
@@ -59,4 +54,4 @@ protected:
     TypeRef type_;
 };
 
-}
+}  // namespace clickhouse
