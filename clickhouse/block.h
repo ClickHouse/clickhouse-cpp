@@ -54,6 +54,8 @@ public:
     /// Count of rows in the block.
     size_t GetRowCount() const;
 
+    size_t RefreshRowCount();
+
     const std::string& GetColumnName(size_t idx) const {
         return columns_.at(idx).name;
     }

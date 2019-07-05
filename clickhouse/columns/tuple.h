@@ -13,6 +13,11 @@ class ColumnTuple : public Column {
 public:
     ColumnTuple(const std::vector<ColumnRef>& columns);
 
+    /// Returns count of elements in the tuple (column references)
+    size_t Elements() const {
+        return columns_.size();
+    }
+
     ColumnRef operator [] (size_t n) const {
         return columns_[n];
     }

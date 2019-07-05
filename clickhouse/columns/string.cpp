@@ -28,6 +28,11 @@ const std::string& ColumnFixedString::operator [] (size_t n) const {
     return data_[n];
 }
 
+size_t ColumnFixedString::FixedSize() const
+{
+       return string_size_;
+}
+
 void ColumnFixedString::Append(ColumnRef column) {
     if (auto col = column->As<ColumnFixedString>()) {
         if (string_size_ == col->string_size_) {
