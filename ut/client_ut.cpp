@@ -9,11 +9,11 @@ class ClientCase : public testing::TestWithParam<ClientOptions> {
 protected:
     void SetUp() override {
         client_ = new Client(GetParam());
-        client_->Execute("CREATE DATABASE IF NOT EXISTS test");
+        client_->Execute("CREATE DATABASE IF NOT EXISTS test_clickhouse_cpp");
     }
 
     void TearDown() override {
-        client_->Execute("DROP DATABASE test");
+        client_->Execute("DROP DATABASE test_clickhouse_cpp");
         delete client_;
     }
 
@@ -25,7 +25,7 @@ TEST_P(ClientCase, Array) {
 
     /// Create a table.
     client_->Execute(
-            "CREATE TABLE IF NOT EXISTS test.array (arr Array(UInt64)) "
+            "CREATE TABLE IF NOT EXISTS test_clickhouse_cpp.array (arr Array(UInt64)) "
             "ENGINE = Memory");
 
     /// Insert some values.
@@ -46,13 +46,13 @@ TEST_P(ClientCase, Array) {
         arr->AppendAsColumn(id);
 
         b.AppendColumn("arr", arr);
-        client_->Insert("test.array", b);
+        client_->Insert("test_clickhouse_cpp.array", b);
     }
 
     const uint64_t ARR_SIZE[] = { 1, 2, 3, 4 };
     const uint64_t VALUE[] = { 1, 3, 7, 9 };
     size_t row = 0;
-    client_->Select("SELECT arr FROM test.array",
+    client_->Select("SELECT arr FROM test_clickhouse_cpp.array",
             [ARR_SIZE, VALUE, &row](const Block& block)
         {
             if (block.GetRowCount() == 0) {
@@ -77,16 +77,16 @@ TEST_P(ClientCase, Date) {
 
     /// Create a table.
     client_->Execute(
-            "CREATE TABLE IF NOT EXISTS test.date (d DateTime) "
+            "CREATE TABLE IF NOT EXISTS test_clickhouse_cpp.date (d DateTime) "
             "ENGINE = Memory");
 
     auto d = std::make_shared<ColumnDateTime>();
     auto const now = std::time(nullptr);
     d->Append(now);
     b.AppendColumn("d", d);
-    client_->Insert("test.date", b);
+    client_->Insert("test_clickhouse_cpp.date", b);
 
-    client_->Select("SELECT d FROM test.date", [&now](const Block& block)
+    client_->Select("SELECT d FROM test_clickhouse_cpp.date", [&now](const Block& block)
         {
             if (block.GetRowCount() == 0) {
                 return;
@@ -104,7 +104,7 @@ TEST_P(ClientCase, Date) {
 
 TEST_P(ClientCase, Generic) {
     client_->Execute(
-            "CREATE TABLE IF NOT EXISTS test.client (id UInt64, name String) "
+            "CREATE TABLE IF NOT EXISTS test_clickhouse_cpp.client (id UInt64, name String) "
             "ENGINE = Memory");
 
     const struct {
@@ -131,12 +131,12 @@ TEST_P(ClientCase, Generic) {
         block.AppendColumn("id"  , id);
         block.AppendColumn("name", name);
 
-        client_->Insert("test.client", block);
+        client_->Insert("test_clickhouse_cpp.client", block);
     }
 
     /// Select values inserted in the previous step.
     size_t row = 0;
-    client_->Select("SELECT id, name FROM test.client", [TEST_DATA, &row](const Block& block)
+    client_->Select("SELECT id, name FROM test_clickhouse_cpp.client", [TEST_DATA, &row](const Block& block)
         {
             if (block.GetRowCount() == 0) {
                 return;
@@ -155,7 +155,7 @@ TEST_P(ClientCase, Generic) {
 TEST_P(ClientCase, Nullable) {
     /// Create a table.
     client_->Execute(
-            "CREATE TABLE IF NOT EXISTS test.nullable (id Nullable(UInt64), date Nullable(Date)) "
+            "CREATE TABLE IF NOT EXISTS test_clickhouse_cpp.nullable (id Nullable(UInt64), date Nullable(Date)) "
             "ENGINE = Memory");
 
     // Round std::time_t to start of date.
@@ -195,12 +195,12 @@ TEST_P(ClientCase, Nullable) {
             block.AppendColumn("date", std::make_shared<ColumnNullable>(date, nulls));
         }
 
-        client_->Insert("test.nullable", block);
+        client_->Insert("test_clickhouse_cpp.nullable", block);
     }
 
     /// Select values inserted in the previous step.
     size_t row = 0;
-    client_->Select("SELECT id, date FROM test.nullable",
+    client_->Select("SELECT id, date FROM test_clickhouse_cpp.nullable",
             [TEST_DATA, &row](const Block& block)
         {
             for (size_t c = 0; c < block.GetRowCount(); ++c, ++row) {
@@ -250,7 +250,7 @@ TEST_P(ClientCase, Numbers) {
 TEST_P(ClientCase, Cancellable) {
     /// Create a table.
     client_->Execute(
-            "CREATE TABLE IF NOT EXISTS test.cancel (x UInt64) "
+            "CREATE TABLE IF NOT EXISTS test_clickhouse_cpp.cancel (x UInt64) "
             "ENGINE = Memory");
 
     /// Insert a few blocks. In order to make cancel have effect, we have to
@@ -266,13 +266,13 @@ TEST_P(ClientCase, Cancellable) {
         }
 
         b.AppendColumn("x", x);
-        client_->Insert("test.cancel", b);
+        client_->Insert("test_clickhouse_cpp.cancel", b);
     }
 
     /// Send a query which is canceled after receiving the first blockr.
     int row_cnt = 0;
     EXPECT_NO_THROW(
-        client_->SelectCancelable("SELECT * FROM test.cancel",
+        client_->SelectCancelable("SELECT * FROM test_clickhouse_cpp.cancel",
             [&row_cnt](const Block& block)
             {
                 row_cnt += block.GetRowCount();
@@ -287,13 +287,13 @@ TEST_P(ClientCase, Cancellable) {
 TEST_P(ClientCase, Exception) {
     /// Create a table.
     client_->Execute(
-            "CREATE TABLE IF NOT EXISTS test.exceptions (id UInt64, name String) "
+            "CREATE TABLE IF NOT EXISTS test_clickhouse_cpp.exceptions (id UInt64, name String) "
             "ENGINE = Memory");
 
     /// Expect failing on table creation.
     EXPECT_THROW(
         client_->Execute(
-            "CREATE TABLE test.exceptions (id UInt64, name String) "
+            "CREATE TABLE test_clickhouse_cpp.exceptions (id UInt64, name String) "
             "ENGINE = Memory"),
         ServerException);
 }
@@ -301,7 +301,7 @@ TEST_P(ClientCase, Exception) {
 TEST_P(ClientCase, Enum) {
     /// Create a table.
     client_->Execute(
-            "CREATE TABLE IF NOT EXISTS test.enums (id UInt64, e Enum8('One' = 1, 'Two' = 2)) "
+            "CREATE TABLE IF NOT EXISTS test_clickhouse_cpp.enums (id UInt64, e Enum8('One' = 1, 'Two' = 2)) "
             "ENGINE = Memory");
 
     const struct {
@@ -335,12 +335,12 @@ TEST_P(ClientCase, Enum) {
         block.AppendColumn("id", id);
         block.AppendColumn("e", e);
 
-        client_->Insert("test.enums", block);
+        client_->Insert("test_clickhouse_cpp.enums", block);
     }
 
     /// Select values inserted in the previous step.
     size_t row = 0;
-    client_->Select("SELECT id, e FROM test.enums", [&row, TEST_DATA](const Block& block)
+    client_->Select("SELECT id, e FROM test_clickhouse_cpp.enums", [&row, TEST_DATA](const Block& block)
         {
             if (block.GetRowCount() == 0) {
                 return;
@@ -361,7 +361,7 @@ TEST_P(ClientCase, Enum) {
 TEST_P(ClientCase, Decimal) {
     client_->Execute(
         "CREATE TABLE IF NOT EXISTS "
-        "test.decimal (id UInt64, d1 Decimal(9, 4), d2 Decimal(18, 9), d3 Decimal(38, 19), "
+        "test_clickhouse_cpp.decimal (id UInt64, d1 Decimal(9, 4), d2 Decimal(18, 9), d3 Decimal(38, 19), "
         "                         d4 Decimal32(4), d5 Decimal64(9), d6 Decimal128(19)) "
         "ENGINE = Memory");
 
@@ -427,10 +427,10 @@ TEST_P(ClientCase, Decimal) {
         b.AppendColumn("d5", d5);
         b.AppendColumn("d6", d6);
 
-        client_->Insert("test.decimal", b);
+        client_->Insert("test_clickhouse_cpp.decimal", b);
     }
 
-    client_->Select("SELECT id, d1, d2, d3, d4, d5, d6 FROM test.decimal ORDER BY id", [](const Block& b) {
+    client_->Select("SELECT id, d1, d2, d3, d4, d5, d6 FROM test_clickhouse_cpp.decimal ORDER BY id", [](const Block& b) {
         if (b.GetRowCount() == 0) {
             return;
         }
