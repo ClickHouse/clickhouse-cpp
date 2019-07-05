@@ -297,15 +297,27 @@ inline void EnumExample(Client& client) {
     client.Execute("DROP TABLE test.enums");
 }
 
+inline void ShowTables(Client& client) {
+    /// Select values inserted in the previous step.
+    client.Select("SHOW TABLES", [](const Block& block)
+        {
+            for (size_t i = 0; i < block.GetRowCount(); ++i) {
+                std::cout << (*block[0]->As<ColumnString>())[i] << "\n";
+            }
+        }
+    );
+}
+
 static void RunTests(Client& client) {
     ArrayExample(client);
+    CancelableExample(client);
     DateExample(client);
+    EnumExample(client);
+    ExecptionExample(client);
     GenericExample(client);
     NullableExample(client);
     NumbersExample(client);
-    CancelableExample(client);
-    ExecptionExample(client);
-    EnumExample(client);
+    ShowTables(client);
 }
 
 int main() {

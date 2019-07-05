@@ -17,7 +17,11 @@ CompressedInput::CompressedInput(CodedInputStream* input)
 
 CompressedInput::~CompressedInput() {
     if (!mem_.Exhausted()) {
+#if __cplusplus < 201703L
         if (!std::uncaught_exception()) {
+#else
+        if (!std::uncaught_exceptions()) {
+#endif
             throw std::runtime_error("some data was not readed");
         }
     }
