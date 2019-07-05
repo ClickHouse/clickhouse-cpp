@@ -63,6 +63,7 @@ static ColumnRef CreateTerminalColumn(const TypeAst& ast) {
         } else if (ast.elements.size() == 1) {
             return std::make_shared<ColumnDecimal>(38, ast.elements.front().value);
         }
+        throw std::runtime_error("Unexpected branch in code");
 
     default:
         return nullptr;
