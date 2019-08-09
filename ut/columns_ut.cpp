@@ -37,7 +37,6 @@ static std::vector<uint64_t> MakeUUIDs() {
          0x3507213c178649f9llu, 0x9faf035d662f60aellu};
 }
 
-
 TEST(ColumnsCase, NumericInit) {
     auto col = std::make_shared<ColumnUInt32>(MakeNumbers());
 
@@ -108,6 +107,15 @@ TEST(ColumnsCase, DateAppend) {
 
     ASSERT_EQ(col2->Size(), 1u);
     ASSERT_EQ(col2->At(0), (now / 86400) * 86400);
+}
+
+TEST(ColumnsCase, Date2038) {
+    auto col1 = std::make_shared<ColumnDate>();
+    std::time_t largeDate(25882ul * 86400ul);
+    col1->Append(largeDate);
+
+    ASSERT_EQ(col1->Size(), 1u);
+    ASSERT_EQ(static_cast<std::uint64_t>(col1->At(0)), 25882ul * 86400ul);
 }
 
 TEST(ColumnsCase, EnumTest) {
