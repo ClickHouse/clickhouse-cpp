@@ -20,6 +20,9 @@ public:
     /// Returns element at given row number.
     const std::string& operator [] (size_t n) const;
 
+    /// Returns the max size of the fixed string
+    size_t FixedSize() const;
+
 public:
     /// Appends content of given column to the end of current one.
     void Append(ColumnRef column) override;

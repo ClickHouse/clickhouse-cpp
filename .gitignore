@@ -271,3 +271,6 @@ __pycache__/
 /buckaroo/
 .buckconfig.local
 BUCKAROO_DEPS
+
+# Visual Studio Code
+/.vscode/

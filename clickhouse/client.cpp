@@ -165,6 +165,8 @@ Client::Impl::Impl(const ClientOptions& opts)
     , buffered_output_(&socket_output_)
     , output_(&buffered_output_)
 {
+    // TODO: throw on big-endianness of platform
+
     for (int i = 0; ; ) {
         try {
             ResetConnection();

@@ -3,6 +3,8 @@
 
 using namespace clickhouse;
 
+// TODO: add tests for Decimal column types.
+
 TEST(TypeParserCase, ParseTerminals) {
     TypeAst ast;
     TypeParser("UInt8").Parse(&ast);

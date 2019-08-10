@@ -2,6 +2,7 @@
 
 #include "array.h"
 #include "date.h"
+#include "decimal.h"
 #include "enum.h"
 #include "nullable.h"
 #include "numeric.h"
@@ -51,6 +52,18 @@ static ColumnRef CreateTerminalColumn(const TypeAst& ast) {
         return std::make_shared<ColumnDateTime>();
     case Type::Date:
         return std::make_shared<ColumnDate>();
+
+    case Type::Decimal32:
+        return std::make_shared<ColumnDecimal>(9, ast.elements.front().value);
+    case Type::Decimal64:
+        return std::make_shared<ColumnDecimal>(18, ast.elements.front().value);
+    case Type::Decimal128:
+        if (ast.elements.size() == 2) {
+            return std::make_shared<ColumnDecimal>(ast.elements.front().value, ast.elements.back().value);
+        } else if (ast.elements.size() == 1) {
+            return std::make_shared<ColumnDecimal>(38, ast.elements.front().value);
+        }
+        throw std::runtime_error("Unexpected branch in code");
 
     default:
         return nullptr;

@@ -14,12 +14,23 @@ ColumnNullable::ColumnNullable(ColumnRef nested, ColumnRef nulls)
     }
 }
 
+void ColumnNullable::Append(bool isnull)
+{
+    nulls_->Append(isnull ? 1 : 0);
+}
+
+
 bool ColumnNullable::IsNull(size_t n) const {
     return nulls_->At(n) != 0;
 }
 
 ColumnRef ColumnNullable::Nested() const {
     return nested_;
+}
+
+ColumnRef ColumnNullable::Nulls() const
+{
+       return nulls_;
 }
 
 void ColumnNullable::Append(ColumnRef column) {

@@ -68,6 +68,25 @@ size_t Block::GetRowCount() const {
     return rows_;
 }
 
+size_t Block::RefreshRowCount()
+{
+    size_t rows = 0UL;
+
+    for (size_t idx = 0UL; idx < columns_.size(); ++idx)
+    {
+       const std::string& name = columns_[idx].name;
+       const ColumnRef& col = columns_[idx].column;
+
+       if (idx == 0UL)
+           rows = col->Size();
+       else if (rows != col->Size())
+           throw std::runtime_error("all columns in block must have same count of rows. Name: ["+name+"], rows: ["+std::to_string(rows)+"], columns: [" + std::to_string(col->Size())+"]");
+    }
+
+    rows_ = rows;
+    return rows_;
+}
+
 ColumnRef Block::operator [] (size_t idx) const {
     if (idx < columns_.size()) {
         return columns_[idx].column;
