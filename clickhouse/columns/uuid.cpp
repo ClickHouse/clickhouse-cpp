@@ -37,7 +37,7 @@ const UInt128 ColumnUUID::operator [] (size_t n) const {
 
 void ColumnUUID::Append(ColumnRef column) {
     if (auto col = column->As<ColumnUUID>()) {
-        data_->Append(data_);
+        data_->Append(col->data_);
     }
 }
 
