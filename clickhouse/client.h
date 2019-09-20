@@ -60,6 +60,12 @@ struct ClientOptions {
     /// Compression method.
     DECLARE_FIELD(compression_method, CompressionMethod, SetCompressionMethod, CompressionMethod::None);
 
+    /// TCP Keep alive options
+    DECLARE_FIELD(tcp_keepalive, bool, TcpKeepAlive, false);
+    DECLARE_FIELD(tcp_keepalive_idle, int, SetTcpKeepAliveIdle, 60);
+    DECLARE_FIELD(tcp_keepalive_intvl, int, SetTcpKeepAliveInterval, 5);
+    DECLARE_FIELD(tcp_keepalive_cnt, int, SetTcpKeepAliveCount, 3);
+
 #undef DECLARE_FIELD
 };
 

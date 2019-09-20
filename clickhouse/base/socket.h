@@ -15,6 +15,7 @@
 #else
 #   include <sys/types.h>
 #   include <sys/socket.h>
+#   include <netinet/tcp.h>
 #   include <poll.h>
 
 #   if !defined(SOCKET)
@@ -57,6 +58,8 @@ public:
     SocketHolder& operator = (SocketHolder&& other) noexcept;
 
     operator SOCKET () const noexcept;
+
+    void SetTcpKeepAlive(int idle, int intvl, int cnt) noexcept;
 
 private:
     SocketHolder(const SocketHolder&) = delete;
