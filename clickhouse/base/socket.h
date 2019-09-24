@@ -58,6 +58,8 @@ public:
 
     operator SOCKET () const noexcept;
 
+    void SetTcpKeepAlive(int idle, int intvl, int cnt) noexcept;
+
 private:
     SocketHolder(const SocketHolder&) = delete;
     SocketHolder& operator = (const SocketHolder&) = delete;
