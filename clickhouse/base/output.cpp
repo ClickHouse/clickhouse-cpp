@@ -70,7 +70,17 @@ BufferedOutput::BufferedOutput(OutputStream* slave, size_t buflen)
 }
 
 BufferedOutput::~BufferedOutput() {
-    Flush();
+    try
+    {
+        Flush();
+    }
+    catch (...)
+    {
+        // That means we've failed to flush some data e.g. to the socket,
+        // but there is nothing we can do at this point (can't bring the socket back),
+        // and throwing in destructor is really a bad idea.
+        // The best we can do is to log the error and ignore it, but currently there is no logging subsystem.
+    }
 }
 
 void BufferedOutput::Reset() {
