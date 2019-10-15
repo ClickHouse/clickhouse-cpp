@@ -15,6 +15,7 @@ C++ client for [Yandex ClickHouse](https://clickhouse.yandex/)
 * String
 * Tuple
 * UInt8, UInt16, UInt32, UInt64, Int8, Int16, Int32, Int64
+* IPv4, IPv6
 
 ## Building
 

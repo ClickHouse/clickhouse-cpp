@@ -28,6 +28,8 @@ static const std::unordered_map<std::string, Type::Code> kTypeCode = {
     { "Enum8",       Type::Enum8 },
     { "Enum16",      Type::Enum16 },
     { "UUID",        Type::UUID },
+    { "IPv4",        Type::IPv4 },
+    { "IPv6",        Type::IPv6 },
 };
 
 static Type::Code GetTypeCode(const std::string& name) {

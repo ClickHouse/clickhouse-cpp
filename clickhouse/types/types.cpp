@@ -65,6 +65,7 @@ std::string Type::GetName() const {
         case UInt16:
             return "UInt16";
         case UInt32:
+        case IPv4:
             return "UInt32";
         case UInt64:
             return "UInt64";
@@ -78,6 +79,8 @@ std::string Type::GetName() const {
             return "String";
         case FixedString:
             return "FixedString(" + std::to_string(string_size_) + ")";
+        case IPv6:
+            return "FixedString(16)";
         case DateTime:
             return "DateTime";
         case Date:

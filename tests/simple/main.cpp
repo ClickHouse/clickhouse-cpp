@@ -308,6 +308,56 @@ inline void ShowTables(Client& client) {
     );
 }
 
+inline void IPExample(Client &client) {
+    /// Create a table.
+    client.Execute("CREATE TABLE IF NOT EXISTS test.ips (id UInt64, v4 IPv4, v6 IPv6) ENGINE = Memory");
+
+    /// Insert some values.
+    {
+        Block block;
+
+        auto id = std::make_shared<ColumnUInt64>();
+        id->Append(1);
+        id->Append(2);
+
+        auto v4 = std::make_shared<ColumnUInt32>();
+        v4->Append(2130706433);
+        v4->Append(3585395774);
+
+        auto v6 = std::make_shared<ColumnFixedString>(16);
+        v6->Append("::1");
+        v6->Append("aa::ff");
+
+        block.AppendColumn("id", id);
+        block.AppendColumn("v4", v4);
+        block.AppendColumn("v6", v6);
+
+        client.Insert("test.ips", block);
+    }
+
+    /// Select values inserted in the previous step.
+    client.Select("SELECT id, v4, v6 FROM test.ips", [](const Block& block)
+        {
+            for (Block::Iterator bi(block); bi.IsValid(); bi.Next()) {
+                std::cout << bi.Name() << " ";
+            }
+            std::cout << std::endl;
+
+            for (size_t i = 0; i < block.GetRowCount(); ++i) {
+                std::cout << (*block[0]->As<ColumnUInt64>())[i] << " "
+                          << (*block[1]->As<ColumnUInt32>())[i] << " "
+                          << (*block[2]->As<ColumnFixedString>())[i] << "\n";
+            }
+        }
+    );
+
+
+    /// Delete table.
+    client.Execute("DROP TABLE test.ips");
+}
+
+
+
 static void RunTests(Client& client) {
     ArrayExample(client);
     CancelableExample(client);
@@ -317,6 +367,7 @@ static void RunTests(Client& client) {
     GenericExample(client);
     NullableExample(client);
     NumbersExample(client);
+    IPExample(client);
     ShowTables(client);
 }
 

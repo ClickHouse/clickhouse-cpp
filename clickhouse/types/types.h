@@ -33,6 +33,8 @@ public:
         Enum8,
         Enum16,
         UUID,
+        IPv4,
+        IPv6,
     };
 
     struct EnumItem {
