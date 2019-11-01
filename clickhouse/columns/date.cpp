@@ -9,7 +9,8 @@ ColumnDate::ColumnDate()
 }
 
 void ColumnDate::Append(const std::time_t& value) {
-    data_->Append(static_cast<uint16_t>(value / 86400));
+    /// TODO: This code is fundamentally wrong.
+    data_->Append(static_cast<uint16_t>(value / std::time_t(86400)));
 }
 
 void ColumnDate::Clear() {
@@ -17,7 +18,8 @@ void ColumnDate::Clear() {
 }
 
 std::time_t ColumnDate::At(size_t n) const {
-    return data_->At(n) * 86400;
+    /// TODO: This code is fundamentally wrong.
+    return data_->At(n) * std::time_t(86400);
 }
 
 void ColumnDate::Append(ColumnRef column) {
