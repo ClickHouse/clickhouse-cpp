@@ -37,6 +37,8 @@ public:
         Decimal32,
         Decimal64,
         Decimal128,
+        IPv4,
+        IPv6,
     };
 
     using EnumItem = std::pair<std::string /* name */, int16_t /* value */>;

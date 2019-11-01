@@ -22,6 +22,7 @@ static ColumnRef CreateTerminalColumn(const TypeAst& ast) {
     case Type::UInt16:
         return std::make_shared<ColumnUInt16>();
     case Type::UInt32:
+    case Type::IPv4:
         return std::make_shared<ColumnUInt32>();
     case Type::UInt64:
         return std::make_shared<ColumnUInt64>();
@@ -47,6 +48,9 @@ static ColumnRef CreateTerminalColumn(const TypeAst& ast) {
         return std::make_shared<ColumnString>();
     case Type::FixedString:
         return std::make_shared<ColumnFixedString>(ast.elements.front().value);
+    case Type::IPv6: {
+        return std::make_shared<ColumnFixedString>(16);
+    }
 
     case Type::DateTime:
         return std::make_shared<ColumnDateTime>();
