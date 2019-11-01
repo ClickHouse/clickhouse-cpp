@@ -12,12 +12,13 @@ public:
     ColumnDate();
 
     /// Appends one element to the end of column.
+    /// TODO: The implementation is fundamentally wrong.
     void Append(const std::time_t& value);
 
     /// Returns element at given row number.
+    /// TODO: The implementation is fundamentally wrong.
     std::time_t At(size_t n) const;
 
-public:
     /// Appends content of given column to the end of current one.
     void Append(ColumnRef column) override;
 
@@ -51,7 +52,6 @@ public:
     /// Returns element at given row number.
     std::time_t At(size_t n) const;
 
-public:
     /// Appends content of given column to the end of current one.
     void Append(ColumnRef column) override;
 
