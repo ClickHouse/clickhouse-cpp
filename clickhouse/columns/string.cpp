@@ -42,6 +42,8 @@ void ColumnFixedString::Append(ColumnRef column) {
 }
 
 bool ColumnFixedString::Load(CodedInputStream* input, size_t rows) {
+    data_.reserve(data_.size() + rows);
+
     for (size_t i = 0; i < rows; ++i) {
         std::string s;
         s.resize(string_size_);
@@ -111,6 +113,8 @@ void ColumnString::Append(ColumnRef column) {
 }
 
 bool ColumnString::Load(CodedInputStream* input, size_t rows) {
+    data_.reserve(data_.size() + rows);
+
     for (size_t i = 0; i < rows; ++i) {
         std::string s;
 
