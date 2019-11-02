@@ -260,8 +260,9 @@ SOCKET SocketConnect(const NetworkAddress& addr) {
             return s;
         }
     }
-    if(last_err>0)
-        throw std::system_error(last_err,std::system_category(),"fail to connect");
+    if (last_err > 0) {
+        throw std::system_error(last_err, std::system_category(), "fail to connect");
+    }
     throw std::system_error(
         errno, std::system_category(), "fail to connect"
     );
