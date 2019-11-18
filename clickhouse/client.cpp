@@ -17,6 +17,7 @@
 #include <thread>
 #include <vector>
 #include <sstream>
+#include <stdexcept>
 
 #define DBMS_NAME                                       "ClickHouse"
 #define DBMS_VERSION_MAJOR                              1

@@ -1,6 +1,8 @@
 #include "uuid.h"
 #include "utils.h"
 
+#include <stdexcept>
+
 namespace clickhouse {
 
 ColumnUUID::ColumnUUID()
