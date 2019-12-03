@@ -41,8 +41,11 @@ TARGET_LINK_LIBRARIES (clickhouse-cpp-lib-static
     lz4-lib
 )
 
-INSTALL(TARGETS clickhouse-cpp-lib LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
-INSTALL(TARGETS clickhouse-cpp-lib-static LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+INSTALL(TARGETS clickhouse-cpp-lib clickhouse-cpp-lib-static
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib
+)
+
 
 # general
 INSTALL(FILES block.h DESTINATION ${INCLUDE_INSTALL_DIR}/clickhouse/)
