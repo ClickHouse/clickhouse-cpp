@@ -276,9 +276,9 @@ void Client::Impl::ResetConnection() {
         throw std::system_error(errno, std::system_category());
     }
 
-    if(options_.tcp_keepalive){
-        s.SetTcpKeepAlive(options_.tcp_keepalive_idle,
-                          options_.tcp_keepalive_intvl,
+    if (options_.tcp_keepalive) {
+        s.SetTcpKeepAlive(options_.tcp_keepalive_idle.count(),
+                          options_.tcp_keepalive_intvl.count(),
                           options_.tcp_keepalive_cnt);
     }
 

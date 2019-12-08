@@ -54,11 +54,16 @@ public:
 
     bool Closed() const noexcept;
 
+    /// @params idle the time (in seconds) the connection needs to remain
+    ///         idle before TCP starts sending keepalive probes.
+    /// @params intvl the time (in seconds) between individual keepalive probes.
+    /// @params cnt the maximum number of keepalive probes TCP should send
+    ///         before dropping the connection.
+    void SetTcpKeepAlive(int idle, int intvl, int cnt) noexcept;
+
     SocketHolder& operator = (SocketHolder&& other) noexcept;
 
     operator SOCKET () const noexcept;
-
-    void SetTcpKeepAlive(int idle, int intvl, int cnt) noexcept;
 
 private:
     SocketHolder(const SocketHolder&) = delete;
