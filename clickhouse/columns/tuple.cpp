@@ -16,6 +16,10 @@ ColumnTuple::ColumnTuple(const std::vector<ColumnRef>& columns)
 {
 }
 
+size_t ColumnTuple::TupleSize() const {
+    return columns_.size();
+}
+
 size_t ColumnTuple::Size() const {
     return columns_.empty() ? 0 : columns_[0]->Size();
 }
