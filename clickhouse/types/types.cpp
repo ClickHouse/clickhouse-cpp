@@ -26,7 +26,6 @@ std::string Type::GetName() const {
         case UInt16:
             return "UInt16";
         case UInt32:
-        case IPv4:
             return "UInt32";
         case UInt64:
             return "UInt64";
@@ -40,8 +39,10 @@ std::string Type::GetName() const {
             return "String";
         case FixedString:
             return As<FixedStringType>()->GetName();
+        case IPv4:
+            return "IPv4";
         case IPv6:
-            return "FixedString(16)";
+            return "IPv6";
         case DateTime:
             return "DateTime";
         case Date:
@@ -75,6 +76,14 @@ TypeRef Type::CreateDate() {
 
 TypeRef Type::CreateDateTime() {
     return TypeRef(new Type(Type::DateTime));
+}
+
+TypeRef Type::CreateIPv4() {
+    return TypeRef(new Type(Type::IPv4));
+}
+
+TypeRef Type::CreateIPv6() {
+    return TypeRef(new Type(Type::IPv6));
 }
 
 TypeRef Type::CreateNullable(TypeRef nested_type) {

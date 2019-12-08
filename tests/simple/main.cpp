@@ -48,7 +48,6 @@ inline void ArrayExample(Client& client) {
     b.AppendColumn("arr", arr);
     client.Insert("test.array", b);
 
-
     client.Select("SELECT arr FROM test.array", [](const Block& block)
         {
             for (size_t c = 0; c < block.GetRowCount(); ++c) {
@@ -293,7 +292,6 @@ inline void EnumExample(Client& client) {
         }
     );
 
-
     /// Delete table.
     client.Execute("DROP TABLE test.enums");
 }
@@ -320,14 +318,17 @@ inline void IPExample(Client &client) {
         auto id = std::make_shared<ColumnUInt64>();
         id->Append(1);
         id->Append(2);
+        id->Append(3);
 
-        auto v4 = std::make_shared<ColumnUInt32>();
-        v4->Append(2130706433);
+        auto v4 = std::make_shared<ColumnIPv4>();
+        v4->Append("127.0.0.1");
         v4->Append(3585395774);
+        v4->Append(0);
 
-        auto v6 = std::make_shared<ColumnFixedString>(16);
+        auto v6 = std::make_shared<ColumnIPv6>();
         v6->Append("::1");
         v6->Append("aa::ff");
+        v6->Append("fe80::86ba:ef31:f2d8:7e8b");
 
         block.AppendColumn("id", id);
         block.AppendColumn("v4", v4);
@@ -346,18 +347,15 @@ inline void IPExample(Client &client) {
 
             for (size_t i = 0; i < block.GetRowCount(); ++i) {
                 std::cout << (*block[0]->As<ColumnUInt64>())[i] << " "
-                          << (*block[1]->As<ColumnUInt32>())[i] << " "
-                          << (*block[2]->As<ColumnFixedString>())[i] << "\n";
+                          << (*block[1]->As<ColumnIPv4>()).AsString(i) << " (" << (*block[1]->As<ColumnIPv4>())[i].s_addr << ") "
+                          << (*block[2]->As<ColumnIPv6>()).AsString(i) << "\n";
             }
         }
     );
 
-
     /// Delete table.
     client.Execute("DROP TABLE test.ips");
 }
-
-
 
 static void RunTests(Client& client) {
     ArrayExample(client);
@@ -366,9 +364,9 @@ static void RunTests(Client& client) {
     EnumExample(client);
     ExecptionExample(client);
     GenericExample(client);
+    IPExample(client);
     NullableExample(client);
     NumbersExample(client);
-    IPExample(client);
     ShowTables(client);
 }
 
