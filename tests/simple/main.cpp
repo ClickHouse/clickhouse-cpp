@@ -296,6 +296,14 @@ inline void EnumExample(Client& client) {
     client.Execute("DROP TABLE test.enums");
 }
 
+inline void SelectNull(Client& client) {
+    client.Select("SELECT NULL", [](const Block& block)
+        {
+            assert(block.GetRowCount() < 2);
+        }
+    );
+}
+
 inline void ShowTables(Client& client) {
     /// Select values inserted in the previous step.
     client.Select("SHOW TABLES", [](const Block& block)
@@ -367,6 +375,7 @@ static void RunTests(Client& client) {
     IPExample(client);
     NullableExample(client);
     NumbersExample(client);
+    SelectNull(client);
     ShowTables(client);
 }
 
