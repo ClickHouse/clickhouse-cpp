@@ -65,3 +65,22 @@ TEST(TypeParserCase, ParseEnum) {
         ++element;
     }
 }
+
+TEST(TypeParserCase, ParseTuple) {
+    TypeAst ast;
+    TypeParser(
+        "Tuple(UInt8, String)")
+        .Parse(&ast);
+    ASSERT_EQ(ast.meta, TypeAst::Tuple);
+    ASSERT_EQ(ast.name, "Tuple");
+    ASSERT_EQ(ast.code, Type::Tuple);
+    ASSERT_EQ(ast.elements.size(), 2u);
+
+    std::vector<std::string> names = {"UInt8", "String"};
+
+    auto element = ast.elements.begin();
+    for (size_t i = 0; i < 2; ++i) {
+        ASSERT_EQ(element->name, names[i]);
+        ++element;
+    }
+}
