@@ -67,6 +67,10 @@ public:
 
     static TypeRef CreateDateTime();
 
+    static TypeRef CreateIPv4();
+
+    static TypeRef CreateIPv6();
+
     static TypeRef CreateNullable(TypeRef nested_type);
 
     template <typename T>

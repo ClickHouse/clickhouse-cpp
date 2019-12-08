@@ -10,6 +10,8 @@ SET ( clickhouse-cpp-lib-src
     columns/date.cpp
     columns/enum.cpp
     columns/factory.cpp
+    columns/ip4.cpp
+    columns/ip6.cpp
     columns/nullable.cpp
     columns/numeric.cpp
     columns/string.cpp

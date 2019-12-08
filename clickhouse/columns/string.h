@@ -29,7 +29,7 @@ public:
 
     /// Saves column data to output stream.
     void Save(CodedOutputStream* output) override;
-    
+
     /// Clear column data .
     void Clear() override;
 
@@ -43,7 +43,6 @@ private:
     const size_t string_size_;
     std::vector<std::string> data_;
 };
-
 
 /**
  * Represents column of variable-length strings.
@@ -71,7 +70,7 @@ public:
 
     /// Saves column data to output stream.
     void Save(CodedOutputStream* output) override;
-    
+
     /// Clear column data .
     void Clear() override;
 

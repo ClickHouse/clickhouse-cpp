@@ -13,6 +13,7 @@
 #   include <winsock2.h>
 #   include <ws2tcpip.h>
 #else
+#   include <arpa/inet.h>
 #   include <sys/types.h>
 #   include <sys/socket.h>
 #   include <poll.h>

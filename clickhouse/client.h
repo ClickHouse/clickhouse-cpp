@@ -6,6 +6,8 @@
 #include "columns/array.h"
 #include "columns/date.h"
 #include "columns/enum.h"
+#include "columns/ip4.h"
+#include "columns/ip6.h"
 #include "columns/nullable.h"
 #include "columns/numeric.h"
 #include "columns/string.h"
