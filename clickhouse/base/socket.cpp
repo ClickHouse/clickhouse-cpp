@@ -11,6 +11,7 @@
 #   include <errno.h>
 #   include <fcntl.h>
 #   include <netdb.h>
+#   include <netinet/tcp.h>
 #   include <signal.h>
 #   include <unistd.h>
 #endif
@@ -134,6 +135,25 @@ void SocketHolder::Close() noexcept {
 
 bool SocketHolder::Closed() const noexcept {
     return handle_ == -1;
+}
+
+void SocketHolder::SetTcpKeepAlive(int idle, int intvl, int cnt) noexcept {
+    int val = 1;
+    setsockopt(handle_, SOL_SOCKET, SO_KEEPALIVE, &val, sizeof(val));
+
+#if defined(_unix_)
+#   if defined(_linux_)
+        setsockopt(handle_, IPPROTO_TCP, TCP_KEEPIDLE, &idle, sizeof(idle));
+#   elif defined(_darwin_)
+        setsockopt(handle_, IPPROTO_TCP, TCP_KEEPALIVE, &idle, sizeof(idle));
+#   else
+#       error "platform does not supported"
+#   endif
+    setsockopt(handle_, IPPROTO_TCP, TCP_KEEPINTVL, &intvl, sizeof(intvl));
+    setsockopt(handle_, IPPROTO_TCP, TCP_KEEPCNT, &cnt, sizeof(cnt));
+#else
+    std::ignore = idle = intvl = cnt;
+#endif
 }
 
 SocketHolder& SocketHolder::operator = (SocketHolder&& other) noexcept {
