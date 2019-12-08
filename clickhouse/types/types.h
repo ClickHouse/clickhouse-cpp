@@ -71,6 +71,8 @@ public:
 
     static TypeRef CreateIPv6();
 
+    static TypeRef CreateNothing();
+
     static TypeRef CreateNullable(TypeRef nested_type);
 
     template <typename T>

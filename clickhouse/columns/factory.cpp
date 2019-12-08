@@ -5,6 +5,7 @@
 #include "enum.h"
 #include "ip4.h"
 #include "ip6.h"
+#include "nothing.h"
 #include "nullable.h"
 #include "numeric.h"
 #include "string.h"
@@ -18,6 +19,9 @@ namespace {
 
 static ColumnRef CreateTerminalColumn(const TypeAst& ast) {
     switch (ast.code) {
+    case Type::Void:
+        return std::make_shared<ColumnNothing>();
+
     case Type::UInt8:
         return std::make_shared<ColumnUInt8>();
     case Type::UInt16:

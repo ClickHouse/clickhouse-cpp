@@ -156,6 +156,10 @@ TypeRef Type::CreateIPv6() {
     return TypeRef(new Type(Type::IPv6));
 }
 
+TypeRef Type::CreateNothing() {
+    return TypeRef(new Type(Type::Void));
+}
+
 TypeRef Type::CreateNullable(TypeRef nested_type) {
     TypeRef type(new Type(Type::Nullable));
     type->nullable_->nested_type = nested_type;
