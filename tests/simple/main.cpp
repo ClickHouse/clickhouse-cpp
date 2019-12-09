@@ -63,6 +63,46 @@ inline void ArrayExample(Client& client) {
     client.Execute("DROP TABLE test.array");
 }
 
+inline void MultiArrayExample(Client& client) {
+    Block b;
+
+    /// Create a table.
+    client.Execute("CREATE TABLE IF NOT EXISTS test.multiarray (arr Array(Array(UInt64))) ENGINE = Memory");
+
+    auto arr = std::make_shared<ColumnArray>(std::make_shared<ColumnUInt64>());
+
+    auto id = std::make_shared<ColumnUInt64>();
+    id->Append(17);
+    arr->AppendAsColumn(id);
+
+    auto a2 = std::make_shared<ColumnArray>(std::make_shared<ColumnArray>(std::make_shared<ColumnUInt64>()));
+    a2->AppendAsColumn(arr);
+    b.AppendColumn("arr", a2);
+    client.Insert("test.multiarray", b);
+
+    client.Select("SELECT arr FROM test.multiarray", [](const Block& block)
+        {
+            for (size_t c = 0; c < block.GetRowCount(); ++c) {
+                auto col = block[0]->As<ColumnArray>()->GetAsColumn(c);
+                cout << "[";
+                for (size_t i = 0; i < col->Size(); ++i) {
+                    auto col2 = col->As<ColumnArray>()->GetAsColumn(i);
+                    for (size_t j = 0; j < col2->Size(); ++j) {
+                        cout << (int)(*col2->As<ColumnUInt64>())[j];
+                        if (j + 1 != col2->Size()) {
+                            cout << " ";
+                        }
+                    }
+                }
+                std::cout << "]" << std::endl;
+            }
+        }
+    );
+
+    /// Delete table.
+    client.Execute("DROP TABLE test.multiarray");
+}
+
 inline void DateExample(Client& client) {
     Block b;
 
@@ -372,6 +412,7 @@ static void RunTests(Client& client) {
     ExecptionExample(client);
     GenericExample(client);
     IPExample(client);
+    MultiArrayExample(client);
     NullableExample(client);
     NumbersExample(client);
     SelectNull(client);
