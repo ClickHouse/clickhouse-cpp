@@ -1,6 +1,8 @@
 
 #include "ip6.h"
 
+#include <stdexcept>
+
 namespace clickhouse {
 
 static_assert(sizeof(struct in6_addr) == 16, "sizeof in6_addr should be 16 bytes");
