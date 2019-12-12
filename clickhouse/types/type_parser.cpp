@@ -30,6 +30,10 @@ static const std::unordered_map<std::string, Type::Code> kTypeCode = {
     { "UUID",        Type::UUID },
     { "IPv4",        Type::IPv4 },
     { "IPv6",        Type::IPv6 },
+    { "Decimal",     Type::Decimal },
+    { "Decimal32",   Type::Decimal32 },
+    { "Decimal64",   Type::Decimal64 },
+    { "Decimal128",  Type::Decimal128 },
 };
 
 static Type::Code GetTypeCode(const std::string& name) {

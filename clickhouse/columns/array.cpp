@@ -38,7 +38,7 @@ ColumnRef ColumnArray::Slice(size_t begin, size_t size) {
     {
         result->Append(std::make_shared<ColumnArray>(GetAsColumn(begin + i)));
     }
-    
+
     return result;
 }
 

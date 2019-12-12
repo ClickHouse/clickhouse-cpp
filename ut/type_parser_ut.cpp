@@ -84,3 +84,44 @@ TEST(TypeParserCase, ParseTuple) {
         ++element;
     }
 }
+
+TEST(TypeParserCase, ParseDecimal) {
+    TypeAst ast;
+    TypeParser("Decimal(12, 5)").Parse(&ast);
+    ASSERT_EQ(ast.meta, TypeAst::Terminal);
+    ASSERT_EQ(ast.name, "Decimal");
+    ASSERT_EQ(ast.code, Type::Decimal);
+    ASSERT_EQ(ast.elements.size(), 2u);
+    ASSERT_EQ(ast.elements[0].value, 12);
+    ASSERT_EQ(ast.elements[1].value, 5);
+}
+
+TEST(TypeParserCase, ParseDecimal32) {
+    TypeAst ast;
+    TypeParser("Decimal32(7)").Parse(&ast);
+    ASSERT_EQ(ast.meta, TypeAst::Terminal);
+    ASSERT_EQ(ast.name, "Decimal32");
+    ASSERT_EQ(ast.code, Type::Decimal32);
+    ASSERT_EQ(ast.elements.size(), 1u);
+    ASSERT_EQ(ast.elements[0].value, 7);
+}
+
+TEST(TypeParserCase, ParseDecimal64) {
+    TypeAst ast;
+    TypeParser("Decimal64(1)").Parse(&ast);
+    ASSERT_EQ(ast.meta, TypeAst::Terminal);
+    ASSERT_EQ(ast.name, "Decimal64");
+    ASSERT_EQ(ast.code, Type::Decimal64);
+    ASSERT_EQ(ast.elements.size(), 1u);
+    ASSERT_EQ(ast.elements[0].value, 1);
+}
+
+TEST(TypeParserCase, ParseDecimal128) {
+    TypeAst ast;
+    TypeParser("Decimal128(3)").Parse(&ast);
+    ASSERT_EQ(ast.meta, TypeAst::Terminal);
+    ASSERT_EQ(ast.name, "Decimal128");
+    ASSERT_EQ(ast.code, Type::Decimal128);
+    ASSERT_EQ(ast.elements.size(), 1u);
+    ASSERT_EQ(ast.elements[0].value, 3);
+}

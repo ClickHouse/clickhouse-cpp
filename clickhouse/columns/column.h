@@ -22,13 +22,13 @@ public:
     virtual ~Column()
     { }
 
-    /// Downcast pointer to the specific culumn's subtype.
+    /// Downcast pointer to the specific column's subtype.
     template <typename T>
     inline std::shared_ptr<T> As() {
         return std::dynamic_pointer_cast<T>(shared_from_this());
     }
 
-    /// Downcast pointer to the specific culumn's subtype.
+    /// Downcast pointer to the specific column's subtype.
     template <typename T>
     inline std::shared_ptr<const T> As() const {
         return std::dynamic_pointer_cast<const T>(shared_from_this());
@@ -45,7 +45,7 @@ public:
 
     /// Saves column data to output stream.
     virtual void Save(CodedOutputStream* output) = 0;
-    
+
     /// Clear column data .
     virtual void Clear() = 0;
 

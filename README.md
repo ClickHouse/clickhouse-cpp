@@ -8,14 +8,15 @@ C++ client for [Yandex ClickHouse](https://clickhouse.yandex/)
 * Array(T)
 * Date
 * DateTime
+* Decimal32, Decimal64, Decimal128
 * Enum8, Enum16
 * FixedString(N)
 * Float32, Float64
+* IPv4, IPv6
 * Nullable(T)
 * String
 * Tuple
 * UInt8, UInt16, UInt32, UInt64, Int8, Int16, Int32, Int64
-* IPv4, IPv6
 
 ## Building
 
