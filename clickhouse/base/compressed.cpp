@@ -3,7 +3,7 @@
 
 #include <cityhash/city.h>
 #include <lz4/lz4.h>
-
+#include <stdexcept>
 #include <system_error>
 
 #define DBMS_MAX_COMPRESSED_SIZE    0x40000000ULL   // 1GB

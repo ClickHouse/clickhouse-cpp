@@ -12,6 +12,8 @@
 
 #include "../types/type_parser.h"
 
+#include <stdexcept>
+
 namespace clickhouse {
 namespace {
 

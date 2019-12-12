@@ -2,6 +2,7 @@
 #include <clickhouse/error_codes.h>
 #include <clickhouse/types/type_parser.h>
 
+#include <stdexcept>
 #include <iostream>
 
 #if defined(_MSC_VER)
