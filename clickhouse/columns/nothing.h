@@ -3,6 +3,8 @@
 
 #include "column.h"
 
+#include <stdexcept>
+
 namespace clickhouse {
 
 /**

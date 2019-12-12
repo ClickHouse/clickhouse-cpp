@@ -47,7 +47,7 @@ class SocketHolder {
 public:
     SocketHolder();
     SocketHolder(SOCKET s);
-    SocketHolder(SocketHolder&& other);
+    SocketHolder(SocketHolder&& other) noexcept;
 
     ~SocketHolder();
 

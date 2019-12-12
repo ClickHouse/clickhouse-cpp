@@ -1,5 +1,12 @@
 
 #include "ip4.h"
+
+#include <stdexcept>
+
+#if defined(_win_)
+using in_addr_t = unsigned long;
+#endif
+
 namespace clickhouse {
 
 ColumnIPv4::ColumnIPv4()
