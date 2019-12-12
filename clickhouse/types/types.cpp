@@ -56,6 +56,7 @@ std::string Type::GetName() const {
         case Enum8:
         case Enum16:
             return As<EnumType>()->GetName();
+        case Decimal:
         case Decimal32:
         case Decimal64:
         case Decimal128:
@@ -76,6 +77,10 @@ TypeRef Type::CreateDate() {
 
 TypeRef Type::CreateDateTime() {
     return TypeRef(new Type(Type::DateTime));
+}
+
+TypeRef Type::CreateDecimal(size_t precision, size_t scale) {
+    return TypeRef(new DecimalType(precision, scale));
 }
 
 TypeRef Type::CreateIPv4() {
@@ -118,10 +123,6 @@ TypeRef Type::CreateUUID() {
     return TypeRef(new Type(Type::UUID));
 }
 
-TypeRef Type::CreateDecimal(size_t precision, size_t scale) {
-    return TypeRef(new DecimalType(precision, scale));
-}
-
 /// class ArrayType
 
 ArrayType::ArrayType(TypeRef item_type) : Type(Array), item_type_(item_type) {
@@ -130,34 +131,26 @@ ArrayType::ArrayType(TypeRef item_type) : Type(Array), item_type_(item_type) {
 /// class DecimalType
 
 DecimalType::DecimalType(size_t precision, size_t scale)
-    : Type([&] {
-          if (precision <= 9) {
-              return Type::Decimal32;
-          } else if (precision <= 18) {
-              return Type::Decimal64;
-          } else {
-              return Type::Decimal128;
-          }
-      }()),
+    : Type(Decimal),
       precision_(precision),
       scale_(scale) {
     // TODO: assert(precision <= 38 && precision > 0);
 }
 
 std::string DecimalType::GetName() const {
-    std::string result = "Decimal";
-
-    if (precision_ <= 9) {
-        result += "32";
-    } else if (precision_ <= 18) {
-        result += "64";
-    } else {
-        result += "128";
+    switch (GetCode()) {
+        case Decimal:
+            return "Decimal(" + std::to_string(precision_) + "," + std::to_string(scale_) + ")";
+        case Decimal32:
+            return "Decimal32(" + std::to_string(scale_) + ")";
+        case Decimal64:
+            return "Decimal64(" + std::to_string(scale_) + ")";
+        case Decimal128:
+            return "Decimal128(" + std::to_string(scale_) + ")";
+        default:
+            /// XXX: NOT REACHED!
+            return "";
     }
-
-    result += "(" + std::to_string(scale_) + ")";
-
-    return result;
 }
 
 /// class EnumType

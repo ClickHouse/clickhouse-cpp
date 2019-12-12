@@ -31,7 +31,7 @@ struct TypeAst {
     int64_t value = 0;
     /// Subelements of the type.
     /// Used to store enum's names and values as well.
-    std::list<TypeAst> elements;
+    std::vector<TypeAst> elements;
 };
 
 

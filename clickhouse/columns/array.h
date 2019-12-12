@@ -28,16 +28,16 @@ public:
 
     /// Saves column data to output stream.
     void Save(CodedOutputStream* output) override;
-    
+
     /// Clear column data .
     void Clear() override;
-    
+
     /// Returns count of rows in the column.
     size_t Size() const override;
 
     /// Makes slice of the current column.
     ColumnRef Slice(size_t, size_t) override;
-    
+
     void OffsetsIncrease(size_t);
 
 private:
