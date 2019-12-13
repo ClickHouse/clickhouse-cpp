@@ -181,6 +181,9 @@ public:
 
     std::string GetName() const;
 
+    /// Type of nested Tuple element type.
+    std::vector<TypeRef> GetTupleType() const { return item_types_; }
+
 private:
     std::vector<TypeRef> item_types_;
 };

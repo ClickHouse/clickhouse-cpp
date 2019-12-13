@@ -23,7 +23,7 @@ C++ client for [Yandex ClickHouse](https://clickhouse.yandex/)
 ```sh
 $ mkdir build .
 $ cd build
-$ cmake ..
+$ cmake .. [-DBUILD_TESTS=ON]
 $ make
 ```
 

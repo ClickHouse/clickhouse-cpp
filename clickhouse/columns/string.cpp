@@ -52,7 +52,7 @@ bool ColumnFixedString::Load(CodedInputStream* input, size_t rows) {
             return false;
         }
 
-        data_.emplace_back(std::move(s));
+        data_.push_back(std::move(s));
     }
 
     return true;
@@ -122,7 +122,7 @@ bool ColumnString::Load(CodedInputStream* input, size_t rows) {
             return false;
         }
 
-        data_.emplace_back(std::move(s));
+        data_.push_back(std::move(s));
     }
 
     return true;

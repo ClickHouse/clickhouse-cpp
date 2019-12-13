@@ -105,6 +105,7 @@ static ColumnRef CreateColumnFromAst(const TypeAst& ast) {
         case TypeAst::Tuple: {
             std::vector<ColumnRef> columns;
 
+            columns.reserve(ast.elements.size());
             for (const auto& elem : ast.elements) {
                 if (auto col = CreateColumnFromAst(elem)) {
                     columns.push_back(col);
@@ -119,6 +120,7 @@ static ColumnRef CreateColumnFromAst(const TypeAst& ast) {
         case TypeAst::Enum: {
             std::vector<Type::EnumItem> enum_items;
 
+            enum_items.reserve(ast.elements.size());
             for (const auto& elem : ast.elements) {
                 enum_items.push_back(
                     Type::EnumItem{elem.name, (int16_t)elem.value});
