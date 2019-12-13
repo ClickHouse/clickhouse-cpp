@@ -59,6 +59,9 @@ public:
     /// Type of nested nullable element.
     TypeRef GetNestedType() const;
 
+    /// Type of nested Tuple element type.
+    std::vector<TypeRef> GetTupleType() const;
+
     /// String representation of the type.
     std::string GetName() const;
 

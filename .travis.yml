@@ -49,6 +49,6 @@ script:
   - eval "${MATRIX_EVAL}"
   - mkdir build
   - cd build
-  - cmake .. && make
+  - cmake .. -DBUILD_TESTS=ON && make
   - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then ./ut/clickhouse-cpp-ut ; fi
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then ./ut/clickhouse-cpp-ut --gtest_filter='-Client/*' ; fi

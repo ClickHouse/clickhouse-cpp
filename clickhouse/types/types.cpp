@@ -52,6 +52,13 @@ TypeRef Type::GetNestedType() const {
     return TypeRef();
 }
 
+std::vector<TypeRef> Type::GetTupleType() const {
+    if (code_ == Tuple) {
+        return tuple_->item_types;
+    }
+    return std::vector<TypeRef>();
+}
+
 std::string Type::GetName() const {
     switch (code_) {
         case Void:

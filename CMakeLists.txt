@@ -4,10 +4,15 @@ INCLUDE (cmake/cpp17.cmake)
 INCLUDE (cmake/subdirs.cmake)
 
 OPTION(BUILD_BENCHMARK "Build benchmark" OFF)
+OPTION(BUILD_TESTS "Build tests" OFF)
 
 PROJECT (CLICKHOUSE-CLIENT)
 
     USE_CXX17()
+
+	IF ("${CMAKE_BUILD_TYPE}" STREQUAL "")
+		set(CMAKE_BUILD_TYPE "Debug")
+	ENDIF()
 
     IF (UNIX)
         IF (APPLE)
@@ -24,12 +29,17 @@ PROJECT (CLICKHOUSE-CLIENT)
     SUBDIRS (
         clickhouse
         contrib/cityhash
-        contrib/gtest
         contrib/lz4
-        tests/simple
-        ut
     )
 
     IF (BUILD_BENCHMARK)
         SUBDIRS(bench)
     ENDIF (BUILD_BENCHMARK)
+
+    IF (BUILD_TESTS)
+        SUBDIRS(
+            contrib/gtest
+            tests/simple
+            ut
+        )
+	ENDIF (BUILD_TESTS)
