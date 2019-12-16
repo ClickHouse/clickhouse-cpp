@@ -151,7 +151,7 @@ bool SocketHolder::Closed() const noexcept {
 
 void SocketHolder::SetTcpKeepAlive(int idle, int intvl, int cnt) noexcept {
     int val = 1;
-    
+
 #if defined(_unix_)
     setsockopt(handle_, SOL_SOCKET, SO_KEEPALIVE, &val, sizeof(val));
 #   if defined(_linux_)
