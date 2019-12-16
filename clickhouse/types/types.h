@@ -7,6 +7,9 @@
 
 namespace clickhouse {
 
+//fix to prevent warning using Wpedantic flag
+__extension__ typedef __int128 int128;
+    
 using TypeRef = std::shared_ptr<class Type>;
 
 class Type {
@@ -200,7 +203,7 @@ inline TypeRef Type::CreateSimple<int64_t>() {
 }
 
 template <>
-inline TypeRef Type::CreateSimple<__int128>() {
+inline TypeRef Type::CreateSimple<int128>() {
     return TypeRef(new Type(Int128));
 }
 
