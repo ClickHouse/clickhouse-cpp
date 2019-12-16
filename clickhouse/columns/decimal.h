@@ -4,7 +4,7 @@
 
 namespace clickhouse {
 
-using Int128 = __int128;
+using Int128 = int128;
 
 /**
  * Represents a column of decimal type.
