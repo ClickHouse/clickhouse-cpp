@@ -4,6 +4,9 @@
 #include "date.h"
 #include "decimal.h"
 #include "enum.h"
+#include "ip4.h"
+#include "ip6.h"
+#include "nothing.h"
 #include "nullable.h"
 #include "numeric.h"
 #include "string.h"
@@ -19,12 +22,14 @@ namespace {
 
 static ColumnRef CreateTerminalColumn(const TypeAst& ast) {
     switch (ast.code) {
+    case Type::Void:
+        return std::make_shared<ColumnNothing>();
+
     case Type::UInt8:
         return std::make_shared<ColumnUInt8>();
     case Type::UInt16:
         return std::make_shared<ColumnUInt16>();
     case Type::UInt32:
-    case Type::IPv4:
         return std::make_shared<ColumnUInt32>();
     case Type::UInt64:
         return std::make_shared<ColumnUInt64>();
@@ -38,38 +43,37 @@ static ColumnRef CreateTerminalColumn(const TypeAst& ast) {
     case Type::Int64:
         return std::make_shared<ColumnInt64>();
 
-    case Type::UUID:
-        return std::make_shared<ColumnUUID>();
-
     case Type::Float32:
         return std::make_shared<ColumnFloat32>();
     case Type::Float64:
         return std::make_shared<ColumnFloat64>();
 
+    case Type::Decimal:
+        return std::make_shared<ColumnDecimal>(ast.elements.front().value, ast.elements.back().value);
+    case Type::Decimal32:
+        return std::make_shared<ColumnDecimal>(9, ast.elements.front().value);
+    case Type::Decimal64:
+        return std::make_shared<ColumnDecimal>(18, ast.elements.front().value);
+    case Type::Decimal128:
+        return std::make_shared<ColumnDecimal>(38, ast.elements.front().value);
+
     case Type::String:
         return std::make_shared<ColumnString>();
     case Type::FixedString:
         return std::make_shared<ColumnFixedString>(ast.elements.front().value);
-    case Type::IPv6: {
-        return std::make_shared<ColumnFixedString>(16);
-    }
 
     case Type::DateTime:
         return std::make_shared<ColumnDateTime>();
     case Type::Date:
         return std::make_shared<ColumnDate>();
 
-    case Type::Decimal32:
-        return std::make_shared<ColumnDecimal>(9, ast.elements.front().value);
-    case Type::Decimal64:
-        return std::make_shared<ColumnDecimal>(18, ast.elements.front().value);
-    case Type::Decimal128:
-        if (ast.elements.size() == 2) {
-            return std::make_shared<ColumnDecimal>(ast.elements.front().value, ast.elements.back().value);
-        } else if (ast.elements.size() == 1) {
-            return std::make_shared<ColumnDecimal>(38, ast.elements.front().value);
-        }
-        throw std::runtime_error("Unexpected branch in code");
+    case Type::IPv4:
+        return std::make_shared<ColumnIPv4>();
+    case Type::IPv6:
+        return std::make_shared<ColumnIPv6>();
+
+    case Type::UUID:
+        return std::make_shared<ColumnUUID>();
 
     default:
         return nullptr;
@@ -98,6 +102,7 @@ static ColumnRef CreateColumnFromAst(const TypeAst& ast) {
         case TypeAst::Tuple: {
             std::vector<ColumnRef> columns;
 
+            columns.reserve(ast.elements.size());
             for (const auto& elem : ast.elements) {
                 if (auto col = CreateColumnFromAst(elem)) {
                     columns.push_back(col);
@@ -112,6 +117,7 @@ static ColumnRef CreateColumnFromAst(const TypeAst& ast) {
         case TypeAst::Enum: {
             std::vector<Type::EnumItem> enum_items;
 
+            enum_items.reserve(ast.elements.size());
             for (const auto& elem : ast.elements) {
                 enum_items.push_back(
                     Type::EnumItem{elem.name, (int16_t)elem.value});

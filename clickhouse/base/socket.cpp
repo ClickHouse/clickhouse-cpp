@@ -11,6 +11,7 @@
 #   include <errno.h>
 #   include <fcntl.h>
 #   include <netdb.h>
+#   include <netinet/tcp.h>
 #   include <signal.h>
 #   include <unistd.h>
 #   include <netinet/tcp.h>
@@ -57,7 +58,18 @@ void SetNonBlock(SOCKET fd, bool value) {
             errno, std::system_category(), "fail to set nonblocking mode");
     }
 #elif defined(_win_)
-    SetNonBlockSocket(fd, 1);
+    unsigned long inbuf = value;
+    unsigned long outbuf = 0;
+    DWORD written = 0;
+
+    if (!inbuf) {
+        WSAEventSelect(fd, nullptr, 0);
+    }
+
+    if (WSAIoctl(fd, FIONBIO, &inbuf, sizeof(inbuf), &outbuf, sizeof(outbuf), &written, 0, 0) == SOCKET_ERROR) {
+        throw std::system_error(
+            errno, std::system_category(), "fail to set nonblocking mode");
+    }
 #endif
 }
 
@@ -112,7 +124,7 @@ SocketHolder::SocketHolder(SOCKET s)
 {
 }
 
-SocketHolder::SocketHolder(SocketHolder&& other)
+SocketHolder::SocketHolder(SocketHolder&& other) noexcept
     : handle_(other.handle_)
 {
     other.handle_ = -1;
@@ -137,6 +149,26 @@ bool SocketHolder::Closed() const noexcept {
     return handle_ == -1;
 }
 
+void SocketHolder::SetTcpKeepAlive(int idle, int intvl, int cnt) noexcept {
+    int val = 1;
+
+#if defined(_unix_)
+    setsockopt(handle_, SOL_SOCKET, SO_KEEPALIVE, &val, sizeof(val));
+#   if defined(_linux_)
+        setsockopt(handle_, IPPROTO_TCP, TCP_KEEPIDLE, &idle, sizeof(idle));
+#   elif defined(_darwin_)
+        setsockopt(handle_, IPPROTO_TCP, TCP_KEEPALIVE, &idle, sizeof(idle));
+#   else
+#       error "platform is not supported"
+#   endif
+    setsockopt(handle_, IPPROTO_TCP, TCP_KEEPINTVL, &intvl, sizeof(intvl));
+    setsockopt(handle_, IPPROTO_TCP, TCP_KEEPCNT, &cnt, sizeof(cnt));
+#else
+    setsockopt(handle_, SOL_SOCKET, SO_KEEPALIVE, (const char*)&val, sizeof(val));
+    std::ignore = idle = intvl = cnt;
+#endif
+}
+
 SocketHolder& SocketHolder::operator = (SocketHolder&& other) noexcept {
     if (this != &other) {
         Close();
@@ -150,23 +182,6 @@ SocketHolder& SocketHolder::operator = (SocketHolder&& other) noexcept {
 
 SocketHolder::operator SOCKET () const noexcept {
     return handle_;
-}
-
-void SocketHolder::SetTcpKeepAlive(int idle, int intvl, int cnt) noexcept {
-    int val = 1;
-    setsockopt(handle_, SOL_SOCKET, SO_KEEPALIVE, &val, sizeof val);
-
-#if defined _darwin_
-    setsockopt(handle_, IPPROTO_TCP, TCP_KEEPALIVE, &idle, sizeof idle);
-    setsockopt(handle_, IPPROTO_TCP, TCP_KEEPINTVL, &intvl, sizeof intvl);
-    setsockopt(handle_, IPPROTO_TCP, TCP_KEEPCNT, &cnt, sizeof cnt);
-#elif defined(_linux_)
-    setsockopt(handle_, IPPROTO_TCP, TCP_KEEPIDLE, &idle, sizeof idle);
-    setsockopt(handle_, IPPROTO_TCP, TCP_KEEPINTVL, &intvl, sizeof intvl);
-    setsockopt(handle_, IPPROTO_TCP, TCP_KEEPCNT, &cnt, sizeof cnt);
-#else
-    std::ignore = idle = intvl = cnt;
-#endif
 }
 
 
@@ -210,7 +225,7 @@ void SocketOutput::DoWrite(const void* data, size_t len) {
     static const int flags = 0;
 #endif
 
-    if (::send(s_, (const char*)data, len, flags) != (int)len) {
+    if (::send(s_, (const char*)data, (int)len, flags) != (int)len) {
         throw std::system_error(
             errno, std::system_category(), "fail to send data"
         );
@@ -240,6 +255,7 @@ NetrworkInitializer::NetrworkInitializer() {
 
 
 SOCKET SocketConnect(const NetworkAddress& addr) {
+    int last_err = 0;
     for (auto res = addr.Info(); res != nullptr; res = res->ai_next) {
         SOCKET s(socket(res->ai_family, res->ai_socktype, res->ai_protocol));
 
@@ -256,7 +272,7 @@ SOCKET SocketConnect(const NetworkAddress& addr) {
                 fd.fd = s;
                 fd.events = POLLOUT;
                 fd.revents = 0;
-                int rval = Poll(&fd, 1, 5000);
+                ssize_t rval = Poll(&fd, 1, 5000);
 
                 if (rval == -1) {
                     throw std::system_error(errno, std::system_category(), "fail to connect");
@@ -269,6 +285,7 @@ SOCKET SocketConnect(const NetworkAddress& addr) {
                         SetNonBlock(s, false);
                         return s;
                     }
+                   last_err = err;
                 }
             }
         } else {
@@ -276,7 +293,9 @@ SOCKET SocketConnect(const NetworkAddress& addr) {
             return s;
         }
     }
-
+    if (last_err > 0) {
+        throw std::system_error(last_err, std::system_category(), "fail to connect");
+    }
     throw std::system_error(
         errno, std::system_category(), "fail to connect"
     );

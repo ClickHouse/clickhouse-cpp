@@ -15,7 +15,7 @@ ColumnUUID::ColumnUUID(ColumnRef data)
     : Column(Type::CreateUUID())
     , data_(data->As<ColumnUInt64>())
 {
-    if (data_->Size()%2 != 0) {
+    if (data_->Size() % 2 != 0) {
         throw std::runtime_error("number of entries must be even (two 64-bit numbers for each UUID)");
     }
 }

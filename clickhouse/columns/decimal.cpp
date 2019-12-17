@@ -1,17 +1,22 @@
 #include "decimal.h"
 
-#include "numeric.h"
-
 namespace clickhouse {
 
-ColumnDecimal::ColumnDecimal(size_t precision, size_t scale) : Column(Type::CreateDecimal(precision, scale)) {
+ColumnDecimal::ColumnDecimal(size_t precision, size_t scale)
+    : Column(Type::CreateDecimal(precision, scale))
+{
     if (precision <= 9) {
-        data_ = ColumnRef(new ColumnInt32());
+        data_ = std::make_shared<ColumnInt32>();
     } else if (precision <= 18) {
-        data_ = ColumnRef(new ColumnInt64());
+        data_ = std::make_shared<ColumnInt64>();
     } else {
-        data_ = ColumnRef(new ColumnInt128());
+        data_ = std::make_shared<ColumnInt128>();
     }
+}
+
+ColumnDecimal::ColumnDecimal(TypeRef type)
+    : Column(type)
+{
 }
 
 void ColumnDecimal::Append(const Int128& value) {
@@ -24,7 +29,7 @@ void ColumnDecimal::Append(const Int128& value) {
     }
 }
 
-void ColumnDecimal::Append(const std::string &value) {
+void ColumnDecimal::Append(const std::string& value) {
     Int128 int_value = 0;
     auto c = value.begin();
     bool sign = true;
@@ -62,13 +67,32 @@ Int128 ColumnDecimal::At(size_t i) const {
     }
 }
 
+void ColumnDecimal::Append(ColumnRef column) {
+    if (auto col = column->As<ColumnDecimal>()) {
+        data_->Append(col->data_);
+    }
+}
+
+bool ColumnDecimal::Load(CodedInputStream* input, size_t rows) {
+    return data_->Load(input, rows);
+}
+
+void ColumnDecimal::Save(CodedOutputStream* output) {
+    data_->Save(output);
+}
+
+void ColumnDecimal::Clear() {
+    data_->Clear();
+}
+
+size_t ColumnDecimal::Size() const {
+    return data_->Size();
+}
+
 ColumnRef ColumnDecimal::Slice(size_t begin, size_t len) {
-    std::shared_ptr<ColumnDecimal> slice(new ColumnDecimal(Type()));
+    std::shared_ptr<ColumnDecimal> slice(new ColumnDecimal(type_));
     slice->data_ = data_->Slice(begin, len);
     return slice;
 }
 
-ColumnDecimal::ColumnDecimal(TypeRef type) : Column(type) {
 }
-
-} // namespace clickhouse

@@ -17,7 +17,6 @@ public:
         Int16,
         Int32,
         Int64,
-        Int128,
         UInt8,
         UInt16,
         UInt32,
@@ -34,11 +33,13 @@ public:
         Enum8,
         Enum16,
         UUID,
+        IPv4,
+        IPv6,
+        Int128,
+        Decimal,
         Decimal32,
         Decimal64,
         Decimal128,
-        IPv4,
-        IPv6,
     };
 
     using EnumItem = std::pair<std::string /* name */, int16_t /* value */>;
@@ -73,6 +74,14 @@ public:
 
     static TypeRef CreateDateTime();
 
+    static TypeRef CreateDecimal(size_t precision, size_t scale);
+
+    static TypeRef CreateIPv4();
+
+    static TypeRef CreateIPv6();
+
+    static TypeRef CreateNothing();
+
     static TypeRef CreateNullable(TypeRef nested_type);
 
     template <typename T>
@@ -89,8 +98,6 @@ public:
     static TypeRef CreateEnum16(const std::vector<EnumItem>& enum_items);
 
     static TypeRef CreateUUID();
-
-    static TypeRef CreateDecimal(size_t precision, size_t scale);
 
 private:
     const Code code_;
@@ -174,6 +181,9 @@ public:
     explicit TupleType(const std::vector<TypeRef>& item_types);
 
     std::string GetName() const;
+
+    /// Type of nested Tuple element type.
+    std::vector<TypeRef> GetTupleType() const { return item_types_; }
 
 private:
     std::vector<TypeRef> item_types_;
