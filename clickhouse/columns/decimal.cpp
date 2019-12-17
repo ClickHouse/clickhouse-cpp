@@ -1,5 +1,7 @@
 #include "decimal.h"
 
+#include <iostream>
+
 namespace clickhouse {
 
 ColumnDecimal::ColumnDecimal(size_t precision, size_t scale)
@@ -32,16 +34,29 @@ void ColumnDecimal::Append(const Int128& value) {
 void ColumnDecimal::Append(const std::string& value) {
     Int128 int_value = 0;
     auto c = value.begin();
+    auto end = value.end();
     bool sign = true;
+    bool has_dot = false;
 
-    while (c != value.end()) {
+    int zeroes = 0;
+
+    while (c != end) {
         if (*c == '-') {
             sign = false;
             if (c != value.begin()) {
                 break;
             }
-        } else if (*c == '.') {
-            /// TODO: compare distance with `scale`
+        } else if (*c == '.' && !has_dot) {
+            size_t distance = std::distance(c, end) - 1;
+            auto scale = type_->As<DecimalType>()->GetScale();
+
+            if (distance <= scale) {
+                zeroes = scale - distance;
+            } else {
+                std::advance(end, scale - distance);
+            }
+
+            has_dot = true;
         } else if (*c >= '0' && *c <= '9') {
             if (__builtin_mul_overflow(int_value, 10, &int_value) ||
                 __builtin_add_overflow(int_value, *c - '0', &int_value)) {
@@ -53,8 +68,15 @@ void ColumnDecimal::Append(const std::string& value) {
         ++c;
     }
 
-    if (c != value.end()) {
+    if (c != end) {
         throw std::runtime_error("unexpected symbol '-' in decimal value");
+    }
+
+    while (zeroes) {
+        if (__builtin_mul_overflow(int_value, 10, &int_value)) {
+            throw std::runtime_error("value is to big for 128-bit integer");
+        }
+        --zeroes;
     }
 
     Append(sign ? int_value : -int_value);
