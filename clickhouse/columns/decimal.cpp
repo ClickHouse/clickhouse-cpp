@@ -41,17 +41,20 @@ void ColumnDecimal::Append(const std::string& value) {
                 break;
             }
         } else if (*c == '.') {
-            // TODO: compare distance with `scale`
+            /// TODO: compare distance with `scale`
         } else if (*c >= '0' && *c <= '9') {
-            int_value = int_value * 10 + (*c - '0');
+            if (__builtin_mul_overflow(int_value, 10, &int_value) ||
+                __builtin_add_overflow(int_value, *c - '0', &int_value)) {
+                throw std::runtime_error("value is to big for 128-bit integer");
+            }
         } else {
-            // TODO: throw exception on unexpected symbol
+            throw std::runtime_error(std::string("unexpected symbol '") + (*c) + "' in decimal value");
         }
         ++c;
     }
 
     if (c != value.end()) {
-        // TODO: throw exception about symbols after 'minus'
+        throw std::runtime_error("unexpected symbol '-' in decimal value");
     }
 
     Append(sign ? int_value : -int_value);

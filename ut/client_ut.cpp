@@ -376,6 +376,27 @@ TEST_P(ClientCase, Decimal) {
         auto d5 = std::make_shared<ColumnDecimal>(18, 9);
         auto d6 = std::make_shared<ColumnDecimal>(38, 19);
 
+        EXPECT_THROW(
+            d1->Append("1234567890123456789012345678901234567890"),
+            std::runtime_error
+        );
+        EXPECT_THROW(
+            d1->Append("123456789012345678901234567890123456.7890"),
+            std::runtime_error
+        );
+        EXPECT_THROW(
+            d1->Append("-1234567890123456789012345678901234567890"),
+            std::runtime_error
+        );
+        EXPECT_THROW(
+            d1->Append("12345678901234567890123456789012345678a"),
+            std::runtime_error
+        );
+        EXPECT_THROW(
+            d1->Append("12345678901234567890123456789012345678-"),
+            std::runtime_error
+        );
+
         id->Append(1);
         d1->Append(123456789);
         d2->Append(123456789012345678);
@@ -518,4 +539,3 @@ INSTANTIATE_TEST_CASE_P(
             .SetPingBeforeQuery(false)
             .SetCompressionMethod(CompressionMethod::LZ4)
     ));
-
