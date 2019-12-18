@@ -376,6 +376,31 @@ TEST_P(ClientCase, Decimal) {
         auto d5 = std::make_shared<ColumnDecimal>(18, 9);
         auto d6 = std::make_shared<ColumnDecimal>(38, 19);
 
+        EXPECT_THROW(
+            d1->Append("1234567890123456789012345678901234567890"),
+            std::runtime_error
+        );
+        EXPECT_THROW(
+            d1->Append("123456789012345678901234567890123456.7890"),
+            std::runtime_error
+        );
+        EXPECT_THROW(
+            d1->Append("-1234567890123456789012345678901234567890"),
+            std::runtime_error
+        );
+        EXPECT_THROW(
+            d1->Append("12345678901234567890123456789012345678a"),
+            std::runtime_error
+        );
+        EXPECT_THROW(
+            d1->Append("12345678901234567890123456789012345678-"),
+            std::runtime_error
+        );
+        EXPECT_THROW(
+            d1->Append("1234.12.1234"),
+            std::runtime_error
+        );
+
         id->Append(1);
         d1->Append(123456789);
         d2->Append(123456789012345678);
@@ -401,7 +426,6 @@ TEST_P(ClientCase, Decimal) {
         d6->Append(-999999999999999999);
 
         // Check strings with decimal point
-        // TODO: check that exception is thrown if point doesn't match the `scale`
         id->Append(4);
         d1->Append("12345.6789");
         d2->Append("123456789.012345678");
@@ -419,6 +443,14 @@ TEST_P(ClientCase, Decimal) {
         d5->Append("-123456789012345678");
         d6->Append("-12345678901234567890123456789012345678");
 
+        id->Append(6);
+        d1->Append("12345.678");
+        d2->Append("123456789.0123456789");
+        d3->Append("1234567890123456789.0123456789012345678");
+        d4->Append("12345.6789");
+        d5->Append("123456789.012345678");
+        d6->Append("1234567890123456789.0123456789012345678");
+
         b.AppendColumn("id", id);
         b.AppendColumn("d1", d1);
         b.AppendColumn("d2", d2);
@@ -435,7 +467,7 @@ TEST_P(ClientCase, Decimal) {
             return;
         }
 
-        ASSERT_EQ(5u, b.GetRowCount());
+        ASSERT_EQ(6u, b.GetRowCount());
 
         auto int128_to_string = [](Int128 value) {
             std::string result;
@@ -504,6 +536,14 @@ TEST_P(ClientCase, Decimal) {
         EXPECT_EQ("-123456789", int128_to_string(decimal(4, 4)));
         EXPECT_EQ("-123456789012345678", int128_to_string(decimal(5, 4)));
         EXPECT_EQ("-12345678901234567890123456789012345678", int128_to_string(decimal(6, 4)));
+
+        EXPECT_EQ(6u, b[0]->As<ColumnUInt64>()->At(5));
+        EXPECT_EQ("123456780", int128_to_string(decimal(1, 5)));
+        EXPECT_EQ("123456789012345678", int128_to_string(decimal(2, 5)));
+        EXPECT_EQ("12345678901234567890123456789012345678", int128_to_string(decimal(3, 5)));
+        EXPECT_EQ("123456789", int128_to_string(decimal(4, 5)));
+        EXPECT_EQ("123456789012345678", int128_to_string(decimal(5, 5)));
+        EXPECT_EQ("12345678901234567890123456789012345678", int128_to_string(decimal(6, 5)));
     });
 }
 
@@ -518,4 +558,3 @@ INSTANTIATE_TEST_CASE_P(
             .SetPingBeforeQuery(false)
             .SetCompressionMethod(CompressionMethod::LZ4)
     ));
-
