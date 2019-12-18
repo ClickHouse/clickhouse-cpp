@@ -38,7 +38,7 @@ void ColumnDecimal::Append(const std::string& value) {
     bool sign = true;
     bool has_dot = false;
 
-    int zeroes = 0;
+    int zeros = 0;
 
     while (c != end) {
         if (*c == '-') {
@@ -51,7 +51,7 @@ void ColumnDecimal::Append(const std::string& value) {
             auto scale = type_->As<DecimalType>()->GetScale();
 
             if (distance <= scale) {
-                zeroes = scale - distance;
+                zeros = scale - distance;
             } else {
                 std::advance(end, scale - distance);
             }
@@ -72,11 +72,11 @@ void ColumnDecimal::Append(const std::string& value) {
         throw std::runtime_error("unexpected symbol '-' in decimal value");
     }
 
-    while (zeroes) {
+    while (zeros) {
         if (__builtin_mul_overflow(int_value, 10, &int_value)) {
             throw std::runtime_error("value is to big for 128-bit integer");
         }
-        --zeroes;
+        --zeros;
     }
 
     Append(sign ? int_value : -int_value);
