@@ -304,6 +304,17 @@ void TestItemLoadingAndSaving(std::shared_ptr<ColumnType> col)
     std::cerr << "Accessing (twice):\t" << timer.GetTotalElapsed().count() << " us"
               << std::endl;
 
+    // validate that appended items match expected
+    for (size_t i = 0; i < ITEMS_COUNT; ++i)
+    {
+        SCOPED_TRACE(i);
+
+        ASSERT_EQ(col->At(i), generate<ValueType>(i));
+        ASSERT_EQ((*col)[i], generate<ValueType>(i));
+    }
+    std::cerr << "Accessing (twice) " << col->Size() << " items of " << col->Type()->GetName() << " took " << timer.GetTotalElapsed().count() << " us"
+              << std::endl;
+
     Buffer buffer;
 
     // Save
@@ -321,11 +332,11 @@ void TestItemLoadingAndSaving(std::shared_ptr<ColumnType> col)
         }
         const auto elapsed = timer.GetTotalElapsed() / (times * 1.0);
 
-        std::cerr << "Saving:\t" << elapsed.count() << " ms"
+        std::cerr << "Saving:\t" << elapsed.count() << " us"
                   << std::endl;
     }
 
-//    const auto size_hint = SizeHint == UseSizeHint::YES ? buffer.size() : 0;
+    const auto size_hint = SizeHint == UseSizeHint::YES ? buffer.size() : 0;
 
     // Load
     {
@@ -337,9 +348,7 @@ void TestItemLoadingAndSaving(std::shared_ptr<ColumnType> col)
             col->Clear();
 
             timer.Start();
-
-            col->Load(&istr, ITEMS_COUNT/*, size_hint*/);
-
+            col->Load(&istr, ITEMS_COUNT, size_hint);
             timer.Pause();
         }
         const auto elapsed = timer.GetTotalElapsed() / times;
@@ -367,20 +376,18 @@ void TestItemLoadingAndSaving(std::shared_ptr<ColumnType> col)
 
 //// test deserialization of the FixedString column
 TEST(ColumnsCase, PERFORMANCE_FixedString) {
-
-
     TestItemLoadingAndSaving<std::string_view, 1'000'000, UseSizeHint::NO>(std::make_shared<ColumnFixedString>(8));
-//    TestItemLoadingAndSaving<std::string_view, 1'000'000, UseSizeHint::YES>(std::make_shared<ColumnFixedString>(8));
+    TestItemLoadingAndSaving<std::string_view, 1'000'000, UseSizeHint::YES>(std::make_shared<ColumnFixedString>(8));
 }
 
 TEST(ColumnsCase, PERFORMANCE_String) {
 
     TestItemLoadingAndSaving<std::string_view, 1'000'000, UseSizeHint::NO>(std::make_shared<ColumnString>());
-//    TestItemLoadingAndSaving<std::string_view, 1'000'000, UseSizeHint::YES>(std::make_shared<ColumnString>());
+    TestItemLoadingAndSaving<std::string_view, 1'000'000, UseSizeHint::YES>(std::make_shared<ColumnString>());
 }
 
 TEST(ColumnsCase, PERFORMANCE_Int) {
 
     TestItemLoadingAndSaving<uint64_t, 1'000'000, UseSizeHint::NO>(std::make_shared<ColumnUInt64>());
-//    TestItemLoadingAndSaving<uint64_t, 1'000'000, UseSizeHint::YES>(std::make_shared<ColumnUInt64>());
+    TestItemLoadingAndSaving<uint64_t, 1'000'000, UseSizeHint::YES>(std::make_shared<ColumnUInt64>());
 }

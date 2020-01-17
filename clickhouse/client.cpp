@@ -30,6 +30,7 @@
 #define DBMS_MIN_REVISION_WITH_CLIENT_INFO              54032
 #define DBMS_MIN_REVISION_WITH_SERVER_TIMEZONE          54058
 #define DBMS_MIN_REVISION_WITH_QUOTA_KEY_IN_CLIENT_INFO 54060
+#define DBMS_MIN_REVISION_WITH_LEADING_COLUMN_SIZE_IN_NATIVE_FORMAT 0xFFFFFFFF
 
 namespace clickhouse {
 
@@ -443,8 +444,14 @@ bool Client::Impl::ReadBlock(Block* block, CodedInputStream* input) {
             return false;
         }
 
+        size_t colum_data_size_hint = 0;
+        if (REVISION >= DBMS_MIN_REVISION_WITH_LEADING_COLUMN_SIZE_IN_NATIVE_FORMAT) {
+            if (!WireFormat::ReadUInt64(input, &colum_data_size_hint))
+                return false;
+        }
+
         if (ColumnRef col = CreateColumnByType(type)) {
-            if (num_rows && !col->Load(input, num_rows)) {
+            if (num_rows && !col->Load(input, num_rows, colum_data_size_hint)) {
                 throw std::runtime_error("can't load");
             }
 

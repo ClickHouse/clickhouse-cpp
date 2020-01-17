@@ -43,7 +43,7 @@ std::string ColumnIPv6::AsString (size_t n) const{
     char buf[INET6_ADDRSTRLEN];
     const char* ip_str = inet_ntop(AF_INET6, addr.data(), buf, INET6_ADDRSTRLEN);
     if (ip_str == nullptr) {
-        throw std::runtime_error("invalid IPv6 format: " + addr);
+        throw std::runtime_error("invalid IPv6 format: " + std::string(addr));
     }
     return ip_str;
 }
@@ -62,8 +62,8 @@ void ColumnIPv6::Append(ColumnRef column) {
     }
 }
 
-bool ColumnIPv6::Load(CodedInputStream* input, size_t rows) {
-    return data_->Load(input, rows);
+bool ColumnIPv6::Load(CodedInputStream* input, size_t rows, size_t size_hint) {
+    return data_->Load(input, rows, size_hint);
 }
 
 void ColumnIPv6::Save(CodedOutputStream* output) {

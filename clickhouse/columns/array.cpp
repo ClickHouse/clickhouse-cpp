@@ -54,11 +54,12 @@ void ColumnArray::Append(ColumnRef column) {
     }
 }
 
-bool ColumnArray::Load(CodedInputStream* input, size_t rows) {
-    if (!offsets_->Load(input, rows)) {
+bool ColumnArray::Load(CodedInputStream* input, size_t rows, size_t /*size_hint*/) {
+    if (!offsets_->Load(input, rows, 0)) {
         return false;
     }
-    if (!data_->Load(input, (*offsets_)[rows - 1])) {
+    // TODO: properly adjust hint for loading data_ column
+    if (!data_->Load(input, (*offsets_)[rows - 1], 0)) {
         return false;
     }
     return true;

@@ -40,8 +40,14 @@ public:
     // occurs.
     bool Skip(size_t count);
 
+    size_t GetBytesRead() const
+    {
+        return bytes_read_;
+    }
+
 private:
     ZeroCopyInput* input_;
+    size_t bytes_read_;
 };
 
 

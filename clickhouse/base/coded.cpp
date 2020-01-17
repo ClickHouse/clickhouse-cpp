@@ -7,7 +7,8 @@ namespace clickhouse {
 static const int MAX_VARINT_BYTES = 10;
 
 CodedInputStream::CodedInputStream(ZeroCopyInput* input)
-    : input_(input)
+    : input_(input),
+      bytes_read_(0)
 {
 }
 
@@ -22,6 +23,7 @@ bool CodedInputStream::ReadRaw(void* buffer, size_t size) {
 
         p += len;
         size -= len;
+        bytes_read_ += len;
     }
 
     return true;
@@ -37,6 +39,7 @@ bool CodedInputStream::Skip(size_t count) {
         }
 
         count -= len;
+        bytes_read_ += len;
     }
 
     return true;
@@ -51,6 +54,8 @@ bool CodedInputStream::ReadVarint64(uint64_t* value) {
         if (!input_->ReadByte(&byte)) {
             return false;
         } else {
+            bytes_read_ += 1;
+
             *value |= (byte & 0x7F) << (7 * i);
 
             if (!(byte & 0x80)) {

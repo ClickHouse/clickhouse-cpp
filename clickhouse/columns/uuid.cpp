@@ -43,8 +43,8 @@ void ColumnUUID::Append(ColumnRef column) {
     }
 }
 
-bool ColumnUUID::Load(CodedInputStream* input, size_t rows) {
-    return data_->Load(input, rows * 2);
+bool ColumnUUID::Load(CodedInputStream* input, size_t rows, size_t size_hint) {
+    return data_->Load(input, rows * 2, size_hint);
 }
 
 void ColumnUUID::Save(CodedOutputStream* output) {

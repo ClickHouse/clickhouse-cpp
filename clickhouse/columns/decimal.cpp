@@ -98,8 +98,8 @@ void ColumnDecimal::Append(ColumnRef column) {
     }
 }
 
-bool ColumnDecimal::Load(CodedInputStream* input, size_t rows) {
-    return data_->Load(input, rows);
+bool ColumnDecimal::Load(CodedInputStream* input, size_t rows, size_t size_hint) {
+    return data_->Load(input, rows, size_hint);
 }
 
 void ColumnDecimal::Save(CodedOutputStream* output) {

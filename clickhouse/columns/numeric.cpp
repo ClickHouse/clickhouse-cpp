@@ -44,7 +44,7 @@ void ColumnVector<T>::Append(ColumnRef column) {
 }
 
 template <typename T>
-bool ColumnVector<T>::Load(CodedInputStream* input, size_t rows) {
+bool ColumnVector<T>::Load(CodedInputStream* input, size_t rows, size_t /*size_hint*/) {
     data_.resize(rows);
 
     return input->ReadRaw(data_.data(), data_.size() * sizeof(T));

@@ -19,7 +19,7 @@ public:
 
 public:
     void Append(ColumnRef column) override;
-    bool Load(CodedInputStream* input, size_t rows) override;
+    bool Load(CodedInputStream* input, size_t rows, size_t size_hint) override;
     void Save(CodedOutputStream* output) override;
     void Clear() override;
     size_t Size() const override;

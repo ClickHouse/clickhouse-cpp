@@ -24,9 +24,9 @@ size_t ColumnTuple::Size() const {
     return columns_.empty() ? 0 : columns_[0]->Size();
 }
 
-bool ColumnTuple::Load(CodedInputStream* input, size_t rows) {
+bool ColumnTuple::Load(CodedInputStream* input, size_t rows, size_t /*size_hint*/) {
     for (auto ci = columns_.begin(); ci != columns_.end(); ++ci) {
-        if (!(*ci)->Load(input, rows)) {
+        if (!(*ci)->Load(input, rows, 0)) {
             return false;
         }
     }
