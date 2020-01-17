@@ -11,8 +11,8 @@ ColumnFixedString::ColumnFixedString(size_t n)
 {
 }
 
-void ColumnFixedString::Append(const std::string& str) {
-    data_.push_back(str);
+void ColumnFixedString::Append(std::string_view str) {
+    data_.push_back(std::string(str));
     data_.back().resize(string_size_);
 }
 
@@ -90,8 +90,8 @@ ColumnString::ColumnString(const std::vector<std::string>& data)
 {
 }
 
-void ColumnString::Append(const std::string& str) {
-    data_.push_back(str);
+void ColumnString::Append(std::string_view str) {
+    data_.push_back(std::string(str));
 }
 
 void ColumnString::Clear() {

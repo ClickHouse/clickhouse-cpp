@@ -369,7 +369,7 @@ inline void EnumExample(Client& client) {
 }
 
 inline void SelectNull(Client& client) {
-    client.Select("SELECT NULL", [](const Block& block)
+    client.Select("SELECT NULL", [](const Block& /*block*/)
         {
             assert(block.GetRowCount() < 2);
         }

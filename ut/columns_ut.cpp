@@ -7,6 +7,7 @@
 #include <clickhouse/columns/uuid.h>
 
 #include <contrib/gtest/gtest.h>
+#include <chrono>
 
 using namespace clickhouse;
 
@@ -170,4 +171,216 @@ TEST(ColumnsCase, UUIDSlice) {
     ASSERT_EQ(sub->Size(), 2u);
     ASSERT_EQ(sub->At(0), UInt128(0x84b9f24bc26b49c6llu, 0xa03b4ab723341951llu));
     ASSERT_EQ(sub->At(1), UInt128(0x3507213c178649f9llu, 0x9faf035d662f60aellu));
+}
+
+
+
+template <typename T>
+T generate(int index);
+
+template <>
+std::uint64_t generate<std::uint64_t>(int index)
+{
+    const auto base = static_cast<std::uint64_t>(index) % 255;
+    return base << 7*8 | base << 6*8 | base << 5*8 | base << 4*8 | base << 3*8 | base << 2*8 | base << 1*8 | base;
+}
+
+template <>
+std::string_view generate<std::string_view>(int index)
+{
+    static const char result_template[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    const auto template_size = sizeof(result_template) - 1;
+
+    const size_t result_size = 8;
+    const auto start_pos = index % (template_size - result_size);
+    return std::string_view(&result_template[start_pos], result_size);
+}
+
+template <typename ChronoDurationType>
+struct Timer
+{
+    using DurationType = ChronoDurationType;
+
+    Timer() {}
+
+    void restart()
+    {
+        started_at = current();
+    }
+
+    void start()
+    {
+        restart();
+    }
+
+    auto elapsed() const
+    {
+        return std::chrono::duration_cast<ChronoDurationType>(current() - started_at);
+    }
+
+    auto current() const
+    {
+        struct timespec ts;
+        clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
+        return std::chrono::nanoseconds(ts.tv_sec * 1000000000LL + ts.tv_nsec);
+    }
+
+private:
+    std::chrono::nanoseconds started_at;
+};
+
+template <typename ChronoDurationType>
+class PausableTimer
+{
+public:
+    PausableTimer()
+    {}
+
+    void Start()
+    {
+        timer.restart();
+        paused = false;
+    }
+
+    void Pause()
+    {
+        total += timer.elapsed();
+        paused = true;
+    }
+
+    auto GetTotalElapsed() const
+    {
+        if (paused)
+        {
+            return total;
+        }
+        else
+        {
+            return total + timer.elapsed();
+        }
+    }
+
+    void Reset()
+    {
+        Pause();
+        total = ChronoDurationType{0};
+    }
+
+    Timer<ChronoDurationType> timer;
+    ChronoDurationType total = ChronoDurationType{0};
+    bool paused = false;
+};
+
+enum class UseSizeHint { NO = 0, YES = 1};
+
+template <typename ValueType, size_t ITEMS_COUNT = 1'000'000, UseSizeHint SizeHint = UseSizeHint::YES, typename ColumnType>
+void TestItemLoadingAndSaving(std::shared_ptr<ColumnType> col)
+{
+    std::cerr << "\n===========================================================" << std::endl;
+    std::cerr << "\t" << ITEMS_COUNT << " items of " << col->Type()->GetName()  << " size hint: " << (SizeHint == UseSizeHint::YES ? "yes" : "no") << std::endl;
+
+    PausableTimer<std::chrono::microseconds> timer;
+
+    const int times = 10;
+    timer.Start();
+    for (size_t i = 0; i < ITEMS_COUNT; ++i)
+    {
+        const auto value = generate<ValueType>(i);
+        col->Append(value);
+    }
+
+    EXPECT_EQ(ITEMS_COUNT, col->Size());
+    std::cerr << "Appending:\t" << timer.GetTotalElapsed().count() << " us"
+              << std::endl;
+
+    // validate that appended items match expected
+    for (size_t i = 0; i < ITEMS_COUNT; ++i)
+    {
+        SCOPED_TRACE(i);
+
+        ASSERT_EQ(col->At(i), generate<ValueType>(i));
+        ASSERT_EQ((*col)[i], generate<ValueType>(i));
+    }
+    std::cerr << "Accessing (twice):\t" << timer.GetTotalElapsed().count() << " us"
+              << std::endl;
+
+    Buffer buffer;
+
+    // Save
+    {
+        for (int i = 0; i < times; ++i)
+        {
+            buffer.clear();
+            BufferOutput bufferOutput(&buffer);
+            CodedOutputStream ostr(&bufferOutput);
+
+            timer.Start();
+            col->Save(&ostr);
+            ostr.Flush();
+            timer.Pause();
+        }
+        const auto elapsed = timer.GetTotalElapsed() / (times * 1.0);
+
+        std::cerr << "Saving:\t" << elapsed.count() << " ms"
+                  << std::endl;
+    }
+
+//    const auto size_hint = SizeHint == UseSizeHint::YES ? buffer.size() : 0;
+
+    // Load
+    {
+        timer.Reset();
+        for (int i = 0; i < times; ++i)
+        {
+            ArrayInput arrayInput(buffer.data(), buffer.size());
+            CodedInputStream istr(&arrayInput);
+            col->Clear();
+
+            timer.Start();
+
+            col->Load(&istr, ITEMS_COUNT/*, size_hint*/);
+
+            timer.Pause();
+        }
+        const auto elapsed = timer.GetTotalElapsed() / times;
+
+        std::cerr << "Loading:\t" << elapsed.count() << " us"
+                  << std::endl;
+    }
+
+    timer.Reset();
+    timer.Start();
+
+    EXPECT_EQ(ITEMS_COUNT, col->Size());
+
+    // validate that loaded items match expected
+    for (size_t i = 0; i < ITEMS_COUNT; ++i)
+    {
+        SCOPED_TRACE(i);
+
+        ASSERT_EQ(col->At(i), generate<ValueType>(i));
+        ASSERT_EQ((*col)[i], generate<ValueType>(i));
+    }
+    std::cerr << "Accessing (twice):\t" << timer.GetTotalElapsed().count() << " us"
+              << std::endl;
+}
+
+//// test deserialization of the FixedString column
+TEST(ColumnsCase, PERFORMANCE_FixedString) {
+
+
+    TestItemLoadingAndSaving<std::string_view, 1'000'000, UseSizeHint::NO>(std::make_shared<ColumnFixedString>(8));
+//    TestItemLoadingAndSaving<std::string_view, 1'000'000, UseSizeHint::YES>(std::make_shared<ColumnFixedString>(8));
+}
+
+TEST(ColumnsCase, PERFORMANCE_String) {
+
+    TestItemLoadingAndSaving<std::string_view, 1'000'000, UseSizeHint::NO>(std::make_shared<ColumnString>());
+//    TestItemLoadingAndSaving<std::string_view, 1'000'000, UseSizeHint::YES>(std::make_shared<ColumnString>());
+}
+
+TEST(ColumnsCase, PERFORMANCE_Int) {
+
+    TestItemLoadingAndSaving<uint64_t, 1'000'000, UseSizeHint::NO>(std::make_shared<ColumnUInt64>());
+//    TestItemLoadingAndSaving<uint64_t, 1'000'000, UseSizeHint::YES>(std::make_shared<ColumnUInt64>());
 }

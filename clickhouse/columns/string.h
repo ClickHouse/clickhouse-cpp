@@ -12,7 +12,7 @@ public:
     explicit ColumnFixedString(size_t n);
 
     /// Appends one element to the column.
-    void Append(const std::string& str);
+    void Append(std::string_view str);
 
     /// Returns element at given row number.
     const std::string& At(size_t n) const;
@@ -43,6 +43,7 @@ public:
     ColumnRef Slice(size_t begin, size_t len) override;
 
 private:
+    // TODO: continious chunk of data in a single buffer, give std::string_view to users on request
     const size_t string_size_;
     std::vector<std::string> data_;
 };
@@ -56,7 +57,7 @@ public:
     explicit ColumnString(const std::vector<std::string>& data);
 
     /// Appends one element to the column.
-    void Append(const std::string& str);
+    void Append(std::string_view str);
 
     /// Returns element at given row number.
     const std::string& At(size_t n) const;
