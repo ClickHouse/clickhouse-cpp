@@ -47,7 +47,7 @@ public:
 	}
 
     /// Loads column data from input stream.
-    bool Load(CodedInputStream* input, size_t rows, size_t /*size_hint*/) override {
+    bool Load(CodedInputStream* input, size_t rows) override {
 		input->Skip(rows);
 		size_ += rows;
 		return true;

@@ -6,7 +6,7 @@
 
 namespace
 {
-const size_t DEFAULT_BLOCK_SIZE = 4096*10;
+const size_t DEFAULT_BLOCK_SIZE = 4096;
 
 template <typename Container>
 size_t ComputeTotalSize(const Container & strings, size_t begin = 0, size_t len = -1)
@@ -70,7 +70,7 @@ void ColumnFixedString::Append(ColumnRef column) {
     }
 }
 
-bool ColumnFixedString::Load(CodedInputStream* input, size_t rows, size_t /*size_hint*/) {
+bool ColumnFixedString::Load(CodedInputStream* input, size_t rows) {
     data_.resize(string_size_ * rows);
     if (!WireFormat::ReadBytes(input, &data_[0], data_.size())) {
         return false;
@@ -192,7 +192,7 @@ void ColumnString::Append(ColumnRef column) {
     if (auto col = column->As<ColumnString>()) {
         const auto total_size = ComputeTotalSize(col->items_);
 
-        // TODO: fill up existing block and then add a trailing one for the rest of items
+        // TODO: fill up existing block with some items and then add a new one for the rest of items
         if (blocks_.size() == 0 || blocks_.back().GetAvailble() < total_size)
             blocks_.emplace_back(std::max(DEFAULT_BLOCK_SIZE, total_size));
         items_.reserve(items_.size() + col->Size());
@@ -203,68 +203,40 @@ void ColumnString::Append(ColumnRef column) {
     }
 }
 
-bool ColumnString::Load(CodedInputStream* input, size_t rows, size_t size_hint) {
+bool ColumnString::Load(CodedInputStream* input, size_t rows) {
     items_.clear();
     blocks_.clear();
 
-    if (size_hint == 0) {
-        items_.reserve(rows);
+    items_.reserve(rows);
 
-        Block * block = 0;
+    Block * block = nullptr;
 
-        for (size_t i = 0; i < rows; ++i) {
-            uint64_t len;
-            if (!WireFormat::ReadUInt64(input, &len))
-                return false;
+    // TODO(performance): unroll a loop to a first row (to get rid of `blocks_.size() == 0` check) and the rest.
+    for (size_t i = 0; i < rows; ++i) {
+        uint64_t len;
+        if (!WireFormat::ReadUInt64(input, &len))
+            return false;
 
-            if (blocks_.size() == 0 || len > block->GetAvailble())
-                block = &blocks_.emplace_back(std::max<size_t>(DEFAULT_BLOCK_SIZE, len));
+        if (blocks_.size() == 0 || len > block->GetAvailble())
+            block = &blocks_.emplace_back(std::max<size_t>(DEFAULT_BLOCK_SIZE, len));
 
-            if (!WireFormat::ReadBytes(input, block->GetCurrentWritePos(), len))
-                return false;
+        if (!WireFormat::ReadBytes(input, block->GetCurrentWritePos(), len))
+            return false;
 
-            items_.emplace_back(block->ConsumeTailAsStringViewUnsafe(len));
-        }
-    }
-    else {
-        items_.reserve(rows);
-        auto & block = blocks_.emplace_back(size_hint);
-
-        for (size_t i = 0; i < rows; ++i) {
-            uint64_t len;
-            if (!WireFormat::ReadUInt64(input, &len))
-                return false;
-
-            if (!WireFormat::ReadBytes(input, block.GetCurrentWritePos(), len))
-                return false;
-
-            items_.emplace_back(block.ConsumeTailAsStringViewUnsafe(len));
-        }
+        items_.emplace_back(block->ConsumeTailAsStringViewUnsafe(len));
     }
 
     return true;
 }
 
 void ColumnString::Save(CodedOutputStream* output) {
-//    std::cerr << "!!!!!!!!!!! items: " << blocks_.front() << " / " << items_.front() << std::endl;
+
     for (const auto & item : items_) {
         WireFormat::WriteString(output, item);
     }
 }
 
 size_t ColumnString::Size() const {
-//    std::cerr << "!!!!! Debug info, " << blocks_.size() << " blocks: ";
-//    for (size_t i = 0; i < std::min<size_t>(10, blocks_.size()); ++i)
-//    {
-//        const auto & b = blocks_[i];
-//        std::cerr << "\tblock #" << i << " : " << b.capacity() << "/" << b.size() << " @ " << (void*)b.data() << "\n";
-//    }
-//    for (size_t i = 0; i < std::min<size_t>(10, items_.size()); ++i)
-//    {
-//        const auto & item = items_[i];
-//        std::cerr << "\titem #" << i << " : " << item.size() << " @ " << (void*)item.data() << "\n";
-//    }
-//    std::cerr << std::endl;
 
     return items_.size();
 }

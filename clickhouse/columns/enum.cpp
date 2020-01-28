@@ -70,7 +70,7 @@ void ColumnEnum<T>::Append(ColumnRef column) {
 }
 
 template <typename T>
-bool ColumnEnum<T>::Load(CodedInputStream* input, size_t rows, size_t /*size_hint*/) {
+bool ColumnEnum<T>::Load(CodedInputStream* input, size_t rows) {
     data_.resize(rows);
     return input->ReadRaw(data_.data(), data_.size() * sizeof(T));
 }

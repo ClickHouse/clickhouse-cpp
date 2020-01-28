@@ -62,8 +62,8 @@ void ColumnIPv4::Append(ColumnRef column) {
     }
 }
 
-bool ColumnIPv4::Load(CodedInputStream* input, size_t rows, size_t size_hint) {
-    return data_->Load(input, rows, size_hint);
+bool ColumnIPv4::Load(CodedInputStream* input, size_t rows) {
+    return data_->Load(input, rows);
 }
 
 void ColumnIPv4::Save(CodedOutputStream* output) {

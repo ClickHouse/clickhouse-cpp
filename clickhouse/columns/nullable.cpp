@@ -50,11 +50,11 @@ void ColumnNullable::Clear() {
     nulls_->Clear();
 }
 
-bool ColumnNullable::Load(CodedInputStream* input, size_t rows, size_t /*size_hint*/) {
-    if (!nulls_->Load(input, rows, 0)) {
+bool ColumnNullable::Load(CodedInputStream* input, size_t rows) {
+    if (!nulls_->Load(input, rows)) {
         return false;
     }
-    if (!nested_->Load(input, rows, 0)) {
+    if (!nested_->Load(input, rows)) {
         return false;
     }
     return true;

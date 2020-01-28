@@ -25,7 +25,7 @@ public:
     void Append(ColumnRef) override { }
 
     /// Loads column data from input stream.
-    bool Load(CodedInputStream* input, size_t rows, size_t size_hint) override;
+    bool Load(CodedInputStream* input, size_t rows) override;
 
     /// Saves column data to output stream.
     void Save(CodedOutputStream* output) override;

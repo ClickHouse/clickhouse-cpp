@@ -175,25 +175,33 @@ TEST(ColumnsCase, UUIDSlice) {
 
 
 
-template <typename T>
-T generate(int index);
-
-template <>
-std::uint64_t generate<std::uint64_t>(int index)
+std::uint64_t generate(const ColumnUInt64&, size_t index)
 {
     const auto base = static_cast<std::uint64_t>(index) % 255;
     return base << 7*8 | base << 6*8 | base << 5*8 | base << 4*8 | base << 3*8 | base << 2*8 | base << 1*8 | base;
 }
 
-template <>
-std::string_view generate<std::string_view>(int index)
+template <size_t RESULT_SIZE=8>
+std::string_view generate_string_view(size_t index)
 {
     static const char result_template[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     const auto template_size = sizeof(result_template) - 1;
 
-    const size_t result_size = 8;
-    const auto start_pos = index % (template_size - result_size);
-    return std::string_view(&result_template[start_pos], result_size);
+    const auto start_pos = index % (template_size - RESULT_SIZE);
+    return std::string_view(&result_template[start_pos], RESULT_SIZE);
+}
+
+std::string_view generate(const ColumnString&, size_t index)
+{
+    // ColumString stores item lengts,and on 1M etnries that builds up to extra 1M bytes,
+    // comparing to 8M bytes of serialized data for ColumnFixedString and ColumUInt64.
+    // So in order to make comparison mode fair, reducing size of data item.
+    return generate_string_view<7>(index);
+}
+
+std::string_view generate(const ColumnFixedString&, size_t index)
+{
+    return generate_string_view<8>(index);
 }
 
 template <typename ChronoDurationType>
@@ -271,123 +279,107 @@ public:
     bool paused = false;
 };
 
-enum class UseSizeHint { NO = 0, YES = 1};
-
-template <typename ValueType, size_t ITEMS_COUNT = 1'000'000, UseSizeHint SizeHint = UseSizeHint::YES, typename ColumnType>
-void TestItemLoadingAndSaving(std::shared_ptr<ColumnType> col)
+template <typename ColumnType>
+void TestItemLoadingAndSaving(ColumnType && col)
 {
+    const size_t ITEMS_COUNT = 1'000'000;
+    const int LOAD_AND_SAVE_REPEAT_TIMES = 10; // run Load() and Save() multiple times to cancel out measurement errors.
+
     std::cerr << "\n===========================================================" << std::endl;
-    std::cerr << "\t" << ITEMS_COUNT << " items of " << col->Type()->GetName()  << " size hint: " << (SizeHint == UseSizeHint::YES ? "yes" : "no") << std::endl;
+    std::cerr << "\t" << ITEMS_COUNT << " items of " << col.Type()->GetName()  << std::endl;
 
     PausableTimer<std::chrono::microseconds> timer;
 
-    const int times = 10;
     timer.Start();
     for (size_t i = 0; i < ITEMS_COUNT; ++i)
     {
-        const auto value = generate<ValueType>(i);
-        col->Append(value);
+        const auto value = generate(col, i);
+        col.Append(value);
     }
 
-    EXPECT_EQ(ITEMS_COUNT, col->Size());
+    EXPECT_EQ(ITEMS_COUNT, col.Size());
     std::cerr << "Appending:\t" << timer.GetTotalElapsed().count() << " us"
               << std::endl;
 
-    // validate that appended items match expected
-    for (size_t i = 0; i < ITEMS_COUNT; ++i)
+    auto validate = [=, &col = std::as_const(col), &timer]()
     {
-        SCOPED_TRACE(i);
+        timer.Reset();
+        timer.Start();
 
-        ASSERT_EQ(col->At(i), generate<ValueType>(i));
-        ASSERT_EQ((*col)[i], generate<ValueType>(i));
-    }
-    std::cerr << "Accessing (twice):\t" << timer.GetTotalElapsed().count() << " us"
-              << std::endl;
+        // validate that appended items match expected
+        for (size_t i = 0; i < ITEMS_COUNT; ++i)
+        {
+            SCOPED_TRACE(i);
 
-    // validate that appended items match expected
-    for (size_t i = 0; i < ITEMS_COUNT; ++i)
-    {
-        SCOPED_TRACE(i);
+            ASSERT_EQ(col.At(i), generate(col, i));
+            ASSERT_EQ(col[i], generate(col, i));
+        }
 
-        ASSERT_EQ(col->At(i), generate<ValueType>(i));
-        ASSERT_EQ((*col)[i], generate<ValueType>(i));
-    }
-    std::cerr << "Accessing (twice) " << col->Size() << " items of " << col->Type()->GetName() << " took " << timer.GetTotalElapsed().count() << " us"
-              << std::endl;
+        std::cerr << "Accessing (twice):\t" << timer.GetTotalElapsed().count() << " us"
+                  << std::endl;
+    };
+
+    validate();
+    EXPECT_NO_FATAL_FAILURE();
 
     Buffer buffer;
 
     // Save
     {
-        for (int i = 0; i < times; ++i)
+        timer.Reset();
+
+        for (int i = 0; i < LOAD_AND_SAVE_REPEAT_TIMES; ++i)
         {
             buffer.clear();
             BufferOutput bufferOutput(&buffer);
             CodedOutputStream ostr(&bufferOutput);
 
             timer.Start();
-            col->Save(&ostr);
+            col.Save(&ostr);
             ostr.Flush();
             timer.Pause();
         }
-        const auto elapsed = timer.GetTotalElapsed() / (times * 1.0);
+        const auto elapsed = timer.GetTotalElapsed() / (LOAD_AND_SAVE_REPEAT_TIMES * 1.0);
 
         std::cerr << "Saving:\t" << elapsed.count() << " us"
                   << std::endl;
     }
 
-    const auto size_hint = SizeHint == UseSizeHint::YES ? buffer.size() : 0;
-
     // Load
     {
         timer.Reset();
-        for (int i = 0; i < times; ++i)
+
+        for (int i = 0; i < LOAD_AND_SAVE_REPEAT_TIMES; ++i)
         {
             ArrayInput arrayInput(buffer.data(), buffer.size());
             CodedInputStream istr(&arrayInput);
-            col->Clear();
+            col.Clear();
 
             timer.Start();
-            col->Load(&istr, ITEMS_COUNT, size_hint);
+            col.Load(&istr, ITEMS_COUNT);
             timer.Pause();
         }
-        const auto elapsed = timer.GetTotalElapsed() / times;
+        const auto elapsed = timer.GetTotalElapsed() / (LOAD_AND_SAVE_REPEAT_TIMES * 1.0);
 
         std::cerr << "Loading:\t" << elapsed.count() << " us"
                   << std::endl;
     }
 
-    timer.Reset();
-    timer.Start();
-
-    EXPECT_EQ(ITEMS_COUNT, col->Size());
-
-    // validate that loaded items match expected
-    for (size_t i = 0; i < ITEMS_COUNT; ++i)
-    {
-        SCOPED_TRACE(i);
-
-        ASSERT_EQ(col->At(i), generate<ValueType>(i));
-        ASSERT_EQ((*col)[i], generate<ValueType>(i));
-    }
-    std::cerr << "Accessing (twice):\t" << timer.GetTotalElapsed().count() << " us"
-              << std::endl;
+    validate();
+    EXPECT_NO_FATAL_FAILURE();
 }
 
 //// test deserialization of the FixedString column
 TEST(ColumnsCase, PERFORMANCE_FixedString) {
-    TestItemLoadingAndSaving<std::string_view, 1'000'000, UseSizeHint::NO>(std::make_shared<ColumnFixedString>(8));
-    TestItemLoadingAndSaving<std::string_view, 1'000'000, UseSizeHint::YES>(std::make_shared<ColumnFixedString>(8));
+    TestItemLoadingAndSaving(ColumnFixedString(8));
 }
 
 TEST(ColumnsCase, PERFORMANCE_String) {
 
-    TestItemLoadingAndSaving<std::string_view, 1'000'000, UseSizeHint::NO>(std::make_shared<ColumnString>());
-    TestItemLoadingAndSaving<std::string_view, 1'000'000, UseSizeHint::YES>(std::make_shared<ColumnString>());
+    TestItemLoadingAndSaving(ColumnString());
 }
 
 TEST(ColumnsCase, PERFORMANCE_Int) {
 
-    TestItemLoadingAndSaving<uint64_t, 1'000'000, UseSizeHint::NO>(std::make_shared<ColumnUInt64>());
-    TestItemLoadingAndSaving<uint64_t, 1'000'000, UseSizeHint::YES>(std::make_shared<ColumnUInt64>());
+    TestItemLoadingAndSaving(ColumnUInt64());
 }
