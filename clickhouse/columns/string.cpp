@@ -3,7 +3,6 @@
 
 #include "../base/wire_format.h"
 
-
 namespace
 {
 const size_t DEFAULT_BLOCK_SIZE = 4096;

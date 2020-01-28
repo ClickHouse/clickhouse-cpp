@@ -36,8 +36,6 @@ public:
     virtual void Append(ColumnRef column) = 0;
 
     /// Loads column data from input stream.
-    /// `size_hint` is a hint on how much nytes in the `input` stream is occupied by data of this column,
-    /// it may be 0 if hint is not available.
     virtual bool Load(CodedInputStream* input, size_t rows) = 0;
 
     /// Saves column data to output stream.
