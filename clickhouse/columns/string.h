@@ -98,8 +98,6 @@ private:
 
     std::vector<std::string_view> items_;
     std::vector<Block> blocks_;
-
-//    std::vector<std::string> data_;
 };
 
 }

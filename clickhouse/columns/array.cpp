@@ -58,7 +58,6 @@ bool ColumnArray::Load(CodedInputStream* input, size_t rows) {
     if (!offsets_->Load(input, rows)) {
         return false;
     }
-    // TODO: properly adjust hint for loading data_ column
     if (!data_->Load(input, (*offsets_)[rows - 1])) {
         return false;
     }

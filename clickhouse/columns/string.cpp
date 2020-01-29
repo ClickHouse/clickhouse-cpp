@@ -207,7 +207,6 @@ bool ColumnString::Load(CodedInputStream* input, size_t rows) {
     blocks_.clear();
 
     items_.reserve(rows);
-
     Block * block = nullptr;
 
     // TODO(performance): unroll a loop to a first row (to get rid of `blocks_.size() == 0` check) and the rest.
@@ -229,14 +228,12 @@ bool ColumnString::Load(CodedInputStream* input, size_t rows) {
 }
 
 void ColumnString::Save(CodedOutputStream* output) {
-
     for (const auto & item : items_) {
         WireFormat::WriteString(output, item);
     }
 }
 
 size_t ColumnString::Size() const {
-
     return items_.size();
 }
 
