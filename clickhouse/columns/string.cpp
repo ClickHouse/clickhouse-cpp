@@ -95,7 +95,7 @@ ColumnRef ColumnFixedString::Slice(size_t begin, size_t len) {
         result->data_ = data_.substr(b, std::min(data_.size() - b, l));
     }
 
-    return std::move(result);
+    return result;
 }
 
 struct ColumnString::Block
