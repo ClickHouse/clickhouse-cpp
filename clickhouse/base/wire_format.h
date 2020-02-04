@@ -23,7 +23,7 @@ public:
 
     static void WriteBytes(CodedOutputStream* output, const void* buf, size_t len);
 
-    static void WriteString(CodedOutputStream* output, const std::string& value);
+    static void WriteString(CodedOutputStream* output, std::string_view value);
 
     static void WriteUInt64(CodedOutputStream* output, const uint64_t value);
 };
@@ -85,7 +85,7 @@ inline void WireFormat::WriteBytes(
 
 inline void WireFormat::WriteString(
     CodedOutputStream* output,
-    const std::string& value)
+    std::string_view value)
 {
     output->WriteVarint64(value.size());
     output->WriteRaw(value.data(), value.size());

@@ -7,6 +7,7 @@
 #include <clickhouse/columns/uuid.h>
 
 #include <contrib/gtest/gtest.h>
+#include <chrono>
 
 using namespace clickhouse;
 
@@ -170,4 +171,215 @@ TEST(ColumnsCase, UUIDSlice) {
     ASSERT_EQ(sub->Size(), 2u);
     ASSERT_EQ(sub->At(0), UInt128(0x84b9f24bc26b49c6llu, 0xa03b4ab723341951llu));
     ASSERT_EQ(sub->At(1), UInt128(0x3507213c178649f9llu, 0x9faf035d662f60aellu));
+}
+
+
+
+std::uint64_t generate(const ColumnUInt64&, size_t index)
+{
+    const auto base = static_cast<std::uint64_t>(index) % 255;
+    return base << 7*8 | base << 6*8 | base << 5*8 | base << 4*8 | base << 3*8 | base << 2*8 | base << 1*8 | base;
+}
+
+template <size_t RESULT_SIZE=8>
+std::string_view generate_string_view(size_t index)
+{
+    static const char result_template[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    const auto template_size = sizeof(result_template) - 1;
+
+    const auto start_pos = index % (template_size - RESULT_SIZE);
+    return std::string_view(&result_template[start_pos], RESULT_SIZE);
+}
+
+std::string_view generate(const ColumnString&, size_t index)
+{
+    // ColumString stores item lengts,and on 1M etnries that builds up to extra 1M bytes,
+    // comparing to 8M bytes of serialized data for ColumnFixedString and ColumUInt64.
+    // So in order to make comparison mode fair, reducing size of data item.
+    return generate_string_view<7>(index);
+}
+
+std::string_view generate(const ColumnFixedString&, size_t index)
+{
+    return generate_string_view<8>(index);
+}
+
+template <typename ChronoDurationType>
+struct Timer
+{
+    using DurationType = ChronoDurationType;
+
+    Timer() {}
+
+    void restart()
+    {
+        started_at = current();
+    }
+
+    void start()
+    {
+        restart();
+    }
+
+    auto elapsed() const
+    {
+        return std::chrono::duration_cast<ChronoDurationType>(current() - started_at);
+    }
+
+    auto current() const
+    {
+        struct timespec ts;
+        clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
+        return std::chrono::nanoseconds(ts.tv_sec * 1000000000LL + ts.tv_nsec);
+    }
+
+private:
+    std::chrono::nanoseconds started_at;
+};
+
+template <typename ChronoDurationType>
+class PausableTimer
+{
+public:
+    PausableTimer()
+    {}
+
+    void Start()
+    {
+        timer.restart();
+        paused = false;
+    }
+
+    void Pause()
+    {
+        total += timer.elapsed();
+        paused = true;
+    }
+
+    auto GetTotalElapsed() const
+    {
+        if (paused)
+        {
+            return total;
+        }
+        else
+        {
+            return total + timer.elapsed();
+        }
+    }
+
+    void Reset()
+    {
+        Pause();
+        total = ChronoDurationType{0};
+    }
+
+    Timer<ChronoDurationType> timer;
+    ChronoDurationType total = ChronoDurationType{0};
+    bool paused = false;
+};
+
+template <typename ColumnType>
+void TestItemLoadingAndSaving(ColumnType && col)
+{
+    const size_t ITEMS_COUNT = 1'000'000;
+    const int LOAD_AND_SAVE_REPEAT_TIMES = 10; // run Load() and Save() multiple times to cancel out measurement errors.
+
+    std::cerr << "\n===========================================================" << std::endl;
+    std::cerr << "\t" << ITEMS_COUNT << " items of " << col.Type()->GetName()  << std::endl;
+
+    PausableTimer<std::chrono::microseconds> timer;
+
+    timer.Start();
+    for (size_t i = 0; i < ITEMS_COUNT; ++i)
+    {
+        const auto value = generate(col, i);
+        col.Append(value);
+    }
+
+    EXPECT_EQ(ITEMS_COUNT, col.Size());
+    std::cerr << "Appending:\t" << timer.GetTotalElapsed().count() << " us"
+              << std::endl;
+
+    auto validate = [=, &col = std::as_const(col), &timer]()
+    {
+        timer.Reset();
+        timer.Start();
+
+        // validate that appended items match expected
+        for (size_t i = 0; i < ITEMS_COUNT; ++i)
+        {
+            SCOPED_TRACE(i);
+
+            ASSERT_EQ(col.At(i), generate(col, i));
+            ASSERT_EQ(col[i], generate(col, i));
+        }
+
+        std::cerr << "Accessing (twice):\t" << timer.GetTotalElapsed().count() << " us"
+                  << std::endl;
+    };
+
+    validate();
+    EXPECT_NO_FATAL_FAILURE();
+
+    Buffer buffer;
+
+    // Save
+    {
+        timer.Reset();
+
+        for (int i = 0; i < LOAD_AND_SAVE_REPEAT_TIMES; ++i)
+        {
+            buffer.clear();
+            BufferOutput bufferOutput(&buffer);
+            CodedOutputStream ostr(&bufferOutput);
+
+            timer.Start();
+            col.Save(&ostr);
+            ostr.Flush();
+            timer.Pause();
+        }
+        const auto elapsed = timer.GetTotalElapsed() / (LOAD_AND_SAVE_REPEAT_TIMES * 1.0);
+
+        std::cerr << "Saving:\t" << elapsed.count() << " us"
+                  << std::endl;
+    }
+
+    // Load
+    {
+        timer.Reset();
+
+        for (int i = 0; i < LOAD_AND_SAVE_REPEAT_TIMES; ++i)
+        {
+            ArrayInput arrayInput(buffer.data(), buffer.size());
+            CodedInputStream istr(&arrayInput);
+            col.Clear();
+
+            timer.Start();
+            col.Load(&istr, ITEMS_COUNT);
+            timer.Pause();
+        }
+        const auto elapsed = timer.GetTotalElapsed() / (LOAD_AND_SAVE_REPEAT_TIMES * 1.0);
+
+        std::cerr << "Loading:\t" << elapsed.count() << " us"
+                  << std::endl;
+    }
+
+    validate();
+    EXPECT_NO_FATAL_FAILURE();
+}
+
+//// test deserialization of the FixedString column
+TEST(ColumnsCase, PERFORMANCE_FixedString) {
+    TestItemLoadingAndSaving(ColumnFixedString(8));
+}
+
+TEST(ColumnsCase, PERFORMANCE_String) {
+
+    TestItemLoadingAndSaving(ColumnString());
+}
+
+TEST(ColumnsCase, PERFORMANCE_Int) {
+
+    TestItemLoadingAndSaving(ColumnUInt64());
 }

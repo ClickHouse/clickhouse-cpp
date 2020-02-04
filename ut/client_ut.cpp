@@ -13,7 +13,8 @@ protected:
     }
 
     void TearDown() override {
-        client_->Execute("DROP DATABASE test_clickhouse_cpp");
+        if (client_)
+            client_->Execute("DROP DATABASE test_clickhouse_cpp");
         delete client_;
     }
 
