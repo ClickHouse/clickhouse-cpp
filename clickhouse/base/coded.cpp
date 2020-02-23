@@ -45,13 +45,13 @@ bool CodedInputStream::Skip(size_t count) {
 bool CodedInputStream::ReadVarint64(uint64_t* value) {
     *value = 0;
 
-    for (size_t i = 0; i < 9; ++i) {
+    for (size_t i = 0; i < MAX_VARINT_BYTES; ++i) {
         uint8_t byte;
 
         if (!input_->ReadByte(&byte)) {
             return false;
         } else {
-            *value |= (byte & 0x7F) << (7 * i);
+            *value |= uint64_t(byte & 0x7F) << (7 * i);
 
             if (!(byte & 0x80)) {
                 return true;
@@ -81,7 +81,7 @@ void CodedOutputStream::WriteVarint64(uint64_t value) {
     uint8_t bytes[MAX_VARINT_BYTES];
     int size = 0;
 
-    for (size_t i = 0; i < 9; ++i) {
+    for (size_t i = 0; i < MAX_VARINT_BYTES; ++i) {
         uint8_t byte = value & 0x7F;
         if (value > 0x7F)
             byte |= 0x80;
