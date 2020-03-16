@@ -98,6 +98,23 @@ ColumnRef ColumnFixedString::Slice(size_t begin, size_t len) {
     return result;
 }
 
+void ColumnFixedString::Swap(Column& other) {
+    if (auto col = dynamic_cast<ColumnFixedString*>(&other)) {
+        std::swap(string_size_, col->string_size_);
+        data_.swap(col->data_);
+    }
+}
+
+ItemView ColumnFixedString::GetItem(size_t index) const {
+    return ItemView{this->At(index)};
+}
+
+void ColumnFixedString::AppendFrom(const Column & col, size_t index) {
+    if (auto string_col = dynamic_cast<const ColumnFixedString*>(&col); string_col && string_col->string_size_ == string_size_) {
+        Append(string_col->At(index));
+    }
+}
+
 struct ColumnString::Block
 {
     using CharT = typename std::string::value_type;
@@ -251,6 +268,23 @@ ColumnRef ColumnString::Slice(size_t begin, size_t len) {
     }
 
     return result;
+}
+
+void ColumnString::Swap(Column& other) {
+    if (auto col = dynamic_cast<ColumnString*>(&other)) {
+        items_.swap(col->items_);
+        blocks_.swap(col->blocks_);
+    }
+}
+
+ItemView ColumnString::GetItem(size_t index) const {
+    return ItemView{this->At(index)};
+}
+
+void ColumnString::AppendFrom(const Column & col, size_t index) {
+    if (auto string_col = dynamic_cast<const ColumnString*>(&col)) {
+        Append(string_col->At(index));
+    }
 }
 
 }

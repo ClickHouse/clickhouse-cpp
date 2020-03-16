@@ -48,6 +48,22 @@ ColumnRef ColumnDate::Slice(size_t begin, size_t len) {
     return result;
 }
 
+void ColumnDate::Swap(Column& other) {
+    if (auto col = dynamic_cast<ColumnDate*>(&other)) {
+        data_.swap(col->data_);
+    }
+}
+
+ItemView ColumnDate::GetItem(size_t index) const {
+    return data_->GetItem(index);
+}
+
+void ColumnDate::AppendFrom(const Column & col, size_t index) {
+    if (auto c = dynamic_cast<const ColumnDate*>(&col)) {
+        data_->AppendFrom(*c->data_, index);
+    }
+}
+
 
 ColumnDateTime::ColumnDateTime()
     : Column(Type::CreateDateTime())
@@ -92,6 +108,22 @@ ColumnRef ColumnDateTime::Slice(size_t begin, size_t len) {
     result->data_->Append(col);
 
     return result;
+}
+
+void ColumnDateTime::Swap(Column& other) {
+    if (auto col = dynamic_cast<ColumnDateTime*>(&other)) {
+        data_.swap(col->data_);
+    }
+}
+
+ItemView ColumnDateTime::GetItem(size_t index) const {
+    return data_->GetItem(index);
+}
+
+void ColumnDateTime::AppendFrom(const Column & col, size_t index) {
+    if (auto c = dynamic_cast<const ColumnDateTime*>(&col)) {
+        data_->AppendFrom(*c->data_, index);
+    }
 }
 
 }

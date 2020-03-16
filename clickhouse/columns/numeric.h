@@ -25,6 +25,8 @@ public:
     /// Returns element at given row number.
     const T& operator [] (size_t n) const;
 
+    void Erase(size_t pos, size_t count = 1);
+
 public:
     /// Appends content of given column to the end of current one.
     void Append(ColumnRef column) override;
@@ -43,6 +45,11 @@ public:
 
     /// Makes slice of the current column.
     ColumnRef Slice(size_t begin, size_t len) override;
+    void Swap(Column& other) override;
+
+    ItemView GetItem(size_t index) const override;
+    void AppendUnsafe(std::string_view);
+    void AppendFrom(const Column & col, size_t index) override;
 
 private:
     std::vector<T> data_;

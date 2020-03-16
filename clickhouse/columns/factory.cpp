@@ -9,6 +9,7 @@
 #include "nothing.h"
 #include "nullable.h"
 #include "numeric.h"
+#include "lowcardinality.h"
 #include "string.h"
 #include "tuple.h"
 #include "uuid.h"
@@ -133,6 +134,9 @@ static ColumnRef CreateColumnFromAst(const TypeAst& ast) {
                 );
             }
             break;
+        }
+        case TypeAst::LowCardinality: {
+            return std::make_shared<ColumnLowCardinality>(CreateTerminalColumn(ast.elements.front()));
         }
 
         case TypeAst::Null:

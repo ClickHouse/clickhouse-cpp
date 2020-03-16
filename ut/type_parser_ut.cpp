@@ -127,3 +127,34 @@ TEST(TypeParserCase, ParseDecimal128) {
     ASSERT_EQ(ast.elements.size(), 1u);
     ASSERT_EQ(ast.elements[0].value, 3);
 }
+
+TEST(TypeParserCase, LowCardinality_String) {
+    TypeAst ast;
+    ASSERT_TRUE(TypeParser("LowCardinality(String)").Parse(&ast));
+    ASSERT_EQ(ast.meta, TypeAst::LowCardinality);
+    ASSERT_EQ(ast.name, "LowCardinality");
+    ASSERT_EQ(ast.code, Type::LowCardinality);
+    ASSERT_EQ(ast.elements.size(), 1u);
+    ASSERT_EQ(ast.elements[0].meta, TypeAst::Terminal);
+    ASSERT_EQ(ast.elements[0].code, Type::String);
+    ASSERT_EQ(ast.elements[0].name, "String");
+    ASSERT_EQ(ast.elements[0].value, 0);
+    ASSERT_EQ(ast.elements[0].elements.size(), 0u);
+}
+
+TEST(TypeParserCase, LowCardinality_FixedString) {
+    TypeAst ast;
+    ASSERT_TRUE(TypeParser("LowCardinality(FixedString(10))").Parse(&ast));
+    ASSERT_EQ(ast.meta, TypeAst::LowCardinality);
+    ASSERT_EQ(ast.name, "LowCardinality");
+    ASSERT_EQ(ast.code, Type::LowCardinality);
+    ASSERT_EQ(ast.elements.size(), 1u);
+    ASSERT_EQ(ast.elements.size(), 1u);
+    ASSERT_EQ(ast.elements[0].meta, TypeAst::Terminal);
+    ASSERT_EQ(ast.elements[0].code, Type::FixedString);
+    ASSERT_EQ(ast.elements[0].name, "FixedString");
+    ASSERT_EQ(ast.elements[0].value, 0);
+    ASSERT_EQ(ast.elements[0].elements.size(), 1u);
+    auto param = TypeAst{TypeAst::Number, Type::Void, "", 10, {}};
+    ASSERT_EQ(ast.elements[0].elements[0], param);
+}

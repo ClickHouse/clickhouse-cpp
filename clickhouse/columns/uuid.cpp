@@ -59,5 +59,21 @@ ColumnRef ColumnUUID::Slice(size_t begin, size_t len) {
     return std::make_shared<ColumnUUID>(data_->Slice(begin * 2, len * 2));
 }
 
+void ColumnUUID::Swap(Column& other) {
+    if (auto col = dynamic_cast<ColumnUUID*>(&other)) {
+        data_.swap(col->data_);
+    }
+}
+
+ItemView ColumnUUID::GetItem(size_t index) const {
+    return data_->GetItem(index);
+}
+
+void ColumnUUID::AppendFrom(const Column & col, size_t index) {
+    if (auto uuid_col = dynamic_cast<const ColumnUUID*>(&col)) {
+        data_->AppendFrom(*uuid_col->data_, index);
+    }
+}
+
 }
 

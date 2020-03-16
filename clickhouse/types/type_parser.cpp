@@ -5,7 +5,44 @@
 #include <mutex>
 #include <unordered_map>
 
+namespace
+{
+
+template <typename Container1, typename Container2>
+bool containersMatch(const Container1 & left, const Container2 & right)
+{
+    if (left.size() != right.size())
+        return false;
+
+    const auto l_begin = std::begin(left);
+    const auto l_end = std::end(left);
+    const auto r_begin = std::begin(left);
+    const auto r_end = std::end(left);
+
+    std::remove_const_t<decltype (l_begin)> l = l_begin;
+    std::remove_const_t<decltype (r_begin)> r = r_begin;
+
+    for (; l != l_end && r != r_end; ++l, ++r)
+    {
+        if (*l != *r)
+            return false;
+    }
+
+    return true;
+}
+
+}
+
 namespace clickhouse {
+
+bool TypeAst::operator==(const TypeAst & other) const
+{
+    return meta == other.meta
+        && code == other.code
+        && name == other.name
+        && value == other.value
+        && containersMatch(elements, other.elements);
+}
 
 static const std::unordered_map<std::string, Type::Code> kTypeCode = {
     { "Int8",        Type::Int8 },
@@ -34,6 +71,7 @@ static const std::unordered_map<std::string, Type::Code> kTypeCode = {
     { "Decimal32",   Type::Decimal32 },
     { "Decimal64",   Type::Decimal64 },
     { "Decimal128",  Type::Decimal128 },
+    { "LowCardinality", Type::LowCardinality },
 };
 
 static Type::Code GetTypeCode(const std::string& name) {
@@ -63,6 +101,10 @@ static TypeAst::Meta GetTypeMeta(const StringView& name) {
 
     if (name == "Enum8" || name == "Enum16") {
         return TypeAst::Enum;
+    }
+
+    if (name == "LowCardinality") {
+        return TypeAst::LowCardinality;
     }
 
     return TypeAst::Terminal;

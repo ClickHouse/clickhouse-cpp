@@ -24,6 +24,9 @@ public:
     void Clear() override;
     size_t Size() const override;
     ColumnRef Slice(size_t begin, size_t len) override;
+    void Swap(Column& other) override;
+    ItemView GetItem(size_t index) const override;
+    void AppendFrom(const Column & col, size_t index) override;
 
 private:
     /// Depending on a precision it can be one of:

@@ -42,10 +42,42 @@ public:
 
     /// Makes slice of the current column.
     ColumnRef Slice(size_t begin, size_t len) override;
+    void Swap(Column&) override;
+
+    ItemView GetItem(size_t) const override;
+    void AppendFrom(const Column & col, size_t index) override;
 
 private:
     ColumnRef nested_;
     std::shared_ptr<ColumnUInt8> nulls_;
 };
+
+
+inline const Column & removeNullable(const Column & col)
+{
+    if (col.Type()->GetCode() == Type::Nullable)
+    {
+        return *static_cast<const ColumnNullable &>(col).Nested();
+    }
+
+    return col;
+}
+
+inline Column & removeNullable(Column & col)
+{
+    return const_cast<Column &>(removeNullable(const_cast<const Column&>(col)));
+}
+
+inline ColumnRef removeNullable(ColumnRef col)
+{
+    if (col->Type()->GetCode() == Type::Nullable)
+    {
+        return static_cast<const ColumnNullable &>(*col).Nested();
+    }
+    return col;
+}
+
+
+
 
 }

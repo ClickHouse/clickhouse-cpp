@@ -38,6 +38,9 @@ public:
     /// Makes slice of the current column.
     ColumnRef Slice(size_t, size_t) override;
 
+    void Swap(Column&) override;
+    void AppendFrom(const Column & col, size_t index) override;
+
     void OffsetsIncrease(size_t);
 
 private:

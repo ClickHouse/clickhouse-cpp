@@ -22,7 +22,7 @@
 #define DBMS_NAME                                       "ClickHouse"
 #define DBMS_VERSION_MAJOR                              1
 #define DBMS_VERSION_MINOR                              1
-#define REVISION                                        54126
+#define REVISION                                        54405
 
 #define DBMS_MIN_REVISION_WITH_TEMPORARY_TABLES         50264
 #define DBMS_MIN_REVISION_WITH_TOTAL_ROWS_IN_PROGRESS   51554
@@ -30,6 +30,7 @@
 #define DBMS_MIN_REVISION_WITH_CLIENT_INFO              54032
 #define DBMS_MIN_REVISION_WITH_SERVER_TIMEZONE          54058
 #define DBMS_MIN_REVISION_WITH_QUOTA_KEY_IN_CLIENT_INFO 54060
+#define DBMS_MIN_REVISION_WITH_LOW_CARDINALITY_TYPE     54405
 
 namespace clickhouse {
 

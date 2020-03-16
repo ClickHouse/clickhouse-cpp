@@ -5,9 +5,10 @@
 #include <clickhouse/columns/numeric.h>
 #include <clickhouse/columns/string.h>
 #include <clickhouse/columns/uuid.h>
+#include <clickhouse/columns/lowcardinality.h>
 
 #include <contrib/gtest/gtest.h>
-#include <chrono>
+#include "utils.h"
 
 using namespace clickhouse;
 
@@ -173,213 +174,118 @@ TEST(ColumnsCase, UUIDSlice) {
     ASSERT_EQ(sub->At(1), UInt128(0x3507213c178649f9llu, 0x9faf035d662f60aellu));
 }
 
-
-
-std::uint64_t generate(const ColumnUInt64&, size_t index)
+std::string foobar(size_t i)
 {
-    const auto base = static_cast<std::uint64_t>(index) % 255;
-    return base << 7*8 | base << 6*8 | base << 5*8 | base << 4*8 | base << 3*8 | base << 2*8 | base << 1*8 | base;
+    std::string result;
+    if (i % 3 == 0)
+        result += "Foo";
+    if (i % 5 == 0)
+        result += "Bar";
+    if (result.empty())
+        result = std::to_string(i);
+
+    return result;
 }
 
-template <size_t RESULT_SIZE=8>
-std::string_view generate_string_view(size_t index)
+template <typename Generator>
+auto build_vector(Generator && gen, size_t items)
 {
-    static const char result_template[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    const auto template_size = sizeof(result_template) - 1;
+    std::vector<std::result_of_t<Generator(size_t)>> result;
+    result.reserve(items);
+    for (size_t i = 0; i < items; ++i)
+    {
+        result.push_back(std::move(gen(i)));
+    }
 
-    const auto start_pos = index % (template_size - RESULT_SIZE);
-    return std::string_view(&result_template[start_pos], RESULT_SIZE);
+    return result;
 }
 
-std::string_view generate(const ColumnString&, size_t index)
-{
-    // ColumString stores item lengts,and on 1M etnries that builds up to extra 1M bytes,
-    // comparing to 8M bytes of serialized data for ColumnFixedString and ColumUInt64.
-    // So in order to make comparison mode fair, reducing size of data item.
-    return generate_string_view<7>(index);
+TEST(ColumnsCase, LowCardinalityWrapperString_Append_and_Read) {
+    const size_t items_count = 11;
+    ColumnLowCardinalityWrapper<ColumnString> col;
+    for (const auto & item : build_vector(&foobar, items_count))
+    {
+        col.Append(item);
+    }
+
+    ASSERT_EQ(col.Size(), items_count);
+    ASSERT_EQ(col.GetDictionarySize(), 8u);
+
+    for (size_t i = 0; i < items_count; ++i)
+    {
+        ASSERT_EQ(col.At(i), foobar(i)) << " at pos: " << i;
+        ASSERT_EQ(col[i], foobar(i)) << " at pos: " << i;
+    }
 }
 
-std::string_view generate(const ColumnFixedString&, size_t index)
-{
-    return generate_string_view<8>(index);
+#define BINARY_STRING(x) std::string_view(x, sizeof(x) - 1)
+
+static const auto LOWCARDINALITY_STRING_FOOBAR_10_ITEMS_BINARY =
+        BINARY_STRING("\x01\x00\x00\x00\x00\x00\x00\x00\x00\x06\x00\x00\x00\x00\x00\x00"
+                      "\x09\x00\x00\x00\x00\x00\x00\x00\x00\x06\x46\x6f\x6f\x42\x61\x72"
+                      "\x01\x31\x01\x32\x03\x46\x6f\x6f\x01\x34\x03\x42\x61\x72\x01\x37"
+                      "\x01\x38\x0a\x00\x00\x00\x00\x00\x00\x00\x01\x02\x03\x04\x05\x06"
+                      "\x04\x07\x08\x04");
+
+TEST(ColumnsCase, LowCardinalityString_Load) {
+    const size_t items_count = 10;
+    ColumnLowCardinalityWrapper<ColumnString> col;
+
+    const auto & data = LOWCARDINALITY_STRING_FOOBAR_10_ITEMS_BINARY;
+    ArrayInput buffer(data.data(), data.size());
+    CodedInputStream stream(&buffer);
+
+    EXPECT_TRUE(col.Load(&stream, items_count));
+
+    for (size_t i = 0; i < items_count; ++i) {
+        EXPECT_EQ(col.At(i), foobar(i)) << " at pos: " << i;
+    }
 }
 
-template <typename ChronoDurationType>
-struct Timer
-{
-    using DurationType = ChronoDurationType;
-
-    Timer() {}
-
-    void restart()
+TEST(ColumnsCase, LowCardinalityString_Save) {
+    const size_t items_count = 10;
+    ColumnLowCardinalityWrapper<ColumnString> col;
+    for (const auto & item : build_vector(&foobar, items_count))
     {
-        started_at = current();
+        col.Append(item);
     }
 
-    void start()
-    {
-        restart();
+    const auto & data = LOWCARDINALITY_STRING_FOOBAR_10_ITEMS_BINARY;
+    ArrayInput buffer(data.data(), data.size());
+    CodedInputStream stream(&buffer);
+
+    EXPECT_TRUE(col.Load(&stream, items_count));
+
+    for (size_t i = 0; i < items_count; ++i) {
+        EXPECT_EQ(col.At(i), foobar(i)) << " at pos: " << i;
     }
-
-    auto elapsed() const
-    {
-        return std::chrono::duration_cast<ChronoDurationType>(current() - started_at);
-    }
-
-    auto current() const
-    {
-        struct timespec ts;
-        clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
-        return std::chrono::nanoseconds(ts.tv_sec * 1000000000LL + ts.tv_nsec);
-    }
-
-private:
-    std::chrono::nanoseconds started_at;
-};
-
-template <typename ChronoDurationType>
-class PausableTimer
-{
-public:
-    PausableTimer()
-    {}
-
-    void Start()
-    {
-        timer.restart();
-        paused = false;
-    }
-
-    void Pause()
-    {
-        total += timer.elapsed();
-        paused = true;
-    }
-
-    auto GetTotalElapsed() const
-    {
-        if (paused)
-        {
-            return total;
-        }
-        else
-        {
-            return total + timer.elapsed();
-        }
-    }
-
-    void Reset()
-    {
-        Pause();
-        total = ChronoDurationType{0};
-    }
-
-    Timer<ChronoDurationType> timer;
-    ChronoDurationType total = ChronoDurationType{0};
-    bool paused = false;
-};
-
-template <typename ColumnType>
-void TestItemLoadingAndSaving(ColumnType && col)
-{
-    const size_t ITEMS_COUNT = 1'000'000;
-    const int LOAD_AND_SAVE_REPEAT_TIMES = 10; // run Load() and Save() multiple times to cancel out measurement errors.
-
-    std::cerr << "\n===========================================================" << std::endl;
-    std::cerr << "\t" << ITEMS_COUNT << " items of " << col.Type()->GetName()  << std::endl;
-
-    PausableTimer<std::chrono::microseconds> timer;
-
-    timer.Start();
-    for (size_t i = 0; i < ITEMS_COUNT; ++i)
-    {
-        const auto value = generate(col, i);
-        col.Append(value);
-    }
-
-    EXPECT_EQ(ITEMS_COUNT, col.Size());
-    std::cerr << "Appending:\t" << timer.GetTotalElapsed().count() << " us"
-              << std::endl;
-
-    auto validate = [=, &col = std::as_const(col), &timer]()
-    {
-        timer.Reset();
-        timer.Start();
-
-        // validate that appended items match expected
-        for (size_t i = 0; i < ITEMS_COUNT; ++i)
-        {
-            SCOPED_TRACE(i);
-
-            ASSERT_EQ(col.At(i), generate(col, i));
-            ASSERT_EQ(col[i], generate(col, i));
-        }
-
-        std::cerr << "Accessing (twice):\t" << timer.GetTotalElapsed().count() << " us"
-                  << std::endl;
-    };
-
-    validate();
-    EXPECT_NO_FATAL_FAILURE();
-
-    Buffer buffer;
-
-    // Save
-    {
-        timer.Reset();
-
-        for (int i = 0; i < LOAD_AND_SAVE_REPEAT_TIMES; ++i)
-        {
-            buffer.clear();
-            BufferOutput bufferOutput(&buffer);
-            CodedOutputStream ostr(&bufferOutput);
-
-            timer.Start();
-            col.Save(&ostr);
-            ostr.Flush();
-            timer.Pause();
-        }
-        const auto elapsed = timer.GetTotalElapsed() / (LOAD_AND_SAVE_REPEAT_TIMES * 1.0);
-
-        std::cerr << "Saving:\t" << elapsed.count() << " us"
-                  << std::endl;
-    }
-
-    // Load
-    {
-        timer.Reset();
-
-        for (int i = 0; i < LOAD_AND_SAVE_REPEAT_TIMES; ++i)
-        {
-            ArrayInput arrayInput(buffer.data(), buffer.size());
-            CodedInputStream istr(&arrayInput);
-            col.Clear();
-
-            timer.Start();
-            col.Load(&istr, ITEMS_COUNT);
-            timer.Pause();
-        }
-        const auto elapsed = timer.GetTotalElapsed() / (LOAD_AND_SAVE_REPEAT_TIMES * 1.0);
-
-        std::cerr << "Loading:\t" << elapsed.count() << " us"
-                  << std::endl;
-    }
-
-    validate();
-    EXPECT_NO_FATAL_FAILURE();
 }
 
-//// test deserialization of the FixedString column
-TEST(ColumnsCase, PERFORMANCE_FixedString) {
-    TestItemLoadingAndSaving(ColumnFixedString(8));
+TEST(ColumnsCase, LowCardinalityWrapperString_ConstructWithVector) {
+    const size_t items_count = 10;
+    ColumnLowCardinalityWrapper<ColumnString> col(build_vector(&foobar, items_count));
+
+    ASSERT_EQ(col.Size(), items_count);
+    ASSERT_EQ(col.GetDictionarySize(), 8u);
+
+    for (size_t i = 0; i < items_count; ++i)
+    {
+        ASSERT_EQ(col.At(i), foobar(i)) << " at pos: " << i;
+    }
 }
 
-TEST(ColumnsCase, PERFORMANCE_String) {
+TEST(ColumnsCase, LowCardinalityWrapperString_ConstructWithExistingLowCardinalityColumn) {
+    const size_t items_count = 10;
+    ColumnRef dict_column = std::make_shared<ColumnString>(build_vector(&foobar, items_count));
+    ColumnRef lc_column = std::make_shared<ColumnLowCardinality>(dict_column);
 
-    TestItemLoadingAndSaving(ColumnString());
-}
+    ColumnLowCardinalityWrapper<ColumnString> col(lc_column);
 
-TEST(ColumnsCase, PERFORMANCE_Int) {
+    ASSERT_EQ(col.Size(), items_count);
+    ASSERT_EQ(col.GetDictionarySize(), 8u);
 
-    TestItemLoadingAndSaving(ColumnUInt64());
+    for (size_t i = 0; i < items_count; ++i)
+    {
+        ASSERT_EQ(col.At(i), foobar(i)) << " at pos: " << i;
+    }
 }

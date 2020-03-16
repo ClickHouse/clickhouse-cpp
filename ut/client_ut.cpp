@@ -8,17 +8,16 @@ using namespace clickhouse;
 class ClientCase : public testing::TestWithParam<ClientOptions> {
 protected:
     void SetUp() override {
-        client_ = new Client(GetParam());
+        client_.reset(new Client(GetParam()));
         client_->Execute("CREATE DATABASE IF NOT EXISTS test_clickhouse_cpp");
     }
 
     void TearDown() override {
         if (client_)
             client_->Execute("DROP DATABASE test_clickhouse_cpp");
-        delete client_;
     }
 
-    Client* client_ = nullptr;
+    std::unique_ptr<Client> client_;
 };
 
 TEST_P(ClientCase, Array) {
@@ -98,6 +97,41 @@ TEST_P(ClientCase, Date) {
                 auto col = block[0]->As<ColumnDateTime>();
                 std::time_t t = col->As<ColumnDateTime>()->At(c);
                 EXPECT_EQ(now, t);
+            }
+        }
+    );
+}
+
+TEST_P(ClientCase, LowCardinality) {
+    Block block;
+    client_->Execute("DROP TABLE IF EXISTS test_clickhouse_cpp.low_cardinality;");
+
+    client_->Execute("CREATE TABLE IF NOT EXISTS "
+            "test_clickhouse_cpp.low_cardinality (lc LowCardinality(String)) "
+            "ENGINE = Memory");
+
+    auto lc = ColumnLowCardinalityWrapper<ColumnString>();
+
+    const std::vector<std::string> data{{"FooBar", "1", "2", "Foo", "4", "Bar", "Foo", "7", "8", "Foo"}};
+    lc.AppendMany(data);
+
+    block.AppendColumn("lc", lc.GetLowCardinalityColumn());
+    client_->Insert("test_clickhouse_cpp.low_cardinality", block);
+
+    client_->Select("SELECT lc FROM test_clickhouse_cpp.low_cardinality",
+        [&data](const Block& block)
+        {
+            if (block.GetRowCount() == 0) {
+                return;
+            }
+
+            ASSERT_EQ(1U, block.GetColumnCount());
+            if (auto lc_column = block[0]->As<ColumnLowCardinality>()) {
+                auto col = ColumnLowCardinalityWrapper<ColumnString>(lc_column);
+                ASSERT_EQ(data.size(), col.Size());
+                for (size_t i = 0; i < col.Size(); ++i) {
+                    EXPECT_EQ(data[i], col[i]) << " at index: " << i;
+                }
             }
         }
     );

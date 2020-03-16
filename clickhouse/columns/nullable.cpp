@@ -74,4 +74,26 @@ ColumnRef ColumnNullable::Slice(size_t begin, size_t len) {
     return std::make_shared<ColumnNullable>(nested_->Slice(begin, len), nulls_->Slice(begin, len));
 }
 
+void ColumnNullable::Swap(Column& other) {
+    if (auto col = dynamic_cast<ColumnNullable*>(&other)) {
+        nested_.swap(col->nested_);
+        nulls_.swap(col->nulls_);
+    }
+}
+
+ItemView ColumnNullable::GetItem(size_t index) const  {
+    if (IsNull(index))
+        return ItemView();
+
+    return nested_->GetItem(index);
+}
+
+void ColumnNullable::AppendFrom(const Column & col, size_t index) {
+    auto nullable_col = dynamic_cast<const ColumnNullable*>(&col);
+    if (nullable_col && nested_->Type()->IsEqual(nullable_col->Nested()->Type())) {
+        nested_->AppendFrom(*nullable_col->nested_, index);
+        Append(nullable_col->IsNull(index));
+    }
+}
+
 }

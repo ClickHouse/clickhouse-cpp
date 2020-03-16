@@ -78,6 +78,19 @@ size_t ColumnArray::Size() const {
     return offsets_->Size();
 }
 
+void ColumnArray::Swap(Column& other) {
+    if (auto col = dynamic_cast<ColumnArray*>(&other)) {
+        data_.swap(col->data_);
+        offsets_.swap(col->offsets_);
+    }
+}
+
+void ColumnArray::AppendFrom(const Column & col, size_t index) {
+    if (auto c = dynamic_cast<const ColumnArray*>(&col)) {
+        AppendAsColumn(c->GetAsColumn(index));
+    }
+}
+
 void ColumnArray::OffsetsIncrease(size_t n) {
     offsets_->Append(n);
 }

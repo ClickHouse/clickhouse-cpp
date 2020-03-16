@@ -120,4 +120,20 @@ ColumnRef ColumnDecimal::Slice(size_t begin, size_t len) {
     return slice;
 }
 
+void ColumnDecimal::Swap(Column& other) {
+    if (auto col = dynamic_cast<ColumnDecimal*>(&other)) {
+        data_.swap(col->data_);
+    }
+}
+
+ItemView ColumnDecimal::GetItem(size_t index) const {
+    return data_->GetItem(index);
+}
+
+void ColumnDecimal::AppendFrom(const Column & col, size_t index) {
+    if (auto c = dynamic_cast<const ColumnDecimal*>(&col)) {
+        data_->AppendFrom(*c->data_, index);
+    }
+}
+
 }

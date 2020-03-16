@@ -14,6 +14,8 @@ namespace clickhouse {
  */
 class ColumnFixedString : public Column {
 public:
+    using ValueType = std::string_view;
+
     explicit ColumnFixedString(size_t n);
 
     /// Appends one element to the column.
@@ -47,8 +49,13 @@ public:
     /// Makes slice of the current column.
     ColumnRef Slice(size_t begin, size_t len) override;
 
+    void Swap(Column& other) override;
+
+    ItemView GetItem(size_t) const override;
+    void AppendFrom(const Column & col, size_t index) override;
+
 private:
-    const size_t string_size_;
+    size_t string_size_;
     std::string data_;
 };
 
@@ -57,10 +64,15 @@ private:
  */
 class ColumnString : public Column {
 public:
+    // Type this column takes as argument of Append and returns with At() and operator[]
+    using ValueType = std::string_view;
+
     ColumnString();
     ~ColumnString();
 
     explicit ColumnString(const std::vector<std::string> & data);
+    ColumnString& operator=(const ColumnString&) = delete;
+    ColumnString(const ColumnString&) = delete;
 
     /// Appends one element to the column.
     void Append(std::string_view str);
@@ -89,6 +101,9 @@ public:
 
     /// Makes slice of the current column.
     ColumnRef Slice(size_t begin, size_t len) override;
+    void Swap(Column& other) override;
+    ItemView GetItem(size_t) const override;
+    void AppendFrom(const Column & col, size_t index) override;
 
 private:
     void AppendUnsafe(std::string_view);
