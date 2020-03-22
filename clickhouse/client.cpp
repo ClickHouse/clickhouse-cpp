@@ -30,6 +30,10 @@
 #define DBMS_MIN_REVISION_WITH_CLIENT_INFO              54032
 #define DBMS_MIN_REVISION_WITH_SERVER_TIMEZONE          54058
 #define DBMS_MIN_REVISION_WITH_QUOTA_KEY_IN_CLIENT_INFO 54060
+//#define DBMS_MIN_REVISION_WITH_TABLES_STATUS            54226
+//#define DBMS_MIN_REVISION_WITH_TIME_ZONE_PARAMETER_IN_DATETIME_DATA_TYPE 54337
+#define DBMS_MIN_REVISION_WITH_SERVER_DISPLAY_NAME      54372
+#define DBMS_MIN_REVISION_WITH_VERSION_PATCH            54401
 #define DBMS_MIN_REVISION_WITH_LOW_CARDINALITY_TYPE     54405
 
 namespace clickhouse {
@@ -52,8 +56,10 @@ struct ClientInfo {
 struct ServerInfo {
     std::string name;
     std::string timezone;
+    std::string display_name;
     uint64_t    version_major;
     uint64_t    version_minor;
+    uint64_t    version_patch;
     uint64_t    revision;
 };
 
@@ -694,6 +700,18 @@ bool Client::Impl::ReceiveHello() {
 
         if (server_info_.revision >= DBMS_MIN_REVISION_WITH_SERVER_TIMEZONE) {
             if (!WireFormat::ReadString(&input_, &server_info_.timezone)) {
+                return false;
+            }
+        }
+
+        if (server_info_.revision >= DBMS_MIN_REVISION_WITH_SERVER_DISPLAY_NAME) {
+            if (!WireFormat::ReadString(&input_, &server_info_.display_name)) {
+                return false;
+            }
+        }
+
+        if (server_info_.revision >= DBMS_MIN_REVISION_WITH_VERSION_PATCH) {
+            if (!WireFormat::ReadUInt64(&input_, &server_info_.version_patch)) {
                 return false;
             }
         }
