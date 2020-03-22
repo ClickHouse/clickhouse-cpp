@@ -51,6 +51,7 @@ class TypeParser {
             LPar,
             RPar,
             Comma,
+            Quote,
             EOS,
         };
 
@@ -65,7 +66,7 @@ public:
     bool Parse(TypeAst* type);
 
 private:
-    Token NextToken();
+    Token NextToken(StringView end_quote);
 
 private:
     const char* cur_;

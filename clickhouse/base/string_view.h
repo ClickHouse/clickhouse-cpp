@@ -75,6 +75,11 @@ public:
         return size_;
     }
 
+    // to mimic std::string and std::string_view
+    inline size_type length() const noexcept {
+        return size();
+    }
+
 public:
     // Returns a substring [pos, pos + count).
     // If the requested substring extends past the end of the string,

@@ -124,10 +124,26 @@ bool TypeParser::Parse(TypeAst* type) {
     type_ = type;
     open_elements_.push(type_);
 
+    StringView end_quote = {};
     do {
-        const Token& token = NextToken();
-
+        const Token & token = NextToken(end_quote);
         switch (token.type) {
+            case Token::Quote:
+            {
+                if (!end_quote) {
+                    // if opening quote:
+                    //     set closing quote the same as the opening one
+                    end_quote = token.value;
+                } else {
+                    // if closing quote
+                    type_->meta = TypeAst::Terminal;
+                    type_->name = token.value.to_string();
+                    type_->code = Type::String;
+
+                    end_quote = StringView{};
+                }
+                break;
+            }
             case Token::Name:
                 type_->meta = GetTypeMeta(token.value);
                 type_->name = token.value.to_string();
@@ -161,7 +177,22 @@ bool TypeParser::Parse(TypeAst* type) {
     } while (true);
 }
 
-TypeParser::Token TypeParser::NextToken() {
+TypeParser::Token TypeParser::NextToken(const StringView end_quote) {
+    if (const auto end_quote_length = end_quote.length()) {
+        // Fast forward to the closing quote.
+
+        const auto start = cur_;
+        for (; cur_ < end_ - end_quote_length; ++cur_) {
+            // TODO (nemkov): handle escaping ?
+            if (end_quote == StringView{cur_, end_quote_length}) {
+                const auto end = cur_;
+                cur_ += end_quote_length;
+
+                return Token{Token::Quote, StringView{start, end}};
+            }
+        }
+    }
+
     for (; cur_ < end_; ++cur_) {
         switch (*cur_) {
             case ' ':
@@ -171,7 +202,6 @@ TypeParser::Token TypeParser::NextToken() {
                 continue;
 
             case '=':
-            case '\'':
                 continue;
 
             case '(':
@@ -180,6 +210,8 @@ TypeParser::Token TypeParser::NextToken() {
                 return Token{Token::RPar, StringView(cur_++, 1)};
             case ',':
                 return Token{Token::Comma, StringView(cur_++, 1)};
+            case '\'':
+                return Token{Token::Quote, StringView(cur_++, 1)};
 
             default: {
                 const char* st = cur_;
