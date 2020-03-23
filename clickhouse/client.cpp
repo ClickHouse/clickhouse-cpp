@@ -570,6 +570,8 @@ void Client::Impl::SendQuery(const std::string& query) {
 
         if (server_info_.revision >= DBMS_MIN_REVISION_WITH_QUOTA_KEY_IN_CLIENT_INFO)
             WireFormat::WriteString(&output_, info.quota_key);
+        if (server_info_.revision >= DBMS_MIN_REVISION_WITH_VERSION_PATCH)
+            WireFormat::WriteUInt64(&output_, info.client_revision);
     }
 
     /// Per query settings.
