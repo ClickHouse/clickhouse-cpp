@@ -3,108 +3,14 @@
 #include "../base/coded.h"
 #include "../base/input.h"
 #include "../types/types.h"
+#include "../columns/itemview.h"
 
-#include <variant>
+#include <memory>
 
 namespace clickhouse {
 
 using ColumnRef = std::shared_ptr<class Column>;
-
-struct ItemView {
-    using DataType = std::variant<double, uint64_t, int64_t, std::string_view>;
-
-    const Type::Code type;
-    const DataType data;
-
-public:
-    explicit ItemView()
-        : type(Type::Void),
-          data{static_cast<std::uint64_t>(0u)}
-    {}
-
-//    template <typename T>
-//    ItemView(Type::Code type, T value)
-//        : type(type),
-//          data{value}
-//    {}
-
-//    struct DeduceTypeTag {};
-
-    template <typename T>
-    explicit ItemView(const T & value)
-        : ItemView(DataType(ConvertToStorageValue(value)))
-    {}
-
-    explicit ItemView(DataType data_type)
-        : type(DeduceType(data_type)),
-          data{std::move(data_type)}
-    {}
-
-    template <typename T>
-    T get() const {
-        return std::get<T>(data);
-    }
-
-    inline std::string_view AsBinaryData() const {
-        return std::visit([](const auto & v) -> std::string_view {
-            if constexpr (std::is_same_v<std::decay_t<decltype(v)>, std::string_view>) {
-                return v;
-            }
-            else {
-                return BinaryDataFromValue(v);
-            }
-        }, data);
-    }
-
-private:
-    inline static Type::Code DeduceType(const DataType & data) {
-        static_assert(std::is_same_v<double, std::variant_alternative_t<0, DataType>>);
-        static_assert(std::is_same_v<uint64_t, std::variant_alternative_t<1, DataType>>);
-        static_assert(std::is_same_v<int64_t, std::variant_alternative_t<2, DataType>>);
-        static_assert(std::is_same_v<std::string_view, std::variant_alternative_t<3, DataType>>);
-
-        switch (data.index()) {
-            case 0:
-                return Type::Float64;
-            case 1:
-                return Type::UInt64;
-            case 2:
-                return Type::Int64;
-            case 3:
-                return Type::String;
-        }
-        return Type::Void;
-    }
-
-    template <typename T>
-    inline static std::string_view BinaryDataFromValue(const T& t) {
-        return std::string_view{reinterpret_cast<const char*>(&t), sizeof(T)};
-    }
-
-    template <typename T>
-    inline auto ConvertToStorageValue(const T& t) {
-        if constexpr (std::is_same_v<std::string_view, T> || std::is_same_v<std::string, T>) {
-            return std::string_view{t};
-        }
-        else if constexpr (std::is_fundamental_v<T>) {
-            if constexpr (std::is_integral_v<T>) {
-                if constexpr (std::is_unsigned_v<T>)
-                    return static_cast<uint64_t>(t);
-                else
-                    return static_cast<int64_t>(t);
-            }
-            else if constexpr (std::is_floating_point_v<T>) {
-                return static_cast<double>(t);
-            }
-        }
-    }
-};
-
-// A bit misleading but safe sugar.
-template <>
-inline std::string ItemView::get<std::string>() const {
-    return std::string{std::get<std::string_view>(data)};
-}
+class ItemView;
 
 /**
  * An abstract base of all columns classes.
@@ -164,8 +70,6 @@ public:
     {
         left.Swap(right);
     }
-
-//    virtual ColumnRef Clone() const = 0;
 
 protected:
     TypeRef type_;

@@ -46,12 +46,12 @@ std::string_view generate(const ColumnFixedString&, size_t index)
     return generate_string_view<8>(index);
 }
 
-std::string_view generate(const ColumnLowCardinalityWrapper<ColumnString>&, size_t index)
+std::string_view generate(const ColumnLowCardinalityT<ColumnString>&, size_t index)
 {
     return generate_string_view<7>(index);
 }
 
-std::string_view generate(const ColumnLowCardinalityWrapper<ColumnFixedString>&, size_t index)
+std::string_view generate(const ColumnLowCardinalityT<ColumnFixedString>&, size_t index)
 {
     return generate_string_view<8>(index);
 }
@@ -70,29 +70,29 @@ auto ValidateColumnItems(ColumnType && col, size_t expected_items)
     }
 };
 
-template <typename ColumnType>
-std::shared_ptr<ColumnType> GetColumnAs(ColumnRef col) {
-    return col->As<ColumnType>();
-}
+//template <typename ColumnType>
+//std::shared_ptr<ColumnType> GetColumnAs(ColumnRef col) {
+//    return col->As<ColumnType>();
+//}
 
-template <>
-std::shared_ptr<ColumnLowCardinalityWrapper<ColumnString>>
-GetColumnAs<ColumnLowCardinalityWrapper<ColumnString>>(ColumnRef col) {
-    return std::make_shared<ColumnLowCardinalityWrapper<ColumnString>>(col->As<ColumnLowCardinality>());
-}
+//template <>
+//std::shared_ptr<ColumnLowCardinalityT<ColumnString>>
+//GetColumnAs<ColumnLowCardinalityT<ColumnString>>(ColumnRef col) {
+//    return std::make_shared<ColumnLowCardinalityT<ColumnString>>(col->As<ColumnLowCardinality>());
+//}
 
-template <>
-std::shared_ptr<ColumnLowCardinalityWrapper<ColumnFixedString>>
-GetColumnAs<ColumnLowCardinalityWrapper<ColumnFixedString>>(ColumnRef col) {
-    return std::make_shared<ColumnLowCardinalityWrapper<ColumnFixedString>>(col->As<ColumnLowCardinality>());
-}
+//template <>
+//std::shared_ptr<ColumnLowCardinalityT<ColumnFixedString>>
+//GetColumnAs<ColumnLowCardinalityT<ColumnFixedString>>(ColumnRef col) {
+//    return std::make_shared<ColumnLowCardinalityT<ColumnFixedString>>(col->As<ColumnLowCardinality>());
+//}
 
 template <typename ColumnType>
 ColumnType InstantiateColumn() {
     if constexpr (std::is_same_v<ColumnType, ColumnFixedString>) {
         return ColumnType(8);
     }
-    else if constexpr (std::is_same_v<ColumnType, ColumnLowCardinalityWrapper<ColumnFixedString>>) {
+    else if constexpr (std::is_same_v<ColumnType, ColumnLowCardinalityT<ColumnFixedString>>) {
         return ColumnType(8);
     }
     else {
@@ -232,10 +232,9 @@ TYPED_TEST_P(ColumnPerformanceTest, InsertAndSelect) {
             }
 
             EXPECT_EQ(1u, block.GetColumnCount());
-            const auto result_col = block[0];
-            auto c = GetColumnAs<ColumnType>(result_col);
+            const auto col = block[0]->As<ColumnType>();
 
-            EXPECT_NO_FATAL_FAILURE(ValidateColumnItems(*c, ITEMS_COUNT));
+            EXPECT_NO_FATAL_FAILURE(ValidateColumnItems(*col, ITEMS_COUNT));
         });
 
         std::cerr << "SELECT:\t" << timer.GetTotalElapsed().count() << " us"
@@ -249,5 +248,5 @@ REGISTER_TYPED_TEST_CASE_P(ColumnPerformanceTest,
 using SimpleColumnTypes = testing::Types<ColumnUInt64, ColumnString, ColumnFixedString>;
 INSTANTIATE_TYPED_TEST_CASE_P(SimpleColumns, ColumnPerformanceTest, SimpleColumnTypes);
 
-using LowCardinalityColumnTypes = ::testing::Types<ColumnLowCardinalityWrapper<ColumnString>, ColumnLowCardinalityWrapper<ColumnFixedString>>;
+using LowCardinalityColumnTypes = ::testing::Types<ColumnLowCardinalityT<ColumnString>, ColumnLowCardinalityT<ColumnFixedString>>;
 INSTANTIATE_TYPED_TEST_CASE_P(LowCardinality, ColumnPerformanceTest, LowCardinalityColumnTypes);

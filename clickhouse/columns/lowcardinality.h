@@ -14,7 +14,7 @@ namespace clickhouse
 {
 
 template <typename NestedColumnType>
-class ColumnLowCardinalityWrapper;
+class ColumnLowCardinalityT;
 
 namespace details
 {
@@ -43,16 +43,14 @@ public:
     using UniqueItems = std::unordered_map<details::LowCardinalityHashKey, size_t /*dictionary index*/, details::LowCardinalityHashKeyHash>;
 
     template <typename T>
-    friend class ColumnLowCardinalityWrapper;
+    friend class ColumnLowCardinalityT;
 
 private:
-    ColumnRef dictionary;
-    IndexColumn index;
-    UniqueItems unique_items_map;
-
-//private:
-//    struct ConstructWithValuesTag {};
-//    ColumnLowCardinality(ColumnRef dictionary_column, ConstructWithValuesTag);
+    // Please note that ColumnLowCardinalityT takes reference to underlying dictionary column object,
+    // so make sure to NOT change address of the dictionary object (with reset(), swap()) or with anything else.
+    ColumnRef dictionary_column_;
+    IndexColumn index_column_;
+    UniqueItems unique_items_map_;
 
 public:
     explicit ColumnLowCardinality(ColumnRef dictionary_column);
@@ -77,13 +75,13 @@ public:
     ColumnRef Slice(size_t begin, size_t len) override;
 
     void Swap(Column& other) override;
-    ItemView GetItem(size_t index) const override;
-    void AppendFrom(const Column& other, size_t index) override;
+    ItemView GetItem(size_t index_column_) const override;
+    void AppendFrom(const Column& other, size_t index_column_) override;
 
     size_t GetDictionarySize() const;
     TypeRef GetNestedType() const;
 
-private:
+protected:
     std::uint64_t getDictionaryIndex(std::uint64_t item_index) const;
     void appendIndex(std::uint64_t item_index);
     void removeLastIndex();
@@ -95,21 +93,12 @@ public:
     static details::LowCardinalityHashKey computeHashKey(const ItemView &);
 };
 
-/** Wrapper that provides convenience interface for accessing/appending individual items in LowCardinalityColumn.
- *
- * Can create an instance of ColumnLowCardinality with dictionary NestedColumnType dictionary column.
- * OR
- * Can wrap existing ColumnLowCardinality with proper dictionary type.
- *
- * Intentionaly not a subclass of Column since:
- * * it is expected to be instantiated on a stack, rather than wrapped in shared_ptr.
- * * to avoid confusion (and complexity) when casting to/from ColumnLowCardinality.
- * * to discourage putting ColumnLowCardinalityWrapper to a block.
+/** Type-aware wrapper that provides simple convenience interface for accessing/appending individual items.
  */
 template <typename DictionaryColumnType>
-class ColumnLowCardinalityWrapper
+class ColumnLowCardinalityT : public ColumnLowCardinality
 {
-    std::shared_ptr<ColumnLowCardinality> lc_column;
+    DictionaryColumnType& typed_dictionary_;
 
 public:
     using WrappedColumnType = DictionaryColumnType;
@@ -117,39 +106,25 @@ public:
     using ValueType = typename DictionaryColumnType::ValueType;
 
     template <typename ...Args>
-    explicit ColumnLowCardinalityWrapper(Args &&... args)
-        : lc_column(std::make_shared<ColumnLowCardinality>(std::make_shared<DictionaryColumnType>(std::forward<Args>(args)...)))
+    explicit ColumnLowCardinalityT(Args &&... args)
+        : ColumnLowCardinality(std::make_shared<DictionaryColumnType>(std::forward<Args>(args)...)),
+          typed_dictionary_(dynamic_cast<DictionaryColumnType&>(*GetDictionary()))
     {}
-
-    // Wrap existing ColumnLowCardinality, throw exception if dictionary type is not NestedColumnType.
-    explicit ColumnLowCardinalityWrapper(ColumnRef low_cardinality_colum)
-        : ColumnLowCardinalityWrapper(low_cardinality_colum->As<ColumnLowCardinality>())
-    {}
-
-    // Wrap existing ColumnLowCardinality, throw exception if dictionary type is not NestedColumnType.
-    explicit ColumnLowCardinalityWrapper(std::shared_ptr<ColumnLowCardinality> low_cardinality_colum)
-        : lc_column(low_cardinality_colum)
-    {
-        if (!low_cardinality_colum)
-            throw std::runtime_error("Can't wrap nullptr ColumnLowCardinality");
-        // casting via reference to throw exception on wrong type.
-        (dynamic_cast<DictionaryColumnType&>(*lc_column->GetDictionary()));
-    }
 
     /// Extended interface to simplify reading/adding individual items.
 
     /// Returns element at given row number.
     inline ValueType At(size_t n) const {
-        return GetTypedDictionary()->At(lc_column->getDictionaryIndex(n));
+        return typed_dictionary_.At(getDictionaryIndex(n));
     }
 
     /// Returns element at given row number.
     inline ValueType operator [] (size_t n) const {
-        return (*GetTypedDictionary())[lc_column->getDictionaryIndex(n)];
+        return typed_dictionary_[getDictionaryIndex(n)];
     }
 
     inline void Append(const ValueType & value) {
-        lc_column->AppendUnsafe(ItemView{value});
+        AppendUnsafe(ItemView{value});
     }
 
     template <typename T>
@@ -157,51 +132,6 @@ public:
         for (const auto & item : container) {
             Append(item);
         }
-    }
-
-    inline size_t GetDictionarySize() const {
-        return lc_column->GetDictionarySize();
-    }
-
-    inline ColumnRef GetLowCardinalityColumn() const {
-        return lc_column;
-    }
-
-    // Column-like functions to simplify testing.
-    inline TypeRef Type() const {
-        return lc_column->Type();
-    }
-
-    inline void Clear() {
-        lc_column->Clear();
-    }
-
-    inline size_t Size() const {
-        return lc_column->Size();
-    }
-
-    inline bool Load(CodedInputStream* input, size_t rows) {
-        return lc_column->Load(input, rows);
-    }
-
-    /// Saves column data to output stream.
-    inline void Save(CodedOutputStream* output) {
-        lc_column->Save(output);
-    }
-
-    inline ColumnRef Slice(size_t begin, size_t len) {
-        return lc_column->Slice(begin, len);
-    }
-
-private:
-    auto GetTypedDictionary()
-    {
-        return static_cast<DictionaryColumnType*>(lc_column->GetDictionary().get());
-    }
-
-    auto GetTypedDictionary() const
-    {
-        return static_cast<const DictionaryColumnType*>(lc_column->GetDictionary().get());
     }
 };
 

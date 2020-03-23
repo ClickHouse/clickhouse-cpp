@@ -117,24 +117,24 @@ namespace clickhouse
 {
 ColumnLowCardinality::ColumnLowCardinality(ColumnRef dictionary_column)
     : Column(Type::CreateLowCardinality(dictionary_column->Type())),
-      dictionary(dictionary_column),
-      index(std::in_place_type_t<ColumnUInt32>{})
+      dictionary_column_(dictionary_column),
+      index_column_(std::in_place_type_t<ColumnUInt32>{})
 {
-    if (dictionary->Size() != 0) {
+    if (dictionary_column_->Size() != 0) {
         // When dictionary column was constructed with values, re-add values by copying to update index and unique_items_map.
 
         // Steal values into temporary column.
-        auto values = dictionary->Slice(0, 0);
-        values->Swap(*dictionary);
+        auto values = dictionary_column_->Slice(0, 0);
+        values->Swap(*dictionary_column_);
 
-        AppendNullItemToDictionary(dictionary);
+        AppendNullItemToDictionary(dictionary_column_);
 
         // Re-add values, updating index and unique_items_map.
         for (size_t i = 0; i < values->Size(); ++i)
             AppendUnsafe(values->GetItem(i));
     }
     else {
-        AppendNullItemToDictionary(dictionary);
+        AppendNullItemToDictionary(dictionary_column_);
     }
 }
 
@@ -145,7 +145,7 @@ std::uint64_t ColumnLowCardinality::getDictionaryIndex(std::uint64_t item_index)
 {
     return std::visit([item_index](const auto & arg) -> std::uint64_t {
         return arg[item_index];
-    }, index);
+    }, index_column_);
 }
 
 void ColumnLowCardinality::appendIndex(std::uint64_t item_index)
@@ -153,13 +153,13 @@ void ColumnLowCardinality::appendIndex(std::uint64_t item_index)
     // TODO (nemkov): handle case when index should go from UInt8 to UInt16, etc.
     std::visit([item_index](auto & arg) {
         arg.Append(item_index);
-    }, index);
+    }, index_column_);
 }
 
 void ColumnLowCardinality::removeLastIndex() {
     std::visit([](auto & arg) {
         arg.Erase(arg.Size() - 1);
-    }, index);
+    }, index_column_);
 }
 
 details::LowCardinalityHashKey ColumnLowCardinality::computeHashKey(const ItemView & data) {
@@ -178,13 +178,13 @@ details::LowCardinalityHashKey ColumnLowCardinality::computeHashKey(const ItemVi
 
 ColumnRef ColumnLowCardinality::GetDictionary()
 {
-    return dictionary;
+    return dictionary_column_;
 }
 
 void ColumnLowCardinality::Append(ColumnRef col)
 {
     auto c = dynamic_cast<const ColumnLowCardinality*>(col.get());
-    if (!c || !dictionary->Type()->IsEqual(c->dictionary->Type()))
+    if (!c || !dictionary_column_->Type()->IsEqual(c->dictionary_column_->Type()))
         return;
 
     for (size_t i = 0; i < c->Size(); ++i) {
@@ -262,11 +262,11 @@ auto Load(ColumnRef new_dictionary_column, CodedInputStream* input, size_t rows)
 bool ColumnLowCardinality::Load(CodedInputStream* input, size_t rows) {
 
     try {
-        auto [new_dictionary, new_index, new_unique_items_map] = ::Load(dictionary->Slice(0, 0), input, rows);
+        auto [new_dictionary, new_index, new_unique_items_map] = ::Load(dictionary_column_->Slice(0, 0), input, rows);
 
-        dictionary.swap(new_dictionary);
-        index.swap(new_index);
-        unique_items_map.swap(new_unique_items_map);
+        dictionary_column_->Swap(*new_dictionary);
+        index_column_.swap(new_index);
+        unique_items_map_.swap(new_unique_items_map);
 
         return true;
     } catch (...) {
@@ -275,21 +275,19 @@ bool ColumnLowCardinality::Load(CodedInputStream* input, size_t rows) {
 }
 
 void ColumnLowCardinality::Save(CodedOutputStream* output) {
-    // BUG(nemkov): ENSURE THAT DICTIONARY HAS A NULL-value as first item.
-
     // prefix
     const uint64_t version = static_cast<uint64_t>(KeySerializationVersion::SharedDictionariesWithAdditionalKeys);
     WireFormat::WriteFixed(output, version);
 
     // body
-    const uint64_t index_serialization_type = indexTypeFromIndexColumn(index) | IndexFlag::HasAdditionalKeysBit;
+    const uint64_t index_serialization_type = indexTypeFromIndexColumn(index_column_) | IndexFlag::HasAdditionalKeysBit;
     WireFormat::WriteFixed(output, index_serialization_type);
 
-    const uint64_t number_of_keys = dictionary->Size();
+    const uint64_t number_of_keys = dictionary_column_->Size();
     WireFormat::WriteFixed(output, number_of_keys);
-    dictionary->Save(output);
+    dictionary_column_->Save(output);
 
-    const auto index_column = getColumnFromVariant(index);
+    const auto index_column = getColumnFromVariant(index_column_);
     const uint64_t number_of_rows = index_column->Size();
     WireFormat::WriteFixed(output, number_of_rows);
     index_column->Save(output);
@@ -299,19 +297,19 @@ void ColumnLowCardinality::Save(CodedOutputStream* output) {
 }
 
 void ColumnLowCardinality::Clear() {
-    getColumnFromVariant(index)->Clear();
-    dictionary->Clear();
+    getColumnFromVariant(index_column_)->Clear();
+    dictionary_column_->Clear();
 }
 
 size_t ColumnLowCardinality::Size() const {
-    return getColumnFromVariant(index)->Size();
+    return getColumnFromVariant(index_column_)->Size();
 }
 
 ColumnRef ColumnLowCardinality::Slice(size_t begin, size_t len) {
     begin = std::min(begin, Size());
     len = std::min(len, Size() - begin);
 
-    ColumnRef new_dictionary = dictionary->Slice(0, 0);
+    ColumnRef new_dictionary = dictionary_column_->Slice(0, 0);
     auto result = std::make_shared<ColumnLowCardinality>(new_dictionary);
 
     for (size_t i = begin; i < begin + len; ++i)
@@ -322,21 +320,21 @@ ColumnRef ColumnLowCardinality::Slice(size_t begin, size_t len) {
 
 void ColumnLowCardinality::Swap(Column& other) {
     auto col = dynamic_cast<ColumnLowCardinality*>(&other);
-    if (!col || !dictionary->Type()->IsEqual(col->dictionary->Type()))
+    if (!col || !dictionary_column_->Type()->IsEqual(col->dictionary_column_->Type()))
         return;
 
-    dictionary.swap(col->dictionary);
-    index.swap(col->index);
-    unique_items_map.swap(col->unique_items_map);
+    dictionary_column_->Swap(*col->dictionary_column_);
+    index_column_.swap(col->index_column_);
+    unique_items_map_.swap(col->unique_items_map_);
 }
 
 ItemView ColumnLowCardinality::GetItem(size_t index) const {
-    return dictionary->GetItem(getDictionaryIndex(index));
+    return dictionary_column_->GetItem(getDictionaryIndex(index));
 }
 
 void ColumnLowCardinality::AppendFrom(const Column& col, size_t index) {
     auto c = dynamic_cast<const ColumnLowCardinality*>(&col);
-    if (!c || !dictionary->Type()->IsEqual(c->dictionary->Type()))
+    if (!c || !dictionary_column_->Type()->IsEqual(c->dictionary_column_->Type()))
         return;
 
     AppendUnsafe(c->GetItem(index));
@@ -347,7 +345,7 @@ void ColumnLowCardinality::AppendUnsafe(const ItemView & value) {
     const auto key = computeHashKey(value);
 
     // If the value is unique, then we are going to append it to a dictionary, hence new index is Size().
-    auto [iterator, is_new_item] = unique_items_map.try_emplace(key, dictionary->Size());
+    auto [iterator, is_new_item] = unique_items_map_.try_emplace(key, dictionary_column_->Size());
 
     try {
         // Order is important, adding to dictionary last, since it is much (MUCH!!!!) harder
@@ -357,24 +355,24 @@ void ColumnLowCardinality::AppendUnsafe(const ItemView & value) {
 
         appendIndex(iterator->second);
         if (is_new_item) {
-            AppendToDictionary(dictionary, value);
+            AppendToDictionary(dictionary_column_, value);
         }
     }
     catch (...) {
         removeLastIndex();
         if (is_new_item)
-            unique_items_map.erase(iterator);
+            unique_items_map_.erase(iterator);
 
         throw;
     }
 }
 
 size_t ColumnLowCardinality::GetDictionarySize() const {
-    return dictionary->Size();
+    return dictionary_column_->Size();
 }
 
 TypeRef ColumnLowCardinality::GetNestedType() const {
-    return dictionary->Type();
+    return dictionary_column_->Type();
 }
 
 }

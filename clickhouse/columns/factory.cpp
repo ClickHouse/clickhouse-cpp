@@ -136,7 +136,16 @@ static ColumnRef CreateColumnFromAst(const TypeAst& ast) {
             break;
         }
         case TypeAst::LowCardinality: {
-            return std::make_shared<ColumnLowCardinality>(CreateTerminalColumn(ast.elements.front()));
+            const auto nested = ast.elements.front();
+            switch (nested.code) {
+                // TODO (nemkov): update this to maximize code reuse.
+                case Type::String:
+                    return std::make_shared<ColumnLowCardinalityT<ColumnString>>();
+                case Type::FixedString:
+                    return std::make_shared<ColumnLowCardinalityT<ColumnFixedString>>(nested.elements.front().value);
+                default:
+                    throw std::runtime_error("LowCardinality(" + nested.name + ") is not supported");
+            }
         }
 
         case TypeAst::Null:

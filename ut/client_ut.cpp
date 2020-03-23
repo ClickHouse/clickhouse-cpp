@@ -110,12 +110,12 @@ TEST_P(ClientCase, LowCardinality) {
             "test_clickhouse_cpp.low_cardinality (lc LowCardinality(String)) "
             "ENGINE = Memory");
 
-    auto lc = ColumnLowCardinalityWrapper<ColumnString>();
+    auto lc = std::make_shared<ColumnLowCardinalityT<ColumnString>>();
 
     const std::vector<std::string> data{{"FooBar", "1", "2", "Foo", "4", "Bar", "Foo", "7", "8", "Foo"}};
-    lc.AppendMany(data);
+    lc->AppendMany(data);
 
-    block.AppendColumn("lc", lc.GetLowCardinalityColumn());
+    block.AppendColumn("lc", lc);
     client_->Insert("test_clickhouse_cpp.low_cardinality", block);
 
     client_->Select("SELECT lc FROM test_clickhouse_cpp.low_cardinality",
@@ -126,11 +126,10 @@ TEST_P(ClientCase, LowCardinality) {
             }
 
             ASSERT_EQ(1U, block.GetColumnCount());
-            if (auto lc_column = block[0]->As<ColumnLowCardinality>()) {
-                auto col = ColumnLowCardinalityWrapper<ColumnString>(lc_column);
-                ASSERT_EQ(data.size(), col.Size());
-                for (size_t i = 0; i < col.Size(); ++i) {
-                    EXPECT_EQ(data[i], col[i]) << " at index: " << i;
+            if (auto col = block[0]->As<ColumnLowCardinalityT<ColumnString>>()) {
+                ASSERT_EQ(data.size(), col->Size());
+                for (size_t i = 0; i < col->Size(); ++i) {
+                    EXPECT_EQ(data[i], (*col)[i]) << " at index: " << i;
                 }
             }
         }

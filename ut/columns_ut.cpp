@@ -202,7 +202,7 @@ auto build_vector(Generator && gen, size_t items)
 
 TEST(ColumnsCase, LowCardinalityWrapperString_Append_and_Read) {
     const size_t items_count = 11;
-    ColumnLowCardinalityWrapper<ColumnString> col;
+    ColumnLowCardinalityT<ColumnString> col;
     for (const auto & item : build_vector(&foobar, items_count))
     {
         col.Append(item);
@@ -229,7 +229,7 @@ static const auto LOWCARDINALITY_STRING_FOOBAR_10_ITEMS_BINARY =
 
 TEST(ColumnsCase, LowCardinalityString_Load) {
     const size_t items_count = 10;
-    ColumnLowCardinalityWrapper<ColumnString> col;
+    ColumnLowCardinalityT<ColumnString> col;
 
     const auto & data = LOWCARDINALITY_STRING_FOOBAR_10_ITEMS_BINARY;
     ArrayInput buffer(data.data(), data.size());
@@ -244,7 +244,7 @@ TEST(ColumnsCase, LowCardinalityString_Load) {
 
 TEST(ColumnsCase, LowCardinalityString_Save) {
     const size_t items_count = 10;
-    ColumnLowCardinalityWrapper<ColumnString> col;
+    ColumnLowCardinalityT<ColumnString> col;
     for (const auto & item : build_vector(&foobar, items_count))
     {
         col.Append(item);
@@ -258,34 +258,5 @@ TEST(ColumnsCase, LowCardinalityString_Save) {
 
     for (size_t i = 0; i < items_count; ++i) {
         EXPECT_EQ(col.At(i), foobar(i)) << " at pos: " << i;
-    }
-}
-
-TEST(ColumnsCase, LowCardinalityWrapperString_ConstructWithVector) {
-    const size_t items_count = 10;
-    ColumnLowCardinalityWrapper<ColumnString> col(build_vector(&foobar, items_count));
-
-    ASSERT_EQ(col.Size(), items_count);
-    ASSERT_EQ(col.GetDictionarySize(), 8u + 1); // 8 unique items from sequence + 1 null-item
-
-    for (size_t i = 0; i < items_count; ++i)
-    {
-        ASSERT_EQ(col.At(i), foobar(i)) << " at pos: " << i;
-    }
-}
-
-TEST(ColumnsCase, LowCardinalityWrapperString_ConstructWithExistingLowCardinalityColumn) {
-    const size_t items_count = 10;
-    ColumnRef dict_column = std::make_shared<ColumnString>(build_vector(&foobar, items_count));
-    ColumnRef lc_column = std::make_shared<ColumnLowCardinality>(dict_column);
-
-    ColumnLowCardinalityWrapper<ColumnString> col(lc_column);
-
-    ASSERT_EQ(col.Size(), items_count);
-    ASSERT_EQ(col.GetDictionarySize(), 8u + 1); // 8 unique items from sequence + 1 null-item
-
-    for (size_t i = 0; i < items_count; ++i)
-    {
-        ASSERT_EQ(col.At(i), foobar(i)) << " at pos: " << i;
     }
 }
