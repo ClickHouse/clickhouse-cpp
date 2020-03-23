@@ -75,8 +75,7 @@ public:
     ColumnRef Slice(size_t begin, size_t len) override;
 
     void Swap(Column& other) override;
-    ItemView GetItem(size_t index_column_) const override;
-    void AppendFrom(const Column& other, size_t index_column_) override;
+    ItemView GetItem(size_t index) const override;
 
     size_t GetDictionarySize() const;
     TypeRef GetNestedType() const;

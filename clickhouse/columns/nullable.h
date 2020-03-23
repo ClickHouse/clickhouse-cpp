@@ -45,7 +45,6 @@ public:
     void Swap(Column&) override;
 
     ItemView GetItem(size_t) const override;
-    void AppendFrom(const Column & col, size_t index) override;
 
 private:
     ColumnRef nested_;

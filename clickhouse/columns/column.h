@@ -62,10 +62,6 @@ public:
         throw std::runtime_error("GetItem() is not supported for column of " + type_->GetName());
     }
 
-    virtual void AppendFrom(const Column &, size_t /*index*/) {
-        throw std::runtime_error("AppendFrom() is not supported for column of " + type_->GetName());
-    }
-
     friend void swap(Column& left, Column& right)
     {
         left.Swap(right);

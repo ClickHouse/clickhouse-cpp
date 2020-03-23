@@ -88,10 +88,4 @@ ItemView ColumnIPv6::GetItem(size_t index) const {
     return data_->GetItem(index);
 }
 
-void ColumnIPv6::AppendFrom(const Column & col, size_t index) {
-    if (auto ip_col = dynamic_cast<const ColumnIPv6*>(&col)) {
-        data_->AppendFrom(*ip_col->data_, index);
-    }
-}
-
 }

@@ -188,7 +188,7 @@ void ColumnLowCardinality::Append(ColumnRef col)
         return;
 
     for (size_t i = 0; i < c->Size(); ++i) {
-        AppendFrom(*c, i);
+        AppendUnsafe(c->GetItem(i));
     }
 }
 
@@ -310,7 +310,7 @@ ColumnRef ColumnLowCardinality::Slice(size_t begin, size_t len) {
     auto result = std::make_shared<ColumnLowCardinality>(new_dictionary);
 
     for (size_t i = begin; i < begin + len; ++i)
-        result->AppendFrom(*this, i);
+        result->AppendUnsafe(this->GetItem(i));
 
     return result;
 }
@@ -327,14 +327,6 @@ void ColumnLowCardinality::Swap(Column& other) {
 
 ItemView ColumnLowCardinality::GetItem(size_t index) const {
     return dictionary_column_->GetItem(getDictionaryIndex(index));
-}
-
-void ColumnLowCardinality::AppendFrom(const Column& col, size_t index) {
-    auto c = dynamic_cast<const ColumnLowCardinality*>(&col);
-    if (!c || !dictionary_column_->Type()->IsEqual(c->dictionary_column_->Type()))
-        return;
-
-    AppendUnsafe(c->GetItem(index));
 }
 
 // No checks regarding value type or validity of value is made.

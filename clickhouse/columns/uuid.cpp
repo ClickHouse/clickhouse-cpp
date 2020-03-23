@@ -69,11 +69,5 @@ ItemView ColumnUUID::GetItem(size_t index) const {
     return data_->GetItem(index);
 }
 
-void ColumnUUID::AppendFrom(const Column & col, size_t index) {
-    if (auto uuid_col = dynamic_cast<const ColumnUUID*>(&col)) {
-        data_->AppendFrom(*uuid_col->data_, index);
-    }
-}
-
 }
 

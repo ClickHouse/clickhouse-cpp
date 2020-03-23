@@ -88,12 +88,4 @@ ItemView ColumnNullable::GetItem(size_t index) const  {
     return nested_->GetItem(index);
 }
 
-void ColumnNullable::AppendFrom(const Column & col, size_t index) {
-    auto nullable_col = dynamic_cast<const ColumnNullable*>(&col);
-    if (nullable_col && nested_->Type()->IsEqual(nullable_col->Nested()->Type())) {
-        nested_->AppendFrom(*nullable_col->nested_, index);
-        Append(nullable_col->IsNull(index));
-    }
-}
-
 }

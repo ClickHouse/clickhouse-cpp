@@ -130,10 +130,4 @@ ItemView ColumnDecimal::GetItem(size_t index) const {
     return data_->GetItem(index);
 }
 
-void ColumnDecimal::AppendFrom(const Column & col, size_t index) {
-    if (auto c = dynamic_cast<const ColumnDecimal*>(&col)) {
-        data_->AppendFrom(*c->data_, index);
-    }
-}
-
 }

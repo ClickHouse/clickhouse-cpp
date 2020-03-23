@@ -85,22 +85,6 @@ ItemView ColumnVector<T>::GetItem(size_t index) const  {
     return ItemView{data_[index]};
 }
 
-template <typename T>
-void ColumnVector<T>::AppendUnsafe(std::string_view item) {
-    if (item.length() < sizeof(T))
-        return;
-
-    const T value = *reinterpret_cast<const T*>(item.data());
-    Append(value);
-}
-
-template <typename T>
-void ColumnVector<T>::AppendFrom(const Column & col, size_t index) {
-    if (auto vector_col = dynamic_cast<const ColumnVector<T>*>(&col)) {
-        Append(vector_col->At(index));
-    }
-}
-
 template class ColumnVector<int8_t>;
 template class ColumnVector<int16_t>;
 template class ColumnVector<int32_t>;

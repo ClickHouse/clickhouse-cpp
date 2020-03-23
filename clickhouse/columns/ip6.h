@@ -43,7 +43,6 @@ public:
     ColumnRef Slice(size_t begin, size_t len) override;
     void Swap(Column& other) override;
     ItemView GetItem(size_t index) const override;
-    void AppendFrom(const Column & col, size_t index) override;
 
 private:
     std::shared_ptr<ColumnFixedString> data_;

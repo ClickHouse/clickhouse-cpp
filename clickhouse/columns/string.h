@@ -52,7 +52,6 @@ public:
     void Swap(Column& other) override;
 
     ItemView GetItem(size_t) const override;
-    void AppendFrom(const Column & col, size_t index) override;
 
 private:
     size_t string_size_;
@@ -103,7 +102,6 @@ public:
     ColumnRef Slice(size_t begin, size_t len) override;
     void Swap(Column& other) override;
     ItemView GetItem(size_t) const override;
-    void AppendFrom(const Column & col, size_t index) override;
 
 private:
     void AppendUnsafe(std::string_view);

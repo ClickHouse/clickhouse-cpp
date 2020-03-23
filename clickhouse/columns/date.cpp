@@ -58,11 +58,6 @@ ItemView ColumnDate::GetItem(size_t index) const {
     return data_->GetItem(index);
 }
 
-void ColumnDate::AppendFrom(const Column & col, size_t index) {
-    if (auto c = dynamic_cast<const ColumnDate*>(&col)) {
-        data_->AppendFrom(*c->data_, index);
-    }
-}
 
 
 ColumnDateTime::ColumnDateTime()
@@ -118,12 +113,6 @@ void ColumnDateTime::Swap(Column& other) {
 
 ItemView ColumnDateTime::GetItem(size_t index) const {
     return data_->GetItem(index);
-}
-
-void ColumnDateTime::AppendFrom(const Column & col, size_t index) {
-    if (auto c = dynamic_cast<const ColumnDateTime*>(&col)) {
-        data_->AppendFrom(*c->data_, index);
-    }
 }
 
 }

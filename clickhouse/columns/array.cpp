@@ -85,12 +85,6 @@ void ColumnArray::Swap(Column& other) {
     }
 }
 
-void ColumnArray::AppendFrom(const Column & col, size_t index) {
-    if (auto c = dynamic_cast<const ColumnArray*>(&col)) {
-        AppendAsColumn(c->GetAsColumn(index));
-    }
-}
-
 void ColumnArray::OffsetsIncrease(size_t n) {
     offsets_->Append(n);
 }

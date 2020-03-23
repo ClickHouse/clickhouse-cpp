@@ -109,12 +109,6 @@ ItemView ColumnFixedString::GetItem(size_t index) const {
     return ItemView{this->At(index)};
 }
 
-void ColumnFixedString::AppendFrom(const Column & col, size_t index) {
-    if (auto string_col = dynamic_cast<const ColumnFixedString*>(&col); string_col && string_col->string_size_ == string_size_) {
-        Append(string_col->At(index));
-    }
-}
-
 struct ColumnString::Block
 {
     using CharT = typename std::string::value_type;
@@ -279,12 +273,6 @@ void ColumnString::Swap(Column& other) {
 
 ItemView ColumnString::GetItem(size_t index) const {
     return ItemView{this->At(index)};
-}
-
-void ColumnString::AppendFrom(const Column & col, size_t index) {
-    if (auto string_col = dynamic_cast<const ColumnString*>(&col)) {
-        Append(string_col->At(index));
-    }
 }
 
 }

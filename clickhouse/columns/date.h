@@ -40,7 +40,6 @@ public:
     void Swap(Column& other) override;
 
     ItemView GetItem(size_t index) const override;
-    void AppendFrom(const Column & col, size_t index) override;
 
 private:
     std::shared_ptr<ColumnUInt16> data_;
@@ -78,7 +77,6 @@ public:
     void Swap(Column& other) override;
 
     ItemView GetItem(size_t index) const override;
-    void AppendFrom(const Column & col, size_t index) override;
 
 private:
     std::shared_ptr<ColumnUInt32> data_;

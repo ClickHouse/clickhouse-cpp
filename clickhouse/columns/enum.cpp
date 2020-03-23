@@ -103,13 +103,6 @@ ItemView ColumnEnum<T>::GetItem(size_t index) const {
     return ItemView{value};
 }
 
-template <typename T>
-void ColumnEnum<T>::AppendFrom(const Column & col, size_t index) {
-    if (auto c = dynamic_cast<const ColumnEnum<T>*>(&col)) {
-        data_.push_back(c->data_[index]);
-    }
-}
-
 template class ColumnEnum<int8_t>;
 template class ColumnEnum<int16_t>;
 
