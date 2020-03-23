@@ -19,6 +19,12 @@ struct ItemView {
     const Type::Code type;
     const DataType data;
 
+private:
+    template <typename X>
+    static std::string_view BinaryDataFromValue(const X& t) {
+        return std::string_view{reinterpret_cast<const char*>(&t), sizeof(X)};
+    }
+
 public:
     explicit ItemView()
         : type(Type::Void),
@@ -69,11 +75,6 @@ private:
                 return Type::String;
         }
         return Type::Void;
-    }
-
-    template <typename T>
-    inline static std::string_view BinaryDataFromValue(const T& t) {
-        return std::string_view{reinterpret_cast<const char*>(&t), sizeof(T)};
     }
 
     template <typename T>

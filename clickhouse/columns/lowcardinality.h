@@ -122,6 +122,8 @@ public:
         return typed_dictionary_[getDictionaryIndex(n)];
     }
 
+    using ColumnLowCardinality::Append;
+
     inline void Append(const ValueType & value) {
         AppendUnsafe(ItemView{value});
     }

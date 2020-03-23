@@ -257,7 +257,6 @@ auto Load(ColumnRef new_dictionary_column, CodedInputStream* input, size_t rows)
 }
 
 bool ColumnLowCardinality::Load(CodedInputStream* input, size_t rows) {
-
     try {
         auto [new_dictionary, new_index, new_unique_items_map] = ::Load(dictionary_column_->Slice(0, 0), input, rows);
 
