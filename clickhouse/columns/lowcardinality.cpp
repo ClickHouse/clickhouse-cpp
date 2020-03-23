@@ -127,7 +127,7 @@ ColumnLowCardinality::ColumnLowCardinality(ColumnRef dictionary_column)
         auto values = dictionary->Slice(0, 0);
         values->Swap(*dictionary);
 
-        AppendNullItemToDictionary(values);
+        AppendNullItemToDictionary(dictionary);
 
         // Re-add values, updating index and unique_items_map.
         for (size_t i = 0; i < values->Size(); ++i)

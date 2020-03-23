@@ -209,7 +209,7 @@ TEST(ColumnsCase, LowCardinalityWrapperString_Append_and_Read) {
     }
 
     ASSERT_EQ(col.Size(), items_count);
-    ASSERT_EQ(col.GetDictionarySize(), 8u);
+    ASSERT_EQ(col.GetDictionarySize(), 8u + 1); // 8 unique items from sequence + 1 null-item
 
     for (size_t i = 0; i < items_count; ++i)
     {
@@ -266,7 +266,7 @@ TEST(ColumnsCase, LowCardinalityWrapperString_ConstructWithVector) {
     ColumnLowCardinalityWrapper<ColumnString> col(build_vector(&foobar, items_count));
 
     ASSERT_EQ(col.Size(), items_count);
-    ASSERT_EQ(col.GetDictionarySize(), 8u);
+    ASSERT_EQ(col.GetDictionarySize(), 8u + 1); // 8 unique items from sequence + 1 null-item
 
     for (size_t i = 0; i < items_count; ++i)
     {
@@ -282,7 +282,7 @@ TEST(ColumnsCase, LowCardinalityWrapperString_ConstructWithExistingLowCardinalit
     ColumnLowCardinalityWrapper<ColumnString> col(lc_column);
 
     ASSERT_EQ(col.Size(), items_count);
-    ASSERT_EQ(col.GetDictionarySize(), 8u);
+    ASSERT_EQ(col.GetDictionarySize(), 8u + 1); // 8 unique items from sequence + 1 null-item
 
     for (size_t i = 0; i < items_count; ++i)
     {
