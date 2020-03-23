@@ -10,7 +10,6 @@
 namespace clickhouse {
 
 using ColumnRef = std::shared_ptr<class Column>;
-class ItemView;
 
 /**
  * An abstract base of all columns classes.
