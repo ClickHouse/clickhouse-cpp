@@ -165,7 +165,7 @@ void ColumnLowCardinality::removeLastIndex() {
 details::LowCardinalityHashKey ColumnLowCardinality::computeHashKey(const ItemView & data) {
     static const auto hasher = std::hash<ItemView::DataType>{};
     if (data.type == Type::Void) {
-        // to distinguish NULL from ColumnNullable and empty string.
+        // to distinguish NULL of ColumnNullable and empty string.
         return {0u, 0u};
     }
 
@@ -219,9 +219,6 @@ auto Load(ColumnRef new_dictionary_column, CodedInputStream* input, size_t rows)
 
     ColumnLowCardinality::IndexColumn new_index = createIndexColumn(static_cast<IndexType>(index_serialization_type & IndexTypeMask));
     Column * new_index_column = getColumnFromVariant(new_index);
-
-    // kinda-clone
-//    ColumnRef new_dictionary_column = dictionary->Slice(0, 0);
 
     if (index_serialization_type & IndexFlag::NeedGlobalDictionaryBit)
         throw std::runtime_error("Global dictionary is not supported.");

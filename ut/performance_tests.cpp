@@ -57,7 +57,7 @@ std::string_view generate(const ColumnLowCardinalityT<ColumnFixedString>&, size_
 }
 
 template <typename ColumnType>
-auto ValidateColumnItems(ColumnType && col, size_t expected_items)
+auto ValidateColumnItems(const ColumnType & col, size_t expected_items)
 {
     ASSERT_EQ(expected_items, col.Size());
     // validate that appended items match expected
@@ -69,23 +69,6 @@ auto ValidateColumnItems(ColumnType && col, size_t expected_items)
         ASSERT_EQ(col[i], generate(col, i));
     }
 };
-
-//template <typename ColumnType>
-//std::shared_ptr<ColumnType> GetColumnAs(ColumnRef col) {
-//    return col->As<ColumnType>();
-//}
-
-//template <>
-//std::shared_ptr<ColumnLowCardinalityT<ColumnString>>
-//GetColumnAs<ColumnLowCardinalityT<ColumnString>>(ColumnRef col) {
-//    return std::make_shared<ColumnLowCardinalityT<ColumnString>>(col->As<ColumnLowCardinality>());
-//}
-
-//template <>
-//std::shared_ptr<ColumnLowCardinalityT<ColumnFixedString>>
-//GetColumnAs<ColumnLowCardinalityT<ColumnFixedString>>(ColumnRef col) {
-//    return std::make_shared<ColumnLowCardinalityT<ColumnFixedString>>(col->As<ColumnLowCardinality>());
-//}
 
 template <typename ColumnType>
 ColumnType InstantiateColumn() {
