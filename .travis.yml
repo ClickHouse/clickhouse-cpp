@@ -51,4 +51,4 @@ script:
   - cd build
   - cmake .. -DBUILD_TESTS=ON && make
   - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then ./ut/clickhouse-cpp-ut ; fi
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then ./ut/clickhouse-cpp-ut --gtest_filter='-Client/*' ; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then ./ut/clickhouse-cpp-ut --gtest_filter=-"Client/*:*Performance*" ; fi
