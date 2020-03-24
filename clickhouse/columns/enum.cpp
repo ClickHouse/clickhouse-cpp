@@ -100,7 +100,7 @@ void ColumnEnum<T>::Swap(Column& other) {
 template <typename T>
 ItemView ColumnEnum<T>::GetItem(size_t index) const {
     const T value = data_[index];
-    return ItemView{value};
+    return ItemView{type_->GetCode(), value};
 }
 
 template class ColumnEnum<int8_t>;

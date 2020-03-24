@@ -106,7 +106,7 @@ void ColumnFixedString::Swap(Column& other) {
 }
 
 ItemView ColumnFixedString::GetItem(size_t index) const {
-    return ItemView{this->At(index)};
+    return ItemView{Type::FixedString, this->At(index)};
 }
 
 struct ColumnString::Block
@@ -272,7 +272,7 @@ void ColumnString::Swap(Column& other) {
 }
 
 ItemView ColumnString::GetItem(size_t index) const {
-    return ItemView{this->At(index)};
+    return ItemView{Type::String, this->At(index)};
 }
 
 }

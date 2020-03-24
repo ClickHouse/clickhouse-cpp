@@ -19,6 +19,7 @@ SET ( clickhouse-cpp-lib-src
     columns/string.cpp
     columns/tuple.cpp
     columns/uuid.cpp
+    columns/itemview.cpp
 
     types/type_parser.cpp
     types/types.cpp

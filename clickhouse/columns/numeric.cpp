@@ -82,7 +82,7 @@ void ColumnVector<T>::Swap(Column& other) {
 
 template <typename T>
 ItemView ColumnVector<T>::GetItem(size_t index) const  {
-    return ItemView{data_[index]};
+    return ItemView{type_->GetCode(), data_[index]};
 }
 
 template class ColumnVector<int8_t>;

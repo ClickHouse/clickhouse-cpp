@@ -4,11 +4,9 @@
 #include "numeric.h"
 
 #include <functional>
-#include <optional>
 #include <string>
 #include <unordered_map>
 #include <utility>
-#include <variant>
 
 namespace clickhouse
 {
@@ -39,7 +37,6 @@ struct LowCardinalityHashKeyHash {
 class ColumnLowCardinality : public Column
 {
 public:
-    using IndexColumn = std::variant<ColumnUInt8, ColumnUInt16, ColumnUInt32, ColumnUInt64>;
     using UniqueItems = std::unordered_map<details::LowCardinalityHashKey, size_t /*dictionary index*/, details::LowCardinalityHashKeyHash>;
 
     template <typename T>
@@ -49,7 +46,7 @@ private:
     // Please note that ColumnLowCardinalityT takes reference to underlying dictionary column object,
     // so make sure to NOT change address of the dictionary object (with reset(), swap()) or with anything else.
     ColumnRef dictionary_column_;
-    IndexColumn index_column_;
+    ColumnRef index_column_;
     UniqueItems unique_items_map_;
 
 public:
@@ -122,10 +119,11 @@ public:
         return typed_dictionary_[getDictionaryIndex(n)];
     }
 
+    // so the non-virtual Append below doesn't shadow Append() from base class when compiled with older compilers.
     using ColumnLowCardinality::Append;
 
     inline void Append(const ValueType & value) {
-        AppendUnsafe(ItemView{value});
+        AppendUnsafe(ItemView{typed_dictionary_.Type()->GetCode(), value});
     }
 
     template <typename T>

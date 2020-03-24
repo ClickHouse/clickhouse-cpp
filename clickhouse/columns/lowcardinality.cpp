@@ -39,42 +39,25 @@ enum IndexFlag
     NeedUpdateDictionary = 1u << 10u
 };
 
-template <typename T>
-auto getColumnFromVariant(const T & column_variant)
-{
-    return std::visit([](auto && arg) -> const Column * {
-        return &arg;
-    }, column_variant);
-}
-
-template <typename T>
-auto getColumnFromVariant(T & column_variant)
-{
-    return std::visit([](auto && arg) -> Column * {
-        return &arg;
-    }, column_variant);
-}
-
-ColumnLowCardinality::IndexColumn createIndexColumn(IndexType type)
+ColumnRef createIndexColumn(IndexType type)
 {
     switch (type)
     {
         case IndexType::UInt8:
-            return ColumnUInt8{};
+            return std::make_shared<ColumnUInt8>();
         case IndexType::UInt16:
-            return ColumnUInt16{};
+            return std::make_shared<ColumnUInt16>();
         case IndexType::UInt32:
-            return ColumnUInt32{};
+            return std::make_shared<ColumnUInt32>();
         case IndexType::UInt64:
-            return ColumnUInt64{};
+            return std::make_shared<ColumnUInt64>();
     }
 
     throw std::runtime_error("Invalid LowCardinality index type value: " + std::to_string(static_cast<uint64_t>(type)));
 }
 
-IndexType indexTypeFromIndexColumn(const ColumnLowCardinality::IndexColumn & index) {
-    const auto type = getColumnFromVariant(index)->Type();
-    switch (type->GetCode()) {
+IndexType indexTypeFromIndexColumn(const Column & index_column) {
+    switch (index_column.Type()->GetCode()) {
         case Type::UInt8:
             return IndexType::UInt8;
         case Type::UInt16:
@@ -84,7 +67,23 @@ IndexType indexTypeFromIndexColumn(const ColumnLowCardinality::IndexColumn & ind
         case Type::UInt64:
             return IndexType::UInt64;
         default:
-            throw std::runtime_error("Invalid index column type for LowCardinality column:" + type->GetName());
+            throw std::runtime_error("Invalid index column type for LowCardinality column:" + index_column.Type()->GetName());
+    }
+}
+
+// std::visit-ish function to avoid including <variant> header, which is not present in older version of XCode.
+template <typename Vizitor, typename ColumnPtrType>
+auto VisitIndexColumn(Vizitor && vizitor, ColumnPtrType && col) {
+    if (auto c = col->template As<ColumnUInt8>()) {
+        return vizitor(*c);
+    } else if (auto c = col->template As<ColumnUInt16>()) {
+        return vizitor(*c);
+    } else if (auto c = col->template As<ColumnUInt32>()) {
+        return vizitor(*c);
+    } else if (auto c = col->template As<ColumnUInt64>()) {
+        return vizitor(*c);
+    } else {
+        throw std::runtime_error("Invalid index column type " + col->Type()->GetName());
     }
 }
 
@@ -107,7 +106,7 @@ inline void AppendNullItemToDictionary(ColumnRef dictionary) {
         AppendToDictionary(dictionary, ItemView{});
     }
     else {
-        AppendToDictionary(dictionary, ItemView{std::string_view{}});
+        AppendToDictionary(dictionary, ItemView{dictionary->Type()->GetCode(), std::string_view{}});
     }
 }
 
@@ -118,7 +117,7 @@ namespace clickhouse
 ColumnLowCardinality::ColumnLowCardinality(ColumnRef dictionary_column)
     : Column(Type::CreateLowCardinality(dictionary_column->Type())),
       dictionary_column_(dictionary_column),
-      index_column_(std::in_place_type_t<ColumnUInt32>{})
+      index_column_(std::make_shared<ColumnUInt32>())
 {
     if (dictionary_column_->Size() != 0) {
         // When dictionary column was constructed with values, re-add values by copying to update index and unique_items_map.
@@ -143,7 +142,7 @@ ColumnLowCardinality::~ColumnLowCardinality()
 
 std::uint64_t ColumnLowCardinality::getDictionaryIndex(std::uint64_t item_index) const
 {
-    return std::visit([item_index](const auto & arg) -> std::uint64_t {
+    return VisitIndexColumn([item_index](const auto & arg) -> std::uint64_t {
         return arg[item_index];
     }, index_column_);
 }
@@ -151,13 +150,13 @@ std::uint64_t ColumnLowCardinality::getDictionaryIndex(std::uint64_t item_index)
 void ColumnLowCardinality::appendIndex(std::uint64_t item_index)
 {
     // TODO (nemkov): handle case when index should go from UInt8 to UInt16, etc.
-    std::visit([item_index](auto & arg) {
+    VisitIndexColumn([item_index](auto & arg) {
         arg.Append(item_index);
     }, index_column_);
 }
 
 void ColumnLowCardinality::removeLastIndex() {
-    std::visit([](auto & arg) {
+    VisitIndexColumn([](auto & arg) {
         arg.Erase(arg.Size() - 1);
     }, index_column_);
 }
@@ -217,9 +216,7 @@ auto Load(ColumnRef new_dictionary_column, CodedInputStream* input, size_t rows)
     if (!WireFormat::ReadFixed(input, &index_serialization_type))
         throw std::runtime_error("Failed to read index serializaton type.");
 
-    ColumnLowCardinality::IndexColumn new_index = createIndexColumn(static_cast<IndexType>(index_serialization_type & IndexTypeMask));
-    Column * new_index_column = getColumnFromVariant(new_index);
-
+    auto new_index_column = createIndexColumn(static_cast<IndexType>(index_serialization_type & IndexTypeMask));
     if (index_serialization_type & IndexFlag::NeedGlobalDictionaryBit)
         throw std::runtime_error("Global dictionary is not supported.");
 
@@ -251,7 +248,7 @@ auto Load(ColumnRef new_dictionary_column, CodedInputStream* input, size_t rows)
     // suffix
     // NOP
 
-    return std::make_tuple(new_dictionary_column, new_index, new_unique_items_map);
+    return std::make_tuple(new_dictionary_column, new_index_column, new_unique_items_map);
 }
 
 }
@@ -276,29 +273,28 @@ void ColumnLowCardinality::Save(CodedOutputStream* output) {
     WireFormat::WriteFixed(output, version);
 
     // body
-    const uint64_t index_serialization_type = indexTypeFromIndexColumn(index_column_) | IndexFlag::HasAdditionalKeysBit;
+    const uint64_t index_serialization_type = indexTypeFromIndexColumn(*index_column_) | IndexFlag::HasAdditionalKeysBit;
     WireFormat::WriteFixed(output, index_serialization_type);
 
     const uint64_t number_of_keys = dictionary_column_->Size();
     WireFormat::WriteFixed(output, number_of_keys);
     dictionary_column_->Save(output);
 
-    const auto index_column = getColumnFromVariant(index_column_);
-    const uint64_t number_of_rows = index_column->Size();
+    const uint64_t number_of_rows = index_column_->Size();
     WireFormat::WriteFixed(output, number_of_rows);
-    index_column->Save(output);
+    index_column_->Save(output);
 
     // suffix
     // NOP
 }
 
 void ColumnLowCardinality::Clear() {
-    getColumnFromVariant(index_column_)->Clear();
+    index_column_->Clear();
     dictionary_column_->Clear();
 }
 
 size_t ColumnLowCardinality::Size() const {
-    return getColumnFromVariant(index_column_)->Size();
+    return index_column_->Size();
 }
 
 ColumnRef ColumnLowCardinality::Slice(size_t begin, size_t len) {
