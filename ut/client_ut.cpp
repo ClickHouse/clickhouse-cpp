@@ -8,7 +8,7 @@ using namespace clickhouse;
 class ClientCase : public testing::TestWithParam<ClientOptions> {
 protected:
     void SetUp() override {
-        client_.reset(new Client(GetParam()));
+        client_ = std::make_unique<Client>(GetParam());
         client_->Execute("CREATE DATABASE IF NOT EXISTS test_clickhouse_cpp");
     }
 

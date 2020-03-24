@@ -10,22 +10,22 @@ struct Timer
 
     Timer() {}
 
-    void restart()
+    void Restart()
     {
-        started_at = current();
+        started_at = Current();
     }
 
-    void start()
+    void Start()
     {
-        restart();
+        Restart();
     }
 
-    auto elapsed() const
+    auto Elapsed() const
     {
-        return std::chrono::duration_cast<ChronoDurationType>(current() - started_at);
+        return std::chrono::duration_cast<ChronoDurationType>(Current() - started_at);
     }
 
-    auto current() const
+    auto Current() const
     {
         struct timespec ts;
         clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
@@ -45,13 +45,13 @@ public:
 
     void Start()
     {
-        timer.restart();
+        timer.Restart();
         paused = false;
     }
 
     void Pause()
     {
-        total += timer.elapsed();
+        total += timer.Elapsed();
         paused = true;
     }
 
@@ -63,7 +63,7 @@ public:
         }
         else
         {
-            return total + timer.elapsed();
+            return total + timer.Elapsed();
         }
     }
 

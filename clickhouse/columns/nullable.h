@@ -51,32 +51,4 @@ private:
     std::shared_ptr<ColumnUInt8> nulls_;
 };
 
-
-inline const Column & removeNullable(const Column & col)
-{
-    if (col.Type()->GetCode() == Type::Nullable)
-    {
-        return *static_cast<const ColumnNullable &>(col).Nested();
-    }
-
-    return col;
-}
-
-inline Column & removeNullable(Column & col)
-{
-    return const_cast<Column &>(removeNullable(const_cast<const Column&>(col)));
-}
-
-inline ColumnRef removeNullable(ColumnRef col)
-{
-    if (col->Type()->GetCode() == Type::Nullable)
-    {
-        return static_cast<const ColumnNullable &>(*col).Nested();
-    }
-    return col;
-}
-
-
-
-
 }

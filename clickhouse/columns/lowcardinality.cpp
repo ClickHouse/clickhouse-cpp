@@ -311,13 +311,13 @@ ColumnRef ColumnLowCardinality::Slice(size_t begin, size_t len) {
 }
 
 void ColumnLowCardinality::Swap(Column& other) {
-    auto col = dynamic_cast<ColumnLowCardinality*>(&other);
-    if (!col || !dictionary_column_->Type()->IsEqual(col->dictionary_column_->Type()))
-        return;
+    auto col = dynamic_cast<ColumnLowCardinality &>(other);
+    if (!dictionary_column_->Type()->IsEqual(col->dictionary_column_->Type()))
+        throw std::runtime_error("Can't swap() LowCardinality columns of different types.");
 
-    dictionary_column_->Swap(*col->dictionary_column_);
-    index_column_.swap(col->index_column_);
-    unique_items_map_.swap(col->unique_items_map_);
+    dictionary_column_->Swap(*col.dictionary_column_);
+    index_column_.swap(col.index_column_);
+    unique_items_map_.swap(col.unique_items_map_);
 }
 
 ItemView ColumnLowCardinality::GetItem(size_t index) const {

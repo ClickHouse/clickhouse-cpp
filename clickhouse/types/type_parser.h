@@ -18,7 +18,7 @@ struct TypeAst {
         Terminal,
         Tuple,
         Enum,
-        LowCardinality
+        LowCardinality,
     };
 
     /// Type's category.
@@ -51,7 +51,7 @@ class TypeParser {
             LPar,
             RPar,
             Comma,
-            Quote,
+            QuotedString, // string with quotation marks included
             EOS,
         };
 
@@ -66,7 +66,7 @@ public:
     bool Parse(TypeAst* type);
 
 private:
-    Token NextToken(StringView end_quote);
+    Token NextToken();
 
 private:
     const char* cur_;

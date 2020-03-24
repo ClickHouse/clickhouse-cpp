@@ -1,11 +1,11 @@
 #include <clickhouse/columns/array.h>
 #include <clickhouse/columns/date.h>
 #include <clickhouse/columns/enum.h>
+#include <clickhouse/columns/lowcardinality.h>
 #include <clickhouse/columns/nullable.h>
 #include <clickhouse/columns/numeric.h>
 #include <clickhouse/columns/string.h>
 #include <clickhouse/columns/uuid.h>
-#include <clickhouse/columns/lowcardinality.h>
 #include <clickhouse/client.h>
 
 #include <contrib/gtest/gtest.h>
