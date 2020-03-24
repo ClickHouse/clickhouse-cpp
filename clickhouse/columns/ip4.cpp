@@ -79,9 +79,8 @@ ColumnRef ColumnIPv4::Slice(size_t begin, size_t len) {
 }
 
 void ColumnIPv4::Swap(Column& other) {
-    if (auto col = dynamic_cast<ColumnIPv4*>(&other)) {
-        data_.swap(col->data_);
-    }
+    auto & col = dynamic_cast<ColumnIPv4 &>(other);
+    data_.swap(col.data_);
 }
 
 ItemView ColumnIPv4::GetItem(size_t index) const {

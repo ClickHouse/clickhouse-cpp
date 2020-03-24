@@ -60,9 +60,8 @@ ColumnRef ColumnUUID::Slice(size_t begin, size_t len) {
 }
 
 void ColumnUUID::Swap(Column& other) {
-    if (auto col = dynamic_cast<ColumnUUID*>(&other)) {
-        data_.swap(col->data_);
-    }
+    auto & col = dynamic_cast<ColumnUUID &>(other);
+    data_.swap(col.data_);
 }
 
 ItemView ColumnUUID::GetItem(size_t index) const {

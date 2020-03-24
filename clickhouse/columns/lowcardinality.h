@@ -8,14 +8,12 @@
 #include <unordered_map>
 #include <utility>
 
-namespace clickhouse
-{
+namespace clickhouse {
 
 template <typename NestedColumnType>
 class ColumnLowCardinalityT;
 
-namespace details
-{
+namespace details {
 
 /** LowCardinalityHashKey used as key in unique items hashmap to abstract away key value
  * (type of which depends on dictionary column) and to reduce likelehood of collisions.
@@ -104,7 +102,7 @@ public:
     template <typename ...Args>
     explicit ColumnLowCardinalityT(Args &&... args)
         : ColumnLowCardinality(std::make_shared<DictionaryColumnType>(std::forward<Args>(args)...)),
-          typed_dictionary_(dynamic_cast<DictionaryColumnType&>(*GetDictionary()))
+          typed_dictionary_(dynamic_cast<DictionaryColumnType &>(*GetDictionary()))
     {}
 
     /// Extended interface to simplify reading/adding individual items.

@@ -79,9 +79,8 @@ ColumnRef ColumnIPv6::Slice(size_t begin, size_t len) {
 }
 
 void ColumnIPv6::Swap(Column& other) {
-    if (auto col = dynamic_cast<ColumnIPv6*>(&other)) {
-        data_.swap(col->data_);
-    }
+    auto & col = dynamic_cast<ColumnIPv6 &>(other);
+    data_.swap(col.data_);
 }
 
 ItemView ColumnIPv6::GetItem(size_t index) const {

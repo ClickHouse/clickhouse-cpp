@@ -10,8 +10,7 @@
 #include <string_view>
 #include <type_traits>
 
-namespace
-{
+namespace {
 using namespace clickhouse;
 
 enum KeySerializationVersion
@@ -90,11 +89,9 @@ auto VisitIndexColumn(Vizitor && vizitor, ColumnPtrType && col) {
 inline void AppendToDictionary(ColumnRef dictionary, const ItemView & item) {
     if (auto c = dictionary->As<ColumnString>()) {
         c->Append(item.get<std::string_view>());
-    }
-    else if (auto c = dictionary->As<ColumnFixedString>()) {
+    } else if (auto c = dictionary->As<ColumnFixedString>()) {
         c->Append(item.get<std::string_view>());
-    }
-    else {
+    } else {
         throw std::runtime_error("Unexpected dictionary column type: " + dictionary->Type()->GetName());
     }
 }
@@ -104,16 +101,14 @@ inline void AppendToDictionary(ColumnRef dictionary, const ItemView & item) {
 inline void AppendNullItemToDictionary(ColumnRef dictionary) {
     if (auto n = dictionary->As<ColumnNullable>()) {
         AppendToDictionary(dictionary, ItemView{});
-    }
-    else {
+    } else {
         AppendToDictionary(dictionary, ItemView{dictionary->Type()->GetCode(), std::string_view{}});
     }
 }
 
 }
 
-namespace clickhouse
-{
+namespace clickhouse {
 ColumnLowCardinality::ColumnLowCardinality(ColumnRef dictionary_column)
     : Column(Type::CreateLowCardinality(dictionary_column->Type())),
       dictionary_column_(dictionary_column),
@@ -131,8 +126,7 @@ ColumnLowCardinality::ColumnLowCardinality(ColumnRef dictionary_column)
         // Re-add values, updating index and unique_items_map.
         for (size_t i = 0; i < values->Size(); ++i)
             AppendUnsafe(values->GetItem(i));
-    }
-    else {
+    } else {
         AppendNullItemToDictionary(dictionary_column_);
     }
 }
@@ -175,14 +169,12 @@ details::LowCardinalityHashKey ColumnLowCardinality::computeHashKey(const ItemVi
     return details::LowCardinalityHashKey{hash1, hash2};
 }
 
-ColumnRef ColumnLowCardinality::GetDictionary()
-{
+ColumnRef ColumnLowCardinality::GetDictionary() {
     return dictionary_column_;
 }
 
-void ColumnLowCardinality::Append(ColumnRef col)
-{
-    auto c = dynamic_cast<const ColumnLowCardinality*>(col.get());
+void ColumnLowCardinality::Append(ColumnRef col) {
+    auto c = col->As<ColumnLowCardinality>();
     if (!c || !dictionary_column_->Type()->IsEqual(c->dictionary_column_->Type()))
         return;
 
@@ -191,8 +183,7 @@ void ColumnLowCardinality::Append(ColumnRef col)
     }
 }
 
-namespace
-{
+namespace {
 
 auto Load(ColumnRef new_dictionary_column, CodedInputStream* input, size_t rows) {
     // This code tries to follow original implementation of ClickHouse's LowCardinality serialization with
@@ -311,8 +302,8 @@ ColumnRef ColumnLowCardinality::Slice(size_t begin, size_t len) {
 }
 
 void ColumnLowCardinality::Swap(Column& other) {
-    auto col = dynamic_cast<ColumnLowCardinality &>(other);
-    if (!dictionary_column_->Type()->IsEqual(col->dictionary_column_->Type()))
+    auto & col = dynamic_cast<ColumnLowCardinality &>(other);
+    if (!dictionary_column_->Type()->IsEqual(col.dictionary_column_->Type()))
         throw std::runtime_error("Can't swap() LowCardinality columns of different types.");
 
     dictionary_column_->Swap(*col.dictionary_column_);

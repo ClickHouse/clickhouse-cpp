@@ -75,10 +75,12 @@ ColumnRef ColumnNullable::Slice(size_t begin, size_t len) {
 }
 
 void ColumnNullable::Swap(Column& other) {
-    if (auto col = dynamic_cast<ColumnNullable*>(&other)) {
-        nested_.swap(col->nested_);
-        nulls_.swap(col->nulls_);
-    }
+    auto & col = dynamic_cast<ColumnNullable &>(other);
+    if (!nested_->Type()->IsEqual(col.nested_->Type()))
+        throw std::runtime_error("Can't swap() Nullable columns of different types.");
+
+    nested_.swap(col.nested_);
+    nulls_.swap(col.nulls_);
 }
 
 ItemView ColumnNullable::GetItem(size_t index) const  {

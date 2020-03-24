@@ -45,9 +45,8 @@ void ColumnTuple::Clear() {
 }
 
 void ColumnTuple::Swap(Column& other) {
-    if (auto col = dynamic_cast<ColumnTuple*>(&other)) {
-        columns_.swap(col->columns_);
-    }
+    auto & col = dynamic_cast<ColumnTuple &>(other);
+    columns_.swap(col.columns_);
 }
 
 }

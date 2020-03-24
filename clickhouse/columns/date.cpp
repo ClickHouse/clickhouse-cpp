@@ -49,9 +49,8 @@ ColumnRef ColumnDate::Slice(size_t begin, size_t len) {
 }
 
 void ColumnDate::Swap(Column& other) {
-    if (auto col = dynamic_cast<ColumnDate*>(&other)) {
-        data_.swap(col->data_);
-    }
+    auto & col = dynamic_cast<ColumnDate &>(other);
+    data_.swap(col.data_);
 }
 
 ItemView ColumnDate::GetItem(size_t index) const {
@@ -106,9 +105,8 @@ ColumnRef ColumnDateTime::Slice(size_t begin, size_t len) {
 }
 
 void ColumnDateTime::Swap(Column& other) {
-    if (auto col = dynamic_cast<ColumnDateTime*>(&other)) {
-        data_.swap(col->data_);
-    }
+    auto & col = dynamic_cast<ColumnDateTime &>(other);
+    data_.swap(col.data_);
 }
 
 ItemView ColumnDateTime::GetItem(size_t index) const {

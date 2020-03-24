@@ -68,9 +68,8 @@ public:
     size_t Size() const override { return size_; }
 
     void Swap(Column& other) override {
-        if (auto col = dynamic_cast<ColumnNothing*>(&other)) {
-            std::swap(size_, col->size_);
-        }
+        auto & col = dynamic_cast<ColumnNothing &>(other);
+        std::swap(size_, col.size_);
     }
 
 private:

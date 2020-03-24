@@ -82,6 +82,6 @@ public:
 private:
     Timer<ChronoDurationType> timer;
     ChronoDurationType total = ChronoDurationType{0};
-    bool paused = false;
+    bool paused = true;
 };
 

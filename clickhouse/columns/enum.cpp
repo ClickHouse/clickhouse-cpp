@@ -92,9 +92,8 @@ ColumnRef ColumnEnum<T>::Slice(size_t begin, size_t len) {
 
 template <typename T>
 void ColumnEnum<T>::Swap(Column& other) {
-    if (auto col = dynamic_cast<ColumnEnum<T>*>(&other)) {
-        data_.swap(col->data_);
-    }
+    auto & col = dynamic_cast<ColumnEnum<T> &>(other);
+    data_.swap(col.data_);
 }
 
 template <typename T>

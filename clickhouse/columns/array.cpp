@@ -79,10 +79,9 @@ size_t ColumnArray::Size() const {
 }
 
 void ColumnArray::Swap(Column& other) {
-    if (auto col = dynamic_cast<ColumnArray*>(&other)) {
-        data_.swap(col->data_);
-        offsets_.swap(col->offsets_);
-    }
+    auto & col = dynamic_cast<ColumnArray &>(other);
+    data_.swap(col.data_);
+    offsets_.swap(col.offsets_);
 }
 
 void ColumnArray::OffsetsIncrease(size_t n) {

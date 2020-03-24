@@ -74,11 +74,9 @@ template <typename ColumnType>
 ColumnType InstantiateColumn() {
     if constexpr (std::is_same_v<ColumnType, ColumnFixedString>) {
         return ColumnType(8);
-    }
-    else if constexpr (std::is_same_v<ColumnType, ColumnLowCardinalityT<ColumnFixedString>>) {
+    } else if constexpr (std::is_same_v<ColumnType, ColumnLowCardinalityT<ColumnFixedString>>) {
         return ColumnType(8);
-    }
-    else {
+    } else {
         return ColumnType();
     }
 }

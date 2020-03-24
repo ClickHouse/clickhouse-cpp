@@ -61,8 +61,7 @@ public:
         throw std::runtime_error("GetItem() is not supported for column of " + type_->GetName());
     }
 
-    friend void swap(Column& left, Column& right)
-    {
+    friend void swap(Column& left, Column& right) {
         left.Swap(right);
     }
 

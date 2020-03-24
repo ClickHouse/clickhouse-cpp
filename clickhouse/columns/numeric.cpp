@@ -75,9 +75,8 @@ ColumnRef ColumnVector<T>::Slice(size_t begin, size_t len) {
 
 template <typename T>
 void ColumnVector<T>::Swap(Column& other) {
-    if (auto col = dynamic_cast<ColumnVector<T>*>(&other)) {
-        data_.swap(col->data_);
-    }
+    auto & col = dynamic_cast<ColumnVector<T> &>(other);
+    data_.swap(col.data_);
 }
 
 template <typename T>

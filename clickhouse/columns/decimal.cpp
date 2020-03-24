@@ -121,9 +121,8 @@ ColumnRef ColumnDecimal::Slice(size_t begin, size_t len) {
 }
 
 void ColumnDecimal::Swap(Column& other) {
-    if (auto col = dynamic_cast<ColumnDecimal*>(&other)) {
-        data_.swap(col->data_);
-    }
+    auto & col = dynamic_cast<ColumnDecimal &>(other);
+    data_.swap(col.data_);
 }
 
 ItemView ColumnDecimal::GetItem(size_t index) const {
