@@ -312,7 +312,11 @@ void ColumnLowCardinality::Swap(Column& other) {
     if (!dictionary_column_->Type()->IsEqual(col.dictionary_column_->Type()))
         throw std::runtime_error("Can't swap() LowCardinality columns of different types.");
 
+    // It is important here not to swap pointers to dictionary object,
+    // but swap contents of dictionaries, so the object inside shared_ptr stays the same
+    // (needed for ColumnLowCardinalityT)
     dictionary_column_->Swap(*col.dictionary_column_);
+
     index_column_.swap(col.index_column_);
     unique_items_map_.swap(col.unique_items_map_);
 }

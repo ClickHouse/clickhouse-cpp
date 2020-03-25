@@ -7,7 +7,6 @@ ADD_EXECUTABLE (clickhouse-cpp-ut
     stream_ut.cpp
     type_parser_ut.cpp
     types_ut.cpp
-    types_ut.cpp
 
     performance_tests.cpp
     tcp_server.cpp
