@@ -16,13 +16,13 @@
 
 using namespace clickhouse;
 
-std::uint64_t generate(const ColumnUInt64&, size_t index) {
+inline std::uint64_t generate(const ColumnUInt64&, size_t index) {
     const auto base = static_cast<std::uint64_t>(index) % 255;
     return base << 7*8 | base << 6*8 | base << 5*8 | base << 4*8 | base << 3*8 | base << 2*8 | base << 1*8 | base;
 }
 
 template <size_t RESULT_SIZE=8>
-std::string_view generate_string_view(size_t index) {
+inline std::string_view generate_string_view(size_t index) {
     static const char result_template[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
                                           "9876543210ZYXWVUTSRQPONMLKJIHGFEDCBAzyxwvutsrqponmlkjihgfedcba"; // to double number of unique combinations
     const auto template_size = sizeof(result_template) - 1;
@@ -31,22 +31,22 @@ std::string_view generate_string_view(size_t index) {
     return std::string_view(&result_template[start_pos], RESULT_SIZE);
 }
 
-std::string_view generate(const ColumnString&, size_t index) {
+inline std::string_view generate(const ColumnString&, size_t index) {
     // ColumString stores item lengts,and on 1M etnries that builds up to extra 1M bytes,
     // comparing to 8M bytes of serialized data for ColumnFixedString and ColumUInt64.
     // So in order to make comparison mode fair, reducing size of data item.
     return generate_string_view<7>(index);
 }
 
-std::string_view generate(const ColumnFixedString&, size_t index) {
+inline std::string_view generate(const ColumnFixedString&, size_t index) {
     return generate_string_view<8>(index);
 }
 
-std::string_view generate(const ColumnLowCardinalityT<ColumnString>&, size_t index) {
+inline std::string_view generate(const ColumnLowCardinalityT<ColumnString>&, size_t index) {
     return generate_string_view<7>(index);
 }
 
-std::string_view generate(const ColumnLowCardinalityT<ColumnFixedString>&, size_t index) {
+inline std::string_view generate(const ColumnLowCardinalityT<ColumnFixedString>&, size_t index) {
     return generate_string_view<8>(index);
 }
 

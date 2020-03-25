@@ -6,10 +6,12 @@
 
 namespace clickhouse {
 
-/** ItemView is a view into a value stored in Column, provides stable interface for reading values from Column in safe manner.
+/** ItemView is a view on a data stored in Column, safe-ish interface for reading values from Column.
  *
- * Data is not owned (hance the name View) and will be invalidated on column update, load or destruction (basically on calling any non-const method of Column).
- * `type` reflects what is stored in `data` and can be almost any value-type (except Nullable, Array, Tuple, LowCardinality).
+ * Data is not owned (hence the name View) and will be invalidated on column update, load
+ * or destruction (basically on calling any non-const method of Column).
+ * `type` reflects what is stored in `data` and can be almost any value-type
+ * (except Nullable, Array, Tuple, LowCardinality).
  *
  */
 struct ItemView {

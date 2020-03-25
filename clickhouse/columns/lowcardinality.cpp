@@ -66,18 +66,18 @@ IndexType indexTypeFromIndexColumn(const Column & index_column) {
 }
 
 template <typename ResultColumnType, typename ColumnType>
-const ResultColumnType & column_down_cast(const ColumnType & c) {
+inline const ResultColumnType & column_down_cast(const ColumnType & c) {
     return dynamic_cast<const ResultColumnType &>(c);
 }
 
 template <typename ResultColumnType, typename ColumnType>
-ResultColumnType & column_down_cast(ColumnType & c) {
+inline ResultColumnType & column_down_cast(ColumnType & c) {
     return dynamic_cast<ResultColumnType &>(c);
 }
 
 // std::visit-ish function to avoid including <variant> header, which is not present in older version of XCode.
 template <typename Vizitor, typename ColumnType>
-auto VisitIndexColumn(Vizitor && vizitor, ColumnType && col) {
+inline auto VisitIndexColumn(Vizitor && vizitor, ColumnType && col) {
     switch (col.Type()->GetCode()) {
         case Type::UInt8:
             return vizitor(column_down_cast<ColumnUInt8>(col));
