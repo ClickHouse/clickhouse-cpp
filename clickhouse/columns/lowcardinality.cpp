@@ -134,15 +134,13 @@ ColumnLowCardinality::ColumnLowCardinality(ColumnRef dictionary_column)
 ColumnLowCardinality::~ColumnLowCardinality()
 {}
 
-std::uint64_t ColumnLowCardinality::getDictionaryIndex(std::uint64_t item_index) const
-{
+std::uint64_t ColumnLowCardinality::getDictionaryIndex(std::uint64_t item_index) const {
     return VisitIndexColumn([item_index](const auto & arg) -> std::uint64_t {
         return arg[item_index];
     }, index_column_);
 }
 
-void ColumnLowCardinality::appendIndex(std::uint64_t item_index)
-{
+void ColumnLowCardinality::appendIndex(std::uint64_t item_index) {
     // TODO (nemkov): handle case when index should go from UInt8 to UInt16, etc.
     VisitIndexColumn([item_index](auto & arg) {
         arg.Append(item_index);

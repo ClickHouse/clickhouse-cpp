@@ -1,6 +1,9 @@
 #pragma once
 
 #include <chrono>
+#include <ratio>
+#include <ostream>
+
 #include <time.h>
 
 template <typename ChronoDurationType>
@@ -8,11 +11,13 @@ struct Timer
 {
     using DurationType = ChronoDurationType;
 
-    Timer() {}
+    Timer()
+        : started_at(Now())
+    {}
 
     void Restart()
     {
-        started_at = Current();
+        started_at = Now();
     }
 
     void Start()
@@ -22,10 +27,11 @@ struct Timer
 
     auto Elapsed() const
     {
-        return std::chrono::duration_cast<ChronoDurationType>(Current() - started_at);
+        return std::chrono::duration_cast<ChronoDurationType>(Now() - started_at);
     }
 
-    auto Current() const
+private:
+    static auto Now()
     {
         struct timespec ts;
         clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
@@ -36,52 +42,29 @@ private:
     std::chrono::nanoseconds started_at;
 };
 
-template <typename ChronoDurationType>
-class PausableTimer
-{
-public:
-    PausableTimer()
-    {}
-
-    void Start()
-    {
-        timer.Restart();
-        paused = false;
+template <typename R>
+const char * getPrefix() {
+    const char * prefix = "?";
+    if constexpr (std::ratio_equal_v<R, std::nano>) {
+        prefix = "n";
+    } else if constexpr (std::ratio_equal_v<R, std::micro>) {
+        prefix = "u";
+    } else if constexpr (std::ratio_equal_v<R, std::milli>) {
+        prefix = "m";
+    } else if constexpr (std::ratio_equal_v<R, std::centi>) {
+        prefix = "c";
+    } else if constexpr (std::ratio_equal_v<R, std::deci>) {
+        prefix = "d";
+    } else {
+        static_assert("Unsupported ratio");
     }
 
-    void Pause()
-    {
-        total += timer.Elapsed();
-        paused = true;
-    }
+    return prefix;
+}
 
-    auto GetTotalElapsed() const
-    {
-        if (paused)
-        {
-            return total;
-        }
-        else
-        {
-            return total + timer.Elapsed();
-        }
-    }
-
-    void Reset()
-    {
-        Pause();
-        total = ChronoDurationType{0};
-    }
-
-    void Restart()
-    {
-        total = ChronoDurationType{0};
-        Start();
-    }
-
-private:
-    Timer<ChronoDurationType> timer;
-    ChronoDurationType total = ChronoDurationType{0};
-    bool paused = true;
-};
-
+namespace std {
+template <typename R, typename P>
+ostream & operator<<(ostream & ostr, const chrono::duration<R, P> & d) {
+    return ostr << d.count() << ::getPrefix<P>() << "s";
+}
+}

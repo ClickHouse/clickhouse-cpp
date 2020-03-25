@@ -89,6 +89,7 @@ TYPED_TEST_CASE_P(ColumnPerformanceTest);
 
 TYPED_TEST_P(ColumnPerformanceTest, SaveAndLoad) {
     auto column = InstantiateColumn<TypeParam>();
+    using Timer = Timer<std::chrono::microseconds>;
 
     const size_t ITEMS_COUNT = 1'000'000;
     const int LOAD_AND_SAVE_REPEAT_TIMES = 10; // run Load() and Save() multiple times to cancel out measurement errors.
@@ -96,30 +97,32 @@ TYPED_TEST_P(ColumnPerformanceTest, SaveAndLoad) {
     std::cerr << "\n===========================================================" << std::endl;
     std::cerr << "\t" << ITEMS_COUNT << " items of " << column.Type()->GetName()  << std::endl;
 
-    PausableTimer<std::chrono::microseconds> timer;
-
-    timer.Start();
-    for (size_t i = 0; i < ITEMS_COUNT; ++i)
     {
-        const auto value = generate(column, i);
-        column.Append(value);
+        Timer timer;
+        for (size_t i = 0; i < ITEMS_COUNT; ++i)
+        {
+            const auto value = generate(column, i);
+            column.Append(value);
+        }
+
+        auto elapsed = timer.Elapsed();
+        EXPECT_EQ(ITEMS_COUNT, column.Size());
+        std::cerr << "Appending:\t" << elapsed << std::endl;
     }
 
-    EXPECT_EQ(ITEMS_COUNT, column.Size());
-    std::cerr << "Appending:\t" << timer.GetTotalElapsed().count() << " us"
-              << std::endl;
+    {
+        Timer timer;
+        EXPECT_NO_FATAL_FAILURE(ValidateColumnItems(column, ITEMS_COUNT));
+        auto elapsed = timer.Elapsed();
 
-    timer.Reset();
-    timer.Start();
-    EXPECT_NO_FATAL_FAILURE(ValidateColumnItems(column, ITEMS_COUNT));
-    std::cerr << "Accessing (twice):\t" << timer.GetTotalElapsed().count() << " us"
-              << std::endl;
+        std::cerr << "Accessing (twice):\t" << elapsed << std::endl;
+    }
 
     Buffer buffer;
 
     // Save
     {
-        timer.Reset();
+        Timer::DurationType total{0};
 
         for (int i = 0; i < LOAD_AND_SAVE_REPEAT_TIMES; ++i)
         {
@@ -127,22 +130,21 @@ TYPED_TEST_P(ColumnPerformanceTest, SaveAndLoad) {
             BufferOutput bufferOutput(&buffer);
             CodedOutputStream ostr(&bufferOutput);
 
-            timer.Start();
+            Timer timer;
             column.Save(&ostr);
             ostr.Flush();
-            timer.Pause();
+            total += timer.Elapsed();
         }
-        const auto elapsed = timer.GetTotalElapsed() / (LOAD_AND_SAVE_REPEAT_TIMES * 1.0);
+        const auto elapsed = total / (LOAD_AND_SAVE_REPEAT_TIMES * 1.0);
 
-        std::cerr << "Saving:\t" << elapsed.count() << " us"
-                  << std::endl;
+        std::cerr << "Saving:\t" << elapsed << std::endl;
     }
 
     std::cerr << "Serialized binary size: " << buffer.size() << std::endl;
 
     // Load
     {
-        timer.Reset();
+        Timer::DurationType total{0};
 
         for (int i = 0; i < LOAD_AND_SAVE_REPEAT_TIMES; ++i)
         {
@@ -150,14 +152,13 @@ TYPED_TEST_P(ColumnPerformanceTest, SaveAndLoad) {
             CodedInputStream istr(&arrayInput);
             column.Clear();
 
-            timer.Start();
+            Timer timer;
             column.Load(&istr, ITEMS_COUNT);
-            timer.Pause();
+            total += timer.Elapsed();
         }
-        const auto elapsed = timer.GetTotalElapsed() / (LOAD_AND_SAVE_REPEAT_TIMES * 1.0);
+        const auto elapsed = total / (LOAD_AND_SAVE_REPEAT_TIMES * 1.0);
 
-        std::cerr << "Loading:\t" << elapsed.count() << " us"
-                  << std::endl;
+        std::cerr << "Loading:\t" << elapsed << std::endl;
     }
 
     EXPECT_NO_FATAL_FAILURE(ValidateColumnItems(column, ITEMS_COUNT));
@@ -165,6 +166,7 @@ TYPED_TEST_P(ColumnPerformanceTest, SaveAndLoad) {
 
 TYPED_TEST_P(ColumnPerformanceTest, InsertAndSelect) {
     using ColumnType = TypeParam;
+    using Timer = Timer<std::chrono::microseconds>;
 
     const std::string table_name = "PerformanceTests.ColumnTest";
     const std::string column_name = "column";
@@ -180,18 +182,22 @@ TYPED_TEST_P(ColumnPerformanceTest, InsertAndSelect) {
     std::cerr << "\n===========================================================" << std::endl;
     std::cerr << "\t" << ITEMS_COUNT << " items of " << column.Type()->GetName()  << std::endl;
 
-    PausableTimer<std::chrono::microseconds> timer;
-
-    timer.Restart();
-    for (size_t i = 0; i < ITEMS_COUNT; ++i)
     {
-        const auto value = generate(column, i);
-        column.Append(value);
-    }
+        Timer timer;
+        for (size_t i = 0; i < ITEMS_COUNT; ++i)
+        {
+            const auto value = generate(column, i);
+            column.Append(value);
+        }
 
+        auto elapsed = timer.Elapsed();
+        std::cerr << "Appending:\t" << elapsed << std::endl;
+    }
     EXPECT_EQ(ITEMS_COUNT, column.Size());
-    std::cerr << "Appending:\t" << timer.GetTotalElapsed().count() << " us"
-        << std::endl;
+
+    if (const auto lc = dynamic_cast<ColumnLowCardinality*>((Column*)&column)) {
+        std::cerr << "Dictionary size: " << lc->GetDictionarySize() << std::endl;
+    }
 
     EXPECT_NO_FATAL_FAILURE(ValidateColumnItems(column, ITEMS_COUNT));
 
@@ -199,15 +205,17 @@ TYPED_TEST_P(ColumnPerformanceTest, InsertAndSelect) {
         Block block;
         block.AppendColumn(column_name, column.Slice(0, ITEMS_COUNT));
 
-        timer.Restart();
+        Timer timer;
         client.Insert(table_name, block);
-        std::cerr << "INSERT:\t" << timer.GetTotalElapsed().count() << " us"
-            << std::endl;
+        auto elapsed = timer.Elapsed();
+        std::cerr << "INSERT:\t" << elapsed << std::endl;
     }
 
     {
-        timer.Restart();
-        client.Select("SELECT " + column_name +  " FROM " + table_name, [&](const Block & block) {
+        Timer timer;
+        Timer::DurationType inner_loop_duration{0};
+        client.Select("SELECT " + column_name +  " FROM " + table_name, [&inner_loop_duration](const Block & block) {
+            Timer timer;
             if (block.GetRowCount() == 0) {
                 return;
             }
@@ -216,10 +224,11 @@ TYPED_TEST_P(ColumnPerformanceTest, InsertAndSelect) {
             const auto col = block[0]->As<ColumnType>();
 
             EXPECT_NO_FATAL_FAILURE(ValidateColumnItems(*col, ITEMS_COUNT));
+            inner_loop_duration += timer.Elapsed();
         });
 
-        std::cerr << "SELECT:\t" << timer.GetTotalElapsed().count() << " us"
-            << std::endl;
+        auto elapsed = timer.Elapsed() - inner_loop_duration;
+        std::cerr << "SELECT:\t" << elapsed << std::endl;
     }
 }
 
