@@ -22,7 +22,7 @@
 #define DBMS_NAME                                       "ClickHouse"
 #define DBMS_VERSION_MAJOR                              1
 #define DBMS_VERSION_MINOR                              1
-#define REVISION                                        54126
+#define REVISION                                        54405
 
 #define DBMS_MIN_REVISION_WITH_TEMPORARY_TABLES         50264
 #define DBMS_MIN_REVISION_WITH_TOTAL_ROWS_IN_PROGRESS   51554
@@ -30,6 +30,11 @@
 #define DBMS_MIN_REVISION_WITH_CLIENT_INFO              54032
 #define DBMS_MIN_REVISION_WITH_SERVER_TIMEZONE          54058
 #define DBMS_MIN_REVISION_WITH_QUOTA_KEY_IN_CLIENT_INFO 54060
+//#define DBMS_MIN_REVISION_WITH_TABLES_STATUS            54226
+//#define DBMS_MIN_REVISION_WITH_TIME_ZONE_PARAMETER_IN_DATETIME_DATA_TYPE 54337
+#define DBMS_MIN_REVISION_WITH_SERVER_DISPLAY_NAME      54372
+#define DBMS_MIN_REVISION_WITH_VERSION_PATCH            54401
+#define DBMS_MIN_REVISION_WITH_LOW_CARDINALITY_TYPE     54405
 
 namespace clickhouse {
 
@@ -45,14 +50,17 @@ struct ClientInfo {
     std::string initial_address = "[::ffff:127.0.0.1]:0";
     uint64_t client_version_major = 0;
     uint64_t client_version_minor = 0;
+    uint64_t client_version_patch = 0;
     uint32_t client_revision = 0;
 };
 
 struct ServerInfo {
     std::string name;
     std::string timezone;
+    std::string display_name;
     uint64_t    version_major;
     uint64_t    version_minor;
+    uint64_t    version_patch;
     uint64_t    revision;
 };
 
@@ -563,6 +571,9 @@ void Client::Impl::SendQuery(const std::string& query) {
 
         if (server_info_.revision >= DBMS_MIN_REVISION_WITH_QUOTA_KEY_IN_CLIENT_INFO)
             WireFormat::WriteString(&output_, info.quota_key);
+        if (server_info_.revision >= DBMS_MIN_REVISION_WITH_VERSION_PATCH) {
+            WireFormat::WriteUInt64(&output_, info.client_version_patch);
+        }
     }
 
     /// Per query settings.
@@ -693,6 +704,18 @@ bool Client::Impl::ReceiveHello() {
 
         if (server_info_.revision >= DBMS_MIN_REVISION_WITH_SERVER_TIMEZONE) {
             if (!WireFormat::ReadString(&input_, &server_info_.timezone)) {
+                return false;
+            }
+        }
+
+        if (server_info_.revision >= DBMS_MIN_REVISION_WITH_SERVER_DISPLAY_NAME) {
+            if (!WireFormat::ReadString(&input_, &server_info_.display_name)) {
+                return false;
+            }
+        }
+
+        if (server_info_.revision >= DBMS_MIN_REVISION_WITH_VERSION_PATCH) {
+            if (!WireFormat::ReadUInt64(&input_, &server_info_.version_patch)) {
                 return false;
             }
         }

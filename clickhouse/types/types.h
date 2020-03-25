@@ -40,6 +40,7 @@ public:
         Decimal32,
         Decimal64,
         Decimal128,
+        LowCardinality,
     };
 
     using EnumItem = std::pair<std::string /* name */, int16_t /* value */>;
@@ -65,7 +66,8 @@ public:
     std::string GetName() const;
 
     /// Is given type same as current one.
-    bool IsEqual(const TypeRef& other) const { return this->GetName() == other->GetName(); }
+    bool IsEqual(const Type& other) const { return this->GetName() == other.GetName(); }
+    bool IsEqual(const TypeRef& other) const { return IsEqual(*other); }
 
 public:
     static TypeRef CreateArray(TypeRef item_type);
@@ -99,9 +101,23 @@ public:
 
     static TypeRef CreateUUID();
 
+    static TypeRef CreateLowCardinality(TypeRef item_type);
+
 private:
     const Code code_;
 };
+
+inline bool operator==(const Type & left, const Type & right) {
+    if (&left == &right)
+        return true;
+    if (typeid(left) == typeid(right))
+        return left.IsEqual(right);
+    return false;
+}
+
+inline bool operator==(const TypeRef & left, const TypeRef & right) {
+    return *left == *right;
+}
 
 class ArrayType : public Type {
 public:
@@ -187,6 +203,20 @@ public:
 
 private:
     std::vector<TypeRef> item_types_;
+};
+
+class LowCardinalityType : public Type {
+public:
+    explicit LowCardinalityType(TypeRef nested_type);
+    ~LowCardinalityType();
+
+    std::string GetName() const { return std::string("LowCardinality(") + nested_type_->GetName() + ")"; }
+
+    /// Type of nested nullable element.
+    TypeRef GetNestedType() const { return nested_type_; }
+
+private:
+    TypeRef nested_type_;
 };
 
 template <>

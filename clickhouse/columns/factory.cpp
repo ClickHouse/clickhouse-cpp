@@ -6,6 +6,7 @@
 #include "enum.h"
 #include "ip4.h"
 #include "ip6.h"
+#include "lowcardinality.h"
 #include "nothing.h"
 #include "nullable.h"
 #include "numeric.h"
@@ -133,6 +134,18 @@ static ColumnRef CreateColumnFromAst(const TypeAst& ast) {
                 );
             }
             break;
+        }
+        case TypeAst::LowCardinality: {
+            const auto nested = ast.elements.front();
+            switch (nested.code) {
+                // TODO (nemkov): update this to maximize code reuse.
+                case Type::String:
+                    return std::make_shared<ColumnLowCardinalityT<ColumnString>>();
+                case Type::FixedString:
+                    return std::make_shared<ColumnLowCardinalityT<ColumnFixedString>>(nested.elements.front().value);
+                default:
+                    throw std::runtime_error("LowCardinality(" + nested.name + ") is not supported");
+            }
         }
 
         case TypeAst::Null:

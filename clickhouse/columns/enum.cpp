@@ -90,6 +90,17 @@ ColumnRef ColumnEnum<T>::Slice(size_t begin, size_t len) {
     return std::make_shared<ColumnEnum<T>>(type_, SliceVector(data_, begin, len));
 }
 
+template <typename T>
+void ColumnEnum<T>::Swap(Column& other) {
+    auto & col = dynamic_cast<ColumnEnum<T> &>(other);
+    data_.swap(col.data_);
+}
+
+template <typename T>
+ItemView ColumnEnum<T>::GetItem(size_t index) const {
+    return ItemView{type_->GetCode(), data_[index]};
+}
+
 template class ColumnEnum<int8_t>;
 template class ColumnEnum<int16_t>;
 

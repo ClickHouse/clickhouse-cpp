@@ -13,11 +13,14 @@ SET ( clickhouse-cpp-lib-src
     columns/factory.cpp
     columns/ip4.cpp
     columns/ip6.cpp
+    columns/lowcardinality.cpp
     columns/nullable.cpp
     columns/numeric.cpp
     columns/string.cpp
     columns/tuple.cpp
     columns/uuid.cpp
+
+    columns/itemview.cpp
 
     types/type_parser.cpp
     types/types.cpp
@@ -82,6 +85,8 @@ INSTALL(FILES columns/enum.h DESTINATION include/clickhouse/columns/)
 INSTALL(FILES columns/factory.h DESTINATION include/clickhouse/columns/)
 INSTALL(FILES columns/ip4.h DESTINATION include/clickhouse/columns/)
 INSTALL(FILES columns/ip6.h DESTINATION include/clickhouse/columns/)
+INSTALL(FILES columns/itemview.h DESTINATION include/clickhouse/columns/)
+INSTALL(FILES columns/lowcardinality.h DESTINATION include/clickhouse/columns/)
 INSTALL(FILES columns/nullable.h DESTINATION include/clickhouse/columns/)
 INSTALL(FILES columns/numeric.h DESTINATION include/clickhouse/columns/)
 INSTALL(FILES columns/string.h DESTINATION include/clickhouse/columns/)

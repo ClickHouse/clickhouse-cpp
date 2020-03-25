@@ -61,6 +61,8 @@ std::string Type::GetName() const {
         case Decimal64:
         case Decimal128:
             return As<DecimalType>()->GetName();
+        case LowCardinality:
+            return As<LowCardinalityType>()->GetName();
     }
 
     // XXX: NOT REACHED!
@@ -121,6 +123,10 @@ TypeRef Type::CreateEnum16(const std::vector<EnumItem>& enum_items) {
 
 TypeRef Type::CreateUUID() {
     return TypeRef(new Type(Type::UUID));
+}
+
+TypeRef Type::CreateLowCardinality(TypeRef item_type) {
+    return std::make_shared<LowCardinalityType>(item_type);
 }
 
 /// class ArrayType
@@ -227,6 +233,12 @@ NullableType::NullableType(TypeRef nested_type) : Type(Nullable), nested_type_(n
 
 TupleType::TupleType(const std::vector<TypeRef>& item_types) : Type(Tuple), item_types_(item_types) {
 }
+
+/// class LowCardinalityType
+LowCardinalityType::LowCardinalityType(TypeRef nested_type) : Type(LowCardinality), nested_type_(nested_type) {
+}
+LowCardinalityType::~LowCardinalityType()
+{}
 
 std::string TupleType::GetName() const {
     std::string result("Tuple(");

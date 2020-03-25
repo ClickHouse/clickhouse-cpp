@@ -22,6 +22,14 @@ void ColumnVector<T>::Append(const T& value) {
 }
 
 template <typename T>
+void ColumnVector<T>::Erase(size_t pos, size_t count) {
+    const auto begin = std::min(pos, data_.size());
+    const auto last = begin + std::min(data_.size() - begin, count);
+
+    data_.erase(data_.begin() + begin, data_.begin() + last);
+}
+
+template <typename T>
 void ColumnVector<T>::Clear() {
     data_.clear();
 }
@@ -63,6 +71,17 @@ size_t ColumnVector<T>::Size() const {
 template <typename T>
 ColumnRef ColumnVector<T>::Slice(size_t begin, size_t len) {
     return std::make_shared<ColumnVector<T>>(SliceVector(data_, begin, len));
+}
+
+template <typename T>
+void ColumnVector<T>::Swap(Column& other) {
+    auto & col = dynamic_cast<ColumnVector<T> &>(other);
+    data_.swap(col.data_);
+}
+
+template <typename T>
+ItemView ColumnVector<T>::GetItem(size_t index) const  {
+    return ItemView{type_->GetCode(), data_[index]};
 }
 
 template class ColumnVector<int8_t>;

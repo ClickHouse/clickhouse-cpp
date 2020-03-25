@@ -3,8 +3,7 @@
 
 #include "../base/wire_format.h"
 
-namespace
-{
+namespace {
 const size_t DEFAULT_BLOCK_SIZE = 4096;
 
 template <typename Container>
@@ -96,6 +95,16 @@ ColumnRef ColumnFixedString::Slice(size_t begin, size_t len) {
     }
 
     return result;
+}
+
+void ColumnFixedString::Swap(Column& other) {
+    auto & col = dynamic_cast<ColumnFixedString &>(other);
+    std::swap(string_size_, col.string_size_);
+    data_.swap(col.data_);
+}
+
+ItemView ColumnFixedString::GetItem(size_t index) const {
+    return ItemView{Type::FixedString, this->At(index)};
 }
 
 struct ColumnString::Block
@@ -251,6 +260,16 @@ ColumnRef ColumnString::Slice(size_t begin, size_t len) {
     }
 
     return result;
+}
+
+void ColumnString::Swap(Column& other) {
+    auto & col = dynamic_cast<ColumnString &>(other);
+    items_.swap(col.items_);
+    blocks_.swap(col.blocks_);
+}
+
+ItemView ColumnString::GetItem(size_t index) const {
+    return ItemView{Type::String, this->At(index)};
 }
 
 }

@@ -4,6 +4,7 @@
 #include "column.h"
 
 #include <stdexcept>
+#include <utility>
 
 namespace clickhouse {
 
@@ -38,6 +39,8 @@ public:
 		return std::make_shared<ColumnNothing>(len);
 	}
 
+    ItemView GetItem(size_t /*index*/) const override { return ItemView{}; }
+
 public:
     /// Appends content of given column to the end of current one.
     void Append(ColumnRef column) override {
@@ -63,6 +66,11 @@ public:
 
     /// Returns count of rows in the column.
     size_t Size() const override { return size_; }
+
+    void Swap(Column& other) override {
+        auto & col = dynamic_cast<ColumnNothing &>(other);
+        std::swap(size_, col.size_);
+    }
 
 private:
 	size_t size_;

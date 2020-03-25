@@ -41,6 +41,8 @@ public:
 
     /// Makes slice of the current column.
     ColumnRef Slice(size_t begin, size_t len) override;
+    void Swap(Column& other) override;
+    ItemView GetItem(size_t index) const override;
 
 private:
     std::shared_ptr<ColumnFixedString> data_;
