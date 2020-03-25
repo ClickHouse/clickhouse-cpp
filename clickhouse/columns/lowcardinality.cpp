@@ -162,16 +162,15 @@ void ColumnLowCardinality::removeLastIndex() {
     }, *index_column_);
 }
 
-details::LowCardinalityHashKey ColumnLowCardinality::computeHashKey(const ItemView & data) {
+details::LowCardinalityHashKey ColumnLowCardinality::computeHashKey(const ItemView & item) {
     static const auto hasher = std::hash<ItemView::DataType>{};
-    if (data.type == Type::Void) {
+    if (item.type == Type::Void) {
         // to distinguish NULL of ColumnNullable and empty string.
         return {0u, 0u};
     }
 
-    const auto hash1 = hasher(data.data);
-    const auto binary = data.AsBinaryData();
-    const auto hash2 = CityHash64(binary.data(), binary.size());
+    const auto hash1 = hasher(item.data);
+    const auto hash2 = CityHash64(item.data.data(), item.data.size());
 
     return details::LowCardinalityHashKey{hash1, hash2};
 }
