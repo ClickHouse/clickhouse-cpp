@@ -118,9 +118,10 @@ TEST_P(ClientCase, LowCardinality) {
     block.AppendColumn("lc", lc);
     client_->Insert("test_clickhouse_cpp.low_cardinality", block);
 
+    size_t total_rows = 0;
     client_->Select("SELECT lc FROM test_clickhouse_cpp.low_cardinality",
-        [&data](const Block& block)
-        {
+        [&total_rows, &data](const Block& block) {
+            total_rows += block.GetRowCount();
             if (block.GetRowCount() == 0) {
                 return;
             }
@@ -134,6 +135,8 @@ TEST_P(ClientCase, LowCardinality) {
             }
         }
     );
+
+    ASSERT_EQ(total_rows, data.size());
 }
 
 TEST_P(ClientCase, Generic) {

@@ -197,10 +197,12 @@ TYPED_TEST_P(ColumnPerformanceTest, InsertAndSelect) {
     }
 
     {
+        size_t total_rows = 0;
         Timer timer;
         Timer::DurationType inner_loop_duration{0};
-        client.Select("SELECT " + column_name +  " FROM " + table_name, [&inner_loop_duration](const Block & block) {
+        client.Select("SELECT " + column_name +  " FROM " + table_name, [&total_rows, &inner_loop_duration](const Block & block) {
             Timer timer;
+            total_rows += block.GetRowCount();
             if (block.GetRowCount() == 0) {
                 return;
             }
@@ -214,6 +216,8 @@ TYPED_TEST_P(ColumnPerformanceTest, InsertAndSelect) {
 
         auto elapsed = timer.Elapsed() - inner_loop_duration;
         std::cerr << "SELECT:\t" << elapsed << std::endl;
+
+        ASSERT_EQ(total_rows, ITEMS_COUNT);
     }
 }
 
