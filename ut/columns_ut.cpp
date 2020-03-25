@@ -174,8 +174,7 @@ TEST(ColumnsCase, UUIDSlice) {
     ASSERT_EQ(sub->At(1), UInt128(0x3507213c178649f9llu, 0x9faf035d662f60aellu));
 }
 
-std::string foobar(size_t i)
-{
+std::string foobar(size_t i) {
     std::string result;
     if (i % 3 == 0)
         result += "Foo";
@@ -188,8 +187,7 @@ std::string foobar(size_t i)
 }
 
 template <typename Generator>
-auto build_vector(Generator && gen, size_t items)
-{
+auto build_vector(Generator && gen, size_t items) {
     std::vector<std::result_of_t<Generator(size_t)>> result;
     result.reserve(items);
     for (size_t i = 0; i < items; ++i)

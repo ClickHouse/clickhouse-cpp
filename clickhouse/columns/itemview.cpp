@@ -1,7 +1,6 @@
 #include "../columns/itemview.h"
 
-namespace clickhouse
-{
+namespace clickhouse {
 
 void ItemView::ValidateData(Type::Code type, DataType data) {
     static const int ANY = -1; // value can be of any size

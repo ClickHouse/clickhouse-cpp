@@ -34,6 +34,7 @@ public:
 
     /// Get type object of the column.
     inline TypeRef Type() const { return type_; }
+    inline const class Type& GetType() const { return *type_; }
 
     /// Appends content of given column to the end of current one.
     virtual void Append(ColumnRef column) = 0;

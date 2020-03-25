@@ -13,13 +13,11 @@
 namespace {
 using namespace clickhouse;
 
-enum KeySerializationVersion
-{
+enum KeySerializationVersion {
     SharedDictionariesWithAdditionalKeys = 1,
 };
 
-enum IndexType
-{
+enum IndexType {
     UInt8 = 0,
     UInt16,
     UInt32,
@@ -28,8 +26,7 @@ enum IndexType
 
 constexpr uint64_t IndexTypeMask = 0b11111111;
 
-enum IndexFlag
-{
+enum IndexFlag {
     /// Need to read dictionary if it wasn't.
     NeedGlobalDictionaryBit = 1u << 8u,
     /// Need to read additional keys. Additional keys are stored before indexes as value N and N keys after them.
@@ -38,10 +35,8 @@ enum IndexFlag
     NeedUpdateDictionary = 1u << 10u
 };
 
-ColumnRef createIndexColumn(IndexType type)
-{
-    switch (type)
-    {
+ColumnRef createIndexColumn(IndexType type) {
+    switch (type) {
         case IndexType::UInt8:
             return std::make_shared<ColumnUInt8>();
         case IndexType::UInt16:
@@ -70,29 +65,43 @@ IndexType indexTypeFromIndexColumn(const Column & index_column) {
     }
 }
 
+template <typename ResultColumnType, typename ColumnType>
+const ResultColumnType & column_down_cast(const ColumnType & c) {
+    return dynamic_cast<const ResultColumnType &>(c);
+}
+
+template <typename ResultColumnType, typename ColumnType>
+ResultColumnType & column_down_cast(ColumnType & c) {
+    return dynamic_cast<ResultColumnType &>(c);
+}
+
 // std::visit-ish function to avoid including <variant> header, which is not present in older version of XCode.
-template <typename Vizitor, typename ColumnPtrType>
-auto VisitIndexColumn(Vizitor && vizitor, ColumnPtrType && col) {
-    if (auto c = col->template As<ColumnUInt8>()) {
-        return vizitor(*c);
-    } else if (auto c = col->template As<ColumnUInt16>()) {
-        return vizitor(*c);
-    } else if (auto c = col->template As<ColumnUInt32>()) {
-        return vizitor(*c);
-    } else if (auto c = col->template As<ColumnUInt64>()) {
-        return vizitor(*c);
-    } else {
-        throw std::runtime_error("Invalid index column type " + col->Type()->GetName());
+template <typename Vizitor, typename ColumnType>
+auto VisitIndexColumn(Vizitor && vizitor, ColumnType && col) {
+    switch (col.Type()->GetCode()) {
+        case Type::UInt8:
+            return vizitor(column_down_cast<ColumnUInt8>(col));
+        case Type::UInt16:
+            return vizitor(column_down_cast<ColumnUInt16>(col));
+        case Type::UInt32:
+            return vizitor(column_down_cast<ColumnUInt32>(col));
+        case Type::UInt64:
+            return vizitor(column_down_cast<ColumnUInt64>(col));
+        default:
+            throw std::runtime_error("Invalid index column type " + col.GetType().GetName());
     }
 }
 
-inline void AppendToDictionary(ColumnRef dictionary, const ItemView & item) {
-    if (auto c = dictionary->As<ColumnString>()) {
-        c->Append(item.get<std::string_view>());
-    } else if (auto c = dictionary->As<ColumnFixedString>()) {
-        c->Append(item.get<std::string_view>());
-    } else {
-        throw std::runtime_error("Unexpected dictionary column type: " + dictionary->Type()->GetName());
+inline void AppendToDictionary(Column& dictionary, const ItemView & item) {
+    switch (dictionary.GetType().GetCode()) {
+        case Type::FixedString:
+            column_down_cast<ColumnFixedString>(dictionary).Append(item.get<std::string_view>());
+            return;
+        case Type::String:
+            column_down_cast<ColumnString>(dictionary).Append(item.get<std::string_view>());
+            return;
+        default:
+            throw std::runtime_error("Unexpected dictionary column type: " + dictionary.GetType().GetName());
     }
 }
 
@@ -100,9 +109,9 @@ inline void AppendToDictionary(ColumnRef dictionary, const ItemView & item) {
 // note that we distinguish empty string from NULL-value.
 inline void AppendNullItemToDictionary(ColumnRef dictionary) {
     if (auto n = dictionary->As<ColumnNullable>()) {
-        AppendToDictionary(dictionary, ItemView{});
+        AppendToDictionary(*dictionary, ItemView{});
     } else {
-        AppendToDictionary(dictionary, ItemView{dictionary->Type()->GetCode(), std::string_view{}});
+        AppendToDictionary(*dictionary, ItemView{dictionary->Type()->GetCode(), std::string_view{}});
     }
 }
 
@@ -137,20 +146,20 @@ ColumnLowCardinality::~ColumnLowCardinality()
 std::uint64_t ColumnLowCardinality::getDictionaryIndex(std::uint64_t item_index) const {
     return VisitIndexColumn([item_index](const auto & arg) -> std::uint64_t {
         return arg[item_index];
-    }, index_column_);
+    }, *index_column_);
 }
 
 void ColumnLowCardinality::appendIndex(std::uint64_t item_index) {
     // TODO (nemkov): handle case when index should go from UInt8 to UInt16, etc.
     VisitIndexColumn([item_index](auto & arg) {
         arg.Append(item_index);
-    }, index_column_);
+    }, *index_column_);
 }
 
 void ColumnLowCardinality::removeLastIndex() {
     VisitIndexColumn([](auto & arg) {
         arg.Erase(arg.Size() - 1);
-    }, index_column_);
+    }, *index_column_);
 }
 
 details::LowCardinalityHashKey ColumnLowCardinality::computeHashKey(const ItemView & data) {
@@ -316,23 +325,24 @@ ItemView ColumnLowCardinality::GetItem(size_t index) const {
 // No checks regarding value type or validity of value is made.
 void ColumnLowCardinality::AppendUnsafe(const ItemView & value) {
     const auto key = computeHashKey(value);
-
+    const auto initial_index_size = index_column_->Size();
     // If the value is unique, then we are going to append it to a dictionary, hence new index is Size().
     auto [iterator, is_new_item] = unique_items_map_.try_emplace(key, dictionary_column_->Size());
-
     try {
         // Order is important, adding to dictionary last, since it is much (MUCH!!!!) harder
-        // to remove item from dictionary column than from index column (also, there is currently no API to do that).
+        // to remove item from dictionary column than from index column
+        // (also, there is currently no API to do that).
         // Hence in catch-block we assume that dictionary wasn't modified on exception
         // and there is nothing to rollback.
 
         appendIndex(iterator->second);
         if (is_new_item) {
-            AppendToDictionary(dictionary_column_, value);
+            AppendToDictionary(*dictionary_column_, value);
         }
     }
     catch (...) {
-        removeLastIndex();
+        if (index_column_->Size() != initial_index_size)
+            removeLastIndex();
         if (is_new_item)
             unique_items_map_.erase(iterator);
 

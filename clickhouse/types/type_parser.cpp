@@ -8,8 +8,7 @@
 
 namespace clickhouse {
 
-bool TypeAst::operator==(const TypeAst & other) const
-{
+bool TypeAst::operator==(const TypeAst & other) const {
     return meta == other.meta
         && code == other.code
         && name == other.name

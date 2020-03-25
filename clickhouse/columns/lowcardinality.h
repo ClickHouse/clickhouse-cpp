@@ -32,8 +32,7 @@ struct LowCardinalityHashKeyHash {
 
 }
 
-class ColumnLowCardinality : public Column
-{
+class ColumnLowCardinality : public Column {
 public:
     using UniqueItems = std::unordered_map<details::LowCardinalityHashKey, size_t /*dictionary index*/, details::LowCardinalityHashKeyHash>;
 
@@ -90,8 +89,7 @@ public:
 /** Type-aware wrapper that provides simple convenience interface for accessing/appending individual items.
  */
 template <typename DictionaryColumnType>
-class ColumnLowCardinalityT : public ColumnLowCardinality
-{
+class ColumnLowCardinalityT : public ColumnLowCardinality {
     DictionaryColumnType& typed_dictionary_;
 
 public:

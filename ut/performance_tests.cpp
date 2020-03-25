@@ -16,15 +16,13 @@
 
 using namespace clickhouse;
 
-std::uint64_t generate(const ColumnUInt64&, size_t index)
-{
+std::uint64_t generate(const ColumnUInt64&, size_t index) {
     const auto base = static_cast<std::uint64_t>(index) % 255;
     return base << 7*8 | base << 6*8 | base << 5*8 | base << 4*8 | base << 3*8 | base << 2*8 | base << 1*8 | base;
 }
 
 template <size_t RESULT_SIZE=8>
-std::string_view generate_string_view(size_t index)
-{
+std::string_view generate_string_view(size_t index) {
     static const char result_template[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
                                           "9876543210ZYXWVUTSRQPONMLKJIHGFEDCBAzyxwvutsrqponmlkjihgfedcba"; // to double number of unique combinations
     const auto template_size = sizeof(result_template) - 1;
@@ -33,32 +31,27 @@ std::string_view generate_string_view(size_t index)
     return std::string_view(&result_template[start_pos], RESULT_SIZE);
 }
 
-std::string_view generate(const ColumnString&, size_t index)
-{
+std::string_view generate(const ColumnString&, size_t index) {
     // ColumString stores item lengts,and on 1M etnries that builds up to extra 1M bytes,
     // comparing to 8M bytes of serialized data for ColumnFixedString and ColumUInt64.
     // So in order to make comparison mode fair, reducing size of data item.
     return generate_string_view<7>(index);
 }
 
-std::string_view generate(const ColumnFixedString&, size_t index)
-{
+std::string_view generate(const ColumnFixedString&, size_t index) {
     return generate_string_view<8>(index);
 }
 
-std::string_view generate(const ColumnLowCardinalityT<ColumnString>&, size_t index)
-{
+std::string_view generate(const ColumnLowCardinalityT<ColumnString>&, size_t index) {
     return generate_string_view<7>(index);
 }
 
-std::string_view generate(const ColumnLowCardinalityT<ColumnFixedString>&, size_t index)
-{
+std::string_view generate(const ColumnLowCardinalityT<ColumnFixedString>&, size_t index) {
     return generate_string_view<8>(index);
 }
 
 template <typename ColumnType>
-auto ValidateColumnItems(const ColumnType & col, size_t expected_items)
-{
+auto ValidateColumnItems(const ColumnType & col, size_t expected_items) {
     ASSERT_EQ(expected_items, col.Size());
     // validate that appended items match expected
     for (size_t i = 0; i < expected_items; ++i)
@@ -99,8 +92,7 @@ TYPED_TEST_P(ColumnPerformanceTest, SaveAndLoad) {
 
     {
         Timer timer;
-        for (size_t i = 0; i < ITEMS_COUNT; ++i)
-        {
+        for (size_t i = 0; i < ITEMS_COUNT; ++i) {
             const auto value = generate(column, i);
             column.Append(value);
         }
@@ -124,8 +116,7 @@ TYPED_TEST_P(ColumnPerformanceTest, SaveAndLoad) {
     {
         Timer::DurationType total{0};
 
-        for (int i = 0; i < LOAD_AND_SAVE_REPEAT_TIMES; ++i)
-        {
+        for (int i = 0; i < LOAD_AND_SAVE_REPEAT_TIMES; ++i) {
             buffer.clear();
             BufferOutput bufferOutput(&buffer);
             CodedOutputStream ostr(&bufferOutput);
@@ -146,8 +137,7 @@ TYPED_TEST_P(ColumnPerformanceTest, SaveAndLoad) {
     {
         Timer::DurationType total{0};
 
-        for (int i = 0; i < LOAD_AND_SAVE_REPEAT_TIMES; ++i)
-        {
+        for (int i = 0; i < LOAD_AND_SAVE_REPEAT_TIMES; ++i) {
             ArrayInput arrayInput(buffer.data(), buffer.size());
             CodedInputStream istr(&arrayInput);
             column.Clear();
@@ -184,8 +174,7 @@ TYPED_TEST_P(ColumnPerformanceTest, InsertAndSelect) {
 
     {
         Timer timer;
-        for (size_t i = 0; i < ITEMS_COUNT; ++i)
-        {
+        for (size_t i = 0; i < ITEMS_COUNT; ++i) {
             const auto value = generate(column, i);
             column.Append(value);
         }
@@ -194,10 +183,6 @@ TYPED_TEST_P(ColumnPerformanceTest, InsertAndSelect) {
         std::cerr << "Appending:\t" << elapsed << std::endl;
     }
     EXPECT_EQ(ITEMS_COUNT, column.Size());
-
-    if (const auto lc = dynamic_cast<ColumnLowCardinality*>((Column*)&column)) {
-        std::cerr << "Dictionary size: " << lc->GetDictionarySize() << std::endl;
-    }
 
     EXPECT_NO_FATAL_FAILURE(ValidateColumnItems(column, ITEMS_COUNT));
 

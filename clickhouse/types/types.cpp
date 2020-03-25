@@ -125,8 +125,7 @@ TypeRef Type::CreateUUID() {
     return TypeRef(new Type(Type::UUID));
 }
 
-TypeRef Type::CreateLowCardinality(TypeRef item_type)
-{
+TypeRef Type::CreateLowCardinality(TypeRef item_type) {
     return std::make_shared<LowCardinalityType>(item_type);
 }
 
