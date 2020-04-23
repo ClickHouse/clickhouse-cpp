@@ -20,6 +20,7 @@ void ItemView::ValidateData(Type::Code type, DataType data) {
         ANY, /*String*/
         ANY, /*FixedString*/
         4,   /*DateTime*/
+        8,   /*DateTime64*/
         2,   /*Date*/
         ERR, /*Array*/
         ERR, /*Nullable*/

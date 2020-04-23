@@ -113,4 +113,69 @@ ItemView ColumnDateTime::GetItem(size_t index) const {
     return data_->GetItem(index);
 }
 
+
+ColumnDateTime64::ColumnDateTime64()
+    : Column(Type::CreateDateTime64(3ul))
+    , data_(std::make_shared<ColumnDecimal>(18ul, 3ul))
+{}
+
+ColumnDateTime64::ColumnDateTime64(size_t precision)
+    : Column(Type::CreateDateTime64(precision))
+    , data_(std::make_shared<ColumnDecimal>(18ul, precision))
+{}
+
+
+void ColumnDateTime64::Append(const Int128& value) {
+    data_->Append(value);
+}
+
+void ColumnDateTime64::Append(const std::string& value) {
+    data_->Append(value);
+}
+
+
+Int128 ColumnDateTime64::At(size_t n) const {
+    return data_->At(n);
+}
+
+void ColumnDateTime64::Append(ColumnRef column) {
+    if (auto col = column->As<ColumnDateTime64>()) {
+        data_->Append(col->data_);
+    }
+}
+
+bool ColumnDateTime64::Load(CodedInputStream* input, size_t rows) {
+    return data_->Load(input, rows);
+}
+
+void ColumnDateTime64::Save(CodedOutputStream* output) {
+    data_->Save(output);
+}
+
+void ColumnDateTime64::Clear() {
+    data_->Clear();
+}
+size_t ColumnDateTime64::Size() const {
+    return data_->Size();
+}
+
+ItemView ColumnDateTime64::GetItem(size_t index) const {
+    return data_->GetItem(index);
+}
+
+void ColumnDateTime64::Swap(Column& other) {
+    auto& col = dynamic_cast<ColumnDateTime64&>(other);
+    data_.swap(col.data_);
+}
+
+ColumnRef ColumnDateTime64::Slice(size_t begin, size_t len) {
+    auto col = data_->Slice(begin, len)->As<ColumnDecimal>();
+    size_t precision = col->Type()->As<DateTime64Type>()->GetPrecision();
+    auto result = std::make_shared<ColumnDateTime64>(precision); // TODO FIXME
+
+    result->data_->Append(col);
+
+    return result;
+}
+
 }

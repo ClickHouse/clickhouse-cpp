@@ -26,6 +26,7 @@ public:
         String,
         FixedString,
         DateTime,
+        DateTime64,
         Date,
         Array,
         Nullable,
@@ -75,6 +76,8 @@ public:
     static TypeRef CreateDate();
 
     static TypeRef CreateDateTime();
+
+    static TypeRef CreateDateTime64(size_t precision);
 
     static TypeRef CreateDecimal(size_t precision, size_t scale);
 
@@ -142,6 +145,18 @@ public:
 
 private:
     const size_t precision_, scale_;
+};
+
+class DateTime64Type: public Type {
+public:
+    DateTime64Type(size_t precision);
+
+    std::string GetName() const;
+
+    inline size_t GetPrecision() const { return precision_; }
+
+private:
+    size_t precision_;
 };
 
 class EnumType : public Type {
