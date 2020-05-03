@@ -9,6 +9,7 @@
 namespace clickhouse {
 
 bool TypeAst::operator==(const TypeAst & other) const {
+    // TODO: operator == must be a friend function.
     return meta == other.meta
         && code == other.code
         && name == other.name

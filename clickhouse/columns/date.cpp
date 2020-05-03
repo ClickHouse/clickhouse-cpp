@@ -113,19 +113,15 @@ ItemView ColumnDateTime::GetItem(size_t index) const {
     return data_->GetItem(index);
 }
 
-
-ColumnDateTime64::ColumnDateTime64()
-    : Column(Type::CreateDateTime64(3ul))
-    , data_(std::make_shared<ColumnDecimal>(18ul, 3ul))
-{}
-
 ColumnDateTime64::ColumnDateTime64(size_t precision)
     : Column(Type::CreateDateTime64(precision))
     , data_(std::make_shared<ColumnDecimal>(18ul, precision))
 {}
 
 
-void ColumnDateTime64::Append(const Int128& value) {
+void ColumnDateTime64::Append(const Int64& value) {
+    // TODO: we need a type, which represents datetime
+    // The precision of Poco.DateTime is not big enough.
     data_->Append(value);
 }
 
@@ -133,8 +129,7 @@ void ColumnDateTime64::Append(const std::string& value) {
     data_->Append(value);
 }
 
-
-Int128 ColumnDateTime64::At(size_t n) const {
+Int64 ColumnDateTime64::At(size_t n) const {
     return data_->At(n);
 }
 
@@ -176,6 +171,10 @@ ColumnRef ColumnDateTime64::Slice(size_t begin, size_t len) {
     result->data_->Append(col);
 
     return result;
+}
+
+size_t ColumnDateTime64::GetPrecision() const {
+    return data_->Type()->As<DecimalType>()->GetScale();
 }
 
 }

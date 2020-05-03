@@ -132,6 +132,18 @@ TEST(ColumnsCase, DateAppend) {
     ASSERT_EQ(col2->At(0), (now / 86400) * 86400);
 }
 
+TEST(ColumnsCase, DateTime64Precision) {
+    auto column = std::make_shared<ColumnDateTime64>(6ul);
+    ASSERT_EQ(column->GetPrecision(), 6ul);
+}
+
+TEST(ColumnsCase, DateTime64Append) {
+    auto column = std::make_shared<ColumnDateTime64>(6ul);
+    column->Append(Int64(1ll));
+    ASSERT_EQ(column->Size(), 1ul);
+    ASSERT_EQ(column->At(0), Int64(1ll));
+}
+
 TEST(ColumnsCase, Date2038) {
     auto col1 = std::make_shared<ColumnDate>();
     std::time_t largeDate(25882ul * 86400ul);
