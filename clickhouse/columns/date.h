@@ -87,15 +87,14 @@ private:
 /** */
 class ColumnDateTime64 : public Column {
 public:
-    ColumnDateTime64();
-    ColumnDateTime64(size_t);
+    explicit ColumnDateTime64(size_t);
 
     /// Appends one element to the end of column.
-    void Append(const Int128& value);
+    void Append(const Int64& value);
     void Append(const std::string& value);
 
     /// Returns element at given row number.
-    Int128 At(size_t n) const;
+    Int64 At(size_t n) const;
 
 public:
     /// Appends content of given column to the end of current one.
@@ -119,6 +118,8 @@ public:
     void Swap(Column& other) override;
 
     ItemView GetItem(size_t index) const override;
+
+    size_t GetPrecision() const;
 private:
     std::shared_ptr<ColumnDecimal> data_;
 };

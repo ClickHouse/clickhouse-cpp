@@ -54,6 +54,7 @@ private:
 };
 
 using Int128 = __int128;
+using Int64 = int64_t;
 
 using ColumnUInt8   = ColumnVector<uint8_t>;
 using ColumnUInt16  = ColumnVector<uint16_t>;
