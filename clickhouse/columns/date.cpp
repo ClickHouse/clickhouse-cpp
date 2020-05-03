@@ -120,7 +120,7 @@ ColumnDateTime64::ColumnDateTime64(size_t precision)
 
 
 void ColumnDateTime64::Append(const Int64& value) {
-    // TODO: we need a type, which represents datetime
+    // TODO: we need a type, which safely represents datetime.
     // The precision of Poco.DateTime is not big enough.
     data_->Append(value);
 }
