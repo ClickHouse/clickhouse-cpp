@@ -63,6 +63,7 @@ INSTALL(FILES base/string_view.h DESTINATION include/clickhouse/base/)
 INSTALL(FILES base/wire_format.h DESTINATION include/clickhouse/base/)
 
 # columns
+INSTALL(FILES columns/column.h DESTINATION include/clickhouse/columns/)
 INSTALL(FILES columns/array.h DESTINATION include/clickhouse/columns/)
 INSTALL(FILES columns/date.h DESTINATION include/clickhouse/columns/)
 INSTALL(FILES columns/enum.h DESTINATION include/clickhouse/columns/)
