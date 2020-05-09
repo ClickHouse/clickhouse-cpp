@@ -269,3 +269,4 @@ __pycache__/
 /buckaroo/
 .buckconfig.local
 BUCKAROO_DEPS
+cmake-build-debug
