@@ -1,7 +1,7 @@
-ClickHouse C++ client [![Build Status](https://travis-ci.org/artpaul/clickhouse-cpp.svg?branch=master)](https://travis-ci.org/artpaul/clickhouse-cpp)
+ClickHouse C++ 11 client [![Build Status](https://travis-ci.org/xplorfin/clickhouse-cpp-11.svg?branch=master)](https://travis-ci.org/artpaul/clickhouse-cpp)
 =====
 
-C++ client for [Yandex ClickHouse](https://clickhouse.yandex/)
+C++ client for [Yandex ClickHouse](https://clickhouse.yandex/). Modified for C++ 11 and maintained by Entropy. 
 
 ## Supported data types
 
