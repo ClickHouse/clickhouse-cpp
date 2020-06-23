@@ -36,7 +36,8 @@ public:
 
     /// Clear column data .
     void Clear() override;
-    
+    std::ostream& Dump(std::ostream& o, size_t index) const override;
+
     /// Returns count of rows in the column.
     size_t Size() const override;
 
@@ -51,4 +52,4 @@ private:
     std::shared_ptr<ColumnUInt8> nulls_;
 };
 
-}
+}  // namespace clickhouse

@@ -274,3 +274,4 @@ BUCKAROO_DEPS
 
 # Visual Studio Code
 /.vscode/
+/.ccls-cache/

@@ -15,22 +15,22 @@ class ColumnLowCardinalityT;
 
 namespace details {
 
-/** LowCardinalityHashKey used as key in unique items hashmap to abstract away key value
- * (type of which depends on dictionary column) and to reduce likelehood of collisions.
+/** LowCardinalityHashKey used as key in unique items hashmap to abstract away
+ * key value (type of which depends on dictionary column) and to reduce
+ * likelehood of collisions.
  *
- * In order to dramatically reduce collision rate, we use 2 different hashes from 2 different hash functions.
- * First hash is used in hashtable (to calculate item position).
- * Second one is used as part of key value and accessed via `operator==()` upon collision resolution/detection.
+ * In order to dramatically reduce collision rate, we use 2 different hashes
+ * from 2 different hash functions. First hash is used in hashtable (to
+ * calculate item position). Second one is used as part of key value and
+ * accessed via `operator==()` upon collision resolution/detection.
  */
 using LowCardinalityHashKey = std::pair<std::uint64_t, std::uint64_t>;
 
 struct LowCardinalityHashKeyHash {
-    inline std::size_t operator()(const LowCardinalityHashKey &hash_key) const noexcept {
-        return hash_key.first;
-    }
+    inline std::size_t operator()(const LowCardinalityHashKey& hash_key) const noexcept { return hash_key.first; }
 };
 
-}
+}  // namespace details
 
 class ColumnLowCardinality : public Column {
 public:
@@ -40,8 +40,9 @@ public:
     friend class ColumnLowCardinalityT;
 
 private:
-    // Please note that ColumnLowCardinalityT takes reference to underlying dictionary column object,
-    // so make sure to NOT change address of the dictionary object (with reset(), swap()) or with anything else.
+    // Please note that ColumnLowCardinalityT takes reference to underlying
+    // dictionary column object, so make sure to NOT change address of the
+    // dictionary object (with reset(), swap()) or with anything else.
     ColumnRef dictionary_column_;
     ColumnRef index_column_;
     UniqueItems unique_items_map_;
@@ -50,7 +51,8 @@ public:
     explicit ColumnLowCardinality(ColumnRef dictionary_column);
     ~ColumnLowCardinality();
 
-    /// Appends another LowCardinality column to the end of this one, updating dictionary.
+    /// Appends another LowCardinality column to the end of this one, updating
+    /// dictionary.
     void Append(ColumnRef /*column*/) override;
 
     /// Loads column data from input stream.
@@ -70,6 +72,7 @@ public:
 
     void Swap(Column& other) override;
     ItemView GetItem(size_t index) const override;
+    std::ostream& Dump(std::ostream& o, size_t /*index*/) const override { return o; };
 
     size_t GetDictionarySize() const;
     TypeRef GetNestedType() const;
@@ -80,13 +83,14 @@ protected:
     void removeLastIndex();
 
     ColumnRef GetDictionary();
-    void AppendUnsafe(const ItemView &);
+    void AppendUnsafe(const ItemView&);
 
 public:
-    static details::LowCardinalityHashKey computeHashKey(const ItemView &);
+    static details::LowCardinalityHashKey computeHashKey(const ItemView&);
 };
 
-/** Type-aware wrapper that provides simple convenience interface for accessing/appending individual items.
+/** Type-aware wrapper that provides simple convenience interface for
+ * accessing/appending individual items.
  */
 template <typename DictionaryColumnType>
 class ColumnLowCardinalityT : public ColumnLowCardinality {
@@ -94,40 +98,35 @@ class ColumnLowCardinalityT : public ColumnLowCardinality {
 
 public:
     using WrappedColumnType = DictionaryColumnType;
-    // Type this column takes as argument of Append and returns with At() and operator[]
+    // Type this column takes as argument of Append and returns with At() and
+    // operator[]
     using ValueType = typename DictionaryColumnType::ValueType;
 
-    template <typename ...Args>
-    explicit ColumnLowCardinalityT(Args &&... args)
+    template <typename... Args>
+    explicit ColumnLowCardinalityT(Args&&... args)
         : ColumnLowCardinality(std::make_shared<DictionaryColumnType>(std::forward<Args>(args)...)),
-          typed_dictionary_(dynamic_cast<DictionaryColumnType &>(*GetDictionary()))
-    {}
+          typed_dictionary_(dynamic_cast<DictionaryColumnType&>(*GetDictionary())) {}
 
     /// Extended interface to simplify reading/adding individual items.
 
     /// Returns element at given row number.
-    inline ValueType At(size_t n) const {
-        return typed_dictionary_.At(getDictionaryIndex(n));
-    }
+    inline ValueType At(size_t n) const { return typed_dictionary_.At(getDictionaryIndex(n)); }
 
     /// Returns element at given row number.
-    inline ValueType operator [] (size_t n) const {
-        return typed_dictionary_[getDictionaryIndex(n)];
-    }
+    inline ValueType operator[](size_t n) const { return typed_dictionary_[getDictionaryIndex(n)]; }
 
-    // so the non-virtual Append below doesn't shadow Append() from base class when compiled with older compilers.
+    // so the non-virtual Append below doesn't shadow Append() from base class
+    // when compiled with older compilers.
     using ColumnLowCardinality::Append;
 
-    inline void Append(const ValueType & value) {
-        AppendUnsafe(ItemView{typed_dictionary_.Type()->GetCode(), value});
-    }
+    inline void Append(const ValueType& value) { AppendUnsafe(ItemView{typed_dictionary_.Type()->GetCode(), value}); }
 
     template <typename T>
     inline void AppendMany(const T& container) {
-        for (const auto & item : container) {
+        for (const auto& item : container) {
             Append(item);
         }
     }
 };
 
-}
+}  // namespace clickhouse

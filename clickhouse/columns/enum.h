@@ -4,7 +4,6 @@
 
 namespace clickhouse {
 
-
 template <typename T>
 class ColumnEnum : public Column {
 public:
@@ -20,7 +19,7 @@ public:
     const std::string NameAt(size_t n) const;
 
     /// Returns element at given row number.
-    const T& operator[] (size_t n) const;
+    const T& operator[](size_t n) const;
 
     /// Set element at given row number.
     void SetAt(size_t n, const T& value, bool checkValue = false);
@@ -35,7 +34,8 @@ public:
 
     /// Saves column data to output stream.
     void Save(CodedOutputStream* output) override;
-    
+
+    std::ostream& Dump(std::ostream& o, size_t index) const override;
     /// Clear column data .
     void Clear() override;
 
@@ -53,7 +53,7 @@ private:
     std::vector<T> data_;
 };
 
-using ColumnEnum8 = ColumnEnum<int8_t>;
+using ColumnEnum8  = ColumnEnum<int8_t>;
 using ColumnEnum16 = ColumnEnum<int16_t>;
 
-}
+}  // namespace clickhouse

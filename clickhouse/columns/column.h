@@ -2,8 +2,8 @@
 
 #include "../base/coded.h"
 #include "../base/input.h"
-#include "../types/types.h"
 #include "../columns/itemview.h"
+#include "../types/types.h"
 
 #include <memory>
 
@@ -56,15 +56,16 @@ public:
 
     virtual void Swap(Column&) = 0;
 
-    /// Get a view on raw item data if it is supported by column, will throw an exception if index is out of range.
-    /// Please note that view is invalidated once column is items are added or deleted, column is loaded from strean or destroyed.
-    virtual ItemView GetItem(size_t) const {
-        throw std::runtime_error("GetItem() is not supported for column of " + type_->GetName());
-    }
+    /// Get a view on raw item data if it is supported by column, will throw an
+    /// exception if index is out of range. Please note that view is invalidated
+    /// once column is items are added or deleted, column is loaded from strean
+    /// or destroyed.
+    virtual ItemView GetItem(size_t) const { throw std::runtime_error("GetItem() is not supported for column of " + type_->GetName()); }
 
-    friend void swap(Column& left, Column& right) {
-        left.Swap(right);
-    }
+    friend void swap(Column& left, Column& right) { left.Swap(right); }
+
+    // Dump the string representation of column data into ostream
+    virtual std::ostream& Dump(std::ostream& o, size_t index) const = 0;
 
 protected:
     TypeRef type_;

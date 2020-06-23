@@ -1,8 +1,8 @@
 #include "lowcardinality.h"
 
-#include "string.h"
-#include "nullable.h"
 #include "../base/wire_format.h"
+#include "nullable.h"
+#include "string.h"
 
 #include <cityhash/city.h>
 
@@ -29,9 +29,11 @@ constexpr uint64_t IndexTypeMask = 0b11111111;
 enum IndexFlag {
     /// Need to read dictionary if it wasn't.
     NeedGlobalDictionaryBit = 1u << 8u,
-    /// Need to read additional keys. Additional keys are stored before indexes as value N and N keys after them.
+    /// Need to read additional keys. Additional keys are stored before indexes
+    /// as value N and N keys after them.
     HasAdditionalKeysBit = 1u << 9u,
-    /// Need to update dictionary. It means that previous granule has different dictionary.
+    /// Need to update dictionary. It means that previous granule has different
+    /// dictionary.
     NeedUpdateDictionary = 1u << 10u
 };
 
@@ -50,7 +52,7 @@ ColumnRef createIndexColumn(IndexType type) {
     throw std::runtime_error("Invalid LowCardinality index type value: " + std::to_string(static_cast<uint64_t>(type)));
 }
 
-IndexType indexTypeFromIndexColumn(const Column & index_column) {
+IndexType indexTypeFromIndexColumn(const Column& index_column) {
     switch (index_column.Type()->GetCode()) {
         case Type::UInt8:
             return IndexType::UInt8;
@@ -66,18 +68,19 @@ IndexType indexTypeFromIndexColumn(const Column & index_column) {
 }
 
 template <typename ResultColumnType, typename ColumnType>
-inline const ResultColumnType & column_down_cast(const ColumnType & c) {
-    return dynamic_cast<const ResultColumnType &>(c);
+inline const ResultColumnType& column_down_cast(const ColumnType& c) {
+    return dynamic_cast<const ResultColumnType&>(c);
 }
 
 template <typename ResultColumnType, typename ColumnType>
-inline ResultColumnType & column_down_cast(ColumnType & c) {
-    return dynamic_cast<ResultColumnType &>(c);
+inline ResultColumnType& column_down_cast(ColumnType& c) {
+    return dynamic_cast<ResultColumnType&>(c);
 }
 
-// std::visit-ish function to avoid including <variant> header, which is not present in older version of XCode.
+// std::visit-ish function to avoid including <variant> header, which is not
+// present in older version of XCode.
 template <typename Vizitor, typename ColumnType>
-inline auto VisitIndexColumn(Vizitor && vizitor, ColumnType && col) {
+inline auto VisitIndexColumn(Vizitor&& vizitor, ColumnType&& col) {
     switch (col.Type()->GetCode()) {
         case Type::UInt8:
             return vizitor(column_down_cast<ColumnUInt8>(col));
@@ -92,7 +95,7 @@ inline auto VisitIndexColumn(Vizitor && vizitor, ColumnType && col) {
     }
 }
 
-inline void AppendToDictionary(Column& dictionary, const ItemView & item) {
+inline void AppendToDictionary(Column& dictionary, const ItemView& item) {
     switch (dictionary.GetType().GetCode()) {
         case Type::FixedString:
             column_down_cast<ColumnFixedString>(dictionary).Append(item.get<std::string_view>());
@@ -115,16 +118,16 @@ inline void AppendNullItemToDictionary(ColumnRef dictionary) {
     }
 }
 
-}
+}  // namespace
 
 namespace clickhouse {
 ColumnLowCardinality::ColumnLowCardinality(ColumnRef dictionary_column)
     : Column(Type::CreateLowCardinality(dictionary_column->Type())),
       dictionary_column_(dictionary_column),
-      index_column_(std::make_shared<ColumnUInt32>())
-{
+      index_column_(std::make_shared<ColumnUInt32>()) {
     if (dictionary_column_->Size() != 0) {
-        // When dictionary column was constructed with values, re-add values by copying to update index and unique_items_map.
+        // When dictionary column was constructed with values, re-add values by
+        // copying to update index and unique_items_map.
 
         // Steal values into temporary column.
         auto values = dictionary_column_->Slice(0, 0);
@@ -133,36 +136,30 @@ ColumnLowCardinality::ColumnLowCardinality(ColumnRef dictionary_column)
         AppendNullItemToDictionary(dictionary_column_);
 
         // Re-add values, updating index and unique_items_map.
-        for (size_t i = 0; i < values->Size(); ++i)
-            AppendUnsafe(values->GetItem(i));
+        for (size_t i = 0; i < values->Size(); ++i) AppendUnsafe(values->GetItem(i));
     } else {
         AppendNullItemToDictionary(dictionary_column_);
     }
 }
 
-ColumnLowCardinality::~ColumnLowCardinality()
-{}
+ColumnLowCardinality::~ColumnLowCardinality() {
+}
 
 std::uint64_t ColumnLowCardinality::getDictionaryIndex(std::uint64_t item_index) const {
-    return VisitIndexColumn([item_index](const auto & arg) -> std::uint64_t {
-        return arg[item_index];
-    }, *index_column_);
+    return VisitIndexColumn([item_index](const auto& arg) -> std::uint64_t { return arg[item_index]; }, *index_column_);
 }
 
 void ColumnLowCardinality::appendIndex(std::uint64_t item_index) {
-    // TODO (nemkov): handle case when index should go from UInt8 to UInt16, etc.
-    VisitIndexColumn([item_index](auto & arg) {
-        arg.Append(item_index);
-    }, *index_column_);
+    // TODO (nemkov): handle case when index should go from UInt8 to UInt16,
+    // etc.
+    VisitIndexColumn([item_index](auto& arg) { arg.Append(item_index); }, *index_column_);
 }
 
 void ColumnLowCardinality::removeLastIndex() {
-    VisitIndexColumn([](auto & arg) {
-        arg.Erase(arg.Size() - 1);
-    }, *index_column_);
+    VisitIndexColumn([](auto& arg) { arg.Erase(arg.Size() - 1); }, *index_column_);
 }
 
-details::LowCardinalityHashKey ColumnLowCardinality::computeHashKey(const ItemView & item) {
+details::LowCardinalityHashKey ColumnLowCardinality::computeHashKey(const ItemView& item) {
     static const auto hasher = std::hash<ItemView::DataType>{};
     if (item.type == Type::Void) {
         // to distinguish NULL of ColumnNullable and empty string.
@@ -181,8 +178,7 @@ ColumnRef ColumnLowCardinality::GetDictionary() {
 
 void ColumnLowCardinality::Append(ColumnRef col) {
     auto c = col->As<ColumnLowCardinality>();
-    if (!c || !dictionary_column_->Type()->IsEqual(c->dictionary_column_->Type()))
-        return;
+    if (!c || !dictionary_column_->Type()->IsEqual(c->dictionary_column_->Type())) return;
 
     for (size_t i = 0; i < c->Size(); ++i) {
         AppendUnsafe(c->GetItem(i));
@@ -192,47 +188,42 @@ void ColumnLowCardinality::Append(ColumnRef col) {
 namespace {
 
 auto Load(ColumnRef new_dictionary_column, CodedInputStream* input, size_t rows) {
-    // This code tries to follow original implementation of ClickHouse's LowCardinality serialization with
-    // NativeBlockOutputStream::writeData() for DataTypeLowCardinality
-    // (see corresponding serializeBinaryBulkStateSuffix, serializeBinaryBulkStatePrefix, and serializeBinaryBulkWithMultipleStreams),
-    // but with certain simplifications: no shared dictionaries, no on-the-fly dictionary updates.
+    // This code tries to follow original implementation of ClickHouse's
+    // LowCardinality serialization with NativeBlockOutputStream::writeData()
+    // for DataTypeLowCardinality (see corresponding
+    // serializeBinaryBulkStateSuffix, serializeBinaryBulkStatePrefix, and
+    // serializeBinaryBulkWithMultipleStreams), but with certain
+    // simplifications: no shared dictionaries, no on-the-fly dictionary
+    // updates.
     //
-    // As for now those fetures not used in client-server protocol and minimal implimintation suffice,
-    // however some day they may.
+    // As for now those fetures not used in client-server protocol and minimal
+    // implimintation suffice, however some day they may.
 
     // prefix
     uint64_t key_version;
-    if (!WireFormat::ReadFixed(input, &key_version))
-        throw std::runtime_error("Failed to read key serialization version.");
+    if (!WireFormat::ReadFixed(input, &key_version)) throw std::runtime_error("Failed to read key serialization version.");
 
     if (key_version != KeySerializationVersion::SharedDictionariesWithAdditionalKeys)
         throw std::runtime_error("Invalid key serialization version value.");
 
     // body
     uint64_t index_serialization_type;
-    if (!WireFormat::ReadFixed(input, &index_serialization_type))
-        throw std::runtime_error("Failed to read index serializaton type.");
+    if (!WireFormat::ReadFixed(input, &index_serialization_type)) throw std::runtime_error("Failed to read index serializaton type.");
 
     auto new_index_column = createIndexColumn(static_cast<IndexType>(index_serialization_type & IndexTypeMask));
-    if (index_serialization_type & IndexFlag::NeedGlobalDictionaryBit)
-        throw std::runtime_error("Global dictionary is not supported.");
+    if (index_serialization_type & IndexFlag::NeedGlobalDictionaryBit) throw std::runtime_error("Global dictionary is not supported.");
 
-    if ((index_serialization_type & IndexFlag::HasAdditionalKeysBit) == 0)
-        throw std::runtime_error("HasAdditionalKeysBit is missing.");
+    if ((index_serialization_type & IndexFlag::HasAdditionalKeysBit) == 0) throw std::runtime_error("HasAdditionalKeysBit is missing.");
 
     uint64_t number_of_keys;
-    if (!WireFormat::ReadFixed(input, &number_of_keys))
-        throw std::runtime_error("Failed to read number of rows in dictionary column.");
+    if (!WireFormat::ReadFixed(input, &number_of_keys)) throw std::runtime_error("Failed to read number of rows in dictionary column.");
 
-    if (!new_dictionary_column->Load(input, number_of_keys))
-        throw std::runtime_error("Failed to read values of dictionary column.");
+    if (!new_dictionary_column->Load(input, number_of_keys)) throw std::runtime_error("Failed to read values of dictionary column.");
 
     uint64_t number_of_rows;
-    if (!WireFormat::ReadFixed(input, &number_of_rows))
-        throw std::runtime_error("Failed to read number of rows in index column.");
+    if (!WireFormat::ReadFixed(input, &number_of_rows)) throw std::runtime_error("Failed to read number of rows in index column.");
 
-    if (number_of_rows != rows)
-        throw std::runtime_error("LowCardinality column must be read in full.");
+    if (number_of_rows != rows) throw std::runtime_error("LowCardinality column must be read in full.");
 
     new_index_column->Load(input, number_of_rows);
 
@@ -248,7 +239,7 @@ auto Load(ColumnRef new_dictionary_column, CodedInputStream* input, size_t rows)
     return std::make_tuple(new_dictionary_column, new_index_column, new_unique_items_map);
 }
 
-}
+}  // namespace
 
 bool ColumnLowCardinality::Load(CodedInputStream* input, size_t rows) {
     try {
@@ -296,25 +287,24 @@ size_t ColumnLowCardinality::Size() const {
 
 ColumnRef ColumnLowCardinality::Slice(size_t begin, size_t len) {
     begin = std::min(begin, Size());
-    len = std::min(len, Size() - begin);
+    len   = std::min(len, Size() - begin);
 
     ColumnRef new_dictionary = dictionary_column_->Slice(0, 0);
-    auto result = std::make_shared<ColumnLowCardinality>(new_dictionary);
+    auto result              = std::make_shared<ColumnLowCardinality>(new_dictionary);
 
-    for (size_t i = begin; i < begin + len; ++i)
-        result->AppendUnsafe(this->GetItem(i));
+    for (size_t i = begin; i < begin + len; ++i) result->AppendUnsafe(this->GetItem(i));
 
     return result;
 }
 
 void ColumnLowCardinality::Swap(Column& other) {
-    auto & col = dynamic_cast<ColumnLowCardinality &>(other);
+    auto& col = dynamic_cast<ColumnLowCardinality&>(other);
     if (!dictionary_column_->Type()->IsEqual(col.dictionary_column_->Type()))
         throw std::runtime_error("Can't swap() LowCardinality columns of different types.");
 
     // It is important here not to swap pointers to dictionary object,
-    // but swap contents of dictionaries, so the object inside shared_ptr stays the same
-    // (needed for ColumnLowCardinalityT)
+    // but swap contents of dictionaries, so the object inside shared_ptr stays
+    // the same (needed for ColumnLowCardinalityT)
     dictionary_column_->Swap(*col.dictionary_column_);
 
     index_column_.swap(col.index_column_);
@@ -326,28 +316,26 @@ ItemView ColumnLowCardinality::GetItem(size_t index) const {
 }
 
 // No checks regarding value type or validity of value is made.
-void ColumnLowCardinality::AppendUnsafe(const ItemView & value) {
-    const auto key = computeHashKey(value);
+void ColumnLowCardinality::AppendUnsafe(const ItemView& value) {
+    const auto key                = computeHashKey(value);
     const auto initial_index_size = index_column_->Size();
-    // If the value is unique, then we are going to append it to a dictionary, hence new index is Size().
+    // If the value is unique, then we are going to append it to a dictionary,
+    // hence new index is Size().
     auto [iterator, is_new_item] = unique_items_map_.try_emplace(key, dictionary_column_->Size());
     try {
-        // Order is important, adding to dictionary last, since it is much (MUCH!!!!) harder
-        // to remove item from dictionary column than from index column
-        // (also, there is currently no API to do that).
-        // Hence in catch-block we assume that dictionary wasn't modified on exception
+        // Order is important, adding to dictionary last, since it is much
+        // (MUCH!!!!) harder to remove item from dictionary column than from
+        // index column (also, there is currently no API to do that). Hence in
+        // catch-block we assume that dictionary wasn't modified on exception
         // and there is nothing to rollback.
 
         appendIndex(iterator->second);
         if (is_new_item) {
             AppendToDictionary(*dictionary_column_, value);
         }
-    }
-    catch (...) {
-        if (index_column_->Size() != initial_index_size)
-            removeLastIndex();
-        if (is_new_item)
-            unique_items_map_.erase(iterator);
+    } catch (...) {
+        if (index_column_->Size() != initial_index_size) removeLastIndex();
+        if (is_new_item) unique_items_map_.erase(iterator);
 
         throw;
     }
@@ -361,4 +349,4 @@ TypeRef ColumnLowCardinality::GetNestedType() const {
     return dictionary_column_->Type();
 }
 
-}
+}  // namespace clickhouse

@@ -140,6 +140,8 @@ public:
 
     inline size_t GetScale() const { return scale_; }
 
+    inline size_t GetPrecision() const { return precision_; }
+
 private:
     const size_t precision_, scale_;
 };

@@ -7,32 +7,26 @@ namespace {
 const size_t DEFAULT_BLOCK_SIZE = 4096;
 
 template <typename Container>
-size_t ComputeTotalSize(const Container & strings, size_t begin = 0, size_t len = -1)
-{
+size_t ComputeTotalSize(const Container& strings, size_t begin = 0, size_t len = -1) {
     size_t result = 0;
     if (begin < strings.size()) {
         len = std::min(len, strings.size() - begin);
 
-        for (size_t i = begin; i < begin + len; ++i)
-            result += strings[i].size();
+        for (size_t i = begin; i < begin + len; ++i) result += strings[i].size();
     }
 
     return result;
 }
 
-}
+}  // namespace
 
 namespace clickhouse {
 
-ColumnFixedString::ColumnFixedString(size_t n)
-    : Column(Type::CreateString(n))
-    , string_size_(n)
-{
+ColumnFixedString::ColumnFixedString(size_t n) : Column(Type::CreateString(n)), string_size_(n) {
 }
 
 void ColumnFixedString::Append(std::string_view str) {
-    if (data_.capacity() < str.size())
-    {
+    if (data_.capacity() < str.size()) {
         // round up to the next block size
         const auto new_size = (((data_.size() + string_size_) / DEFAULT_BLOCK_SIZE) + 1) * DEFAULT_BLOCK_SIZE;
         data_.reserve(new_size);
@@ -50,14 +44,13 @@ std::string_view ColumnFixedString::At(size_t n) const {
     return std::string_view(&data_.at(pos), string_size_);
 }
 
-std::string_view ColumnFixedString::operator [](size_t n) const {
+std::string_view ColumnFixedString::operator[](size_t n) const {
     const auto pos = n * string_size_;
     return std::string_view(&data_[pos], string_size_);
 }
 
-size_t ColumnFixedString::FixedSize() const
-{
-       return string_size_;
+size_t ColumnFixedString::FixedSize() const {
+    return string_size_;
 }
 
 void ColumnFixedString::Append(ColumnRef column) {
@@ -89,8 +82,8 @@ ColumnRef ColumnFixedString::Slice(size_t begin, size_t len) {
     auto result = std::make_shared<ColumnFixedString>(string_size_);
 
     if (begin < Size()) {
-        const auto b = begin * string_size_;
-        const auto l = len * string_size_;
+        const auto b  = begin * string_size_;
+        const auto l  = len * string_size_;
         result->data_ = data_.substr(b, std::min(data_.size() - b, l));
     }
 
@@ -98,7 +91,7 @@ ColumnRef ColumnFixedString::Slice(size_t begin, size_t len) {
 }
 
 void ColumnFixedString::Swap(Column& other) {
-    auto & col = dynamic_cast<ColumnFixedString &>(other);
+    auto& col = dynamic_cast<ColumnFixedString&>(other);
     std::swap(string_size_, col.string_size_);
     data_.swap(col.data_);
 }
@@ -107,23 +100,14 @@ ItemView ColumnFixedString::GetItem(size_t index) const {
     return ItemView{Type::FixedString, this->At(index)};
 }
 
-struct ColumnString::Block
-{
+struct ColumnString::Block {
     using CharT = typename std::string::value_type;
 
-    explicit Block(size_t starting_capacity)
-        : size(0),
-          capacity(starting_capacity),
-          data_(new CharT[capacity])
-    {}
+    explicit Block(size_t starting_capacity) : size(0), capacity(starting_capacity), data_(new CharT[capacity]) {}
 
-    inline auto GetAvailble() const
-    {
-        return capacity - size;
-    }
+    inline auto GetAvailble() const { return capacity - size; }
 
-    std::string_view AppendUnsafe(std::string_view str)
-    {
+    std::string_view AppendUnsafe(std::string_view str) {
         const auto pos = &data_[size];
 
         memcpy(pos, str.data(), str.size());
@@ -132,13 +116,9 @@ struct ColumnString::Block
         return std::string_view(pos, str.size());
     }
 
-    auto GetCurrentWritePos()
-    {
-        return &data_[size];
-    }
+    auto GetCurrentWritePos() { return &data_[size]; }
 
-    std::string_view ConsumeTailAsStringViewUnsafe(size_t len)
-    {
+    std::string_view ConsumeTailAsStringViewUnsafe(size_t len) {
         const auto start = &data_[size];
         size += len;
         return std::string_view(start, len);
@@ -149,37 +129,30 @@ struct ColumnString::Block
     std::unique_ptr<CharT[]> data_;
 };
 
-ColumnString::ColumnString()
-    : Column(Type::CreateString())
-{
+ColumnString::ColumnString() : Column(Type::CreateString()) {
 }
 
-ColumnString::ColumnString(const std::vector<std::string> & data)
-    : Column(Type::CreateString())
-{
+ColumnString::ColumnString(const std::vector<std::string>& data) : Column(Type::CreateString()) {
     items_.reserve(data.size());
     blocks_.emplace_back(ComputeTotalSize(data));
 
-    for (const auto & s : data)
-    {
+    for (const auto& s : data) {
         AppendUnsafe(s);
     }
 }
 
-ColumnString::~ColumnString()
-{}
+ColumnString::~ColumnString() {
+}
 
 void ColumnString::Append(std::string_view str) {
-    if (blocks_.size() == 0 || blocks_.back().GetAvailble() < str.length())
-    {
+    if (blocks_.size() == 0 || blocks_.back().GetAvailble() < str.length()) {
         blocks_.emplace_back(std::max(DEFAULT_BLOCK_SIZE, str.size()));
     }
 
     items_.emplace_back(blocks_.back().AppendUnsafe(str));
 }
 
-void ColumnString::AppendUnsafe(std::string_view str)
-{
+void ColumnString::AppendUnsafe(std::string_view str) {
     items_.emplace_back(blocks_.back().AppendUnsafe(str));
 }
 
@@ -192,7 +165,7 @@ std::string_view ColumnString::At(size_t n) const {
     return items_.at(n);
 }
 
-std::string_view ColumnString::operator [] (size_t n) const {
+std::string_view ColumnString::operator[](size_t n) const {
     return items_[n];
 }
 
@@ -200,7 +173,8 @@ void ColumnString::Append(ColumnRef column) {
     if (auto col = column->As<ColumnString>()) {
         const auto total_size = ComputeTotalSize(col->items_);
 
-        // TODO: fill up existing block with some items and then add a new one for the rest of items
+        // TODO: fill up existing block with some items and then add a new one
+        // for the rest of items
         if (blocks_.size() == 0 || blocks_.back().GetAvailble() < total_size)
             blocks_.emplace_back(std::max(DEFAULT_BLOCK_SIZE, total_size));
         items_.reserve(items_.size() + col->Size());
@@ -216,19 +190,17 @@ bool ColumnString::Load(CodedInputStream* input, size_t rows) {
     blocks_.clear();
 
     items_.reserve(rows);
-    Block * block = nullptr;
+    Block* block = nullptr;
 
-    // TODO(performance): unroll a loop to a first row (to get rid of `blocks_.size() == 0` check) and the rest.
+    // TODO(performance): unroll a loop to a first row (to get rid of
+    // `blocks_.size() == 0` check) and the rest.
     for (size_t i = 0; i < rows; ++i) {
         uint64_t len;
-        if (!WireFormat::ReadUInt64(input, &len))
-            return false;
+        if (!WireFormat::ReadUInt64(input, &len)) return false;
 
-        if (blocks_.size() == 0 || len > block->GetAvailble())
-            block = &blocks_.emplace_back(std::max<size_t>(DEFAULT_BLOCK_SIZE, len));
+        if (blocks_.size() == 0 || len > block->GetAvailble()) block = &blocks_.emplace_back(std::max<size_t>(DEFAULT_BLOCK_SIZE, len));
 
-        if (!WireFormat::ReadBytes(input, block->GetCurrentWritePos(), len))
-            return false;
+        if (!WireFormat::ReadBytes(input, block->GetCurrentWritePos(), len)) return false;
 
         items_.emplace_back(block->ConsumeTailAsStringViewUnsafe(len));
     }
@@ -237,7 +209,7 @@ bool ColumnString::Load(CodedInputStream* input, size_t rows) {
 }
 
 void ColumnString::Save(CodedOutputStream* output) {
-    for (const auto & item : items_) {
+    for (const auto& item : items_) {
         WireFormat::WriteString(output, item);
     }
 }
@@ -253,8 +225,7 @@ ColumnRef ColumnString::Slice(size_t begin, size_t len) {
         len = std::min(len, items_.size() - begin);
 
         result->blocks_.emplace_back(ComputeTotalSize(items_, begin, len));
-        for (size_t i = begin; i < begin + len; ++i)
-        {
+        for (size_t i = begin; i < begin + len; ++i) {
             result->Append(items_[i]);
         }
     }
@@ -263,7 +234,7 @@ ColumnRef ColumnString::Slice(size_t begin, size_t len) {
 }
 
 void ColumnString::Swap(Column& other) {
-    auto & col = dynamic_cast<ColumnString &>(other);
+    auto& col = dynamic_cast<ColumnString&>(other);
     items_.swap(col.items_);
     blocks_.swap(col.blocks_);
 }
@@ -272,4 +243,11 @@ ItemView ColumnString::GetItem(size_t index) const {
     return ItemView{Type::String, this->At(index)};
 }
 
+std::ostream& ColumnFixedString::Dump(std::ostream& o, size_t index) const {
+    return o << this->At(index);
 }
+
+std::ostream& ColumnString::Dump(std::ostream& o, size_t index) const {
+    return o << this->At(index);
+}
+}  // namespace clickhouse

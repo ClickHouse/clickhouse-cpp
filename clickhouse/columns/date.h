@@ -30,12 +30,14 @@ public:
 
     /// Clear column data .
     void Clear() override;
-    
+
     /// Returns count of rows in the column.
     size_t Size() const override;
 
     /// Makes slice of the current column.
     ColumnRef Slice(size_t begin, size_t len) override;
+
+    std::ostream& Dump(std::ostream& o, size_t index) const override;
 
     void Swap(Column& other) override;
 
@@ -70,6 +72,7 @@ public:
 
     /// Returns count of rows in the column.
     size_t Size() const override;
+    std::ostream& Dump(std::ostream& o, size_t index) const override;
 
     /// Makes slice of the current column.
     ColumnRef Slice(size_t begin, size_t len) override;
@@ -82,4 +85,4 @@ private:
     std::shared_ptr<ColumnUInt32> data_;
 };
 
-}
+}  // namespace clickhouse

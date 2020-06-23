@@ -23,7 +23,7 @@ public:
     const T& At(size_t n) const;
 
     /// Returns element at given row number.
-    const T& operator [] (size_t n) const;
+    const T& operator[](size_t n) const;
 
     void Erase(size_t pos, size_t count = 1);
 
@@ -42,6 +42,7 @@ public:
 
     /// Returns count of rows in the column.
     size_t Size() const override;
+    std::ostream& Dump(std::ostream& o, size_t index) const override;
 
     /// Makes slice of the current column.
     ColumnRef Slice(size_t begin, size_t len) override;
@@ -55,18 +56,18 @@ private:
 
 using Int128 = __int128;
 
-using ColumnUInt8   = ColumnVector<uint8_t>;
-using ColumnUInt16  = ColumnVector<uint16_t>;
-using ColumnUInt32  = ColumnVector<uint32_t>;
-using ColumnUInt64  = ColumnVector<uint64_t>;
+using ColumnUInt8  = ColumnVector<uint8_t>;
+using ColumnUInt16 = ColumnVector<uint16_t>;
+using ColumnUInt32 = ColumnVector<uint32_t>;
+using ColumnUInt64 = ColumnVector<uint64_t>;
 
-using ColumnInt8    = ColumnVector<int8_t>;
-using ColumnInt16   = ColumnVector<int16_t>;
-using ColumnInt32   = ColumnVector<int32_t>;
-using ColumnInt64   = ColumnVector<int64_t>;
-using ColumnInt128  = ColumnVector<Int128>;
+using ColumnInt8   = ColumnVector<int8_t>;
+using ColumnInt16  = ColumnVector<int16_t>;
+using ColumnInt32  = ColumnVector<int32_t>;
+using ColumnInt64  = ColumnVector<int64_t>;
+using ColumnInt128 = ColumnVector<Int128>;
 
 using ColumnFloat32 = ColumnVector<float>;
 using ColumnFloat64 = ColumnVector<double>;
 
-}
+}  // namespace clickhouse

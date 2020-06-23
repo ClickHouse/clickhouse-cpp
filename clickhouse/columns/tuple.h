@@ -16,17 +16,16 @@ public:
     /// Returns count of columns in the tuple.
     size_t TupleSize() const;
 
-    ColumnRef operator [] (size_t n) const {
-        return columns_[n];
-    }
+    ColumnRef operator[](size_t n) const { return columns_[n]; }
 
 public:
     /// Appends content of given column to the end of current one.
-    void Append(ColumnRef) override { }
+    void Append(ColumnRef) override {}
 
     /// Loads column data from input stream.
     bool Load(CodedInputStream* input, size_t rows) override;
 
+    std::ostream& Dump(std::ostream& o, size_t index) const override;
     /// Saves column data to output stream.
     void Save(CodedOutputStream* output) override;
 
@@ -44,4 +43,4 @@ private:
     std::vector<ColumnRef> columns_;
 };
 
-}
+}  // namespace clickhouse

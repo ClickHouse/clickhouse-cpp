@@ -9,16 +9,10 @@ using in_addr_t = unsigned long;
 
 namespace clickhouse {
 
-ColumnIPv4::ColumnIPv4()
-    : Column(Type::CreateIPv4())
-    , data_(std::make_shared<ColumnUInt32>())
-{
+ColumnIPv4::ColumnIPv4() : Column(Type::CreateIPv4()), data_(std::make_shared<ColumnUInt32>()) {
 }
 
-ColumnIPv4::ColumnIPv4(ColumnRef data)
-    : Column(Type::CreateIPv4())
-    , data_(data->As<ColumnUInt32>())
-{
+ColumnIPv4::ColumnIPv4(ColumnRef data) : Column(Type::CreateIPv4()), data_(data->As<ColumnUInt32>()) {
     if (data_->Size() != 0) {
         throw std::runtime_error("number of entries must be even (32-bit numbers for each IPv4)");
     }
@@ -46,7 +40,7 @@ in_addr ColumnIPv4::At(size_t n) const {
     return addr;
 }
 
-in_addr ColumnIPv4::operator [] (size_t n) const {
+in_addr ColumnIPv4::operator[](size_t n) const {
     struct in_addr addr;
     addr.s_addr = ntohl(data_->operator[](n));
     return addr;
@@ -79,7 +73,7 @@ ColumnRef ColumnIPv4::Slice(size_t begin, size_t len) {
 }
 
 void ColumnIPv4::Swap(Column& other) {
-    auto & col = dynamic_cast<ColumnIPv4 &>(other);
+    auto& col = dynamic_cast<ColumnIPv4&>(other);
     data_.swap(col.data_);
 }
 
@@ -87,4 +81,7 @@ ItemView ColumnIPv4::GetItem(size_t index) const {
     return data_->GetItem(index);
 }
 
+std::ostream& ColumnIPv4::Dump(std::ostream& o, size_t index) const {
+    return o << AsString(index);
 }
+}  // namespace clickhouse

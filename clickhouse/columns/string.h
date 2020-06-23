@@ -25,10 +25,11 @@ public:
     std::string_view At(size_t n) const;
 
     /// Returns element at given row number.
-    std::string_view operator [] (size_t n) const;
+    std::string_view operator[](size_t n) const;
 
     /// Returns the max size of the fixed string
     size_t FixedSize() const;
+    std::ostream& Dump(std::ostream& o, size_t index) const override;
 
 public:
     /// Appends content of given column to the end of current one.
@@ -63,15 +64,16 @@ private:
  */
 class ColumnString : public Column {
 public:
-    // Type this column takes as argument of Append and returns with At() and operator[]
+    // Type this column takes as argument of Append and returns with At() and
+    // operator[]
     using ValueType = std::string_view;
 
     ColumnString();
     ~ColumnString();
 
-    explicit ColumnString(const std::vector<std::string> & data);
+    explicit ColumnString(const std::vector<std::string>& data);
     ColumnString& operator=(const ColumnString&) = delete;
-    ColumnString(const ColumnString&) = delete;
+    ColumnString(const ColumnString&)            = delete;
 
     /// Appends one element to the column.
     void Append(std::string_view str);
@@ -80,7 +82,7 @@ public:
     std::string_view At(size_t n) const;
 
     /// Returns element at given row number.
-    std::string_view operator [] (size_t n) const;
+    std::string_view operator[](size_t n) const;
 
 public:
     /// Appends content of given column to the end of current one.
@@ -102,6 +104,7 @@ public:
     ColumnRef Slice(size_t begin, size_t len) override;
     void Swap(Column& other) override;
     ItemView GetItem(size_t) const override;
+    std::ostream& Dump(std::ostream& o, size_t index) const override;
 
 private:
     void AppendUnsafe(std::string_view);
@@ -113,4 +116,4 @@ private:
     std::vector<Block> blocks_;
 };
 
-}
+}  // namespace clickhouse

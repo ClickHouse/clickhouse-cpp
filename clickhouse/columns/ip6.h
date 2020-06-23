@@ -1,11 +1,11 @@
 #pragma once
 
-#include "string.h"
 #include "../base/socket.h"
+#include "string.h"
 
 namespace clickhouse {
 
-class ColumnIPv6 : public Column{
+class ColumnIPv6 : public Column {
 public:
     ColumnIPv6();
     explicit ColumnIPv6(ColumnRef data);
@@ -19,9 +19,10 @@ public:
     in6_addr At(size_t n) const;
 
     /// Returns element at given row number.
-    in6_addr operator [] (size_t n) const;
+    in6_addr operator[](size_t n) const;
 
     std::string AsString(size_t n) const;
+    std::ostream& Dump(std::ostream& o, size_t index) const override;
 
 public:
     /// Appends content of given column to the end of current one.
@@ -48,4 +49,4 @@ private:
     std::shared_ptr<ColumnFixedString> data_;
 };
 
-}
+}  // namespace clickhouse

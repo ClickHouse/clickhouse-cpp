@@ -1,20 +1,20 @@
 #include "array.h"
+#include <ostream>
 #include <stdexcept>
+#include <string>
 
 namespace clickhouse {
 
 ColumnArray::ColumnArray(ColumnRef data)
-    : Column(Type::CreateArray(data->Type()))
-    , data_(data)
-    , offsets_(std::make_shared<ColumnUInt64>())
-{
+    : Column(Type::CreateArray(data->Type())), data_(data), offsets_(std::make_shared<ColumnUInt64>()) {
 }
 
 void ColumnArray::AppendAsColumn(ColumnRef array) {
     if (!data_->Type()->IsEqual(array->Type())) {
-        throw std::runtime_error(
-            "can't append column of type " + array->Type()->GetName() + " "
-            "to column type " + data_->Type()->GetName());
+        throw std::runtime_error("can't append column of type " + array->Type()->GetName() +
+                                 " "
+                                 "to column type " +
+                                 data_->Type()->GetName());
     }
 
     if (offsets_->Size() == 0) {
@@ -34,8 +34,7 @@ ColumnRef ColumnArray::Slice(size_t begin, size_t size) {
     auto result = std::make_shared<ColumnArray>(GetAsColumn(begin));
     result->OffsetsIncrease(1);
 
-    for (size_t i = 1; i < size; i++)
-    {
+    for (size_t i = 1; i < size; i++) {
         result->Append(std::make_shared<ColumnArray>(GetAsColumn(begin + i)));
     }
 
@@ -79,7 +78,7 @@ size_t ColumnArray::Size() const {
 }
 
 void ColumnArray::Swap(Column& other) {
-    auto & col = dynamic_cast<ColumnArray &>(other);
+    auto& col = dynamic_cast<ColumnArray&>(other);
     data_.swap(col.data_);
     offsets_.swap(col.offsets_);
 }
@@ -96,4 +95,16 @@ size_t ColumnArray::GetSize(size_t n) const {
     return (n == 0) ? (*offsets_)[n] : ((*offsets_)[n] - (*offsets_)[n - 1]);
 }
 
+std::ostream& ColumnArray::Dump(std::ostream& o, size_t index) const {
+    o << "[";
+    auto columnArr = this->GetAsColumn(index);
+    size_t size    = columnArr->Size();
+    for (size_t i = 0; i < size; i++) {
+        columnArr->Dump(o, i);
+        if (i != size - 1) {
+            o << ",";
+        }
+    }
+    return o << "]";
 }
+}  // namespace clickhouse
