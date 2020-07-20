@@ -190,3 +190,20 @@ TEST(TypeParserCase, LowCardinality_FixedString) {
     auto param = TypeAst{TypeAst::Number, Type::Void, "", 10, {}};
     ASSERT_EQ(ast.elements[0].elements[0], param);
 }
+
+TEST(TypeParserCase, SimpleAggregateFunction_UInt64) {
+    TypeAst ast;
+    TypeParser("SimpleAggregateFunction(func, UInt64)").Parse(&ast);
+    ASSERT_EQ(ast.meta, TypeAst::SimpleAggregateFunction);
+    ASSERT_EQ(ast.name, "SimpleAggregateFunction");
+    ASSERT_EQ(ast.code, Type::Void);
+    ASSERT_EQ(ast.elements.size(), 2u);
+    ASSERT_EQ(ast.elements[0].name, "func");
+    ASSERT_EQ(ast.elements[0].code, Type::Void);
+    ASSERT_EQ(ast.elements[0].meta, TypeAst::Terminal);
+    ASSERT_EQ(ast.elements[0].value, 0);
+    ASSERT_EQ(ast.elements[1].name, "UInt64");
+    ASSERT_EQ(ast.elements[1].code, Type::UInt64);
+    ASSERT_EQ(ast.elements[1].meta, TypeAst::Terminal);
+    ASSERT_EQ(ast.elements[1].value, 0);
+}

@@ -1,6 +1,7 @@
 #include <clickhouse/columns/array.h>
 #include <clickhouse/columns/date.h>
 #include <clickhouse/columns/enum.h>
+#include <clickhouse/columns/factory.h>
 #include <clickhouse/columns/lowcardinality.h>
 #include <clickhouse/columns/nullable.h>
 #include <clickhouse/columns/numeric.h>
@@ -257,4 +258,12 @@ TEST(ColumnsCase, LowCardinalityString_Save) {
     for (size_t i = 0; i < items_count; ++i) {
         EXPECT_EQ(col.At(i), foobar(i)) << " at pos: " << i;
     }
+}
+
+TEST(ColumnsCase, CreateSimpleAggregateFunction) {
+    auto col = CreateColumnByType("SimpleAggregateFunction(funt, Int32");
+
+    ASSERT_EQ("Int32", col->Type()->GetName());
+    ASSERT_EQ(Type::Int32, col->Type()->GetCode());
+    ASSERT_NE(nullptr, col->As<ColumnInt32>());
 }

@@ -79,6 +79,10 @@ static TypeAst::Meta GetTypeMeta(const StringView& name) {
         return TypeAst::LowCardinality;
     }
 
+    if (name == "SimpleAggregateFunction") {
+        return TypeAst::SimpleAggregateFunction;
+    }
+
     return TypeAst::Terminal;
 }
 

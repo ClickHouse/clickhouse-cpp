@@ -284,6 +284,34 @@ TEST_P(ClientCase, Numbers) {
     EXPECT_EQ(100000U, num);
 }
 
+TEST_P(ClientCase, SimpleAggregateFunction) {
+    client_->Execute("DROP TABLE IF EXISTS test_clickhouse_cpp.SimpleAggregateFunction");
+    client_->Execute(
+            "CREATE TABLE IF NOT EXISTS test_clickhouse_cpp.SimpleAggregateFunction (saf SimpleAggregateFunction(sum, UInt64))"
+            "ENGINE = Memory");
+
+    constexpr size_t EXPECTED_ROWS = 10;
+    client_->Execute("INSERT INTO test_clickhouse_cpp.SimpleAggregateFunction (saf) SELECT number FROM system.numbers LIMIT 10");
+
+    size_t total_rows = 0;
+    client_->Select("Select * FROM test_clickhouse_cpp.SimpleAggregateFunction", [&total_rows](const Block & block) {
+        if (block.GetRowCount() == 0)
+            return;
+
+        total_rows += block.GetRowCount();
+        auto col = block[0]->As<ColumnUInt64>();
+        ASSERT_NE(nullptr, col);
+
+        for (size_t r = 0; r < col->Size(); ++r) {
+            EXPECT_EQ(r, col->At(r));
+        }
+
+        EXPECT_EQ(total_rows, col->Size());
+    });
+
+    EXPECT_EQ(EXPECTED_ROWS, total_rows);
+}
+
 TEST_P(ClientCase, Cancellable) {
     /// Create a table.
     client_->Execute(
