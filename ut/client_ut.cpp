@@ -3,6 +3,19 @@
 
 using namespace clickhouse;
 
+namespace clickhouse
+{
+std::ostream & operator<<(std::ostream & ostr, const ServerInfo & server_info)
+{
+    return ostr << server_info.name << "/" << server_info.display_name
+                << " ver "
+                << server_info.version_major << "."
+                << server_info.version_minor << "."
+                << server_info.version_patch
+                << " (" << server_info.revision << ")";
+}
+}
+
 // Use value-parameterized tests to run same tests with different client
 // options.
 class ClientCase : public testing::TestWithParam<ClientOptions> {
@@ -285,6 +298,12 @@ TEST_P(ClientCase, Numbers) {
 }
 
 TEST_P(ClientCase, SimpleAggregateFunction) {
+    const auto & server_info = client_->GetServerInfo();
+    if (server_info.version_major <= 19 && server_info.version_minor < 9) {
+        std::cout << "Test is skipped since server '" << server_info << "' does not support SimpleAggregateFunction" << std::endl;
+        return;
+    }
+
     client_->Execute("DROP TABLE IF EXISTS test_clickhouse_cpp.SimpleAggregateFunction");
     client_->Execute(
             "CREATE TABLE IF NOT EXISTS test_clickhouse_cpp.SimpleAggregateFunction (saf SimpleAggregateFunction(sum, UInt64))"

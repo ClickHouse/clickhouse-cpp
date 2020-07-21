@@ -55,16 +55,6 @@ struct ClientInfo {
     uint32_t client_revision = 0;
 };
 
-struct ServerInfo {
-    std::string name;
-    std::string timezone;
-    std::string display_name;
-    uint64_t    version_major;
-    uint64_t    version_minor;
-    uint64_t    version_patch;
-    uint64_t    revision;
-};
-
 std::ostream& operator<<(std::ostream& os, const ClientOptions& opt) {
     os << "Client(" << opt.user << '@' << opt.host << ":" << opt.port
        << " ping_before_query:" << opt.ping_before_query
@@ -90,6 +80,8 @@ public:
     void Ping();
 
     void ResetConnection();
+
+    const ServerInfo& GetServerInfo() const;
 
 private:
     bool Handshake();
@@ -295,6 +287,10 @@ void Client::Impl::ResetConnection() {
     if (!Handshake()) {
         throw std::runtime_error("fail to connect to " + options_.host);
     }
+}
+
+const ServerInfo& Client::Impl::GetServerInfo() const {
+    return server_info_;
 }
 
 bool Client::Impl::Handshake() {
@@ -787,6 +783,10 @@ void Client::Ping() {
 
 void Client::ResetConnection() {
     impl_->ResetConnection();
+}
+
+const ServerInfo& Client::GetServerInfo() const {
+    return impl_->GetServerInfo();
 }
 
 }
