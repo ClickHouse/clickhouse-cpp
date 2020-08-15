@@ -55,6 +55,9 @@ void ColumnArray::Append(ColumnRef column) {
 }
 
 bool ColumnArray::Load(CodedInputStream* input, size_t rows) {
+    if (!rows) {
+        return true;
+    }
     if (!offsets_->Load(input, rows)) {
         return false;
     }
