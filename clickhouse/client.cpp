@@ -173,7 +173,7 @@ Client::Impl::Impl(const ClientOptions& opts)
 {
     // TODO: throw on big-endianness of platform
 
-    for (int i = 0; ; ) {
+    for (unsigned int i = 0; ; ) {
         try {
             ResetConnection();
             break;
@@ -731,7 +731,7 @@ bool Client::Impl::ReceiveHello() {
 }
 
 void Client::Impl::RetryGuard(std::function<void()> func) {
-    for (int i = 0; i <= options_.send_retries; ++i) {
+    for (unsigned int i = 0; ; ++i) {
         try {
             func();
             return;
@@ -745,7 +745,7 @@ void Client::Impl::RetryGuard(std::function<void()> func) {
                 ok = false;
             }
 
-            if (!ok) {
+            if (!ok && i == options_.send_retries) {
                 throw;
             }
         }
