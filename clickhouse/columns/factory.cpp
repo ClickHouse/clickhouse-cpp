@@ -147,6 +147,9 @@ static ColumnRef CreateColumnFromAst(const TypeAst& ast) {
                     throw std::runtime_error("LowCardinality(" + nested.name + ") is not supported");
             }
         }
+        case TypeAst::SimpleAggregateFunction: {
+            return CreateTerminalColumn(ast.elements.back());
+        }
 
         case TypeAst::Null:
         case TypeAst::Number:

@@ -23,6 +23,16 @@
 
 namespace clickhouse {
 
+struct ServerInfo {
+    std::string name;
+    std::string timezone;
+    std::string display_name;
+    uint64_t    version_major;
+    uint64_t    version_minor;
+    uint64_t    version_patch;
+    uint64_t    revision;
+};
+
 /// Methods of block compression.
 enum class CompressionMethod {
     None    = -1,
@@ -105,6 +115,8 @@ public:
 
     /// Reset connection with initial params.
     void ResetConnection();
+
+    const ServerInfo& GetServerInfo() const;
 
 private:
     ClientOptions options_;

@@ -79,6 +79,10 @@ static TypeAst::Meta GetTypeMeta(const StringView& name) {
         return TypeAst::LowCardinality;
     }
 
+    if (name == "SimpleAggregateFunction") {
+        return TypeAst::SimpleAggregateFunction;
+    }
+
     return TypeAst::Terminal;
 }
 
@@ -135,7 +139,12 @@ bool TypeParser::Parse(TypeAst* type) {
                 type_ = &type_->elements.back();
                 break;
             case Token::EOS:
+            {
+                // Ubalanced braces, brackets, etc is an error.
+                if (open_elements_.size() != 1)
+                    return false;
                 return true;
+            }
             case Token::Invalid:
                 return false;
         }

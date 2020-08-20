@@ -3,6 +3,19 @@
 
 using namespace clickhouse;
 
+namespace clickhouse
+{
+std::ostream & operator<<(std::ostream & ostr, const ServerInfo & server_info)
+{
+    return ostr << server_info.name << "/" << server_info.display_name
+                << " ver "
+                << server_info.version_major << "."
+                << server_info.version_minor << "."
+                << server_info.version_patch
+                << " (" << server_info.revision << ")";
+}
+}
+
 // Use value-parameterized tests to run same tests with different client
 // options.
 class ClientCase : public testing::TestWithParam<ClientOptions> {
@@ -282,6 +295,40 @@ TEST_P(ClientCase, Numbers) {
         }
     );
     EXPECT_EQ(100000U, num);
+}
+
+TEST_P(ClientCase, SimpleAggregateFunction) {
+    const auto & server_info = client_->GetServerInfo();
+    if (server_info.version_major <= 19 && server_info.version_minor < 9) {
+        std::cout << "Test is skipped since server '" << server_info << "' does not support SimpleAggregateFunction" << std::endl;
+        return;
+    }
+
+    client_->Execute("DROP TABLE IF EXISTS test_clickhouse_cpp.SimpleAggregateFunction");
+    client_->Execute(
+            "CREATE TABLE IF NOT EXISTS test_clickhouse_cpp.SimpleAggregateFunction (saf SimpleAggregateFunction(sum, UInt64))"
+            "ENGINE = Memory");
+
+    constexpr size_t EXPECTED_ROWS = 10;
+    client_->Execute("INSERT INTO test_clickhouse_cpp.SimpleAggregateFunction (saf) SELECT number FROM system.numbers LIMIT 10");
+
+    size_t total_rows = 0;
+    client_->Select("Select * FROM test_clickhouse_cpp.SimpleAggregateFunction", [&total_rows](const Block & block) {
+        if (block.GetRowCount() == 0)
+            return;
+
+        total_rows += block.GetRowCount();
+        auto col = block[0]->As<ColumnUInt64>();
+        ASSERT_NE(nullptr, col);
+
+        for (size_t r = 0; r < col->Size(); ++r) {
+            EXPECT_EQ(r, col->At(r));
+        }
+
+        EXPECT_EQ(total_rows, col->Size());
+    });
+
+    EXPECT_EQ(EXPECTED_ROWS, total_rows);
 }
 
 TEST_P(ClientCase, Cancellable) {
