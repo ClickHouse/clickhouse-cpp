@@ -261,9 +261,24 @@ TEST(ColumnsCase, LowCardinalityString_Save) {
 }
 
 TEST(ColumnsCase, CreateSimpleAggregateFunction) {
-    auto col = CreateColumnByType("SimpleAggregateFunction(funt, Int32");
+    auto col = CreateColumnByType("SimpleAggregateFunction(funt, Int32)");
 
     ASSERT_EQ("Int32", col->Type()->GetName());
     ASSERT_EQ(Type::Int32, col->Type()->GetCode());
     ASSERT_NE(nullptr, col->As<ColumnInt32>());
+}
+
+
+TEST(CreateColumnByType, UnmatchedBrackets) {
+    // When type string has unmatched brackets, CreateColumnByType must return nullptr.
+    ASSERT_EQ(nullptr, CreateColumnByType("FixedString(10"));
+    ASSERT_EQ(nullptr, CreateColumnByType("Nullable(FixedString(10000"));
+    ASSERT_EQ(nullptr, CreateColumnByType("Nullable(FixedString(10000)"));
+    ASSERT_EQ(nullptr, CreateColumnByType("LowCardinality(Nullable(FixedString(10000"));
+    ASSERT_EQ(nullptr, CreateColumnByType("LowCardinality(Nullable(FixedString(10000)"));
+    ASSERT_EQ(nullptr, CreateColumnByType("LowCardinality(Nullable(FixedString(10000))"));
+    ASSERT_EQ(nullptr, CreateColumnByType("Array(LowCardinality(Nullable(FixedString(10000"));
+    ASSERT_EQ(nullptr, CreateColumnByType("Array(LowCardinality(Nullable(FixedString(10000)"));
+    ASSERT_EQ(nullptr, CreateColumnByType("Array(LowCardinality(Nullable(FixedString(10000))"));
+    ASSERT_EQ(nullptr, CreateColumnByType("Array(LowCardinality(Nullable(FixedString(10000)))"));
 }
