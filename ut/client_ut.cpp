@@ -30,7 +30,29 @@ protected:
             client_->Execute("DROP DATABASE test_clickhouse_cpp");
     }
 
+    template <typename T>
+    std::shared_ptr<T> createTableWithOneColumn(Block & block)
+    {
+        auto col = std::make_shared<T>();
+        const auto type_name = col->GetType().GetName();
+
+        client_->Execute("DROP TABLE IF EXISTS " + table_name + ";");
+        client_->Execute("CREATE TABLE IF NOT EXISTS " + table_name + "( " + column_name + " " + type_name + " )"
+                "ENGINE = Memory");
+
+        block.AppendColumn("test_column", col);
+
+        return col;
+    }
+
+    std::string getOneColumnSelectQuery() const
+    {
+        return "SELECT " + column_name + " FROM " + table_name;
+    }
+
     std::unique_ptr<Client> client_;
+    const std::string table_name = "test_clickhouse_cpp.test_ut_table";
+    const std::string column_name = "test_column";
 };
 
 TEST_P(ClientCase, Array) {
@@ -117,22 +139,57 @@ TEST_P(ClientCase, Date) {
 
 TEST_P(ClientCase, LowCardinality) {
     Block block;
-    client_->Execute("DROP TABLE IF EXISTS test_clickhouse_cpp.low_cardinality;");
-
-    client_->Execute("CREATE TABLE IF NOT EXISTS "
-            "test_clickhouse_cpp.low_cardinality (lc LowCardinality(String)) "
-            "ENGINE = Memory");
-
-    auto lc = std::make_shared<ColumnLowCardinalityT<ColumnString>>();
+    auto lc = createTableWithOneColumn<ColumnLowCardinalityT<ColumnString>>(block);
 
     const std::vector<std::string> data{{"FooBar", "1", "2", "Foo", "4", "Bar", "Foo", "7", "8", "Foo"}};
     lc->AppendMany(data);
 
-    block.AppendColumn("lc", lc);
-    client_->Insert("test_clickhouse_cpp.low_cardinality", block);
+    block.RefreshRowCount();
+    client_->Insert(table_name, block);
 
     size_t total_rows = 0;
-    client_->Select("SELECT lc FROM test_clickhouse_cpp.low_cardinality",
+    client_->Select(getOneColumnSelectQuery(),
+        [&total_rows, &data](const Block& block) {
+            total_rows += block.GetRowCount();
+            if (block.GetRowCount() == 0) {
+                return;
+            }
+
+            ASSERT_EQ(1U, block.GetColumnCount());
+            if (auto col = block[0]->As<ColumnLowCardinalityT<ColumnString>>()) {
+                ASSERT_EQ(data.size(), col->Size());
+                for (size_t i = 0; i < col->Size(); ++i) {
+                    EXPECT_EQ(data[i], (*col)[i]) << " at index: " << i;
+                }
+            }
+        }
+    );
+
+    ASSERT_EQ(total_rows, data.size());
+}
+
+TEST_P(ClientCase, LowCardinality_InsertAfterClear) {
+    // User can successfully insert values after invoking Clear() on LC column.
+    Block block;
+    auto lc = createTableWithOneColumn<ColumnLowCardinalityT<ColumnString>>(block);
+
+    // Add some data, but don't care about it much.
+    lc->AppendMany(std::vector<std::string_view>{"abc", "def", "123", "abc", "123", "def", "ghi"});
+    EXPECT_GT(lc->Size(), 0u);
+    EXPECT_GT(lc->GetDictionarySize(), 0u);
+
+    lc->Clear();
+
+    // Now ensure that all data appended after Clear() is inserted properly
+    const std::vector<std::string> data{{"FooBar", "1", "2", "Foo", "4", "Bar", "Foo", "7", "8", "Foo"}};
+    lc->AppendMany(data);
+
+    block.RefreshRowCount();
+    client_->Insert(table_name, block);
+
+    // Now validate that data was properly inserted
+    size_t total_rows = 0;
+    client_->Select(getOneColumnSelectQuery(),
         [&total_rows, &data](const Block& block) {
             total_rows += block.GetRowCount();
             if (block.GetRowCount() == 0) {
