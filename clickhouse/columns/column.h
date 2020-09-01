@@ -57,7 +57,7 @@ public:
     virtual void Swap(Column&) = 0;
 
     /// Get a view on raw item data if it is supported by column, will throw an exception if index is out of range.
-    /// Please note that view is invalidated once column is items are added or deleted, column is loaded from strean or destroyed.
+    /// Please note that view is invalidated once column items are added or deleted, column is loaded from strean or destroyed.
     virtual ItemView GetItem(size_t) const {
         throw std::runtime_error("GetItem() is not supported for column of " + type_->GetName());
     }
