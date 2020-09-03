@@ -114,10 +114,14 @@ ItemView ColumnDateTime::GetItem(size_t index) const {
 }
 
 ColumnDateTime64::ColumnDateTime64(size_t precision)
-    : Column(Type::CreateDateTime64(precision))
-    , data_(std::make_shared<ColumnDecimal>(18ul, precision))
+    : ColumnDateTime64(Type::CreateDateTime64(precision), std::make_shared<ColumnDecimal>(18ul, precision))
 {}
 
+ColumnDateTime64::ColumnDateTime64(TypeRef type, std::shared_ptr<ColumnDecimal> data)
+    : Column(type),
+      data_(data),
+      precision_(type->As<DateTime64Type>()->GetPrecision())
+{}
 
 void ColumnDateTime64::Append(const Int64& value) {
     // TODO: we need a type, which safely represents datetime.
@@ -125,9 +129,9 @@ void ColumnDateTime64::Append(const Int64& value) {
     data_->Append(value);
 }
 
-void ColumnDateTime64::Append(const std::string& value) {
-    data_->Append(value);
-}
+//void ColumnDateTime64::Append(const std::string& value) {
+//    data_->Append(value);
+//}
 
 Int64 ColumnDateTime64::At(size_t n) const {
     return data_->At(n);
@@ -160,21 +164,22 @@ ItemView ColumnDateTime64::GetItem(size_t index) const {
 
 void ColumnDateTime64::Swap(Column& other) {
     auto& col = dynamic_cast<ColumnDateTime64&>(other);
+    if (col.GetPrecision() != GetPrecision()) {
+        throw std::runtime_error("Can't swap DateTime64 columns when precisions are not the same: "
+                + std::to_string(GetPrecision()) + "(this) != " + std::to_string(col.GetPrecision()) + "(that)");
+    }
+
     data_.swap(col.data_);
 }
 
 ColumnRef ColumnDateTime64::Slice(size_t begin, size_t len) {
-    auto col = data_->Slice(begin, len)->As<ColumnDecimal>();
-    size_t precision = col->Type()->As<DateTime64Type>()->GetPrecision();
-    auto result = std::make_shared<ColumnDateTime64>(precision); // TODO FIXME
+    auto sliced_data = data_->Slice(begin, len)->As<ColumnDecimal>();
 
-    result->data_->Append(col);
-
-    return result;
+    return ColumnRef{new ColumnDateTime64(type_, sliced_data)};
 }
 
 size_t ColumnDateTime64::GetPrecision() const {
-    return data_->Type()->As<DecimalType>()->GetScale();
+    return precision_;
 }
 
 }

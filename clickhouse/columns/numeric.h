@@ -14,7 +14,7 @@ public:
 
     ColumnVector();
 
-    explicit ColumnVector(const std::vector<T>& data);
+    explicit ColumnVector(std::vector<T> data);
 
     /// Appends one element to the end of column.
     void Append(const T& value);

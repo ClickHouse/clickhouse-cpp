@@ -26,7 +26,6 @@ public:
         String,
         FixedString,
         DateTime,
-        DateTime64,
         Date,
         Array,
         Nullable,
@@ -42,6 +41,7 @@ public:
         Decimal64,
         Decimal128,
         LowCardinality,
+        DateTime64,
     };
 
     using EnumItem = std::pair<std::string /* name */, int16_t /* value */>;
@@ -150,7 +150,7 @@ private:
 
 class DateTime64Type: public Type {
 public:
-    DateTime64Type(size_t precision);
+    explicit DateTime64Type(size_t precision);
 
     std::string GetName() const;
 

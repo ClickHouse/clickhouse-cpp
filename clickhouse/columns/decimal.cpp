@@ -1,6 +1,6 @@
 #include "decimal.h"
 
-#include <iostream>
+#include <cassert>
 
 namespace clickhouse {
 
@@ -83,12 +83,16 @@ void ColumnDecimal::Append(const std::string& value) {
 }
 
 Int128 ColumnDecimal::At(size_t i) const {
-    if (data_->Type()->GetCode() == Type::Int32) {
-        return static_cast<Int128>(data_->As<ColumnInt32>()->At(i));
-    } else if (data_->Type()->GetCode() == Type::Int64) {
-        return static_cast<Int128>(data_->As<ColumnInt64>()->At(i));
-    } else {
-        return data_->As<ColumnInt128>()->At(i);
+    switch (data_->Type()->GetCode()) {
+        case Type::Int32:
+            return static_cast<Int128>(data_->As<ColumnInt32>()->At(i));
+        case Type::Int64:
+            return static_cast<Int128>(data_->As<ColumnInt64>()->At(i));
+        case Type::Int128:
+            return data_->As<ColumnInt128>()->At(i);
+        default:
+            assert(false && "Invalid data_ column type in ColumnDecimal");
+            return 0;
     }
 }
 
@@ -127,6 +131,16 @@ void ColumnDecimal::Swap(Column& other) {
 
 ItemView ColumnDecimal::GetItem(size_t index) const {
     return data_->GetItem(index);
+}
+
+size_t ColumnDecimal::GetScale() const
+{
+    return type_->As<DecimalType>()->GetScale();
+}
+
+size_t ColumnDecimal::GetPrecision() const
+{
+    return type_->As<DecimalType>()->GetPrecision();
 }
 
 }

@@ -227,7 +227,13 @@ EnumType::ValueToNameIterator EnumType::EndValueToName() const {
 
 /// class DateTime64Type
 
-DateTime64Type::DateTime64Type(size_t precision) : Type(DateTime64), precision_(precision) {}
+DateTime64Type::DateTime64Type(size_t precision)
+    : Type(DateTime64), precision_(precision) {
+
+    if (precision_ > 18) {
+        throw std::runtime_error("DateTime64 precision is > 18");
+    }
+}
 
 std::string DateTime64Type::GetName() const {
     std::string datetime64_representation;
