@@ -40,13 +40,14 @@ public:
     friend class ColumnLowCardinalityT;
 
 private:
-    // Please note that ColumnLowCardinalityT takes reference to underlying dictionary column object,
+    // IMPLEMENTATION NOTE: ColumnLowCardinalityT takes reference to underlying dictionary column object,
     // so make sure to NOT change address of the dictionary object (with reset(), swap()) or with anything else.
     ColumnRef dictionary_column_;
     ColumnRef index_column_;
     UniqueItems unique_items_map_;
 
 public:
+    // c-tor makes a deep copy of the dictionary_column.
     explicit ColumnLowCardinality(ColumnRef dictionary_column);
     ~ColumnLowCardinality();
 

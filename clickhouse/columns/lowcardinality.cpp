@@ -122,22 +122,19 @@ inline auto GetNullItemForDictionary(const ColumnRef dictionary) {
 namespace clickhouse {
 ColumnLowCardinality::ColumnLowCardinality(ColumnRef dictionary_column)
     : Column(Type::CreateLowCardinality(dictionary_column->Type())),
-      dictionary_column_(dictionary_column),
+      dictionary_column_(dictionary_column->Slice(0, 0)), // safe way to get an column of the same type.
       index_column_(std::make_shared<ColumnUInt32>())
 {
-    if (dictionary_column_->Size() != 0) {
-        // When dictionary column was constructed with values, re-add values by copying to update index and unique_items_map.
-        // TODO: eliminate data copying by coming with better solution than doing AppendUnsafe() N times.
-
-        // Steal values into temporary column.
-        auto values = dictionary_column_->Slice(0, 0);
-        values->Swap(*dictionary_column_);
-
+    if (dictionary_column->Size() != 0) {
         AppendNullItemToEmptyColumn();
 
-        // Re-add values, updating index and unique_items_map.
-        for (size_t i = 0; i < values->Size(); ++i)
-            AppendUnsafe(values->GetItem(i));
+        // Add values, updating index_column_ and unique_items_map_.
+        for (size_t i = 0; i < dictionary_column->Size(); ++i) {
+            // TODO: it would be possible to eliminate copying
+            // by adding InsertUnsafe(pos, ItemView) method to a Column,
+            // but that is too much work for now.
+            AppendUnsafe(dictionary_column->GetItem(i));
+        }
     } else {
         AppendNullItemToEmptyColumn();
     }
@@ -304,8 +301,7 @@ ColumnRef ColumnLowCardinality::Slice(size_t begin, size_t len) {
     begin = std::min(begin, Size());
     len = std::min(len, Size() - begin);
 
-    ColumnRef new_dictionary = dictionary_column_->Slice(0, 0);
-    auto result = std::make_shared<ColumnLowCardinality>(new_dictionary);
+    auto result = std::make_shared<ColumnLowCardinality>(dictionary_column_->Slice(0, 0));
 
     for (size_t i = begin; i < begin + len; ++i)
         result->AppendUnsafe(this->GetItem(i));
