@@ -11,7 +11,14 @@
 #include <contrib/gtest/gtest.h>
 #include "utils.h"
 
+#include <string_view>
+
+
+namespace
+{
+
 using namespace clickhouse;
+using namespace std::literals::string_view_literals;
 
 static std::vector<uint32_t> MakeNumbers() {
     return std::vector<uint32_t>
@@ -38,6 +45,17 @@ static std::vector<uint64_t> MakeUUIDs() {
         {0xbb6a8c699ab2414cllu, 0x86697b7fd27f0825llu,
          0x84b9f24bc26b49c6llu, 0xa03b4ab723341951llu,
          0x3507213c178649f9llu, 0x9faf035d662f60aellu};
+}
+
+#define BINARY_STRING(x) std::string_view(x, sizeof(x) - 1)
+
+static const auto LOWCARDINALITY_STRING_FOOBAR_10_ITEMS_BINARY =
+        "\x01\x00\x00\x00\x00\x00\x00\x00\x00\x06\x00\x00\x00\x00\x00\x00"
+        "\x09\x00\x00\x00\x00\x00\x00\x00\x00\x06\x46\x6f\x6f\x42\x61\x72"
+        "\x01\x31\x01\x32\x03\x46\x6f\x6f\x01\x34\x03\x42\x61\x72\x01\x37"
+        "\x01\x38\x0a\x00\x00\x00\x00\x00\x00\x00\x01\x02\x03\x04\x05\x06"
+        "\x04\x07\x08\x04"sv;
+
 }
 
 // TODO: add tests for ColumnDecimal.
@@ -217,14 +235,26 @@ TEST(ColumnsCase, LowCardinalityWrapperString_Append_and_Read) {
     }
 }
 
-#define BINARY_STRING(x) std::string_view(x, sizeof(x) - 1)
+TEST(ColumnsCase, ColumnLowCardinalityT_String_Clear_and_Append) {
+    const size_t items_count = 11;
+    ColumnLowCardinalityT<ColumnString> col;
+    for (const auto & item : build_vector(&foobar, items_count))
+    {
+        col.Append(item);
+    }
 
-static const auto LOWCARDINALITY_STRING_FOOBAR_10_ITEMS_BINARY =
-        BINARY_STRING("\x01\x00\x00\x00\x00\x00\x00\x00\x00\x06\x00\x00\x00\x00\x00\x00"
-                      "\x09\x00\x00\x00\x00\x00\x00\x00\x00\x06\x46\x6f\x6f\x42\x61\x72"
-                      "\x01\x31\x01\x32\x03\x46\x6f\x6f\x01\x34\x03\x42\x61\x72\x01\x37"
-                      "\x01\x38\x0a\x00\x00\x00\x00\x00\x00\x00\x01\x02\x03\x04\x05\x06"
-                      "\x04\x07\x08\x04");
+    col.Clear();
+    ASSERT_EQ(col.Size(), 0u);
+    ASSERT_EQ(col.GetDictionarySize(), 1u); // null-item
+
+    for (const auto & item : build_vector(&foobar, items_count))
+    {
+        col.Append(item);
+    }
+
+    ASSERT_EQ(col.Size(), items_count);
+    ASSERT_EQ(col.GetDictionarySize(), 8u + 1); // 8 unique items from sequence + 1 null-item
+}
 
 TEST(ColumnsCase, LowCardinalityString_Load) {
     const size_t items_count = 10;

@@ -10,6 +10,8 @@
 #include <string_view>
 #include <type_traits>
 
+#include <cassert>
+
 namespace {
 using namespace clickhouse;
 
@@ -105,13 +107,13 @@ inline void AppendToDictionary(Column& dictionary, const ItemView & item) {
     }
 }
 
-// Add special NULL-item, which is expected at pos(0) in dictionary,
+// A special NULL-item, which is expected at pos(0) in dictionary,
 // note that we distinguish empty string from NULL-value.
-inline void AppendNullItemToDictionary(ColumnRef dictionary) {
+inline auto GetNullItemForDictionary(const ColumnRef dictionary) {
     if (auto n = dictionary->As<ColumnNullable>()) {
-        AppendToDictionary(*dictionary, ItemView{});
+        return ItemView{};
     } else {
-        AppendToDictionary(*dictionary, ItemView{dictionary->Type()->GetCode(), std::string_view{}});
+        return ItemView{dictionary->Type()->GetCode(), std::string_view{}};
     }
 }
 
@@ -120,23 +122,21 @@ inline void AppendNullItemToDictionary(ColumnRef dictionary) {
 namespace clickhouse {
 ColumnLowCardinality::ColumnLowCardinality(ColumnRef dictionary_column)
     : Column(Type::CreateLowCardinality(dictionary_column->Type())),
-      dictionary_column_(dictionary_column),
+      dictionary_column_(dictionary_column->Slice(0, 0)), // safe way to get an column of the same type.
       index_column_(std::make_shared<ColumnUInt32>())
 {
-    if (dictionary_column_->Size() != 0) {
-        // When dictionary column was constructed with values, re-add values by copying to update index and unique_items_map.
+    if (dictionary_column->Size() != 0) {
+        AppendNullItemToEmptyColumn();
 
-        // Steal values into temporary column.
-        auto values = dictionary_column_->Slice(0, 0);
-        values->Swap(*dictionary_column_);
-
-        AppendNullItemToDictionary(dictionary_column_);
-
-        // Re-add values, updating index and unique_items_map.
-        for (size_t i = 0; i < values->Size(); ++i)
-            AppendUnsafe(values->GetItem(i));
+        // Add values, updating index_column_ and unique_items_map_.
+        for (size_t i = 0; i < dictionary_column->Size(); ++i) {
+            // TODO: it would be possible to eliminate copying
+            // by adding InsertUnsafe(pos, ItemView) method to a Column,
+            // but that is too much work for now.
+            AppendUnsafe(dictionary_column->GetItem(i));
+        }
     } else {
-        AppendNullItemToDictionary(dictionary_column_);
+        AppendNullItemToEmptyColumn();
     }
 }
 
@@ -288,6 +288,9 @@ void ColumnLowCardinality::Save(CodedOutputStream* output) {
 void ColumnLowCardinality::Clear() {
     index_column_->Clear();
     dictionary_column_->Clear();
+    unique_items_map_.clear();
+
+    AppendNullItemToEmptyColumn();
 }
 
 size_t ColumnLowCardinality::Size() const {
@@ -298,8 +301,7 @@ ColumnRef ColumnLowCardinality::Slice(size_t begin, size_t len) {
     begin = std::min(begin, Size());
     len = std::min(len, Size() - begin);
 
-    ColumnRef new_dictionary = dictionary_column_->Slice(0, 0);
-    auto result = std::make_shared<ColumnLowCardinality>(new_dictionary);
+    auto result = std::make_shared<ColumnLowCardinality>(dictionary_column_->Slice(0, 0));
 
     for (size_t i = begin; i < begin + len; ++i)
         result->AppendUnsafe(this->GetItem(i));
@@ -351,6 +353,19 @@ void ColumnLowCardinality::AppendUnsafe(const ItemView & value) {
 
         throw;
     }
+}
+
+void ColumnLowCardinality::AppendNullItemToEmptyColumn()
+{
+    // INVARIANT: Empty LC column has an (invisible) null-item at pos 0, which MUST be present in
+    // unique_items_map_ in order to reuse dictionary posistion on subsequent Append()-s.
+
+    // Should be only performed on empty LC column.
+    assert(dictionary_column_->Size() == 0 && unique_items_map_.empty());
+
+    const auto null_item = GetNullItemForDictionary(dictionary_column_);
+    AppendToDictionary(*dictionary_column_, null_item);
+    unique_items_map_.emplace(computeHashKey(null_item), dictionary_column_->Size());
 }
 
 size_t ColumnLowCardinality::GetDictionarySize() const {
