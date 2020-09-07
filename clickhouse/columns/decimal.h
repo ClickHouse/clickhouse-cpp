@@ -37,7 +37,7 @@ private:
     ///  - ColumnInt128
     ColumnRef data_;
 
-    explicit ColumnDecimal(TypeRef type); // for `Slice(…)`
+    explicit ColumnDecimal(TypeRef type, ColumnRef data);
 };
 
 }

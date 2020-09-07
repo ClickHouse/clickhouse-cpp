@@ -1,7 +1,5 @@
 #include "decimal.h"
 
-#include <cassert>
-
 namespace clickhouse {
 
 ColumnDecimal::ColumnDecimal(size_t precision, size_t scale)
@@ -16,8 +14,9 @@ ColumnDecimal::ColumnDecimal(size_t precision, size_t scale)
     }
 }
 
-ColumnDecimal::ColumnDecimal(TypeRef type)
-    : Column(type)
+ColumnDecimal::ColumnDecimal(TypeRef type, ColumnRef data)
+    : Column(type),
+      data_(data)
 {
 }
 
@@ -91,7 +90,7 @@ Int128 ColumnDecimal::At(size_t i) const {
         case Type::Int128:
             return data_->As<ColumnInt128>()->At(i);
         default:
-            assert(false && "Invalid data_ column type in ColumnDecimal");
+            throw std::runtime_error("Invalid data_ column type in ColumnDecimal");
             return 0;
     }
 }
@@ -119,9 +118,8 @@ size_t ColumnDecimal::Size() const {
 }
 
 ColumnRef ColumnDecimal::Slice(size_t begin, size_t len) {
-    std::shared_ptr<ColumnDecimal> slice(new ColumnDecimal(type_));
-    slice->data_ = data_->Slice(begin, len);
-    return slice;
+    // coundn't use std::make_shared since this c-tor is private
+    return ColumnRef{new ColumnDecimal(type_, data_->Slice(begin, len))};
 }
 
 void ColumnDecimal::Swap(Column& other) {

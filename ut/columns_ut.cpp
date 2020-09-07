@@ -224,15 +224,15 @@ TEST(ColumnsCase, DateTime64_Swap) {
     }
 
     auto column2 = std::make_shared<ColumnDateTime64>(6ul);
+    const auto single_dt64_value = 1'234'567'890'123'456'789ll;
+    column2->Append(single_dt64_value);
     column->Swap(*column2);
 
     // Validate that all items were transferred to column2.
-    ASSERT_EQ(0u, column->Size());
+    ASSERT_EQ(1u, column->Size());
+    EXPECT_EQ(single_dt64_value, column->At(0));
+
     ASSERT_EQ(data.size(), column2->Size());
-
-    // Clearing doesn't affects precision value.
-    ASSERT_EQ(6ul, column->GetPrecision());
-
     for (size_t i = 0; i < data.size(); ++i) {
         ASSERT_EQ(data[i], column2->At(i));
     }
@@ -287,6 +287,23 @@ TEST(ColumnsCase, DateTime64_Slice) {
             ASSERT_EQ(data[i], slice->At(i - offset));
         }
     }
+}
+
+TEST(ColumnsCase, DateTime64_Slice_OUTOFBAND) {
+    // Slice() shouldn't throw exceptions on invalid parameters, just clamp values to the nearest bounds.
+
+    auto column = std::make_shared<ColumnDateTime64>(6ul);
+
+    // Non-Empty slice on empty column
+    EXPECT_EQ(0u, column->Slice(0, 10)->Size());
+
+    const auto data = MakeDateTime64s();
+    for (const auto & v : data) {
+        column->Append(v);
+    }
+
+    EXPECT_EQ(column->Slice(0, data.size() + 1)->Size(), data.size());
+    EXPECT_EQ(column->Slice(data.size() + 1, 1)->Size(), 0u);
 }
 
 TEST(ColumnsCase, DateTime64_Swap_EXCEPTION) {
