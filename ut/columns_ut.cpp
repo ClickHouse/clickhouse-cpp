@@ -304,6 +304,7 @@ TEST(ColumnsCase, DateTime64_Slice_OUTOFBAND) {
 
     EXPECT_EQ(column->Slice(0, data.size() + 1)->Size(), data.size());
     EXPECT_EQ(column->Slice(data.size() + 1, 1)->Size(), 0u);
+    EXPECT_EQ(column->Slice(data.size() / 2, data.size() / 2 + 2)->Size(), data.size() - data.size() / 2);
 }
 
 TEST(ColumnsCase, DateTime64_Swap_EXCEPTION) {

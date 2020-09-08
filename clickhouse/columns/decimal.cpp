@@ -91,7 +91,6 @@ Int128 ColumnDecimal::At(size_t i) const {
             return data_->As<ColumnInt128>()->At(i);
         default:
             throw std::runtime_error("Invalid data_ column type in ColumnDecimal");
-            return 0;
     }
 }
 

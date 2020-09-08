@@ -767,10 +767,11 @@ TEST_P(ClientCase, DateTime64) {
                 return;
             }
 
+            const auto offset = total_rows - block.GetRowCount();
             ASSERT_EQ(1U, block.GetColumnCount());
             if (auto col = block[0]->As<ColumnDateTime64>()) {
                 for (size_t i = 0; i < col->Size(); ++i) {
-                    EXPECT_EQ(data[i], col->At(i)) << " at index: " << i;
+                    EXPECT_EQ(data[offset + i], col->At(i)) << " at index: " << i;
                 }
             }
         }
