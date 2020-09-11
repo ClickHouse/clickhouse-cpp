@@ -27,6 +27,9 @@ public:
     void Swap(Column& other) override;
     ItemView GetItem(size_t index) const override;
 
+    size_t GetScale() const;
+    size_t GetPrecision() const;
+
 private:
     /// Depending on a precision it can be one of:
     ///  - ColumnInt32
@@ -34,7 +37,7 @@ private:
     ///  - ColumnInt128
     ColumnRef data_;
 
-    explicit ColumnDecimal(TypeRef type); // for `Slice(…)`
+    explicit ColumnDecimal(TypeRef type, ColumnRef data);
 };
 
 }

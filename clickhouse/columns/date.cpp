@@ -113,4 +113,73 @@ ItemView ColumnDateTime::GetItem(size_t index) const {
     return data_->GetItem(index);
 }
 
+ColumnDateTime64::ColumnDateTime64(size_t precision)
+    : ColumnDateTime64(Type::CreateDateTime64(precision), std::make_shared<ColumnDecimal>(18ul, precision))
+{}
+
+ColumnDateTime64::ColumnDateTime64(TypeRef type, std::shared_ptr<ColumnDecimal> data)
+    : Column(type),
+      data_(data),
+      precision_(type->As<DateTime64Type>()->GetPrecision())
+{}
+
+void ColumnDateTime64::Append(const Int64& value) {
+    // TODO: we need a type, which safely represents datetime.
+    // The precision of Poco.DateTime is not big enough.
+    data_->Append(value);
+}
+
+//void ColumnDateTime64::Append(const std::string& value) {
+//    data_->Append(value);
+//}
+
+Int64 ColumnDateTime64::At(size_t n) const {
+    return data_->At(n);
+}
+
+void ColumnDateTime64::Append(ColumnRef column) {
+    if (auto col = column->As<ColumnDateTime64>()) {
+        data_->Append(col->data_);
+    }
+}
+
+bool ColumnDateTime64::Load(CodedInputStream* input, size_t rows) {
+    return data_->Load(input, rows);
+}
+
+void ColumnDateTime64::Save(CodedOutputStream* output) {
+    data_->Save(output);
+}
+
+void ColumnDateTime64::Clear() {
+    data_->Clear();
+}
+size_t ColumnDateTime64::Size() const {
+    return data_->Size();
+}
+
+ItemView ColumnDateTime64::GetItem(size_t index) const {
+    return data_->GetItem(index);
+}
+
+void ColumnDateTime64::Swap(Column& other) {
+    auto& col = dynamic_cast<ColumnDateTime64&>(other);
+    if (col.GetPrecision() != GetPrecision()) {
+        throw std::runtime_error("Can't swap DateTime64 columns when precisions are not the same: "
+                + std::to_string(GetPrecision()) + "(this) != " + std::to_string(col.GetPrecision()) + "(that)");
+    }
+
+    data_.swap(col.data_);
+}
+
+ColumnRef ColumnDateTime64::Slice(size_t begin, size_t len) {
+    auto sliced_data = data_->Slice(begin, len)->As<ColumnDecimal>();
+
+    return ColumnRef{new ColumnDateTime64(type_, sliced_data)};
+}
+
+size_t ColumnDateTime64::GetPrecision() const {
+    return precision_;
+}
+
 }

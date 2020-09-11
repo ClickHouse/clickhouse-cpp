@@ -1,12 +1,12 @@
 #include <clickhouse/client.h>
 #include <contrib/gtest/gtest.h>
 
+#include <cmath>
+
 using namespace clickhouse;
 
-namespace clickhouse
-{
-std::ostream & operator<<(std::ostream & ostr, const ServerInfo & server_info)
-{
+namespace clickhouse {
+std::ostream & operator<<(std::ostream & ostr, const ServerInfo & server_info) {
     return ostr << server_info.name << "/" << server_info.display_name
                 << " ver "
                 << server_info.version_major << "."
@@ -14,6 +14,33 @@ std::ostream & operator<<(std::ostream & ostr, const ServerInfo & server_info)
                 << server_info.version_patch
                 << " (" << server_info.revision << ")";
 }
+}
+
+namespace {
+
+uint64_t versionNumber(
+        uint64_t version_major,
+        uint64_t version_minor,
+        uint64_t version_patch = 0,
+        uint64_t revision = 0) {
+
+    // in this case version_major can be up to 1000
+    static auto revision_decimal_places = 8;
+    static auto patch_decimal_places = 4;
+    static auto minor_decimal_places = 4;
+
+    auto const result = version_major * static_cast<uint64_t>(std::pow(10, minor_decimal_places + patch_decimal_places + revision_decimal_places))
+            + version_minor * static_cast<uint64_t>(std::pow(10, patch_decimal_places + revision_decimal_places))
+            + version_patch * static_cast<uint64_t>(std::pow(10, revision_decimal_places))
+            + revision;
+
+    return result;
+}
+
+uint64_t versionNumber(const ServerInfo & server_info) {
+    return versionNumber(server_info.version_major, server_info.version_minor, server_info.version_patch, server_info.revision);
+}
+
 }
 
 // Use value-parameterized tests to run same tests with different client
@@ -356,7 +383,7 @@ TEST_P(ClientCase, Numbers) {
 
 TEST_P(ClientCase, SimpleAggregateFunction) {
     const auto & server_info = client_->GetServerInfo();
-    if (server_info.version_major <= 19 && server_info.version_minor < 9) {
+    if (versionNumber(server_info) < versionNumber(19, 9)) {
         std::cout << "Test is skipped since server '" << server_info << "' does not support SimpleAggregateFunction" << std::endl;
         return;
     }
@@ -686,6 +713,71 @@ TEST_P(ClientCase, Decimal) {
         EXPECT_EQ("123456789012345678", int128_to_string(decimal(5, 5)));
         EXPECT_EQ("12345678901234567890123456789012345678", int128_to_string(decimal(6, 5)));
     });
+}
+
+// Test roundtrip of DateTime64 values
+TEST_P(ClientCase, DateTime64) {
+    const auto & server_info = client_->GetServerInfo();
+    if (versionNumber(server_info) < versionNumber(20, 1)) {
+        std::cout << "Test is skipped since server '" << server_info << "' does not support DateTime64" << std::endl;
+        return;
+    }
+
+    Block block;
+    client_->Execute("DROP TABLE IF EXISTS test_clickhouse_cpp.datetime64;");
+
+    client_->Execute("CREATE TABLE IF NOT EXISTS "
+            "test_clickhouse_cpp.datetime64 (dt DateTime64(6)) "
+            "ENGINE = Memory");
+
+    auto col_dt64 = std::make_shared<ColumnDateTime64>(6);
+    block.AppendColumn("dt", col_dt64);
+
+    // Empty INSERT and SELECT
+    client_->Insert("test_clickhouse_cpp.datetime64", block);
+    client_->Select("SELECT dt FROM test_clickhouse_cpp.datetime64",
+        [](const Block& block) {
+            ASSERT_EQ(0U, block.GetRowCount());
+        }
+    );
+
+    const std::vector<Int64> data{
+        -1'234'567'890'123'456'7ll, // approx year 1578
+        -1'234'567'890'123ll,       // 1969-12-17T17:03:52.890123
+        -1'234'567ll,               // 1969-12-31T23:59:58.234567
+        0,                          // epoch
+        1'234'567ll,                // 1970-01-01T00:00:01.234567
+        1'234'567'890'123ll,        // 1970-01-15T06:56:07.890123
+        1'234'567'890'123'456'7ll   // 2361-03-21T19:15:01.234567
+    };
+    for (const auto & d : data) {
+        col_dt64->Append(d);
+    }
+
+    block.RefreshRowCount();
+
+    // Non-empty INSERT and SELECT
+    client_->Insert("test_clickhouse_cpp.datetime64", block);
+
+    size_t total_rows = 0;
+    client_->Select("SELECT dt FROM test_clickhouse_cpp.datetime64",
+        [&total_rows, &data](const Block& block) {
+            total_rows += block.GetRowCount();
+            if (block.GetRowCount() == 0) {
+                return;
+            }
+
+            const auto offset = total_rows - block.GetRowCount();
+            ASSERT_EQ(1U, block.GetColumnCount());
+            if (auto col = block[0]->As<ColumnDateTime64>()) {
+                for (size_t i = 0; i < col->Size(); ++i) {
+                    EXPECT_EQ(data[offset + i], col->At(i)) << " at index: " << i;
+                }
+            }
+        }
+    );
+
+    ASSERT_EQ(total_rows, data.size());
 }
 
 INSTANTIATE_TEST_CASE_P(

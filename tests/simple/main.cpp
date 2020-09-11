@@ -4,6 +4,7 @@
 
 #include <stdexcept>
 #include <iostream>
+#include <cmath>
 
 #if defined(_MSC_VER)
 #   pragma warning(disable : 4996)
@@ -119,7 +120,7 @@ inline void DateExample(Client& client) {
         {
             for (size_t c = 0; c < block.GetRowCount(); ++c) {
                 auto col = block[0]->As<ColumnDateTime>();
-                std::time_t t = col->As<ColumnDateTime>()->At(c);
+                std::time_t t = col->At(c);
                 std::cerr << std::asctime(std::localtime(&t)) << " " << std::endl;
             }
         }
@@ -127,6 +128,36 @@ inline void DateExample(Client& client) {
 
     /// Delete table.
     client.Execute("DROP TABLE test.date");
+}
+
+inline void DateTime64Example(Client& client) {
+    Block b;
+
+    /// Create a table.
+    client.Execute("CREATE TABLE IF NOT EXISTS test.datetime64 (dt64 DateTime64(6)) ENGINE = Memory");
+
+    size_t precision = 6ul;
+    auto d = std::make_shared<ColumnDateTime64>(precision);
+    assert(d->GetPrecision() == precision);
+    Int64 precision_multiplier = std::pow(10ull, precision);
+    Int64 datetime = Int64(std::time(nullptr)) * precision_multiplier;
+
+    d->Append(datetime);
+    b.AppendColumn("dt64", d);
+    client.Insert("test.date", b);
+
+    client.Select("SELECT d FROM test.datetime64", [precision_multiplier](const Block& block)
+        {
+            for (size_t c = 0; c < block.GetRowCount(); ++c) {
+                auto col = block[0]->As<ColumnDateTime64>();
+                const time_t t = static_cast<time_t>(col->At(c) / precision_multiplier);
+                std::cerr << std::asctime(std::localtime(&t)) << " " << std::endl;
+            }
+        }
+    );
+
+    /// Delete table.
+    client.Execute("DROP TABLE test.datetime64");
 }
 
 inline void DecimalExample(Client& client) {
@@ -442,6 +473,7 @@ static void RunTests(Client& client) {
     ArrayExample(client);
     CancelableExample(client);
     DateExample(client);
+    DateTime64Example(client);
     DecimalExample(client);
     EnumExample(client);
     ExecptionExample(client);

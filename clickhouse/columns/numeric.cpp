@@ -10,9 +10,16 @@ ColumnVector<T>::ColumnVector()
 }
 
 template <typename T>
-ColumnVector<T>::ColumnVector(const std::vector<T>& data)
+ColumnVector<T>::ColumnVector(const std::vector<T> & data)
     : Column(Type::CreateSimple<T>())
     , data_(data)
+{
+}
+
+template <typename T>
+ColumnVector<T>::ColumnVector(std::vector<T> && data)
+    : Column(Type::CreateSimple<T>())
+    , data_(std::move(data))
 {
 }
 

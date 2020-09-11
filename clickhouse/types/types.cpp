@@ -45,6 +45,8 @@ std::string Type::GetName() const {
             return "IPv6";
         case DateTime:
             return "DateTime";
+        case DateTime64:
+            return As<DateTime64Type>()->GetName();
         case Date:
             return "Date";
         case Array:
@@ -79,6 +81,10 @@ TypeRef Type::CreateDate() {
 
 TypeRef Type::CreateDateTime() {
     return TypeRef(new Type(Type::DateTime));
+}
+
+TypeRef Type::CreateDateTime64(size_t precision) {
+    return TypeRef(new DateTime64Type(precision));
 }
 
 TypeRef Type::CreateDecimal(size_t precision, size_t scale) {
@@ -217,6 +223,25 @@ EnumType::ValueToNameIterator EnumType::BeginValueToName() const {
 
 EnumType::ValueToNameIterator EnumType::EndValueToName() const {
     return value_to_name_.end();
+}
+
+/// class DateTime64Type
+
+DateTime64Type::DateTime64Type(size_t precision)
+    : Type(DateTime64), precision_(precision) {
+
+    if (precision_ > 18) {
+        throw std::runtime_error("DateTime64 precision is > 18");
+    }
+}
+
+std::string DateTime64Type::GetName() const {
+    std::string datetime64_representation;
+    datetime64_representation.reserve(14);
+    datetime64_representation += "DateTime64(";
+    datetime64_representation += std::to_string(precision_);
+    datetime64_representation += ")";
+    return datetime64_representation;
 }
 
 /// class FixedStringType

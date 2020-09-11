@@ -80,7 +80,16 @@ class ColumnPerformanceTest : public ::testing::Test {
 
 TYPED_TEST_CASE_P(ColumnPerformanceTest);
 
+// Turns out this is the easiest way to skip test with current version of gtest
+#ifndef NDEBUG
+#  define SKIP_IN_DEBUG_BUILDS() do { std::cerr << "Test skipped...\n"; return; } while(0)
+#else
+#  define SKIP_IN_DEBUG_BUILDS() (void)(0)
+#endif
+
 TYPED_TEST_P(ColumnPerformanceTest, SaveAndLoad) {
+    SKIP_IN_DEBUG_BUILDS();
+
     auto column = InstantiateColumn<TypeParam>();
     using Timer = Timer<std::chrono::microseconds>;
 
@@ -155,6 +164,8 @@ TYPED_TEST_P(ColumnPerformanceTest, SaveAndLoad) {
 }
 
 TYPED_TEST_P(ColumnPerformanceTest, InsertAndSelect) {
+    SKIP_IN_DEBUG_BUILDS();
+
     using ColumnType = TypeParam;
     using Timer = Timer<std::chrono::microseconds>;
 

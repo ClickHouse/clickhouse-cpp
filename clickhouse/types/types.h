@@ -41,6 +41,7 @@ public:
         Decimal64,
         Decimal128,
         LowCardinality,
+        DateTime64,
     };
 
     using EnumItem = std::pair<std::string /* name */, int16_t /* value */>;
@@ -75,6 +76,8 @@ public:
     static TypeRef CreateDate();
 
     static TypeRef CreateDateTime();
+
+    static TypeRef CreateDateTime64(size_t precision);
 
     static TypeRef CreateDecimal(size_t precision, size_t scale);
 
@@ -139,9 +142,22 @@ public:
     std::string GetName() const;
 
     inline size_t GetScale() const { return scale_; }
+    inline size_t GetPrecision() const { return precision_; }
 
 private:
     const size_t precision_, scale_;
+};
+
+class DateTime64Type: public Type {
+public:
+    explicit DateTime64Type(size_t precision);
+
+    std::string GetName() const;
+
+    inline size_t GetPrecision() const { return precision_; }
+
+private:
+    size_t precision_;
 };
 
 class EnumType : public Type {
