@@ -125,18 +125,18 @@ ColumnLowCardinality::ColumnLowCardinality(ColumnRef dictionary_column)
       dictionary_column_(dictionary_column->Slice(0, 0)), // safe way to get an column of the same type.
       index_column_(std::make_shared<ColumnUInt32>())
 {
-    if (dictionary_column->Size() != 0) {
-        AppendNullItemToEmptyColumn();
+    AppendNullItemToEmptyColumn();
 
+    if (dictionary_column->Size() != 0) {
         // Add values, updating index_column_ and unique_items_map_.
+
+        // TODO: it would be possible to eliminate copying
+        // by adding InsertUnsafe(pos, ItemView) method to a Column
+        // (to insert null-item at pos 0),
+        // but that is too much work for now.
         for (size_t i = 0; i < dictionary_column->Size(); ++i) {
-            // TODO: it would be possible to eliminate copying
-            // by adding InsertUnsafe(pos, ItemView) method to a Column,
-            // but that is too much work for now.
             AppendUnsafe(dictionary_column->GetItem(i));
         }
-    } else {
-        AppendNullItemToEmptyColumn();
     }
 }
 
@@ -365,7 +365,7 @@ void ColumnLowCardinality::AppendNullItemToEmptyColumn()
 
     const auto null_item = GetNullItemForDictionary(dictionary_column_);
     AppendToDictionary(*dictionary_column_, null_item);
-    unique_items_map_.emplace(computeHashKey(null_item), dictionary_column_->Size());
+    unique_items_map_.emplace(computeHashKey(null_item), 0);
 }
 
 size_t ColumnLowCardinality::GetDictionarySize() const {
