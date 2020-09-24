@@ -85,7 +85,7 @@ auto SameValueSeq(const U & value) {
 
 template <typename ResultType, typename Generator1, typename Generator2>
 auto AlternateGenerators(Generator1 && gen1, Generator2 && gen2) {
-    return [=](size_t i) -> ResultType {
+    return [&gen1, &gen2](size_t i) -> ResultType {
         if (i % 2 == 0)
             return gen1(i/2);
         else
