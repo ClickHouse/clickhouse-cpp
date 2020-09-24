@@ -1,5 +1,7 @@
 #pragma once
 
+#include "absl/numeric/int128.h"
+
 #include <map>
 #include <memory>
 #include <string>
@@ -257,7 +259,7 @@ inline TypeRef Type::CreateSimple<int64_t>() {
 }
 
 template <>
-inline TypeRef Type::CreateSimple<__int128>() {
+inline TypeRef Type::CreateSimple<absl::int128>() {
     return TypeRef(new Type(Int128));
 }
 
