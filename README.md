@@ -7,7 +7,11 @@ C++ client for [Yandex ClickHouse](https://clickhouse.yandex/)
 
 * Array(T)
 * Date
+<<<<<<< HEAD
 * DateTime, DateTime64
+=======
+* DateTime([timezone]), DateTime64(N, [timezone])
+>>>>>>> 7d44d98... check that brackets are properly balanced in a type definition
 * Decimal32, Decimal64, Decimal128
 * Enum8, Enum16
 * FixedString(N)

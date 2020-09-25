@@ -65,12 +65,22 @@ ColumnDateTime::ColumnDateTime()
 {
 }
 
+ColumnDateTime::ColumnDateTime(std::string timezone)
+    : Column(Type::CreateDateTime(std::move(timezone)))
+    , data_(std::make_shared<ColumnUInt32>())
+{
+}
+
 void ColumnDateTime::Append(const std::time_t& value) {
     data_->Append(static_cast<uint32_t>(value));
 }
 
 std::time_t ColumnDateTime::At(size_t n) const {
     return data_->At(n);
+}
+
+std::string ColumnDateTime::Timezone() const {
+    return DateTimeType(type_).Timezone();
 }
 
 void ColumnDateTime::Append(ColumnRef column) {
@@ -104,6 +114,7 @@ ColumnRef ColumnDateTime::Slice(size_t begin, size_t len) {
     return result;
 }
 
+<<<<<<< HEAD
 void ColumnDateTime::Swap(Column& other) {
     auto & col = dynamic_cast<ColumnDateTime &>(other);
     data_.swap(col.data_);
@@ -111,6 +122,25 @@ void ColumnDateTime::Swap(Column& other) {
 
 ItemView ColumnDateTime::GetItem(size_t index) const {
     return data_->GetItem(index);
+=======
+
+ColumnDateTime64::ColumnDateTime64(size_t precision)
+    : Column(Type::CreateDateTime64(precision))
+    , data_(std::make_shared<ColumnUInt64>())
+{
+}
+
+ColumnDateTime64::ColumnDateTime64(size_t precision, std::string timezone)
+    : Column(Type::CreateDateTime64(precision, std::move(timezone)))
+    , data_(std::make_shared<ColumnUInt64>())
+{
+}
+
+ColumnDateTime64::ColumnDateTime64(TypeRef type, std::shared_ptr<ColumnUInt64> data)
+    : Column(type)
+    , data_(std::move(data))
+{
+>>>>>>> 7d44d98... check that brackets are properly balanced in a type definition
 }
 
 ColumnDateTime64::ColumnDateTime64(size_t precision)
@@ -135,6 +165,10 @@ void ColumnDateTime64::Append(const Int64& value) {
 
 Int64 ColumnDateTime64::At(size_t n) const {
     return data_->At(n);
+}
+
+std::string ColumnDateTime64::Timezone() const {
+    return DateTimeType(type_).Timezone();
 }
 
 void ColumnDateTime64::Append(ColumnRef column) {

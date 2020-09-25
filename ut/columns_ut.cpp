@@ -2,7 +2,10 @@
 #include <clickhouse/columns/date.h>
 #include <clickhouse/columns/enum.h>
 #include <clickhouse/columns/factory.h>
+<<<<<<< HEAD
 #include <clickhouse/columns/lowcardinality.h>
+=======
+>>>>>>> 7d44d98... check that brackets are properly balanced in a type definition
 #include <clickhouse/columns/nullable.h>
 #include <clickhouse/columns/numeric.h>
 #include <clickhouse/columns/string.h>
@@ -351,6 +354,14 @@ TEST(ColumnsCase, Date2038) {
     ASSERT_EQ(static_cast<std::uint64_t>(col1->At(0)), 25882ul * 86400ul);
 }
 
+TEST(ColumnsCase, DateTime) {
+    ASSERT_NE(nullptr, CreateColumnByType("DateTime"));
+    ASSERT_NE(nullptr, CreateColumnByType("DateTime('Europe/Moscow')"));
+
+    ASSERT_EQ(CreateColumnByType("DateTime('UTC')")->As<ColumnDateTime>()->Timezone(), "UTC");
+    ASSERT_EQ(CreateColumnByType("DateTime64(3, 'UTC')")->As<ColumnDateTime64>()->Timezone(), "UTC");
+}
+
 TEST(ColumnsCase, EnumTest) {
     std::vector<Type::EnumItem> enum_items = {{"Hi", 1}, {"Hello", 2}};
 
@@ -369,6 +380,8 @@ TEST(ColumnsCase, EnumTest) {
 
     auto col16 = std::make_shared<ColumnEnum16>(Type::CreateEnum16(enum_items));
     ASSERT_TRUE(col16->Type()->IsEqual(Type::CreateEnum16(enum_items)));
+
+    ASSERT_TRUE(CreateColumnByType("Enum8('Hi' = 1, 'Hello' = 2)")->Type()->IsEqual(Type::CreateEnum8(enum_items)));
 }
 
 TEST(ColumnsCase, NullableSlice) {
@@ -403,6 +416,7 @@ TEST(ColumnsCase, UUIDSlice) {
     ASSERT_EQ(sub->At(1), UInt128(0x3507213c178649f9llu, 0x9faf035d662f60aellu));
 }
 
+<<<<<<< HEAD
 TEST(ColumnsCase, ColumnLowCardinalityString_Append_and_Read) {
     const size_t items_count = 11;
     ColumnLowCardinalityT<ColumnString> col;
@@ -574,10 +588,15 @@ TEST(ColumnsCase, CreateSimpleAggregateFunction) {
 
 
 TEST(CreateColumnByType, UnmatchedBrackets) {
+=======
+TEST(ColumnsCase, UnmatchedBrackets) {
+    ASSERT_NE(nullptr, CreateColumnByType("FixedString(10)"));
+>>>>>>> 7d44d98... check that brackets are properly balanced in a type definition
     // When type string has unmatched brackets, CreateColumnByType must return nullptr.
     ASSERT_EQ(nullptr, CreateColumnByType("FixedString(10"));
     ASSERT_EQ(nullptr, CreateColumnByType("Nullable(FixedString(10000"));
     ASSERT_EQ(nullptr, CreateColumnByType("Nullable(FixedString(10000)"));
+<<<<<<< HEAD
     ASSERT_EQ(nullptr, CreateColumnByType("LowCardinality(Nullable(FixedString(10000"));
     ASSERT_EQ(nullptr, CreateColumnByType("LowCardinality(Nullable(FixedString(10000)"));
     ASSERT_EQ(nullptr, CreateColumnByType("LowCardinality(Nullable(FixedString(10000))"));
@@ -585,4 +604,6 @@ TEST(CreateColumnByType, UnmatchedBrackets) {
     ASSERT_EQ(nullptr, CreateColumnByType("Array(LowCardinality(Nullable(FixedString(10000)"));
     ASSERT_EQ(nullptr, CreateColumnByType("Array(LowCardinality(Nullable(FixedString(10000))"));
     ASSERT_EQ(nullptr, CreateColumnByType("Array(LowCardinality(Nullable(FixedString(10000)))"));
+=======
+>>>>>>> 7d44d98... check that brackets are properly balanced in a type definition
 }

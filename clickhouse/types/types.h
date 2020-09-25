@@ -76,9 +76,9 @@ public:
 
     static TypeRef CreateDate();
 
-    static TypeRef CreateDateTime();
+    static TypeRef CreateDateTime(std::string timezone = std::string());
 
-    static TypeRef CreateDateTime64(size_t precision);
+    static TypeRef CreateDateTime64(size_t precision, std::string timezone = std::string());
 
     static TypeRef CreateDecimal(size_t precision, size_t scale);
 
@@ -119,9 +119,16 @@ inline bool operator==(const Type & left, const Type & right) {
     return false;
 }
 
+<<<<<<< HEAD
 inline bool operator==(const TypeRef & left, const TypeRef & right) {
     return *left == *right;
 }
+=======
+    struct DateTimeImpl {
+        size_t precision;
+        std::string timezone;
+    };
+>>>>>>> 7d44d98... check that brackets are properly balanced in a type definition
 
 class ArrayType : public Type {
 public:
@@ -140,13 +147,31 @@ class DecimalType : public Type {
 public:
     DecimalType(size_t precision, size_t scale);
 
+<<<<<<< HEAD
     std::string GetName() const;
+=======
+    friend class EnumType;
+    friend class DateTimeType;
+>>>>>>> 7d44d98... check that brackets are properly balanced in a type definition
 
     inline size_t GetScale() const { return scale_; }
     inline size_t GetPrecision() const { return precision_; }
 
+<<<<<<< HEAD
 private:
     const size_t precision_, scale_;
+=======
+    const Code code_;
+    union {
+        ArrayImpl* array_;
+        DateTimeImpl* date_time_;
+        DecimalImpl* decimal_;
+        NullableImpl* nullable_;
+        TupleImpl* tuple_;
+        EnumImpl* enum_;
+        int string_size_;
+    };
+>>>>>>> 7d44d98... check that brackets are properly balanced in a type definition
 };
 
 class DateTime64Type: public Type {
@@ -234,6 +259,17 @@ public:
 
 private:
     TypeRef nested_type_;
+};
+
+class DateTimeType {
+public:
+    explicit DateTimeType(const TypeRef& type);
+
+    /// Timezone associated with a data column.
+    std::string Timezone() const;
+
+private:
+    TypeRef type_;
 };
 
 template <>

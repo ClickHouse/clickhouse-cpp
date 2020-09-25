@@ -123,6 +123,10 @@ bool TypeParser::Parse(TypeAst* type) {
                 type_->meta = TypeAst::Number;
                 type_->value = std::stol(token.value.to_string());
                 break;
+            case Token::String:
+                type_->meta = TypeAst::String;
+                type_->value_string = std::string(token.value);
+                break;
             case Token::LPar:
                 type_->elements.emplace_back(TypeAst());
                 open_elements_.push(type_);
@@ -132,6 +136,7 @@ bool TypeParser::Parse(TypeAst* type) {
                 type_ = open_elements_.top();
                 open_elements_.pop();
                 break;
+            case Token::Assign:
             case Token::Comma:
                 type_ = open_elements_.top();
                 open_elements_.pop();
@@ -140,10 +145,17 @@ bool TypeParser::Parse(TypeAst* type) {
                 type_ = &type_->elements.back();
                 break;
             case Token::EOS:
+<<<<<<< HEAD
             {
                 // Ubalanced braces, brackets, etc is an error.
                 if (open_elements_.size() != 1)
                     return false;
+=======
+                // Ubalanced braces, brackets, etc is an error.
+                if (open_elements_.size() != 1) {
+                    return false;
+                }
+>>>>>>> 7d44d98... check that brackets are properly balanced in a type definition
                 return true;
             }
             case Token::Invalid:
@@ -162,8 +174,12 @@ TypeParser::Token TypeParser::NextToken() {
                 continue;
 
             case '=':
+<<<<<<< HEAD
                 continue;
 
+=======
+                return Token{Token::Assign, std::string_view(cur_++, 1)};
+>>>>>>> 7d44d98... check that brackets are properly balanced in a type definition
             case '(':
                 return Token{Token::LPar, StringView(cur_++, 1)};
             case ')':
@@ -189,6 +205,16 @@ TypeParser::Token TypeParser::NextToken() {
 
             default: {
                 const char* st = cur_;
+
+                if (*cur_ == '\'') {
+                    for (st = ++cur_; cur_ < end_; ++cur_) {
+                        if (*cur_ == '\'') {
+                            return Token{Token::String, std::string_view(st, cur_++ - st)};
+                        }
+                    }
+
+                    return Token{Token::Invalid, std::string_view()};
+                }
 
                 if (isalpha(*cur_) || *cur_ == '_') {
                     for (; cur_ < end_; ++cur_) {
