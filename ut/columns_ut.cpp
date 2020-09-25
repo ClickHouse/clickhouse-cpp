@@ -54,7 +54,7 @@ static const auto LOWCARDINALITY_STRING_FOOBAR_10_ITEMS_BINARY =
         "\x04\x07\x08\x04"sv;
 
 template <typename Generator>
-auto build_vector(size_t items, Generator && gen) {
+auto GenerateVector(size_t items, Generator && gen) {
     std::vector<std::result_of_t<Generator(size_t)>> result;
     result.reserve(items);
     for (size_t i = 0; i < items; ++i) {
@@ -64,7 +64,7 @@ auto build_vector(size_t items, Generator && gen) {
     return result;
 }
 
-std::string foobar(size_t i) {
+std::string FooBarSeq(size_t i) {
     std::string result;
     if (i % 3 == 0)
         result += "Foo";
@@ -72,6 +72,34 @@ std::string foobar(size_t i) {
         result += "Bar";
     if (result.empty())
         result = std::to_string(i);
+
+    return result;
+}
+
+template <typename T, typename U = T>
+auto SameValueSeq(const U & value) {
+    return [&value](size_t) -> T {
+        return value;
+    };
+}
+
+template <typename ResultType, typename Generator1, typename Generator2>
+auto AlternateGenerators(Generator1 && gen1, Generator2 && gen2) {
+    return [&gen1, &gen2](size_t i) -> ResultType {
+        if (i % 2 == 0)
+            return gen1(i/2);
+        else
+            return gen2(i/2);
+    };
+}
+
+template <typename T>
+std::vector<T> ConcatSequences(std::vector<T> && vec1, std::vector<T> && vec2)
+{
+    std::vector<T> result(vec1);
+
+    result.reserve(vec1.size() + vec2.size());
+    result.insert(result.end(), vec2.begin(), vec2.end());
 
     return result;
 }
@@ -85,7 +113,7 @@ static std::vector<Int64> MakeDateTime64s() {
     // Please note there are values outside of DateTime (32-bit) range that might
     // not have correct string representation in CH yet,
     // but still are supported as Int64 values.
-    return build_vector(200,
+    return GenerateVector(200,
         [] (size_t i )-> Int64 {
             return (i - 100) * year * 2 + (i * 10) * seconds_multiplier + i;
         });
@@ -375,10 +403,10 @@ TEST(ColumnsCase, UUIDSlice) {
     ASSERT_EQ(sub->At(1), UInt128(0x3507213c178649f9llu, 0x9faf035d662f60aellu));
 }
 
-TEST(ColumnsCase, LowCardinalityWrapperString_Append_and_Read) {
+TEST(ColumnsCase, ColumnLowCardinalityString_Append_and_Read) {
     const size_t items_count = 11;
     ColumnLowCardinalityT<ColumnString> col;
-    for (const auto & item : build_vector(items_count, &foobar)) {
+    for (const auto & item : GenerateVector(items_count, &FooBarSeq)) {
         col.Append(item);
     }
 
@@ -386,15 +414,15 @@ TEST(ColumnsCase, LowCardinalityWrapperString_Append_and_Read) {
     ASSERT_EQ(col.GetDictionarySize(), 8u + 1); // 8 unique items from sequence + 1 null-item
 
     for (size_t i = 0; i < items_count; ++i) {
-        ASSERT_EQ(col.At(i), foobar(i)) << " at pos: " << i;
-        ASSERT_EQ(col[i], foobar(i)) << " at pos: " << i;
+        ASSERT_EQ(col.At(i), FooBarSeq(i)) << " at pos: " << i;
+        ASSERT_EQ(col[i], FooBarSeq(i)) << " at pos: " << i;
     }
 }
 
-TEST(ColumnsCase, ColumnLowCardinalityT_String_Clear_and_Append) {
+TEST(ColumnsCase, ColumnLowCardinalityString_Clear_and_Append) {
     const size_t items_count = 11;
     ColumnLowCardinalityT<ColumnString> col;
-    for (const auto & item : build_vector(items_count, &foobar))
+    for (const auto & item : GenerateVector(items_count, &FooBarSeq))
     {
         col.Append(item);
     }
@@ -403,7 +431,7 @@ TEST(ColumnsCase, ColumnLowCardinalityT_String_Clear_and_Append) {
     ASSERT_EQ(col.Size(), 0u);
     ASSERT_EQ(col.GetDictionarySize(), 1u); // null-item
 
-    for (const auto & item : build_vector(items_count, &foobar))
+    for (const auto & item : GenerateVector(items_count, &FooBarSeq))
     {
         col.Append(item);
     }
@@ -412,7 +440,7 @@ TEST(ColumnsCase, ColumnLowCardinalityT_String_Clear_and_Append) {
     ASSERT_EQ(col.GetDictionarySize(), 8u + 1); // 8 unique items from sequence + 1 null-item
 }
 
-TEST(ColumnsCase, LowCardinalityString_Load) {
+TEST(ColumnsCase, ColumnLowCardinalityString_Load) {
     const size_t items_count = 10;
     ColumnLowCardinalityT<ColumnString> col;
 
@@ -423,25 +451,116 @@ TEST(ColumnsCase, LowCardinalityString_Load) {
     EXPECT_TRUE(col.Load(&stream, items_count));
 
     for (size_t i = 0; i < items_count; ++i) {
-        EXPECT_EQ(col.At(i), foobar(i)) << " at pos: " << i;
+        EXPECT_EQ(col.At(i), FooBarSeq(i)) << " at pos: " << i;
     }
 }
 
-TEST(ColumnsCase, LowCardinalityString_Save) {
+// This is temporary diabled since we are not 100% compatitable with ClickHouse
+// on how we serailize LC columns, but we check interoperability in other tests (see client_ut.cpp)
+TEST(ColumnsCase, DISABLED_ColumnLowCardinalityString_Save) {
     const size_t items_count = 10;
     ColumnLowCardinalityT<ColumnString> col;
-    for (const auto & item : build_vector(items_count, &foobar)) {
+    for (const auto & item : GenerateVector(items_count, &FooBarSeq)) {
         col.Append(item);
     }
 
-    const auto & data = LOWCARDINALITY_STRING_FOOBAR_10_ITEMS_BINARY;
-    ArrayInput buffer(data.data(), data.size());
-    CodedInputStream stream(&buffer);
+    ArrayOutput output(0, 0);
+    CodedOutputStream output_stream(&output);
 
-    EXPECT_TRUE(col.Load(&stream, items_count));
+    const size_t expected_output_size = LOWCARDINALITY_STRING_FOOBAR_10_ITEMS_BINARY.size();
+    // Enough space to account for possible overflow from both right and left sides.
+    char buffer[expected_output_size * 10] = {'\0'};
+    const char margin_content[sizeof(buffer)] = {'\0'};
 
-    for (size_t i = 0; i < items_count; ++i) {
-        EXPECT_EQ(col.At(i), foobar(i)) << " at pos: " << i;
+    const size_t left_margin_size = 10;
+    const size_t right_margin_size = sizeof(buffer) - left_margin_size - expected_output_size;
+
+    // Since overflow from left side is less likely to happen, leave only tiny margin there.
+    auto write_pos = buffer + left_margin_size;
+    const auto left_margin = buffer;
+    const auto right_margin = write_pos + expected_output_size;
+
+    output.Reset(write_pos, expected_output_size);
+
+    EXPECT_NO_THROW(col.Save(&output_stream));
+
+    // Left margin should be blank
+    EXPECT_EQ(std::string_view(margin_content, left_margin_size), std::string_view(left_margin, left_margin_size));
+    // Right margin should be blank too
+    EXPECT_EQ(std::string_view(margin_content, right_margin_size), std::string_view(right_margin, right_margin_size));
+
+    // TODO: right now LC columns do not write indexes in the most compact way possible, so binary representation is a bit different
+    // (there might be other inconsistances too)
+    EXPECT_EQ(LOWCARDINALITY_STRING_FOOBAR_10_ITEMS_BINARY, std::string_view(write_pos, expected_output_size));
+}
+
+TEST(ColumnsCase, ColumnLowCardinalityString_SaveAndLoad) {
+    // Verify that we can load binary representation back
+    ColumnLowCardinalityT<ColumnString> col;
+
+    const auto items = GenerateVector(10, &FooBarSeq);
+    for (const auto & item : items) {
+        col.Append(item);
+    }
+
+    char buffer[256] = {'\0'}; // about 3 times more space than needed for this set of values.
+    {
+        ArrayOutput output(buffer, sizeof(buffer));
+        CodedOutputStream output_stream(&output);
+        EXPECT_NO_THROW(col.Save(&output_stream));
+    }
+
+    col.Clear();
+
+    {
+        // Load the data back
+        ArrayInput input(buffer, sizeof(buffer));
+        CodedInputStream input_stream(&input);
+        EXPECT_TRUE(col.Load(&input_stream, items.size()));
+    }
+
+    for (size_t i = 0; i < items.size(); ++i) {
+        EXPECT_EQ(col.At(i), items[i]) << " at pos: " << i;
+    }
+}
+
+TEST(ColumnsCase, ColumnLowCardinalityString_WithEmptyString_1) {
+    // Verify that when empty string is added to a LC column it can be retrieved back as empty string.
+    ColumnLowCardinalityT<ColumnString> col;
+    const auto values = GenerateVector(10, AlternateGenerators<std::string>(SameValueSeq<std::string>(""), FooBarSeq));
+    for (const auto & item : values) {
+        col.Append(item);
+    }
+
+    for (size_t i = 0; i < values.size(); ++i) {
+        EXPECT_EQ(values[i], col.At(i)) << " at pos: " << i;
+    }
+}
+
+TEST(ColumnsCase, ColumnLowCardinalityString_WithEmptyString_2) {
+    // Verify that when empty string is added to a LC column it can be retrieved back as empty string.
+    // (Ver2): Make sure that outcome doesn't depend if empty values are on odd positions
+    ColumnLowCardinalityT<ColumnString> col;
+    const auto values = GenerateVector(10, AlternateGenerators<std::string>(FooBarSeq, SameValueSeq<std::string>("")));
+    for (const auto & item : values) {
+        col.Append(item);
+    }
+
+    for (size_t i = 0; i < values.size(); ++i) {
+        EXPECT_EQ(values[i], col.At(i)) << " at pos: " << i;
+    }
+}
+
+TEST(ColumnsCase, ColumnLowCardinalityString_WithEmptyString_3) {
+    // When we have many leading empty strings and some non-empty values.
+    ColumnLowCardinalityT<ColumnString> col;
+    const auto values = ConcatSequences(GenerateVector(100, SameValueSeq<std::string>("")), GenerateVector(5, FooBarSeq));
+    for (const auto & item : values) {
+        col.Append(item);
+    }
+
+    for (size_t i = 0; i < values.size(); ++i) {
+        EXPECT_EQ(values[i], col.At(i)) << " at pos: " << i;
     }
 }
 
