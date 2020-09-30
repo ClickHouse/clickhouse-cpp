@@ -80,6 +80,9 @@ struct ClientOptions {
     DECLARE_FIELD(tcp_keepalive_intvl, std::chrono::seconds, SetTcpKeepAliveInterval, std::chrono::seconds(5));
     DECLARE_FIELD(tcp_keepalive_cnt, unsigned int, SetTcpKeepAliveCount, 3);
 
+    // TCP options
+    DECLARE_FIELD(tcp_nodelay, bool, TcpNoDelay, false);
+
 #undef DECLARE_FIELD
 };
 

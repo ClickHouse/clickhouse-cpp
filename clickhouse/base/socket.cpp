@@ -169,6 +169,11 @@ void SocketHolder::SetTcpKeepAlive(int idle, int intvl, int cnt) noexcept {
 #endif
 }
 
+void SocketHolder::SetTcpNoDelay(bool nodelay) noexcept {
+    int val = nodelay;
+    setsockopt(handle_, IPPROTO_TCP, TCP_NODELAY, &val, sizeof(val));
+}
+
 SocketHolder& SocketHolder::operator = (SocketHolder&& other) noexcept {
     if (this != &other) {
         Close();
