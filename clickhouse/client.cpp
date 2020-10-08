@@ -205,21 +205,14 @@ void Client::Impl::Insert(const std::string& table_name, const Block& block) {
         RetryGuard([this]() { Ping(); });
     }
 
-    std::vector<std::string> fields;
-    fields.reserve(block.GetColumnCount());
-
-    // Enumerate all fields
-    for (unsigned int i = 0; i < block.GetColumnCount(); i++) {
-        fields.push_back(block.GetColumnName(i));
-    }
-
     std::stringstream fields_section;
+		const auto num_columns = block.GetColumnCount();
 
-    for (auto elem = fields.begin(); elem != fields.end(); ++elem) {
-        if (std::distance(elem, fields.end()) == 1) {
-            fields_section << *elem;
+    for (unsigned int i = 0; i < num_columns; ++i) {
+        if (i == num_columns - 1) {
+            fields_section << block.GetColumnName(i);
         } else {
-            fields_section << *elem << ",";
+            fields_section << block.GetColumnName(i) << ",";
         }
     }
 
@@ -432,10 +425,9 @@ bool Client::Impl::ReadBlock(Block* block, CodedInputStream* input) {
         return false;
     }
 
+    std::string name;
+    std::string type;
     for (size_t i = 0; i < num_columns; ++i) {
-        std::string name;
-        std::string type;
-
         if (!WireFormat::ReadString(input, &name)) {
             return false;
         }
@@ -461,9 +453,7 @@ bool Client::Impl::ReceiveData() {
     Block block;
 
     if (REVISION >= DBMS_MIN_REVISION_WITH_TEMPORARY_TABLES) {
-        std::string table_name;
-
-        if (!WireFormat::ReadString(&input_, &table_name)) {
+        if (!WireFormat::SkipString(&input_)) {
             return false;
         }
     }
