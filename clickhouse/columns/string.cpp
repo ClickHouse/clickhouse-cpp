@@ -32,7 +32,7 @@ ColumnFixedString::ColumnFixedString(size_t n)
 
 void ColumnFixedString::Append(std::string_view str) {
     if (str.size() != string_size_) {
-        throw std::runtime_error("Expected string of length " + string_size_ ", received \"" + str + "\"");
+        throw std::runtime_error("Expected string of length " + std::to_string(string_size_) + ", received \"" + str + "\"");
     }
     if (data_.capacity() - data_.size() < str.size())
     {
