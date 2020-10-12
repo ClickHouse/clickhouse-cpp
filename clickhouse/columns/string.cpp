@@ -31,7 +31,10 @@ ColumnFixedString::ColumnFixedString(size_t n)
 }
 
 void ColumnFixedString::Append(std::string_view str) {
-    if (data_.capacity() < str.size())
+    if (str.size() != string_size_) {
+        throw std::runtime_error("Expected string of length " + string_size_ ", received \"" + str + "\"");
+    }
+    if (data_.capacity() - data_.size() < str.size())
     {
         // round up to the next block size
         const auto new_size = (((data_.size() + string_size_) / DEFAULT_BLOCK_SIZE) + 1) * DEFAULT_BLOCK_SIZE;
