@@ -638,7 +638,7 @@ void Client::Impl::SendData(const Block& block) {
                 buf.resize(9 + LZ4_compressBound(tmp.size()));
 
                 // Compress data
-                int size = LZ4_compress((const char*)tmp.data(), (char*)buf.data() + 9, tmp.size());
+                int size = LZ4_compress_default((const char*)tmp.data(), (char*)buf.data() + 9, tmp.size(), buf.size() - 9);
                 buf.resize(9 + size);
 
                 // Fill header

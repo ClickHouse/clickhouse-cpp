@@ -85,7 +85,7 @@ bool CompressedInput::Decompress() {
 
         data_ = Buffer(original);
 
-        if (LZ4_decompress_fast((const char*)tmp.data() + 9, (char*)data_.data(), original) < 0) {
+        if (LZ4_decompress_safe((const char*)tmp.data() + 9, (char*)data_.data(), compressed - 9, original) < 0) {
             throw std::runtime_error("can't decompress data");
         } else {
             mem_.Reset(data_.data(), original);
