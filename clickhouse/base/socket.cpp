@@ -308,7 +308,7 @@ ssize_t Poll(struct pollfd* fds, int nfds, int timeout) noexcept {
 #else
     return poll(fds, nfds, timeout);
 #endif
-    return -1;
+    return rval;
 }
 
 }
