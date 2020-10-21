@@ -248,8 +248,15 @@ void Client::Impl::Insert(const std::string& table_name, const Block& block) {
     SendData(Block());
 
     // Wait for EOS.
-    while (ReceivePacket()) {
+    uint64_t eos_packet{0};
+    while (ReceivePacket(&eos_packet)) {
         ;
+    }
+
+    if (eos_packet != ServerCodes::EndOfStream && eos_packet != ServerCodes::Exception
+        && eos_packet != ServerCodes::Log && options_.rethrow_exceptions) {
+        throw std::runtime_error(std::string{"unexpected packet from server while receiving end of query, expected (expected Exception, EndOfStream or Log, got: "}
+                            + (eos_packet ? std::to_string(eos_packet) : "nothing") + ")");
     }
 }
 
@@ -495,23 +502,29 @@ bool Client::Impl::ReceiveException(bool rethrow) {
     std::unique_ptr<Exception> e(new Exception);
     Exception* current = e.get();
 
+    bool exception_received = true;
     do {
         bool has_nested = false;
 
         if (!WireFormat::ReadFixed(&input_, &current->code)) {
-            return false;
+           exception_received = false;
+           break;
         }
         if (!WireFormat::ReadString(&input_, &current->name)) {
-            return false;
+            exception_received = false;
+            break;
         }
         if (!WireFormat::ReadString(&input_, &current->display_text)) {
-            return false;
+            exception_received = false;
+            break;
         }
         if (!WireFormat::ReadString(&input_, &current->stack_trace)) {
-            return false;
+            exception_received = false;
+            break;
         }
         if (!WireFormat::ReadFixed(&input_, &has_nested)) {
-            return false;
+            exception_received = false;
+            break;
         }
 
         if (has_nested) {
@@ -530,7 +543,7 @@ bool Client::Impl::ReceiveException(bool rethrow) {
         throw ServerException(std::move(e));
     }
 
-    return true;
+    return exception_received;
 }
 
 void Client::Impl::SendCancel() {
