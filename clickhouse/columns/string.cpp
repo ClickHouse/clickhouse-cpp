@@ -31,9 +31,12 @@ ColumnFixedString::ColumnFixedString(size_t n)
 }
 
 void ColumnFixedString::Append(std::string_view str) {
-    if (str.size() != string_size_) {
-        throw std::runtime_error("Expected string of length " + std::to_string(string_size_) + ", received \"" + std::string(str) + "\"");
+    if (str.size() > string_size_) {
+        throw std::runtime_error("Expected string of length not greater than "
+                                 + std::to_string(string_size_) + " bytes, received "
+                                 + std::to_string(str.size()) + " bytes.");
     }
+
     if (data_.capacity() - data_.size() < str.size())
     {
         // round up to the next block size
@@ -42,6 +45,9 @@ void ColumnFixedString::Append(std::string_view str) {
     }
 
     data_.insert(data_.size(), str);
+    // Pad up to string_size_ with zeroes.
+    const auto padding_size = string_size_ - str.size();
+    data_.resize(data_.size() + padding_size, char(0));
 }
 
 void ColumnFixedString::Clear() {

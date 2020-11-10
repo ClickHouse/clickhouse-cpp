@@ -144,14 +144,48 @@ TEST(ColumnsCase, NumericSlice) {
 
 
 TEST(ColumnsCase, FixedStringInit) {
-    auto col = std::make_shared<ColumnFixedString>(3);
-    for (const auto& s : MakeFixedStrings()) {
+    const auto column_data = MakeFixedStrings();
+    auto col = std::make_shared<ColumnFixedString>(3, column_data);
+
+    ASSERT_EQ(col->Size(), column_data.size());
+
+    size_t i = 0;
+    for (const auto& s : column_data) {
+        EXPECT_EQ(s, col->At(i));
+        ++i;
+    }
+}
+
+TEST(ColumnsCase, FixedString_Append_SmallStrings) {
+    // Ensure that strings smaller than FixedString's size
+    // are padded with zeroes on insertion.
+
+    const size_t string_size = 7;
+    const auto column_data = MakeFixedStrings();
+
+    auto col = std::make_shared<ColumnFixedString>(string_size);
+    size_t i = 0;
+    for (const auto& s : column_data) {
         col->Append(s);
+
+        EXPECT_EQ(string_size, col->At(i).size());
+
+        std::string expected = column_data[i];
+        expected.resize(string_size, char(0));
+        EXPECT_EQ(expected, col->At(i));
+
+        ++i;
     }
 
-    ASSERT_EQ(col->Size(), 4u);
-    ASSERT_EQ(col->At(1), "bbb");
-    ASSERT_EQ(col->At(3), "ddd");
+    ASSERT_EQ(col->Size(), i);
+}
+
+TEST(ColumnsCase, FixedString_Append_LargeString) {
+    // Ensure that inserting strings larger than FixedString size thorws exception.
+
+    const auto col = std::make_shared<ColumnFixedString>(1);
+    EXPECT_ANY_THROW(col->Append("2c"));
+    EXPECT_ANY_THROW(col->Append("this is a long string"));
 }
 
 TEST(ColumnsCase, StringInit) {
