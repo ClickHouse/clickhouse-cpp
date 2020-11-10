@@ -37,8 +37,7 @@ void ColumnFixedString::Append(std::string_view str) {
     if (data_.capacity() - data_.size() < str.size())
     {
         // round up to the next block size
-        const auto new_size = (((data_.size() + 
-                                 _size_) / DEFAULT_BLOCK_SIZE) + 1) * DEFAULT_BLOCK_SIZE;
+        const auto new_size = (((data_.size() + string_size_) / DEFAULT_BLOCK_SIZE) + 1) * DEFAULT_BLOCK_SIZE;
         data_.reserve(new_size);
     }
 
