@@ -11,6 +11,7 @@
 #include <contrib/gtest/gtest.h>
 
 #include <string>
+#include <type_traits>
 
 #include "utils.h"
 
@@ -63,16 +64,15 @@ auto ValidateColumnItems(const ColumnType & col, size_t expected_items) {
     }
 };
 
-template <typename ColumnType>
-ColumnType InstantiateColumn() {
-    if constexpr (std::is_same_v<ColumnType, ColumnFixedString>) {
-        return ColumnType(8);
-    } else if constexpr (std::is_same_v<ColumnType, ColumnLowCardinalityT<ColumnFixedString>>) {
-        return ColumnType(8);
-    } else {
-        return ColumnType();
-    }
+template <class ColumnType>
+typename std::enable_if<
+    std::is_same<ColumnType, ColumnFixedString>::value ||
+    std::is_same<ColumnType, ColumnLowCardinality<ColumnFixedString>>::value , ColumnType>::type InstantiateColumn()
+{
+    return ColumnType(8);
 }
+
+template <class ColumnType> ColumnType InstantiateColumn() { return ColumnType(); }
 
 template <typename ColumnType>
 class ColumnPerformanceTest : public ::testing::Test {

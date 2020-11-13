@@ -2,8 +2,10 @@
 
 #include "../types/types.h"
 
+#include <sstream>
 #include <string_view>
 #include <stdexcept>
+#include <type_traits>
 
 namespace clickhouse {
 
@@ -22,17 +24,15 @@ struct ItemView {
     const DataType data;
 
 private:
-    template <typename T>
-    inline auto ConvertToStorageValue(const T& t) {
-        if constexpr (std::is_same_v<std::string_view, T> || std::is_same_v<std::string, T>) {
-            return std::string_view{t};
-        } else if constexpr (std::is_fundamental_v<T>) {
-            return std::string_view{reinterpret_cast<const char*>(&t), sizeof(T)};
-        } else {
-            // will caue error at compile-time
-            return;
-        }
-    }
+    template <class T>
+    typename std::enable_if<
+        std::is_same<std::string_view, T>::value ||
+        std::is_same<std::string, T>::value, std::string_view>::type
+    ConvertToStorageValue(const T& t) { return std::string_view{t}; }
+
+    template <class T>
+    typename std::enable_if<std::is_fundamental<T>::value>::type
+    ConvertToStorageValue(const T& t) { return std::string_view{reinterpret_cast<const char*>(&t), sizeof(T)}; }
 
 public:
     ItemView(Type::Code type, DataType data)
@@ -51,16 +51,19 @@ public:
         : ItemView(type, ConvertToStorageValue(value))
     {}
 
-    template <typename T>
-    T get() const {
-        if constexpr (std::is_same_v<std::string_view, T> || std::is_same_v<std::string, T>) {
-            return data;
-        } else if constexpr (std::is_fundamental_v<T>) {
-            if (sizeof(T) == data.size()) {
-                return *reinterpret_cast<const T*>(data.data());
-            } else {
-                throw std::runtime_error("Incompatitable value type and size.");
-            }
+    template <class T>
+    typename std::enable_if<
+        std::is_same<std::string_view, T>::value ||
+        std::is_same<std::string, T>::value, T>::type
+    get() const { return data; }
+
+    template <class T>
+    typename std::enable_if<std::is_fundamental<T>::value>::type
+    get() const {
+        if (sizeof(T) == data.size()) {
+            return *reinterpret_cast<const T*>(data.data());
+        } else {
+            throw std::runtime_error("Incompatitable value type and size.");
         }
     }
 

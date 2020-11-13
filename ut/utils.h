@@ -3,6 +3,7 @@
 #include <chrono>
 #include <ratio>
 #include <ostream>
+#include <type_traits>
 
 #include <time.h>
 
@@ -42,24 +43,15 @@ private:
     std::chrono::nanoseconds started_at;
 };
 
-template <typename R>
-const char * getPrefix() {
-    const char * prefix = "?";
-    if constexpr (std::ratio_equal_v<R, std::nano>) {
-        prefix = "n";
-    } else if constexpr (std::ratio_equal_v<R, std::micro>) {
-        prefix = "u";
-    } else if constexpr (std::ratio_equal_v<R, std::milli>) {
-        prefix = "m";
-    } else if constexpr (std::ratio_equal_v<R, std::centi>) {
-        prefix = "c";
-    } else if constexpr (std::ratio_equal_v<R, std::deci>) {
-        prefix = "d";
-    } else {
-        static_assert("Unsupported ratio");
-    }
+template <class R> typename std::enable_if<std::ratio_equal<R, std::nano>::value, const char*>::type getPrefix() { return "n"; }
+template <class R> typename std::enable_if<std::ratio_equal<R, std::micro>::value, const char*>::type getPrefix() { return "u"; }
+template <class R> typename std::enable_if<std::ratio_equal<R, std::milli>::value, const char*>::type getPrefix() { return "m"; }
+template <class R> typename std::enable_if<std::ratio_equal<R, std::centi>::value, const char*>::type getPrefix() { return "c"; }
+template <class R> typename std::enable_if<std::ratio_equal<R, std::deci>::value, const char*>::type getPrefix() { return "d"; }
 
-    return prefix;
+template <class R> const char* getPrefix() {
+    static_assert(!std::is_same<R, R>::value, "Unsupported ratio");
+    return "?";
 }
 
 namespace std {
