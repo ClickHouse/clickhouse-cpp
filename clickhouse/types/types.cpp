@@ -245,9 +245,9 @@ DateTimeType::DateTimeType(std::string timezone)
 
 std::string DateTimeType::GetName() const {
     std::string datetime_representation = "DateTime";
-    const auto timezone = Timezone();
+    const auto & timezone = Timezone();
     if (!timezone.empty())
-        datetime_representation += "(" + timezone + ")";
+        datetime_representation += "('" + timezone + "')";
 
     return datetime_representation;
 }
@@ -255,7 +255,7 @@ std::string DateTimeType::GetName() const {
 /// class DateTime64Type
 
 DateTime64Type::DateTime64Type(size_t precision, std::string timezone)
-    : Type(DateTime64), TypeWithTimeZoneMixin(std::move(timezone)), precision_(precision) {
+    : Type(DateTime64), details::TypeWithTimeZoneMixin(std::move(timezone)), precision_(precision) {
 
     if (precision_ > 18) {
         throw std::runtime_error("DateTime64 precision is > 18");
@@ -268,9 +268,9 @@ std::string DateTime64Type::GetName() const {
     datetime64_representation += "DateTime64(";
     datetime64_representation += std::to_string(precision_);
 
-    const auto timezone = Timezone();
+    const auto & timezone = Timezone();
     if (!timezone.empty()) {
-        datetime64_representation += ", " + timezone;
+        datetime64_representation += ", '" + timezone + "'";
     }
 
     datetime64_representation += ")";

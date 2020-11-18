@@ -596,3 +596,35 @@ TEST(ColumnsCase, UnmatchedBrackets) {
     ASSERT_EQ(nullptr, CreateColumnByType("Array(LowCardinality(Nullable(FixedString(10000))"));
     ASSERT_EQ(nullptr, CreateColumnByType("Array(LowCardinality(Nullable(FixedString(10000)))"));
 }
+
+class ColumnsCaseWithName : public ::testing::TestWithParam<const char* /*Column Type String*/>
+{};
+
+TEST_P(ColumnsCaseWithName, CreateColumnByType)
+{
+    const auto col = CreateColumnByType(GetParam());
+    ASSERT_NE(nullptr, col);
+    EXPECT_EQ(col->GetType().GetName(), GetParam());
+}
+
+INSTANTIATE_TEST_CASE_P(Basic, ColumnsCaseWithName, ::testing::Values(
+    "Int8", "Int16", "Int32", "Int64",
+    "UInt8", "UInt16", "UInt32", "UInt64",
+    "String", "Date", "DateTime"
+));
+
+INSTANTIATE_TEST_CASE_P(Parametrized, ColumnsCaseWithName, ::testing::Values(
+    "FixedString(0)", "FixedString(10000)",
+    "DateTime('UTC')", "DateTime64(3, 'UTC')",
+    "Decimal(9,3)", "Decimal(18,3)",
+    "Enum8('ONE' = 1, 'TWO' = 2)",
+    "Enum16('ONE' = 1, 'TWO' = 2, 'THREE' = 3, 'FOUR' = 4)"
+));
+
+
+INSTANTIATE_TEST_CASE_P(Nested, ColumnsCaseWithName, ::testing::Values(
+    "Nullable(FixedString(10000))",
+    "Nullable(LowCardinality(FixedString(10000)))",
+    "Array(Nullable(LowCardinality(FixedString(10000))))",
+    "Array(Enum8('ONE' = 1, 'TWO' = 2))"
+));
