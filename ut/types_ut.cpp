@@ -12,9 +12,8 @@ TEST(TypesCase, TypeName) {
 
     ASSERT_EQ(Type::CreateArray(Type::CreateSimple<int32_t>())->As<ArrayType>()->GetItemType()->GetCode(), Type::Int32);
 
-<<<<<<< HEAD
     ASSERT_EQ(Type::CreateTuple({Type::CreateSimple<int32_t>(), Type::CreateString()})->GetName(), "Tuple(Int32, String)");
-=======
+
     ASSERT_EQ(
         Type::CreateTuple({
             Type::CreateSimple<int32_t>(),
@@ -30,7 +29,6 @@ TEST(TypesCase, TypeName) {
         Type::CreateEnum8({})->GetName(),
         "Enum8()"
     );
->>>>>>> 7d44d98... check that brackets are properly balanced in a type definition
 }
 
 TEST(TypesCase, NullableType) {

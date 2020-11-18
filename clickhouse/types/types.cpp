@@ -4,68 +4,7 @@
 
 namespace clickhouse {
 
-<<<<<<< HEAD
-Type::Type(const Code code) : code_(code) {
-=======
-Type::Type(const Code code)
-    : code_(code)
-{
-    if (code_ == Array) {
-        array_ = new ArrayImpl;
-    } else if (code_ == DateTime || code_ == DateTime64) {
-        date_time_ = new DateTimeImpl;
-    } else if (code_ == Tuple) {
-        tuple_ = new TupleImpl;
-    } else if (code_ == Nullable) {
-        nullable_ = new NullableImpl;
-    } else if (code_ == Enum8 || code_ == Enum16) {
-        enum_ = new EnumImpl;
-    } else if (code_== Decimal || code_== Decimal32 || code_ == Decimal64 || code_ == Decimal128) {
-        decimal_ = new DecimalImpl;
-    }
-}
-
-Type::~Type() {
-    if (code_ == Array) {
-        delete array_;
-    } else if (code_ == DateTime || code_ == DateTime64) {
-        delete date_time_;
-    } else if (code_ == Tuple) {
-        delete tuple_;
-    } else if (code_ == Nullable) {
-        delete nullable_;
-    } else if (code_ == Enum8 || code_ == Enum16) {
-        delete enum_;
-    } else if (code_== Decimal || code_== Decimal32 || code_ == Decimal64 || code_ == Decimal128) {
-        delete decimal_;
-    }
-}
-
-Type::Code Type::GetCode() const {
-    return code_;
-}
-
-TypeRef Type::GetItemType() const {
-    if (code_ == Array) {
-        return array_->item_type;
-    }
-    return TypeRef();
-}
-
-TypeRef Type::GetNestedType() const {
-    if (code_ == Nullable) {
-        return nullable_->nested_type;
-    }
-    return TypeRef();
-}
-
-std::vector<TypeRef> Type::GetTupleType() const {
-    if (code_ == Tuple) {
-        return tuple_->item_types;
-    }
-    return std::vector<TypeRef>();
->>>>>>> 7d44d98... check that brackets are properly balanced in a type definition
-}
+Type::Type(const Code code) : code_(code) {}
 
 std::string Type::GetName() const {
     switch (code_) {
@@ -104,22 +43,11 @@ std::string Type::GetName() const {
         case IPv6:
             return "IPv6";
         case DateTime:
-            if (date_time_->timezone.empty()) {
-                return "DateTime";
-            } else {
-                return "DateTime('" + date_time_->timezone + "')";
-            }
+        {
+            return As<DateTimeType>()->GetName();
+        }
         case DateTime64:
-<<<<<<< HEAD
             return As<DateTime64Type>()->GetName();
-=======
-            if (date_time_->timezone.empty()) {
-                return "DateTime64(" + std::to_string(date_time_->precision) + ")";
-            } else {
-                return "DateTime64(" + std::to_string(date_time_->precision) + ", '" +
-                    date_time_->timezone + "')";
-            }
->>>>>>> 7d44d98... check that brackets are properly balanced in a type definition
         case Date:
             return "Date";
         case Array:
@@ -129,30 +57,8 @@ std::string Type::GetName() const {
         case Tuple:
             return As<TupleType>()->GetName();
         case Enum8:
-<<<<<<< HEAD
         case Enum16:
             return As<EnumType>()->GetName();
-=======
-        case Enum16: {
-            std::string result;
-            if (code_ == Enum8) {
-                result = "Enum8(";
-            } else {
-                result = "Enum16(";
-            }
-            for (auto ei = enum_->value_to_name.begin(); ei != enum_->value_to_name.end(); ++ei) {
-                if (ei != enum_->value_to_name.begin()) {
-                    result += ", ";
-                }
-                result += "'";
-                result += ei->second;
-                result += "' = ";
-                result += std::to_string(ei->first);
-            }
-            result += ")";
-            return result;
-        }
->>>>>>> 7d44d98... check that brackets are properly balanced in a type definition
         case Decimal:
         case Decimal32:
         case Decimal64:
@@ -175,21 +81,11 @@ TypeRef Type::CreateDate() {
 }
 
 TypeRef Type::CreateDateTime(std::string timezone) {
-    TypeRef type(new Type(Type::DateTime));
-    type->date_time_->timezone = std::move(timezone);
-    return type;
+    return TypeRef(new DateTimeType(std::move(timezone)));
 }
 
-<<<<<<< HEAD
-TypeRef Type::CreateDateTime64(size_t precision) {
-    return TypeRef(new DateTime64Type(precision));
-=======
 TypeRef Type::CreateDateTime64(size_t precision, std::string timezone) {
-    TypeRef type(new Type(Type::DateTime64));
-    type->date_time_->precision = precision;
-    type->date_time_->timezone = std::move(timezone);
-    return type;
->>>>>>> 7d44d98... check that brackets are properly balanced in a type definition
+    return TypeRef(new DateTime64Type(precision, std::move(timezone)));
 }
 
 TypeRef Type::CreateDecimal(size_t precision, size_t scale) {
@@ -288,7 +184,7 @@ std::string EnumType::GetName() const {
         result = "Enum16(";
     }
 
-    for (auto ei = value_to_name_.begin();;) {
+    for (auto ei = value_to_name_.begin(); ei != value_to_name_.end();) {
         result += "'";
         result += ei->second;
         result += "' = ";
@@ -330,10 +226,36 @@ EnumType::ValueToNameIterator EnumType::EndValueToName() const {
     return value_to_name_.end();
 }
 
+
+namespace details
+{
+TypeWithTimeZoneMixin::TypeWithTimeZoneMixin(std::string timezone)
+    : timezone_(std::move(timezone)) {
+}
+
+const std::string & TypeWithTimeZoneMixin::Timezone() const {
+    return timezone_;
+}
+}
+
+/// class DateTimeType
+DateTimeType::DateTimeType(std::string timezone)
+    : Type(DateTime), details::TypeWithTimeZoneMixin(std::move(timezone)) {
+}
+
+std::string DateTimeType::GetName() const {
+    std::string datetime_representation = "DateTime";
+    const auto timezone = Timezone();
+    if (!timezone.empty())
+        datetime_representation += "(" + timezone + ")";
+
+    return datetime_representation;
+}
+
 /// class DateTime64Type
 
-DateTime64Type::DateTime64Type(size_t precision)
-    : Type(DateTime64), precision_(precision) {
+DateTime64Type::DateTime64Type(size_t precision, std::string timezone)
+    : Type(DateTime64), TypeWithTimeZoneMixin(std::move(timezone)), precision_(precision) {
 
     if (precision_ > 18) {
         throw std::runtime_error("DateTime64 precision is > 18");
@@ -345,11 +267,16 @@ std::string DateTime64Type::GetName() const {
     datetime64_representation.reserve(14);
     datetime64_representation += "DateTime64(";
     datetime64_representation += std::to_string(precision_);
+
+    const auto timezone = Timezone();
+    if (!timezone.empty()) {
+        datetime64_representation += ", " + timezone;
+    }
+
     datetime64_representation += ")";
     return datetime64_representation;
 }
 
-<<<<<<< HEAD
 /// class FixedStringType
 
 FixedStringType::FixedStringType(size_t n) : Type(FixedString), size_(n) {
@@ -367,22 +294,10 @@ TupleType::TupleType(const std::vector<TypeRef>& item_types) : Type(Tuple), item
 
 /// class LowCardinalityType
 LowCardinalityType::LowCardinalityType(TypeRef nested_type) : Type(LowCardinality), nested_type_(nested_type) {
-=======
-DateTimeType::DateTimeType(const TypeRef& type)
-    : type_(type)
-{
-    assert(type->GetCode() == Type::DateTime ||
-           type->GetCode() == Type::DateTime64);
 }
 
-std::string DateTimeType::Timezone() const {
-    return type_->date_time_->timezone;
+LowCardinalityType::~LowCardinalityType() {
 }
-
->>>>>>> 7d44d98... check that brackets are properly balanced in a type definition
-}
-LowCardinalityType::~LowCardinalityType()
-{}
 
 std::string TupleType::GetName() const {
     std::string result("Tuple(");

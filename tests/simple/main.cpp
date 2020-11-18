@@ -122,11 +122,7 @@ inline void DateExample(Client& client) {
     client.Select("SELECT d, dz FROM test.date", [](const Block& block)
         {
             for (size_t c = 0; c < block.GetRowCount(); ++c) {
-<<<<<<< HEAD
-                auto col = block[0]->As<ColumnDateTime>();
-                std::time_t t = col->At(c);
-                std::cerr << std::asctime(std::localtime(&t)) << " " << std::endl;
-=======
+
                 auto print_value = [&](const auto& col) {
                     std::time_t t = col->At(c);
                     std::cerr << std::asctime(std::localtime(&t));
@@ -135,7 +131,6 @@ inline void DateExample(Client& client) {
 
                 print_value(block[0]->As<ColumnDateTime>());
                 print_value(block[1]->As<ColumnDateTime>());
->>>>>>> 7d44d98... check that brackets are properly balanced in a type definition
             }
         }
     );
@@ -150,28 +145,10 @@ inline void DateTime64Example(Client& client) {
     /// Create a table.
     client.Execute("CREATE TABLE IF NOT EXISTS test.datetime64 (dt64 DateTime64(6)) ENGINE = Memory");
 
-<<<<<<< HEAD
-    size_t precision = 6ul;
-    auto d = std::make_shared<ColumnDateTime64>(precision);
-    assert(d->GetPrecision() == precision);
-    Int64 precision_multiplier = std::pow(10ull, precision);
-    Int64 datetime = Int64(std::time(nullptr)) * precision_multiplier;
-
-    d->Append(datetime);
-    b.AppendColumn("dt64", d);
-    client.Insert("test.date", b);
-
-    client.Select("SELECT d FROM test.datetime64", [precision_multiplier](const Block& block)
-        {
-            for (size_t c = 0; c < block.GetRowCount(); ++c) {
-                auto col = block[0]->As<ColumnDateTime64>();
-                const time_t t = static_cast<time_t>(col->At(c) / precision_multiplier);
-                std::cerr << std::asctime(std::localtime(&t)) << " " << std::endl;
-=======
     auto d = std::make_shared<ColumnDateTime64>(6);
     d->Append(std::time(nullptr) * 1000000 + 123456);
     b.AppendColumn("d", d);
-    client.Insert("test.date", b);
+    client.Insert("test.datetime64", b);
 
     client.Select("SELECT d FROM test.date", [](const Block& block)
         {
@@ -183,7 +160,6 @@ inline void DateTime64Example(Client& client) {
                 uint64_t us = t % 1000000;
                 std::cerr << "ctime: " << std::asctime(std::localtime(&ct));
                 std::cerr << "us: " << us << std::endl;
->>>>>>> 7d44d98... check that brackets are properly balanced in a type definition
             }
         }
     );

@@ -61,18 +61,15 @@ TEST(TypeParserCase, ParseEnum) {
 
     auto element = ast.elements.begin();
     for (size_t i = 0; i < 4; ++i) {
-<<<<<<< HEAD
-        ASSERT_EQ(element->name, names[i]);
-        ASSERT_EQ(element->code, Type::String);
-=======
-        ASSERT_EQ(element->code, Type::Void);
-        ASSERT_EQ(element->meta, TypeAst::String);
-        ASSERT_EQ(element->value_string, names[i]);
+        EXPECT_EQ(element->code, Type::String);
+        EXPECT_EQ(element->meta, TypeAst::Terminal);
+        EXPECT_EQ(element->value_string, names[i]);
+
         ++element;
-        ASSERT_EQ(element->code, Type::Void);
-        ASSERT_EQ(element->meta, TypeAst::Number);
->>>>>>> 7d44d98... check that brackets are properly balanced in a type definition
-        ASSERT_EQ(element->value, values[i]);
+        EXPECT_EQ(element->code, Type::Void);
+        EXPECT_EQ(element->meta, TypeAst::Number);
+        EXPECT_EQ(element->value, values[i]);
+
         ++element;
     }
 }
@@ -137,7 +134,6 @@ TEST(TypeParserCase, ParseDecimal128) {
     ASSERT_EQ(ast.elements[0].value, 3);
 }
 
-<<<<<<< HEAD
 TEST(TypeParserCase, ParseDateTime_NO_TIMEZONE) {
     TypeAst ast;
     TypeParser("DateTime").Parse(&ast);
@@ -148,18 +144,15 @@ TEST(TypeParserCase, ParseDateTime_NO_TIMEZONE) {
 }
 
 TEST(TypeParserCase, ParseDateTime_UTC_TIMEZONE) {
-=======
-TEST(TypeParserCase, ParseDateTime) {
->>>>>>> 7d44d98... check that brackets are properly balanced in a type definition
     TypeAst ast;
     TypeParser("DateTime('UTC')").Parse(&ast);
     ASSERT_EQ(ast.meta, TypeAst::Terminal);
     ASSERT_EQ(ast.name, "DateTime");
     ASSERT_EQ(ast.code, Type::DateTime);
     ASSERT_EQ(ast.elements.size(), 1u);
-<<<<<<< HEAD
+
     ASSERT_EQ(ast.elements[0].code, Type::String);
-    ASSERT_EQ(ast.elements[0].name, "UTC");
+    ASSERT_EQ(ast.elements[0].value_string, "UTC");
     ASSERT_EQ(ast.elements[0].meta, TypeAst::Terminal);
 }
 
@@ -170,7 +163,7 @@ TEST(TypeParserCase, ParseDateTime_MINSK_TIMEZONE) {
     ASSERT_EQ(ast.name, "DateTime");
     ASSERT_EQ(ast.code, Type::DateTime);
     ASSERT_EQ(ast.elements[0].code, Type::String);
-    ASSERT_EQ(ast.elements[0].name, "Europe/Minsk");
+    ASSERT_EQ(ast.elements[0].value_string, "Europe/Minsk");
     ASSERT_EQ(ast.elements[0].meta, TypeAst::Terminal);
 }
 
@@ -201,7 +194,7 @@ TEST(TypeParserCase, LowCardinality_FixedString) {
     ASSERT_EQ(ast.elements[0].name, "FixedString");
     ASSERT_EQ(ast.elements[0].value, 0);
     ASSERT_EQ(ast.elements[0].elements.size(), 1u);
-    auto param = TypeAst{TypeAst::Number, Type::Void, "", 10, {}};
+    auto param = TypeAst{TypeAst::Number, Type::Void, "", 10, {}, {}};
     ASSERT_EQ(ast.elements[0].elements[0], param);
 }
 
@@ -219,8 +212,6 @@ TEST(TypeParserCase, SimpleAggregateFunction_UInt64) {
     ASSERT_EQ(ast.elements[1].name, "UInt64");
     ASSERT_EQ(ast.elements[1].code, Type::UInt64);
     ASSERT_EQ(ast.elements[1].meta, TypeAst::Terminal);
-=======
-    ASSERT_EQ(ast.elements[0].value_string, "UTC");
 }
 
 TEST(TypeParserCase, ParseDateTime64) {
@@ -233,6 +224,5 @@ TEST(TypeParserCase, ParseDateTime64) {
     ASSERT_EQ(ast.elements[0].name, "");
     ASSERT_EQ(ast.elements[0].value, 3);
     ASSERT_EQ(ast.elements[1].value_string, "UTC");
->>>>>>> 7d44d98... check that brackets are properly balanced in a type definition
     ASSERT_EQ(ast.elements[1].value, 0);
 }
