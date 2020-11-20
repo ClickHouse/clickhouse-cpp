@@ -23,61 +23,63 @@ namespace {
 
 static ColumnRef CreateTerminalColumn(const TypeAst& ast) {
     switch (ast.code) {
-        case Type::Void:
-            return std::make_shared<ColumnNothing>();
+    case Type::Void:
+        return std::make_shared<ColumnNothing>();
 
-        case Type::UInt8:
-            return std::make_shared<ColumnUInt8>();
-        case Type::UInt16:
-            return std::make_shared<ColumnUInt16>();
-        case Type::UInt32:
-            return std::make_shared<ColumnUInt32>();
-        case Type::UInt64:
-            return std::make_shared<ColumnUInt64>();
+    case Type::UInt8:
+        return std::make_shared<ColumnUInt8>();
+    case Type::UInt16:
+        return std::make_shared<ColumnUInt16>();
+    case Type::UInt32:
+        return std::make_shared<ColumnUInt32>();
+    case Type::UInt64:
+        return std::make_shared<ColumnUInt64>();
 
-        case Type::Int8:
-            return std::make_shared<ColumnInt8>();
-        case Type::Int16:
-            return std::make_shared<ColumnInt16>();
-        case Type::Int32:
-            return std::make_shared<ColumnInt32>();
-        case Type::Int64:
-            return std::make_shared<ColumnInt64>();
+    case Type::Int8:
+        return std::make_shared<ColumnInt8>();
+    case Type::Int16:
+        return std::make_shared<ColumnInt16>();
+    case Type::Int32:
+        return std::make_shared<ColumnInt32>();
+    case Type::Int64:
+        return std::make_shared<ColumnInt64>();
 
-        case Type::Float32:
-            return std::make_shared<ColumnFloat32>();
-        case Type::Float64:
-            return std::make_shared<ColumnFloat64>();
+    case Type::Float32:
+        return std::make_shared<ColumnFloat32>();
+    case Type::Float64:
+        return std::make_shared<ColumnFloat64>();
 
-        case Type::Decimal:
-            return std::make_shared<ColumnDecimal>(ast.elements.front().value, ast.elements.back().value);
-        case Type::Decimal32:
-            return std::make_shared<ColumnDecimal>(9, ast.elements.front().value);
-        case Type::Decimal64:
-            return std::make_shared<ColumnDecimal>(18, ast.elements.front().value);
-        case Type::Decimal128:
-            return std::make_shared<ColumnDecimal>(38, ast.elements.front().value);
+    case Type::Decimal:
+        return std::make_shared<ColumnDecimal>(ast.elements.front().value, ast.elements.back().value);
+    case Type::Decimal32:
+        return std::make_shared<ColumnDecimal>(9, ast.elements.front().value);
+    case Type::Decimal64:
+        return std::make_shared<ColumnDecimal>(18, ast.elements.front().value);
+    case Type::Decimal128:
+        return std::make_shared<ColumnDecimal>(38, ast.elements.front().value);
 
-        case Type::String:
-            return std::make_shared<ColumnString>();
-        case Type::FixedString:
-            return std::make_shared<ColumnFixedString>(ast.elements.front().value);
+    case Type::String:
+        return std::make_shared<ColumnString>();
+    case Type::FixedString:
+        return std::make_shared<ColumnFixedString>(ast.elements.front().value);
 
-        case Type::DateTime:
-            return std::make_shared<ColumnDateTime>();
-        case Type::Date:
-            return std::make_shared<ColumnDate>();
+    case Type::DateTime:
+        return std::make_shared<ColumnDateTime>();
+    case Type::DateTime64:
+        return std::make_shared<ColumnDateTime64>(ast.elements.front().value);
+    case Type::Date:
+        return std::make_shared<ColumnDate>();
 
-        case Type::IPv4:
-            return std::make_shared<ColumnIPv4>();
-        case Type::IPv6:
-            return std::make_shared<ColumnIPv6>();
+    case Type::IPv4:
+        return std::make_shared<ColumnIPv4>();
+    case Type::IPv6:
+        return std::make_shared<ColumnIPv6>();
 
-        case Type::UUID:
-            return std::make_shared<ColumnUUID>();
+    case Type::UUID:
+        return std::make_shared<ColumnUUID>();
 
-        default:
-            return nullptr;
+    default:
+        return nullptr;
     }
 }
 
@@ -136,6 +138,9 @@ static ColumnRef CreateColumnFromAst(const TypeAst& ast) {
                 default:
                     throw std::runtime_error("LowCardinality(" + nested.name + ") is not supported");
             }
+        }
+        case TypeAst::SimpleAggregateFunction: {
+            return CreateTerminalColumn(ast.elements.back());
         }
 
         case TypeAst::Null:

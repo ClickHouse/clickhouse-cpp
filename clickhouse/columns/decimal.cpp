@@ -17,7 +17,10 @@ ColumnDecimal::ColumnDecimal(size_t precision, size_t scale) : Column(Type::Crea
     }
 }
 
-ColumnDecimal::ColumnDecimal(TypeRef type) : Column(type) {
+ColumnDecimal::ColumnDecimal(TypeRef type, ColumnRef data)
+    : Column(type),
+      data_(data)
+{
 }
 
 void ColumnDecimal::Append(const Int128& value) {
@@ -81,12 +84,15 @@ void ColumnDecimal::Append(const std::string& value) {
 }
 
 Int128 ColumnDecimal::At(size_t i) const {
-    if (data_->Type()->GetCode() == Type::Int32) {
-        return static_cast<Int128>(data_->As<ColumnInt32>()->At(i));
-    } else if (data_->Type()->GetCode() == Type::Int64) {
-        return static_cast<Int128>(data_->As<ColumnInt64>()->At(i));
-    } else {
-        return data_->As<ColumnInt128>()->At(i);
+    switch (data_->Type()->GetCode()) {
+        case Type::Int32:
+            return static_cast<Int128>(data_->As<ColumnInt32>()->At(i));
+        case Type::Int64:
+            return static_cast<Int128>(data_->As<ColumnInt64>()->At(i));
+        case Type::Int128:
+            return data_->As<ColumnInt128>()->At(i);
+        default:
+            throw std::runtime_error("Invalid data_ column type in ColumnDecimal");
     }
 }
 
@@ -113,9 +119,8 @@ size_t ColumnDecimal::Size() const {
 }
 
 ColumnRef ColumnDecimal::Slice(size_t begin, size_t len) {
-    std::shared_ptr<ColumnDecimal> slice(new ColumnDecimal(type_));
-    slice->data_ = data_->Slice(begin, len);
-    return slice;
+    // coundn't use std::make_shared since this c-tor is private
+    return ColumnRef{new ColumnDecimal(type_, data_->Slice(begin, len))};
 }
 
 void ColumnDecimal::Swap(Column& other) {
@@ -143,4 +148,15 @@ std::ostream& ColumnDecimal::Dump(std::ostream& o, size_t index) const {
     }
     return o << result << std::setprecision(t->GetPrecision());
 }
+
+size_t ColumnDecimal::GetScale() const
+{
+    return type_->As<DecimalType>()->GetScale();
+}
+
+size_t ColumnDecimal::GetPrecision() const
+{
+    return type_->As<DecimalType>()->GetPrecision();
+}
+
 }  // namespace clickhouse

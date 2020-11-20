@@ -30,6 +30,7 @@ static const std::unordered_map<std::string, Type::Code> kTypeCode = {
     { "String",      Type::String },
     { "FixedString", Type::FixedString },
     { "DateTime",    Type::DateTime },
+    { "DateTime64",  Type::DateTime64 },
     { "Date",        Type::Date },
     { "Array",       Type::Array },
     { "Nullable",    Type::Nullable },
@@ -77,6 +78,10 @@ static TypeAst::Meta GetTypeMeta(const StringView& name) {
 
     if (name == "LowCardinality") {
         return TypeAst::LowCardinality;
+    }
+
+    if (name == "SimpleAggregateFunction") {
+        return TypeAst::SimpleAggregateFunction;
     }
 
     return TypeAst::Terminal;
@@ -135,7 +140,12 @@ bool TypeParser::Parse(TypeAst* type) {
                 type_ = &type_->elements.back();
                 break;
             case Token::EOS:
+            {
+                // Ubalanced braces, brackets, etc is an error.
+                if (open_elements_.size() != 1)
+                    return false;
                 return true;
+            }
             case Token::Invalid:
                 return false;
         }

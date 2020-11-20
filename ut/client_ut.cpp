@@ -1,7 +1,47 @@
 #include <clickhouse/client.h>
 #include <contrib/gtest/gtest.h>
 
+#include <cmath>
+
 using namespace clickhouse;
+
+namespace clickhouse {
+std::ostream & operator<<(std::ostream & ostr, const ServerInfo & server_info) {
+    return ostr << server_info.name << "/" << server_info.display_name
+                << " ver "
+                << server_info.version_major << "."
+                << server_info.version_minor << "."
+                << server_info.version_patch
+                << " (" << server_info.revision << ")";
+}
+}
+
+namespace {
+
+uint64_t versionNumber(
+        uint64_t version_major,
+        uint64_t version_minor,
+        uint64_t version_patch = 0,
+        uint64_t revision = 0) {
+
+    // in this case version_major can be up to 1000
+    static auto revision_decimal_places = 8;
+    static auto patch_decimal_places = 4;
+    static auto minor_decimal_places = 4;
+
+    auto const result = version_major * static_cast<uint64_t>(std::pow(10, minor_decimal_places + patch_decimal_places + revision_decimal_places))
+            + version_minor * static_cast<uint64_t>(std::pow(10, patch_decimal_places + revision_decimal_places))
+            + version_patch * static_cast<uint64_t>(std::pow(10, revision_decimal_places))
+            + revision;
+
+    return result;
+}
+
+uint64_t versionNumber(const ServerInfo & server_info) {
+    return versionNumber(server_info.version_major, server_info.version_minor, server_info.version_patch, server_info.revision);
+}
+
+}
 
 // Use value-parameterized tests to run same tests with different client
 // options.
@@ -17,7 +57,29 @@ protected:
             client_->Execute("DROP DATABASE test_clickhouse_cpp");
     }
 
+    template <typename T>
+    std::shared_ptr<T> createTableWithOneColumn(Block & block)
+    {
+        auto col = std::make_shared<T>();
+        const auto type_name = col->GetType().GetName();
+
+        client_->Execute("DROP TABLE IF EXISTS " + table_name + ";");
+        client_->Execute("CREATE TABLE IF NOT EXISTS " + table_name + "( " + column_name + " " + type_name + " )"
+                "ENGINE = Memory");
+
+        block.AppendColumn("test_column", col);
+
+        return col;
+    }
+
+    std::string getOneColumnSelectQuery() const
+    {
+        return "SELECT " + column_name + " FROM " + table_name;
+    }
+
     std::unique_ptr<Client> client_;
+    const std::string table_name = "test_clickhouse_cpp.test_ut_table";
+    const std::string column_name = "test_column";
 };
 
 TEST_P(ClientCase, Array) {
@@ -104,22 +166,57 @@ TEST_P(ClientCase, Date) {
 
 TEST_P(ClientCase, LowCardinality) {
     Block block;
-    client_->Execute("DROP TABLE IF EXISTS test_clickhouse_cpp.low_cardinality;");
-
-    client_->Execute("CREATE TABLE IF NOT EXISTS "
-            "test_clickhouse_cpp.low_cardinality (lc LowCardinality(String)) "
-            "ENGINE = Memory");
-
-    auto lc = std::make_shared<ColumnLowCardinalityT<ColumnString>>();
+    auto lc = createTableWithOneColumn<ColumnLowCardinalityT<ColumnString>>(block);
 
     const std::vector<std::string> data{{"FooBar", "1", "2", "Foo", "4", "Bar", "Foo", "7", "8", "Foo"}};
     lc->AppendMany(data);
 
-    block.AppendColumn("lc", lc);
-    client_->Insert("test_clickhouse_cpp.low_cardinality", block);
+    block.RefreshRowCount();
+    client_->Insert(table_name, block);
 
     size_t total_rows = 0;
-    client_->Select("SELECT lc FROM test_clickhouse_cpp.low_cardinality",
+    client_->Select(getOneColumnSelectQuery(),
+        [&total_rows, &data](const Block& block) {
+            total_rows += block.GetRowCount();
+            if (block.GetRowCount() == 0) {
+                return;
+            }
+
+            ASSERT_EQ(1U, block.GetColumnCount());
+            if (auto col = block[0]->As<ColumnLowCardinalityT<ColumnString>>()) {
+                ASSERT_EQ(data.size(), col->Size());
+                for (size_t i = 0; i < col->Size(); ++i) {
+                    EXPECT_EQ(data[i], (*col)[i]) << " at index: " << i;
+                }
+            }
+        }
+    );
+
+    ASSERT_EQ(total_rows, data.size());
+}
+
+TEST_P(ClientCase, LowCardinality_InsertAfterClear) {
+    // User can successfully insert values after invoking Clear() on LC column.
+    Block block;
+    auto lc = createTableWithOneColumn<ColumnLowCardinalityT<ColumnString>>(block);
+
+    // Add some data, but don't care about it much.
+    lc->AppendMany(std::vector<std::string_view>{"abc", "def", "123", "abc", "123", "def", "ghi"});
+    EXPECT_GT(lc->Size(), 0u);
+    EXPECT_GT(lc->GetDictionarySize(), 0u);
+
+    lc->Clear();
+
+    // Now ensure that all data appended after Clear() is inserted properly
+    const std::vector<std::string> data{{"FooBar", "1", "2", "Foo", "4", "Bar", "Foo", "7", "8", "Foo"}};
+    lc->AppendMany(data);
+
+    block.RefreshRowCount();
+    client_->Insert(table_name, block);
+
+    // Now validate that data was properly inserted
+    size_t total_rows = 0;
+    client_->Select(getOneColumnSelectQuery(),
         [&total_rows, &data](const Block& block) {
             total_rows += block.GetRowCount();
             if (block.GetRowCount() == 0) {
@@ -282,6 +379,40 @@ TEST_P(ClientCase, Numbers) {
         }
     );
     EXPECT_EQ(100000U, num);
+}
+
+TEST_P(ClientCase, SimpleAggregateFunction) {
+    const auto & server_info = client_->GetServerInfo();
+    if (versionNumber(server_info) < versionNumber(19, 9)) {
+        std::cout << "Test is skipped since server '" << server_info << "' does not support SimpleAggregateFunction" << std::endl;
+        return;
+    }
+
+    client_->Execute("DROP TABLE IF EXISTS test_clickhouse_cpp.SimpleAggregateFunction");
+    client_->Execute(
+            "CREATE TABLE IF NOT EXISTS test_clickhouse_cpp.SimpleAggregateFunction (saf SimpleAggregateFunction(sum, UInt64))"
+            "ENGINE = Memory");
+
+    constexpr size_t EXPECTED_ROWS = 10;
+    client_->Execute("INSERT INTO test_clickhouse_cpp.SimpleAggregateFunction (saf) SELECT number FROM system.numbers LIMIT 10");
+
+    size_t total_rows = 0;
+    client_->Select("Select * FROM test_clickhouse_cpp.SimpleAggregateFunction", [&total_rows](const Block & block) {
+        if (block.GetRowCount() == 0)
+            return;
+
+        total_rows += block.GetRowCount();
+        auto col = block[0]->As<ColumnUInt64>();
+        ASSERT_NE(nullptr, col);
+
+        for (size_t r = 0; r < col->Size(); ++r) {
+            EXPECT_EQ(r, col->At(r));
+        }
+
+        EXPECT_EQ(total_rows, col->Size());
+    });
+
+    EXPECT_EQ(EXPECTED_ROWS, total_rows);
 }
 
 TEST_P(ClientCase, Cancellable) {
@@ -582,6 +713,71 @@ TEST_P(ClientCase, Decimal) {
         EXPECT_EQ("123456789012345678", int128_to_string(decimal(5, 5)));
         EXPECT_EQ("12345678901234567890123456789012345678", int128_to_string(decimal(6, 5)));
     });
+}
+
+// Test roundtrip of DateTime64 values
+TEST_P(ClientCase, DateTime64) {
+    const auto & server_info = client_->GetServerInfo();
+    if (versionNumber(server_info) < versionNumber(20, 1)) {
+        std::cout << "Test is skipped since server '" << server_info << "' does not support DateTime64" << std::endl;
+        return;
+    }
+
+    Block block;
+    client_->Execute("DROP TABLE IF EXISTS test_clickhouse_cpp.datetime64;");
+
+    client_->Execute("CREATE TABLE IF NOT EXISTS "
+            "test_clickhouse_cpp.datetime64 (dt DateTime64(6)) "
+            "ENGINE = Memory");
+
+    auto col_dt64 = std::make_shared<ColumnDateTime64>(6);
+    block.AppendColumn("dt", col_dt64);
+
+    // Empty INSERT and SELECT
+    client_->Insert("test_clickhouse_cpp.datetime64", block);
+    client_->Select("SELECT dt FROM test_clickhouse_cpp.datetime64",
+        [](const Block& block) {
+            ASSERT_EQ(0U, block.GetRowCount());
+        }
+    );
+
+    const std::vector<Int64> data{
+        -1'234'567'890'123'456'7ll, // approx year 1578
+        -1'234'567'890'123ll,       // 1969-12-17T17:03:52.890123
+        -1'234'567ll,               // 1969-12-31T23:59:58.234567
+        0,                          // epoch
+        1'234'567ll,                // 1970-01-01T00:00:01.234567
+        1'234'567'890'123ll,        // 1970-01-15T06:56:07.890123
+        1'234'567'890'123'456'7ll   // 2361-03-21T19:15:01.234567
+    };
+    for (const auto & d : data) {
+        col_dt64->Append(d);
+    }
+
+    block.RefreshRowCount();
+
+    // Non-empty INSERT and SELECT
+    client_->Insert("test_clickhouse_cpp.datetime64", block);
+
+    size_t total_rows = 0;
+    client_->Select("SELECT dt FROM test_clickhouse_cpp.datetime64",
+        [&total_rows, &data](const Block& block) {
+            total_rows += block.GetRowCount();
+            if (block.GetRowCount() == 0) {
+                return;
+            }
+
+            const auto offset = total_rows - block.GetRowCount();
+            ASSERT_EQ(1U, block.GetColumnCount());
+            if (auto col = block[0]->As<ColumnDateTime64>()) {
+                for (size_t i = 0; i < col->Size(); ++i) {
+                    EXPECT_EQ(data[offset + i], col->At(i)) << " at index: " << i;
+                }
+            }
+        }
+    );
+
+    ASSERT_EQ(total_rows, data.size());
 }
 
 INSTANTIATE_TEST_CASE_P(

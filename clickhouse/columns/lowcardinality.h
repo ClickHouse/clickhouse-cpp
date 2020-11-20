@@ -40,14 +40,14 @@ public:
     friend class ColumnLowCardinalityT;
 
 private:
-    // Please note that ColumnLowCardinalityT takes reference to underlying
-    // dictionary column object, so make sure to NOT change address of the
-    // dictionary object (with reset(), swap()) or with anything else.
+    // IMPLEMENTATION NOTE: ColumnLowCardinalityT takes reference to underlying dictionary column object,
+    // so make sure to NOT change address of the dictionary object (with reset(), swap()) or with anything else.
     ColumnRef dictionary_column_;
     ColumnRef index_column_;
     UniqueItems unique_items_map_;
 
 public:
+    // c-tor makes a deep copy of the dictionary_column.
     explicit ColumnLowCardinality(ColumnRef dictionary_column);
     ~ColumnLowCardinality();
 
@@ -85,6 +85,9 @@ protected:
     ColumnRef GetDictionary();
     void AppendUnsafe(const ItemView&);
 
+private:
+    void AppendNullItemToEmptyColumn();
+
 public:
     static details::LowCardinalityHashKey computeHashKey(const ItemView&);
 };
@@ -94,7 +97,9 @@ public:
  */
 template <typename DictionaryColumnType>
 class ColumnLowCardinalityT : public ColumnLowCardinality {
+
     DictionaryColumnType& typed_dictionary_;
+    const Type::Code type_;
 
 public:
     using WrappedColumnType = DictionaryColumnType;
@@ -105,7 +110,9 @@ public:
     template <typename... Args>
     explicit ColumnLowCardinalityT(Args&&... args)
         : ColumnLowCardinality(std::make_shared<DictionaryColumnType>(std::forward<Args>(args)...)),
-          typed_dictionary_(dynamic_cast<DictionaryColumnType&>(*GetDictionary())) {}
+          typed_dictionary_(dynamic_cast<DictionaryColumnType &>(*GetDictionary())),
+          type_(typed_dictionary_.Type()->GetCode())
+    {}
 
     /// Extended interface to simplify reading/adding individual items.
 
@@ -119,7 +126,9 @@ public:
     // when compiled with older compilers.
     using ColumnLowCardinality::Append;
 
-    inline void Append(const ValueType& value) { AppendUnsafe(ItemView{typed_dictionary_.Type()->GetCode(), value}); }
+    inline void Append(const ValueType & value) {
+        AppendUnsafe(ItemView{type_, value});
+    }
 
     template <typename T>
     inline void AppendMany(const T& container) {

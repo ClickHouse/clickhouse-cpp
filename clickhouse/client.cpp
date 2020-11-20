@@ -55,16 +55,6 @@ struct ClientInfo {
     uint32_t client_revision = 0;
 };
 
-struct ServerInfo {
-    std::string name;
-    std::string timezone;
-    std::string display_name;
-    uint64_t    version_major;
-    uint64_t    version_minor;
-    uint64_t    version_patch;
-    uint64_t    revision;
-};
-
 std::ostream& operator<<(std::ostream& os, const ClientOptions& opt) {
     os << "Client(" << opt.user << '@' << opt.host << ":" << opt.port
        << " ping_before_query:" << opt.ping_before_query
@@ -90,6 +80,8 @@ public:
     void Ping();
 
     void ResetConnection();
+
+    const ServerInfo& GetServerInfo() const;
 
 private:
     bool Handshake();
@@ -173,7 +165,7 @@ Client::Impl::Impl(const ClientOptions& opts)
 {
     // TODO: throw on big-endianness of platform
 
-    for (int i = 0; ; ) {
+    for (unsigned int i = 0; ; ) {
         try {
             ResetConnection();
             break;
@@ -256,8 +248,15 @@ void Client::Impl::Insert(const std::string& table_name, const Block& block) {
     SendData(Block());
 
     // Wait for EOS.
-    while (ReceivePacket()) {
+    uint64_t eos_packet{0};
+    while (ReceivePacket(&eos_packet)) {
         ;
+    }
+
+    if (eos_packet != ServerCodes::EndOfStream && eos_packet != ServerCodes::Exception
+        && eos_packet != ServerCodes::Log && options_.rethrow_exceptions) {
+        throw std::runtime_error(std::string{"unexpected packet from server while receiving end of query, expected (expected Exception, EndOfStream or Log, got: "}
+                            + (eos_packet ? std::to_string(eos_packet) : "nothing") + ")");
     }
 }
 
@@ -295,6 +294,10 @@ void Client::Impl::ResetConnection() {
     if (!Handshake()) {
         throw std::runtime_error("fail to connect to " + options_.host);
     }
+}
+
+const ServerInfo& Client::Impl::GetServerInfo() const {
+    return server_info_;
 }
 
 bool Client::Impl::Handshake() {
@@ -499,23 +502,29 @@ bool Client::Impl::ReceiveException(bool rethrow) {
     std::unique_ptr<Exception> e(new Exception);
     Exception* current = e.get();
 
+    bool exception_received = true;
     do {
         bool has_nested = false;
 
         if (!WireFormat::ReadFixed(&input_, &current->code)) {
-            return false;
+           exception_received = false;
+           break;
         }
         if (!WireFormat::ReadString(&input_, &current->name)) {
-            return false;
+            exception_received = false;
+            break;
         }
         if (!WireFormat::ReadString(&input_, &current->display_text)) {
-            return false;
+            exception_received = false;
+            break;
         }
         if (!WireFormat::ReadString(&input_, &current->stack_trace)) {
-            return false;
+            exception_received = false;
+            break;
         }
         if (!WireFormat::ReadFixed(&input_, &has_nested)) {
-            return false;
+            exception_received = false;
+            break;
         }
 
         if (has_nested) {
@@ -534,7 +543,7 @@ bool Client::Impl::ReceiveException(bool rethrow) {
         throw ServerException(std::move(e));
     }
 
-    return true;
+    return exception_received;
 }
 
 void Client::Impl::SendCancel() {
@@ -731,7 +740,7 @@ bool Client::Impl::ReceiveHello() {
 }
 
 void Client::Impl::RetryGuard(std::function<void()> func) {
-    for (int i = 0; i <= options_.send_retries; ++i) {
+    for (unsigned int i = 0; ; ++i) {
         try {
             func();
             return;
@@ -745,7 +754,7 @@ void Client::Impl::RetryGuard(std::function<void()> func) {
                 ok = false;
             }
 
-            if (!ok) {
+            if (!ok && i == options_.send_retries) {
                 throw;
             }
         }
@@ -787,6 +796,10 @@ void Client::Ping() {
 
 void Client::ResetConnection() {
     impl_->ResetConnection();
+}
+
+const ServerInfo& Client::GetServerInfo() const {
+    return impl_->GetServerInfo();
 }
 
 }
