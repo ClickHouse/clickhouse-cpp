@@ -1,11 +1,10 @@
 #include "date.h"
+#include <iomanip>
+#include <ostream>
 
 namespace clickhouse {
 
-ColumnDate::ColumnDate()
-    : Column(Type::CreateDate())
-    , data_(std::make_shared<ColumnUInt16>())
-{
+ColumnDate::ColumnDate() : Column(Type::CreateDate()), data_(std::make_shared<ColumnUInt16>()) {
 }
 
 void ColumnDate::Append(const std::time_t& value) {
@@ -40,7 +39,7 @@ size_t ColumnDate::Size() const {
 }
 
 ColumnRef ColumnDate::Slice(size_t begin, size_t len) {
-    auto col = data_->Slice(begin, len)->As<ColumnUInt16>();
+    auto col    = data_->Slice(begin, len)->As<ColumnUInt16>();
     auto result = std::make_shared<ColumnDate>();
 
     result->data_->Append(col);
@@ -49,7 +48,7 @@ ColumnRef ColumnDate::Slice(size_t begin, size_t len) {
 }
 
 void ColumnDate::Swap(Column& other) {
-    auto & col = dynamic_cast<ColumnDate &>(other);
+    auto& col = dynamic_cast<ColumnDate&>(other);
     data_.swap(col.data_);
 }
 
@@ -57,12 +56,7 @@ ItemView ColumnDate::GetItem(size_t index) const {
     return data_->GetItem(index);
 }
 
-
-
-ColumnDateTime::ColumnDateTime()
-    : Column(Type::CreateDateTime())
-    , data_(std::make_shared<ColumnUInt32>())
-{
+ColumnDateTime::ColumnDateTime() : Column(Type::CreateDateTime()), data_(std::make_shared<ColumnUInt32>()) {
 }
 
 void ColumnDateTime::Append(const std::time_t& value) {
@@ -96,7 +90,7 @@ void ColumnDateTime::Clear() {
 }
 
 ColumnRef ColumnDateTime::Slice(size_t begin, size_t len) {
-    auto col = data_->Slice(begin, len)->As<ColumnUInt32>();
+    auto col    = data_->Slice(begin, len)->As<ColumnUInt32>();
     auto result = std::make_shared<ColumnDateTime>();
 
     result->data_->Append(col);
@@ -105,12 +99,17 @@ ColumnRef ColumnDateTime::Slice(size_t begin, size_t len) {
 }
 
 void ColumnDateTime::Swap(Column& other) {
-    auto & col = dynamic_cast<ColumnDateTime &>(other);
+    auto& col = dynamic_cast<ColumnDateTime&>(other);
     data_.swap(col.data_);
 }
 
 ItemView ColumnDateTime::GetItem(size_t index) const {
     return data_->GetItem(index);
+}
+
+std::ostream& ColumnDateTime::Dump(std::ostream& o, size_t index) const {
+    std::time_t value = this->At(index);
+    return o << std::asctime(std::localtime(&value));
 }
 
 ColumnDateTime64::ColumnDateTime64(size_t precision)
@@ -182,4 +181,14 @@ size_t ColumnDateTime64::GetPrecision() const {
     return precision_;
 }
 
+std::ostream& ColumnDateTime64::Dump(std::ostream& o, size_t index) const {
+    std::time_t value = this->At(index);
+    return o << std::put_time(std::localtime(&value), "%Y-%m-%d");
 }
+
+std::ostream& ColumnDate::Dump(std::ostream& o, size_t index) const {
+    std::time_t value = this->At(index);
+    return o << std::put_time(std::localtime(&value), "%Y-%m-%d");
+}
+
+}  // namespace clickhouse

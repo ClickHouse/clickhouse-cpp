@@ -2,17 +2,18 @@
 
 #include "../types/types.h"
 
-#include <string_view>
 #include <stdexcept>
+#include <string_view>
 
 namespace clickhouse {
 
-/** ItemView is a view on a data stored in Column, safe-ish interface for reading values from Column.
+/** ItemView is a view on a data stored in Column, safe-ish interface for
+ * reading values from Column.
  *
- * Data is not owned (hence the name View) and will be invalidated on column update, load
- * or destruction (basically on calling any non-const method of Column).
- * `type` reflects what is stored in `data` and can be almost any value-type
- * (except Nullable, Array, Tuple, LowCardinality).
+ * Data is not owned (hence the name View) and will be invalidated on column
+ * update, load or destruction (basically on calling any non-const method of
+ * Column). `type` reflects what is stored in `data` and can be almost any
+ * value-type (except Nullable, Array, Tuple, LowCardinality).
  *
  */
 struct ItemView {
@@ -35,21 +36,12 @@ private:
     }
 
 public:
-    ItemView(Type::Code type, DataType data)
-        : type(type),
-          data(data)
-    {
-        ValidateData(type, data);
-    }
+    ItemView(Type::Code type, DataType data) : type(type), data(data) { ValidateData(type, data); }
 
-    explicit ItemView()
-        : ItemView(Type::Void, {nullptr, 0})
-    {}
+    explicit ItemView() : ItemView(Type::Void, {nullptr, 0}) {}
 
     template <typename T>
-    explicit ItemView(Type::Code type, const T & value)
-        : ItemView(type, ConvertToStorageValue(value))
-    {}
+    explicit ItemView(Type::Code type, const T& value) : ItemView(type, ConvertToStorageValue(value)) {}
 
     template <typename T>
     T get() const {
@@ -64,12 +56,11 @@ public:
         }
     }
 
-    inline std::string_view AsBinaryData() const {
-        return data;
-    }
+    inline std::string_view AsBinaryData() const { return data; }
 
-    // Validate that value matches type, will throw an exception if validation fails.
+    // Validate that value matches type, will throw an exception if validation
+    // fails.
     static void ValidateData(Type::Code type, DataType data);
 };
 
-}
+}  // namespace clickhouse

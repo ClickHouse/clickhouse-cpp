@@ -1,10 +1,13 @@
 #include "decimal.h"
 
+#include <cmath>
+#include <iomanip>
+#include <iostream>
+#include "utils.h"
+
 namespace clickhouse {
 
-ColumnDecimal::ColumnDecimal(size_t precision, size_t scale)
-    : Column(Type::CreateDecimal(precision, scale))
-{
+ColumnDecimal::ColumnDecimal(size_t precision, size_t scale) : Column(Type::CreateDecimal(precision, scale)) {
     if (precision <= 9) {
         data_ = std::make_shared<ColumnInt32>();
     } else if (precision <= 18) {
@@ -32,10 +35,10 @@ void ColumnDecimal::Append(const Int128& value) {
 
 void ColumnDecimal::Append(const std::string& value) {
     Int128 int_value = 0;
-    auto c = value.begin();
-    auto end = value.end();
-    bool sign = true;
-    bool has_dot = false;
+    auto c           = value.begin();
+    auto end         = value.end();
+    bool sign        = true;
+    bool has_dot     = false;
 
     int zeros = 0;
 
@@ -47,7 +50,7 @@ void ColumnDecimal::Append(const std::string& value) {
             }
         } else if (*c == '.' && !has_dot) {
             size_t distance = std::distance(c, end) - 1;
-            auto scale = type_->As<DecimalType>()->GetScale();
+            auto scale      = type_->As<DecimalType>()->GetScale();
 
             if (distance <= scale) {
                 zeros = scale - distance;
@@ -57,8 +60,7 @@ void ColumnDecimal::Append(const std::string& value) {
 
             has_dot = true;
         } else if (*c >= '0' && *c <= '9') {
-            if (__builtin_mul_overflow(int_value, 10, &int_value) ||
-                __builtin_add_overflow(int_value, *c - '0', &int_value)) {
+            if (__builtin_mul_overflow(int_value, 10, &int_value) || __builtin_add_overflow(int_value, *c - '0', &int_value)) {
                 throw std::runtime_error("value is too big for 128-bit integer");
             }
         } else {
@@ -122,12 +124,29 @@ ColumnRef ColumnDecimal::Slice(size_t begin, size_t len) {
 }
 
 void ColumnDecimal::Swap(Column& other) {
-    auto & col = dynamic_cast<ColumnDecimal &>(other);
+    auto& col = dynamic_cast<ColumnDecimal&>(other);
     data_.swap(col.data_);
 }
 
 ItemView ColumnDecimal::GetItem(size_t index) const {
     return data_->GetItem(index);
+}
+std::ostream& ColumnDecimal::Dump(std::ostream& o, size_t index) const {
+    // return writeNumber(o, this->At(index));
+    auto t         = this->Type()->As<DecimalType>();
+    double divider = (double)std::pow((int)10, (int)t->GetScale());
+    double result  = 0;
+    if (data_->Type()->GetCode() == Type::Int32) {
+        int32_t value = data_->As<ColumnInt32>()->At(index);
+        result        = value / divider;
+    } else if (data_->Type()->GetCode() == Type::Int64) {
+        int64_t value = data_->As<ColumnInt64>()->At(index);
+        result        = value / divider;
+    } else {
+        __int128 value = data_->As<ColumnInt128>()->At(index);
+        result         = value / divider;
+    }
+    return o << result << std::setprecision(t->GetPrecision());
 }
 
 size_t ColumnDecimal::GetScale() const
@@ -140,4 +159,4 @@ size_t ColumnDecimal::GetPrecision() const
     return type_->As<DecimalType>()->GetPrecision();
 }
 
-}
+}  // namespace clickhouse

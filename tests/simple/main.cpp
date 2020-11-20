@@ -470,6 +470,7 @@ inline void IPExample(Client &client) {
 }
 
 static void RunTests(Client& client) {
+    client.Execute("CREATE DATABASE IF NOT EXISTS test");
     ArrayExample(client);
     CancelableExample(client);
     DateExample(client);
@@ -484,6 +485,7 @@ static void RunTests(Client& client) {
     NumbersExample(client);
     SelectNull(client);
     ShowTables(client);
+    client.Execute("DROP DATABASE test");
 }
 
 int main() {

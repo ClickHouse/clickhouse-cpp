@@ -4,22 +4,18 @@
 namespace clickhouse {
 
 template <typename T>
-ColumnEnum<T>::ColumnEnum(TypeRef type)
-    : Column(type)
-{
+ColumnEnum<T>::ColumnEnum(TypeRef type) : Column(type) {
 }
 
 template <typename T>
-ColumnEnum<T>::ColumnEnum(TypeRef type, const std::vector<T>& data)
-    : Column(type)
-    , data_(data)
-{
+ColumnEnum<T>::ColumnEnum(TypeRef type, const std::vector<T>& data) : Column(type), data_(data) {
 }
 
 template <typename T>
 void ColumnEnum<T>::Append(const T& value, bool checkValue) {
-    if  (checkValue) {
-        // TODO: type_->HasEnumValue(value), "Enum type doesn't have value " + std::to_string(value);
+    if (checkValue) {
+        // TODO: type_->HasEnumValue(value), "Enum type doesn't have value " +
+        // std::to_string(value);
     }
     data_.push_back(value);
 }
@@ -45,14 +41,15 @@ const std::string ColumnEnum<T>::NameAt(size_t n) const {
 }
 
 template <typename T>
-const T& ColumnEnum<T>::operator[] (size_t n) const {
+const T& ColumnEnum<T>::operator[](size_t n) const {
     return data_[n];
 }
 
 template <typename T>
 void ColumnEnum<T>::SetAt(size_t n, const T& value, bool checkValue) {
     if (checkValue) {
-        // TODO: type_->HasEnumValue(value), "Enum type doesn't have value " + std::to_string(value);
+        // TODO: type_->HasEnumValue(value), "Enum type doesn't have value " +
+        // std::to_string(value);
     }
     data_.at(n) = value;
 }
@@ -92,7 +89,7 @@ ColumnRef ColumnEnum<T>::Slice(size_t begin, size_t len) {
 
 template <typename T>
 void ColumnEnum<T>::Swap(Column& other) {
-    auto & col = dynamic_cast<ColumnEnum<T> &>(other);
+    auto& col = dynamic_cast<ColumnEnum<T>&>(other);
     data_.swap(col.data_);
 }
 
@@ -104,4 +101,8 @@ ItemView ColumnEnum<T>::GetItem(size_t index) const {
 template class ColumnEnum<int8_t>;
 template class ColumnEnum<int16_t>;
 
+template <typename T>
+std::ostream& ColumnEnum<T>::Dump(std::ostream& o, size_t index) const {
+    return o << NameAt(index);
 }
+}  // namespace clickhouse

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "numeric.h"
 #include "../base/socket.h"
+#include "numeric.h"
 
 namespace clickhouse {
 
@@ -20,9 +20,10 @@ public:
     in_addr At(size_t n) const;
 
     /// Returns element at given row number.
-    in_addr operator [] (size_t n) const;
+    in_addr operator[](size_t n) const;
 
     std::string AsString(size_t n) const;
+    std::ostream& Dump(std::ostream& o, size_t index) const override;
 
 public:
     /// Appends content of given column to the end of current one.
@@ -51,4 +52,4 @@ private:
     std::shared_ptr<ColumnUInt32> data_;
 };
 
-}
+}  // namespace clickhouse

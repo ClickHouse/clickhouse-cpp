@@ -26,6 +26,7 @@ public:
     ColumnRef Slice(size_t begin, size_t len) override;
     void Swap(Column& other) override;
     ItemView GetItem(size_t index) const override;
+    std::ostream& Dump(std::ostream& o, size_t index) const override;
 
     size_t GetScale() const;
     size_t GetPrecision() const;
@@ -40,4 +41,4 @@ private:
     explicit ColumnDecimal(TypeRef type, ColumnRef data);
 };
 
-}
+}  // namespace clickhouse

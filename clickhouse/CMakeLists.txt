@@ -6,6 +6,7 @@ SET ( clickhouse-cpp-lib-src
     base/platform.cpp
     base/socket.cpp
 
+    columns/utils.cpp
     columns/array.cpp
     columns/date.cpp
     columns/decimal.cpp
@@ -19,7 +20,6 @@ SET ( clickhouse-cpp-lib-src
     columns/string.cpp
     columns/tuple.cpp
     columns/uuid.cpp
-
     columns/itemview.cpp
 
     types/type_parser.cpp

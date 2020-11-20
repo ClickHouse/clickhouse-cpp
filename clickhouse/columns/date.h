@@ -31,12 +31,14 @@ public:
 
     /// Clear column data .
     void Clear() override;
-    
+
     /// Returns count of rows in the column.
     size_t Size() const override;
 
     /// Makes slice of the current column.
     ColumnRef Slice(size_t begin, size_t len) override;
+
+    std::ostream& Dump(std::ostream& o, size_t index) const override;
 
     void Swap(Column& other) override;
 
@@ -71,6 +73,7 @@ public:
 
     /// Returns count of rows in the column.
     size_t Size() const override;
+    std::ostream& Dump(std::ostream& o, size_t index) const override;
 
     /// Makes slice of the current column.
     ColumnRef Slice(size_t begin, size_t len) override;
@@ -82,7 +85,6 @@ public:
 private:
     std::shared_ptr<ColumnUInt32> data_;
 };
-
 
 /** */
 class ColumnDateTime64 : public Column {
@@ -122,6 +124,8 @@ public:
     ItemView GetItem(size_t index) const override;
 
     size_t GetPrecision() const;
+
+    std::ostream& Dump(std::ostream& o, size_t index) const override;
 
 private:
     ColumnDateTime64(TypeRef type, std::shared_ptr<ColumnDecimal> data);

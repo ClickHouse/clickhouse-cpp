@@ -1,12 +1,11 @@
 #include "numeric.h"
+#include <string>
 #include "utils.h"
 
 namespace clickhouse {
 
 template <typename T>
-ColumnVector<T>::ColumnVector()
-    : Column(Type::CreateSimple<T>())
-{
+ColumnVector<T>::ColumnVector() : Column(Type::CreateSimple<T>()) {
 }
 
 template <typename T>
@@ -31,7 +30,7 @@ void ColumnVector<T>::Append(const T& value) {
 template <typename T>
 void ColumnVector<T>::Erase(size_t pos, size_t count) {
     const auto begin = std::min(pos, data_.size());
-    const auto last = begin + std::min(data_.size() - begin, count);
+    const auto last  = begin + std::min(data_.size() - begin, count);
 
     data_.erase(data_.begin() + begin, data_.begin() + last);
 }
@@ -47,7 +46,7 @@ const T& ColumnVector<T>::At(size_t n) const {
 }
 
 template <typename T>
-const T& ColumnVector<T>::operator [] (size_t n) const {
+const T& ColumnVector<T>::operator[](size_t n) const {
     return data_[n];
 }
 
@@ -82,12 +81,12 @@ ColumnRef ColumnVector<T>::Slice(size_t begin, size_t len) {
 
 template <typename T>
 void ColumnVector<T>::Swap(Column& other) {
-    auto & col = dynamic_cast<ColumnVector<T> &>(other);
+    auto& col = dynamic_cast<ColumnVector<T>&>(other);
     data_.swap(col.data_);
 }
 
 template <typename T>
-ItemView ColumnVector<T>::GetItem(size_t index) const  {
+ItemView ColumnVector<T>::GetItem(size_t index) const {
     return ItemView{type_->GetCode(), data_[index]};
 }
 
@@ -105,4 +104,8 @@ template class ColumnVector<Int128>;
 template class ColumnVector<float>;
 template class ColumnVector<double>;
 
+template <typename T>
+std::ostream& ColumnVector<T>::Dump(std::ostream& o, size_t index) const {
+    return writeNumber(o, this->At(index));
 }
+}  // namespace clickhouse

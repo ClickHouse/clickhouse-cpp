@@ -23,7 +23,9 @@ public:
     const UInt128 At(size_t n) const;
 
     /// Returns element at given row number.
-    const UInt128 operator [] (size_t n) const;
+    const UInt128 operator[](size_t n) const;
+
+    std::ostream& Dump(std::ostream& o, size_t index) const override;
 
 public:
     /// Appends content of given column to the end of current one.
@@ -34,7 +36,7 @@ public:
 
     /// Saves column data to output stream.
     void Save(CodedOutputStream* output) override;
-    
+
     /// Clear column data .
     void Clear() override;
 
@@ -51,4 +53,4 @@ private:
     std::shared_ptr<ColumnUInt64> data_;
 };
 
-}
+}  // namespace clickhouse

@@ -86,16 +86,11 @@ static ColumnRef CreateTerminalColumn(const TypeAst& ast) {
 static ColumnRef CreateColumnFromAst(const TypeAst& ast) {
     switch (ast.meta) {
         case TypeAst::Array: {
-            return std::make_shared<ColumnArray>(
-                CreateColumnFromAst(ast.elements.front())
-            );
+            return std::make_shared<ColumnArray>(CreateColumnFromAst(ast.elements.front()));
         }
 
         case TypeAst::Nullable: {
-            return std::make_shared<ColumnNullable>(
-                CreateColumnFromAst(ast.elements.front()),
-                std::make_shared<ColumnUInt8>()
-            );
+            return std::make_shared<ColumnNullable>(CreateColumnFromAst(ast.elements.front()), std::make_shared<ColumnUInt8>());
         }
 
         case TypeAst::Terminal: {
@@ -122,18 +117,13 @@ static ColumnRef CreateColumnFromAst(const TypeAst& ast) {
 
             enum_items.reserve(ast.elements.size());
             for (const auto& elem : ast.elements) {
-                enum_items.push_back(
-                    Type::EnumItem{elem.name, (int16_t)elem.value});
+                enum_items.push_back(Type::EnumItem{elem.name, (int16_t)elem.value});
             }
 
             if (ast.code == Type::Enum8) {
-                return std::make_shared<ColumnEnum8>(
-                    Type::CreateEnum8(enum_items)
-                );
+                return std::make_shared<ColumnEnum8>(Type::CreateEnum8(enum_items));
             } else if (ast.code == Type::Enum16) {
-                return std::make_shared<ColumnEnum16>(
-                    Type::CreateEnum16(enum_items)
-                );
+                return std::make_shared<ColumnEnum16>(Type::CreateEnum16(enum_items));
             }
             break;
         }
@@ -161,8 +151,7 @@ static ColumnRef CreateColumnFromAst(const TypeAst& ast) {
     return nullptr;
 }
 
-} // namespace
-
+}  // namespace
 
 ColumnRef CreateColumnByType(const std::string& type_name) {
     auto ast = ParseTypeName(type_name);
@@ -173,4 +162,4 @@ ColumnRef CreateColumnByType(const std::string& type_name) {
     return nullptr;
 }
 
-}
+}  // namespace clickhouse
