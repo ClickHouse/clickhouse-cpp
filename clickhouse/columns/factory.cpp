@@ -64,9 +64,20 @@ static ColumnRef CreateTerminalColumn(const TypeAst& ast) {
         return std::make_shared<ColumnFixedString>(ast.elements.front().value);
 
     case Type::DateTime:
-        return std::make_shared<ColumnDateTime>();
+        if (ast.elements.empty()) {
+            return std::make_shared<ColumnDateTime>();
+        } else {
+            return std::make_shared<ColumnDateTime>(ast.elements[0].value_string);
+        }
     case Type::DateTime64:
-        return std::make_shared<ColumnDateTime64>(ast.elements.front().value);
+        if (ast.elements.empty()) {
+            return nullptr;
+        }
+        if (ast.elements.size() == 1) {
+            return std::make_shared<ColumnDateTime64>(ast.elements[0].value);
+        } else {
+            return std::make_shared<ColumnDateTime64>(ast.elements[0].value, ast.elements[1].value_string);
+        }
     case Type::Date:
         return std::make_shared<ColumnDate>();
 
@@ -120,10 +131,11 @@ static ColumnRef CreateColumnFromAst(const TypeAst& ast) {
         case TypeAst::Enum: {
             std::vector<Type::EnumItem> enum_items;
 
-            enum_items.reserve(ast.elements.size());
-            for (const auto& elem : ast.elements) {
+            enum_items.reserve(ast.elements.size() / 2);
+            for (size_t i = 0; i < ast.elements.size(); i += 2) {
                 enum_items.push_back(
-                    Type::EnumItem{elem.name, (int16_t)elem.value});
+                    Type::EnumItem{ast.elements[i].value_string,
+                                   (int16_t)ast.elements[i + 1].value});
             }
 
             if (ast.code == Type::Enum8) {
@@ -153,8 +165,10 @@ static ColumnRef CreateColumnFromAst(const TypeAst& ast) {
             return CreateTerminalColumn(ast.elements.back());
         }
 
+        case TypeAst::Assign:
         case TypeAst::Null:
         case TypeAst::Number:
+        case TypeAst::String:
             break;
     }
 
