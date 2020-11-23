@@ -352,8 +352,8 @@ TEST(ColumnsCase, Date2038) {
 }
 
 TEST(ColumnsCase, DateTime) {
-//    ASSERT_NE(nullptr, CreateColumnByType("DateTime"));
-//    ASSERT_NE(nullptr, CreateColumnByType("DateTime('Europe/Moscow')"));
+    ASSERT_NE(nullptr, CreateColumnByType("DateTime"));
+    ASSERT_NE(nullptr, CreateColumnByType("DateTime('Europe/Moscow')"));
 
     ASSERT_EQ(CreateColumnByType("DateTime('UTC')")->As<ColumnDateTime>()->Timezone(), "UTC");
     ASSERT_EQ(CreateColumnByType("DateTime64(3, 'UTC')")->As<ColumnDateTime64>()->Timezone(), "UTC");
