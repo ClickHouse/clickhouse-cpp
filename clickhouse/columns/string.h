@@ -3,7 +3,13 @@
 #include "column.h"
 
 #include <string>
-#include <string_view>
+#if defined(__GNUC__) && __GNUC__ < 7
+# include <experimental/string_view>
+# define string_view experimental::string_view
+#else
+# include <string_view>
+#endif
+
 #include <utility>
 #include <vector>
 

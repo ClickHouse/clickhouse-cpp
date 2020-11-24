@@ -11,8 +11,12 @@
 #include <contrib/gtest/gtest.h>
 #include "utils.h"
 
-#include <string_view>
-
+#if defined(__GNUC__) && __GNUC__ < 7
+# include <experimental/string_view>
+# define string_view experimental::string_view
+#else
+# include <string_view>
+#endif
 
 namespace {
 
