@@ -1,11 +1,10 @@
 #include "types.h"
 
-#include <assert.h>
+#include <stdexcept>
 
 namespace clickhouse {
 
-Type::Type(const Code code) : code_(code) {
-}
+Type::Type(const Code code) : code_(code) {}
 
 std::string Type::GetName() const {
     switch (code_) {
@@ -44,7 +43,9 @@ std::string Type::GetName() const {
         case IPv6:
             return "IPv6";
         case DateTime:
-            return "DateTime";
+        {
+            return As<DateTimeType>()->GetName();
+        }
         case DateTime64:
             return As<DateTime64Type>()->GetName();
         case Date:
@@ -79,12 +80,12 @@ TypeRef Type::CreateDate() {
     return TypeRef(new Type(Type::Date));
 }
 
-TypeRef Type::CreateDateTime() {
-    return TypeRef(new Type(Type::DateTime));
+TypeRef Type::CreateDateTime(std::string timezone) {
+    return TypeRef(new DateTimeType(std::move(timezone)));
 }
 
-TypeRef Type::CreateDateTime64(size_t precision) {
-    return TypeRef(new DateTime64Type(precision));
+TypeRef Type::CreateDateTime64(size_t precision, std::string timezone) {
+    return TypeRef(new DateTime64Type(precision, std::move(timezone)));
 }
 
 TypeRef Type::CreateDecimal(size_t precision, size_t scale) {
@@ -183,7 +184,7 @@ std::string EnumType::GetName() const {
         result = "Enum16(";
     }
 
-    for (auto ei = value_to_name_.begin();;) {
+    for (auto ei = value_to_name_.begin(); ei != value_to_name_.end();) {
         result += "'";
         result += ei->second;
         result += "' = ";
@@ -225,10 +226,36 @@ EnumType::ValueToNameIterator EnumType::EndValueToName() const {
     return value_to_name_.end();
 }
 
+
+namespace details
+{
+TypeWithTimeZoneMixin::TypeWithTimeZoneMixin(std::string timezone)
+    : timezone_(std::move(timezone)) {
+}
+
+const std::string & TypeWithTimeZoneMixin::Timezone() const {
+    return timezone_;
+}
+}
+
+/// class DateTimeType
+DateTimeType::DateTimeType(std::string timezone)
+    : Type(DateTime), details::TypeWithTimeZoneMixin(std::move(timezone)) {
+}
+
+std::string DateTimeType::GetName() const {
+    std::string datetime_representation = "DateTime";
+    const auto & timezone = Timezone();
+    if (!timezone.empty())
+        datetime_representation += "('" + timezone + "')";
+
+    return datetime_representation;
+}
+
 /// class DateTime64Type
 
-DateTime64Type::DateTime64Type(size_t precision)
-    : Type(DateTime64), precision_(precision) {
+DateTime64Type::DateTime64Type(size_t precision, std::string timezone)
+    : Type(DateTime64), details::TypeWithTimeZoneMixin(std::move(timezone)), precision_(precision) {
 
     if (precision_ > 18) {
         throw std::runtime_error("DateTime64 precision is > 18");
@@ -240,6 +267,12 @@ std::string DateTime64Type::GetName() const {
     datetime64_representation.reserve(14);
     datetime64_representation += "DateTime64(";
     datetime64_representation += std::to_string(precision_);
+
+    const auto & timezone = Timezone();
+    if (!timezone.empty()) {
+        datetime64_representation += ", '" + timezone + "'";
+    }
+
     datetime64_representation += ")";
     return datetime64_representation;
 }
@@ -262,8 +295,9 @@ TupleType::TupleType(const std::vector<TypeRef>& item_types) : Type(Tuple), item
 /// class LowCardinalityType
 LowCardinalityType::LowCardinalityType(TypeRef nested_type) : Type(LowCardinality), nested_type_(nested_type) {
 }
-LowCardinalityType::~LowCardinalityType()
-{}
+
+LowCardinalityType::~LowCardinalityType() {
+}
 
 std::string TupleType::GetName() const {
     std::string result("Tuple(");

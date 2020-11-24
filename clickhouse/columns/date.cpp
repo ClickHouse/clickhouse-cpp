@@ -65,12 +65,22 @@ ColumnDateTime::ColumnDateTime()
 {
 }
 
+ColumnDateTime::ColumnDateTime(std::string timezone)
+    : Column(Type::CreateDateTime(std::move(timezone)))
+    , data_(std::make_shared<ColumnUInt32>())
+{
+}
+
 void ColumnDateTime::Append(const std::time_t& value) {
     data_->Append(static_cast<uint32_t>(value));
 }
 
 std::time_t ColumnDateTime::At(size_t n) const {
     return data_->At(n);
+}
+
+std::string ColumnDateTime::Timezone() const {
+    return type_->As<DateTimeType>()->Timezone();
 }
 
 void ColumnDateTime::Append(ColumnRef column) {
@@ -117,6 +127,10 @@ ColumnDateTime64::ColumnDateTime64(size_t precision)
     : ColumnDateTime64(Type::CreateDateTime64(precision), std::make_shared<ColumnDecimal>(18ul, precision))
 {}
 
+ColumnDateTime64::ColumnDateTime64(size_t precision, std::string timezone)
+    : ColumnDateTime64(Type::CreateDateTime64(precision, std::move(timezone)), std::make_shared<ColumnDecimal>(18ul, precision))
+{}
+
 ColumnDateTime64::ColumnDateTime64(TypeRef type, std::shared_ptr<ColumnDecimal> data)
     : Column(type),
       data_(data),
@@ -135,6 +149,10 @@ void ColumnDateTime64::Append(const Int64& value) {
 
 Int64 ColumnDateTime64::At(size_t n) const {
     return data_->At(n);
+}
+
+std::string ColumnDateTime64::Timezone() const {
+    return type_->As<DateTime64Type>()->Timezone();
 }
 
 void ColumnDateTime64::Append(ColumnRef column) {

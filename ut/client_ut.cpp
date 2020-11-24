@@ -139,7 +139,7 @@ TEST_P(ClientCase, Date) {
 
     /// Create a table.
     client_->Execute(
-            "CREATE TABLE IF NOT EXISTS test_clickhouse_cpp.date (d DateTime) "
+            "CREATE TABLE IF NOT EXISTS test_clickhouse_cpp.date (d DateTime('UTC')) "
             "ENGINE = Memory");
 
     auto d = std::make_shared<ColumnDateTime>();
@@ -159,6 +159,7 @@ TEST_P(ClientCase, Date) {
                 auto col = block[0]->As<ColumnDateTime>();
                 std::time_t t = col->As<ColumnDateTime>()->At(c);
                 EXPECT_EQ(now, t);
+                EXPECT_EQ(col->Timezone(), "UTC");
             }
         }
     );

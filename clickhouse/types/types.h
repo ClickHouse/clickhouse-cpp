@@ -76,9 +76,9 @@ public:
 
     static TypeRef CreateDate();
 
-    static TypeRef CreateDateTime();
+    static TypeRef CreateDateTime(std::string timezone = std::string());
 
-    static TypeRef CreateDateTime64(size_t precision);
+    static TypeRef CreateDateTime64(size_t precision, std::string timezone = std::string());
 
     static TypeRef CreateDecimal(size_t precision, size_t scale);
 
@@ -141,6 +141,8 @@ public:
     DecimalType(size_t precision, size_t scale);
 
     std::string GetName() const;
+    friend class EnumType;
+    friend class DateTimeType;
 
     inline size_t GetScale() const { return scale_; }
     inline size_t GetPrecision() const { return precision_; }
@@ -149,14 +151,35 @@ private:
     const size_t precision_, scale_;
 };
 
-class DateTime64Type: public Type {
+namespace details
+{
+class TypeWithTimeZoneMixin
+{
 public:
-    explicit DateTime64Type(size_t precision);
+    TypeWithTimeZoneMixin(std::string timezone);
+
+    /// Timezone associated with a data column.
+    const std::string & Timezone() const;
+
+private:
+    std::string timezone_;
+};
+}
+
+class DateTimeType : public Type, public details::TypeWithTimeZoneMixin {
+public:
+    explicit DateTimeType(std::string timezone);
+
+    std::string GetName() const;
+};
+
+class DateTime64Type: public Type, public details::TypeWithTimeZoneMixin {
+public:
+    explicit DateTime64Type(size_t precision, std::string timezone_);
 
     std::string GetName() const;
 
     inline size_t GetPrecision() const { return precision_; }
-
 private:
     size_t precision_;
 };

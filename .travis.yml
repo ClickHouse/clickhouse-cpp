@@ -51,11 +51,15 @@ matrix:
       osx_image: xcode9.4
       compiler: clang
 
-before_install:
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then echo 'deb http://repo.yandex.ru/clickhouse/deb/stable main/' | sudo tee /etc/apt/sources.list.d/clickhouse.list ; fi
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then sudo apt-key adv --keyserver keyserver.ubuntu.com --recv E0C56BD4 ; fi
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then sudo apt-get update -q && sudo apt-get install -q -y --allow-unauthenticated clickhouse-server-common ; fi
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then sudo service clickhouse-server start ; fi
+before_install: |
+  if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
+    sudo apt-get install apt-transport-https ca-certificates dirmngr
+    sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv E0C56BD4
+    echo "deb https://repo.clickhouse.tech/deb/stable/ main/" | sudo tee \
+        /etc/apt/sources.list.d/clickhouse.list
+    sudo apt-get update -q && sudo apt-get install -q -y --allow-unauthenticated clickhouse-server
+    sudo service clickhouse-server start
+  fi
 
 # Build steps
 script:

@@ -24,6 +24,14 @@ public:
 
     explicit ColumnFixedString(size_t n);
 
+    template <typename Values>
+    ColumnFixedString(size_t n, const Values & values)
+        : ColumnFixedString(n)
+    {
+        for (const auto & v : values)
+            Append(v);
+    }
+
     /// Appends one element to the column.
     void Append(std::string_view str);
 

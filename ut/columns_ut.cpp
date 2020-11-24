@@ -148,14 +148,48 @@ TEST(ColumnsCase, NumericSlice) {
 
 
 TEST(ColumnsCase, FixedStringInit) {
-    auto col = std::make_shared<ColumnFixedString>(3);
-    for (const auto& s : MakeFixedStrings()) {
+    const auto column_data = MakeFixedStrings();
+    auto col = std::make_shared<ColumnFixedString>(3, column_data);
+
+    ASSERT_EQ(col->Size(), column_data.size());
+
+    size_t i = 0;
+    for (const auto& s : column_data) {
+        EXPECT_EQ(s, col->At(i));
+        ++i;
+    }
+}
+
+TEST(ColumnsCase, FixedString_Append_SmallStrings) {
+    // Ensure that strings smaller than FixedString's size
+    // are padded with zeroes on insertion.
+
+    const size_t string_size = 7;
+    const auto column_data = MakeFixedStrings();
+
+    auto col = std::make_shared<ColumnFixedString>(string_size);
+    size_t i = 0;
+    for (const auto& s : column_data) {
         col->Append(s);
+
+        EXPECT_EQ(string_size, col->At(i).size());
+
+        std::string expected = column_data[i];
+        expected.resize(string_size, char(0));
+        EXPECT_EQ(expected, col->At(i));
+
+        ++i;
     }
 
-    ASSERT_EQ(col->Size(), 4u);
-    ASSERT_EQ(col->At(1), "bbb");
-    ASSERT_EQ(col->At(3), "ddd");
+    ASSERT_EQ(col->Size(), i);
+}
+
+TEST(ColumnsCase, FixedString_Append_LargeString) {
+    // Ensure that inserting strings larger than FixedString size thorws exception.
+
+    const auto col = std::make_shared<ColumnFixedString>(1);
+    EXPECT_ANY_THROW(col->Append("2c"));
+    EXPECT_ANY_THROW(col->Append("this is a long string"));
 }
 
 TEST(ColumnsCase, StringInit) {
@@ -355,6 +389,14 @@ TEST(ColumnsCase, Date2038) {
     ASSERT_EQ(static_cast<std::uint64_t>(col1->At(0)), 25882ul * 86400ul);
 }
 
+TEST(ColumnsCase, DateTime) {
+    ASSERT_NE(nullptr, CreateColumnByType("DateTime"));
+    ASSERT_NE(nullptr, CreateColumnByType("DateTime('Europe/Moscow')"));
+
+    ASSERT_EQ(CreateColumnByType("DateTime('UTC')")->As<ColumnDateTime>()->Timezone(), "UTC");
+    ASSERT_EQ(CreateColumnByType("DateTime64(3, 'UTC')")->As<ColumnDateTime64>()->Timezone(), "UTC");
+}
+
 TEST(ColumnsCase, EnumTest) {
     std::vector<Type::EnumItem> enum_items = {{"Hi", 1}, {"Hello", 2}};
 
@@ -373,6 +415,8 @@ TEST(ColumnsCase, EnumTest) {
 
     auto col16 = std::make_shared<ColumnEnum16>(Type::CreateEnum16(enum_items));
     ASSERT_TRUE(col16->Type()->IsEqual(Type::CreateEnum16(enum_items)));
+
+    ASSERT_TRUE(CreateColumnByType("Enum8('Hi' = 1, 'Hello' = 2)")->Type()->IsEqual(Type::CreateEnum8(enum_items)));
 }
 
 TEST(ColumnsCase, NullableSlice) {
@@ -577,7 +621,7 @@ TEST(ColumnsCase, CreateSimpleAggregateFunction) {
 }
 
 
-TEST(CreateColumnByType, UnmatchedBrackets) {
+TEST(ColumnsCase, UnmatchedBrackets) {
     // When type string has unmatched brackets, CreateColumnByType must return nullptr.
     ASSERT_EQ(nullptr, CreateColumnByType("FixedString(10"));
     ASSERT_EQ(nullptr, CreateColumnByType("Nullable(FixedString(10000"));
@@ -590,3 +634,35 @@ TEST(CreateColumnByType, UnmatchedBrackets) {
     ASSERT_EQ(nullptr, CreateColumnByType("Array(LowCardinality(Nullable(FixedString(10000))"));
     ASSERT_EQ(nullptr, CreateColumnByType("Array(LowCardinality(Nullable(FixedString(10000)))"));
 }
+
+class ColumnsCaseWithName : public ::testing::TestWithParam<const char* /*Column Type String*/>
+{};
+
+TEST_P(ColumnsCaseWithName, CreateColumnByType)
+{
+    const auto col = CreateColumnByType(GetParam());
+    ASSERT_NE(nullptr, col);
+    EXPECT_EQ(col->GetType().GetName(), GetParam());
+}
+
+INSTANTIATE_TEST_CASE_P(Basic, ColumnsCaseWithName, ::testing::Values(
+    "Int8", "Int16", "Int32", "Int64",
+    "UInt8", "UInt16", "UInt32", "UInt64",
+    "String", "Date", "DateTime"
+));
+
+INSTANTIATE_TEST_CASE_P(Parametrized, ColumnsCaseWithName, ::testing::Values(
+    "FixedString(0)", "FixedString(10000)",
+    "DateTime('UTC')", "DateTime64(3, 'UTC')",
+    "Decimal(9,3)", "Decimal(18,3)",
+    "Enum8('ONE' = 1, 'TWO' = 2)",
+    "Enum16('ONE' = 1, 'TWO' = 2, 'THREE' = 3, 'FOUR' = 4)"
+));
+
+
+INSTANTIATE_TEST_CASE_P(Nested, ColumnsCaseWithName, ::testing::Values(
+    "Nullable(FixedString(10000))",
+    "Nullable(LowCardinality(FixedString(10000)))",
+    "Array(Nullable(LowCardinality(FixedString(10000))))",
+    "Array(Enum8('ONE' = 1, 'TWO' = 2))"
+));
