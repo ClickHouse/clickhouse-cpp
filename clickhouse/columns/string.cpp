@@ -38,7 +38,7 @@ void ColumnFixedString::Append(std::string_view str) {
         data_.reserve(new_size);
     }
 
-    data_.insert(data_.size(), str);
+    data_.insert(data_.size(), str.data(), str.size());
 }
 
 void ColumnFixedString::Clear() {
