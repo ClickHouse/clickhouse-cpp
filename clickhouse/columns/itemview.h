@@ -9,6 +9,14 @@
 
 namespace clickhouse {
 
+template <class T>
+static typename std::enable_if<std::is_same<std::string_view, T>::value || std::is_same<std::string, T>::value,
+    std::string_view>::type ConvertToStorageValue(const T& t) { return std::string_view{t}; }
+
+template <class T>
+static typename std::enable_if<std::is_fundamental<T>::value, std::string_view>::type
+    ConvertToStorageValue(const T& t) { return std::string_view{reinterpret_cast<const char*>(&t), sizeof(T)}; }
+
 /** ItemView is a view on a data stored in Column, safe-ish interface for reading values from Column.
  *
  * Data is not owned (hence the name View) and will be invalidated on column update, load
@@ -22,17 +30,6 @@ struct ItemView {
 
     const Type::Code type;
     const DataType data;
-
-private:
-    template <class T>
-    typename std::enable_if<
-        std::is_same<std::string_view, T>::value ||
-        std::is_same<std::string, T>::value, std::string_view>::type
-    ConvertToStorageValue(const T& t) { return std::string_view{t}; }
-
-    template <class T>
-    typename std::enable_if<std::is_fundamental<T>::value>::type
-    ConvertToStorageValue(const T& t) { return std::string_view{reinterpret_cast<const char*>(&t), sizeof(T)}; }
 
 public:
     ItemView(Type::Code type, DataType data)
