@@ -67,12 +67,16 @@ auto ValidateColumnItems(const ColumnType & col, size_t expected_items) {
 template <class ColumnType>
 typename std::enable_if<
     std::is_same<ColumnType, ColumnFixedString>::value ||
-    std::is_same<ColumnType, ColumnLowCardinality<ColumnFixedString>>::value , ColumnType>::type InstantiateColumn()
+    std::is_same<ColumnType, ColumnLowCardinalityT<ColumnFixedString>>::value , ColumnType>::type InstantiateColumn()
 {
     return ColumnType(8);
 }
 
-template <class ColumnType> ColumnType InstantiateColumn() { return ColumnType(); }
+template <class ColumnType>
+typename std::enable_if<
+    !std::is_same<ColumnType, ColumnFixedString>::value &&
+    !std::is_same<ColumnType, ColumnLowCardinalityT<ColumnFixedString>>::value , ColumnType>::type
+InstantiateColumn() { return ColumnType(); }
 
 template <typename ColumnType>
 class ColumnPerformanceTest : public ::testing::Test {

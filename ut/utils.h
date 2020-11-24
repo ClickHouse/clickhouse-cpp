@@ -49,11 +49,6 @@ template <class R> typename std::enable_if<std::ratio_equal<R, std::milli>::valu
 template <class R> typename std::enable_if<std::ratio_equal<R, std::centi>::value, const char*>::type getPrefix() { return "c"; }
 template <class R> typename std::enable_if<std::ratio_equal<R, std::deci>::value, const char*>::type getPrefix() { return "d"; }
 
-template <class R> const char* getPrefix() {
-    static_assert(!std::is_same<R, R>::value, "Unsupported ratio");
-    return "?";
-}
-
 namespace std {
 template <typename R, typename P>
 ostream & operator<<(ostream & ostr, const chrono::duration<R, P> & d) {
