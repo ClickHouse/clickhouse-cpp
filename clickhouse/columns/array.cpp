@@ -1,6 +1,13 @@
 #include "array.h"
 #include <stdexcept>
 
+#if defined(__GNUC__) && __GNUC__ < 7
+# include <experimental/string_view>
+# define string_view experimental::string_view
+#else
+# include <string_view>
+#endif
+
 namespace clickhouse {
 
 ColumnArray::ColumnArray(ColumnRef data)
