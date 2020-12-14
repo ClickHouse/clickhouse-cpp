@@ -6,12 +6,10 @@
 
 #if defined(__GNUC__) && __GNUC__ < 7
 # include <experimental/string_view>
-using namespace std::experimental::string_view_literals;
 using string_view = std::experimental::string_view;
 #else
 # include <string_view>
 using string_view = std::string_view;
-using namespace std::literals::string_view_literals;
 #endif
 
 /**
