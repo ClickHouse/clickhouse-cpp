@@ -7,16 +7,7 @@
 #include <cityhash/city.h>
 
 #include <functional>
-
-#if defined(__GNUC__) && __GNUC__ < 7
-# include <experimental/string_view>
-# define string_view experimental::string_view
-#else
-# include <string_view>
-#endif
-
 #include <type_traits>
-
 #include <cassert>
 
 namespace {
@@ -104,10 +95,10 @@ inline auto VisitIndexColumn(Vizitor && vizitor, ColumnType && col) {
 inline void AppendToDictionary(Column& dictionary, const ItemView & item) {
     switch (dictionary.GetType().GetCode()) {
         case Type::FixedString:
-            column_down_cast<ColumnFixedString>(dictionary).Append(item.get<std::string_view>());
+            column_down_cast<ColumnFixedString>(dictionary).Append(item.get<string_view>());
             return;
         case Type::String:
-            column_down_cast<ColumnString>(dictionary).Append(item.get<std::string_view>());
+            column_down_cast<ColumnString>(dictionary).Append(item.get<string_view>());
             return;
         default:
             throw std::runtime_error("Unexpected dictionary column type: " + dictionary.GetType().GetName());
@@ -120,7 +111,7 @@ inline auto GetNullItemForDictionary(const ColumnRef dictionary) {
     if (auto n = dictionary->As<ColumnNullable>()) {
         return ItemView{};
     } else {
-        return ItemView{dictionary->Type()->GetCode(), std::string_view{}};
+        return ItemView{dictionary->Type()->GetCode(), string_view{}};
     }
 }
 

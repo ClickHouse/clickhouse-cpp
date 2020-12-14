@@ -10,22 +10,20 @@
 
 #include <contrib/gtest/gtest.h>
 #include "utils.h"
-
-#if defined(__GNUC__) && __GNUC__ < 7
-# include <experimental/string_view>
-# define string_view experimental::string_view
-#else
-# include <string_view>
-#endif
+#include "../clickhouse/base/string_view.h"
 
 namespace {
 
 using namespace clickhouse;
+
+#if defined(__GNUC__) && __GNUC__ < 7
+using namespace std::experimental::literals::string_view_literals;
+#else
 using namespace std::literals::string_view_literals;
+#endif
 
 static std::vector<uint32_t> MakeNumbers() {
-    return std::vector<uint32_t>
-        {1, 2, 3, 7, 11, 13, 17, 19, 23, 29, 31};
+    return std::vector<uint32_t> {1, 2, 3, 7, 11, 13, 17, 19, 23, 29, 31};
 }
 
 static std::vector<uint8_t> MakeBools() {
@@ -533,13 +531,13 @@ TEST(ColumnsCase, DISABLED_ColumnLowCardinalityString_Save) {
     EXPECT_NO_THROW(col.Save(&output_stream));
 
     // Left margin should be blank
-    EXPECT_EQ(std::string_view(margin_content, left_margin_size), std::string_view(left_margin, left_margin_size));
+    EXPECT_EQ(string_view(margin_content, left_margin_size), string_view(left_margin, left_margin_size));
     // Right margin should be blank too
-    EXPECT_EQ(std::string_view(margin_content, right_margin_size), std::string_view(right_margin, right_margin_size));
+    EXPECT_EQ(string_view(margin_content, right_margin_size), string_view(right_margin, right_margin_size));
 
     // TODO: right now LC columns do not write indexes in the most compact way possible, so binary representation is a bit different
     // (there might be other inconsistances too)
-    EXPECT_EQ(LOWCARDINALITY_STRING_FOOBAR_10_ITEMS_BINARY, std::string_view(write_pos, expected_output_size));
+    EXPECT_EQ(LOWCARDINALITY_STRING_FOOBAR_10_ITEMS_BINARY, string_view(write_pos, expected_output_size));
 }
 
 TEST(ColumnsCase, ColumnLowCardinalityString_SaveAndLoad) {

@@ -4,6 +4,14 @@
 #include <stdexcept>
 #include <string>
 
+#if defined(__GNUC__) && __GNUC__ < 7
+# include <experimental/string_view>
+using string_view = std::experimental::string_view;
+#else
+# include <string_view>
+using string_view = std::string_view;
+#endif
+
 /**
  * A lightweight non-owning read-only view into a subsequence of a string.
  */

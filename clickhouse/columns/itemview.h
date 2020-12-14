@@ -3,26 +3,19 @@
 #include "../types/types.h"
 
 #include <sstream>
-
-#if defined(__GNUC__) && __GNUC__ < 7
-# include <experimental/string_view>
-# define string_view experimental::string_view
-#else
-# include <string_view>
-#endif
-
 #include <stdexcept>
 #include <type_traits>
+#include "../base/string_view.h"
 
 namespace clickhouse {
 
 template <class T>
-static typename std::enable_if<std::is_same<std::string_view, T>::value || std::is_same<std::string, T>::value,
-    std::string_view>::type ConvertToStorageValue(const T& t) { return std::string_view{t}; }
+static typename std::enable_if<std::is_same<string_view, T>::value || std::is_same<std::string, T>::value,
+    string_view>::type ConvertToStorageValue(const T& t) { return {t}; }
 
 template <class T>
-static typename std::enable_if<std::is_fundamental<T>::value, std::string_view>::type
-    ConvertToStorageValue(const T& t) { return std::string_view{reinterpret_cast<const char*>(&t), sizeof(T)}; }
+static typename std::enable_if<std::is_fundamental<T>::value, string_view>::type
+    ConvertToStorageValue(const T& t) { return {reinterpret_cast<const char*>(&t), sizeof(T)}; }
 
 /** ItemView is a view on a data stored in Column, safe-ish interface for reading values from Column.
  *
@@ -33,7 +26,7 @@ static typename std::enable_if<std::is_fundamental<T>::value, std::string_view>:
  *
  */
 struct ItemView {
-    using DataType = std::string_view;
+    using DataType = string_view;
 
     const Type::Code type;
     const DataType data;
@@ -57,7 +50,7 @@ public:
 
     template <class T>
     typename std::enable_if<
-        std::is_same<std::string_view, T>::value ||
+        std::is_same<string_view, T>::value ||
         std::is_same<std::string, T>::value, T>::type
     get() const { return data; }
 
@@ -71,7 +64,7 @@ public:
         }
     }
 
-    inline std::string_view AsBinaryData() const {
+    inline string_view AsBinaryData() const {
         return data;
     }
 

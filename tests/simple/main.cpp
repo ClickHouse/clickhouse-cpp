@@ -408,7 +408,7 @@ inline void EnumExample(Client& client) {
 }
 
 inline void SelectNull(Client& client) {
-    client.Select("SELECT NULL", []([[maybe_unused]] const Block& block)
+    client.Select("SELECT NULL", [](const Block& block)
         {
             assert(block.GetRowCount() < 2);
             (void)(block);

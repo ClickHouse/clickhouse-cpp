@@ -3,14 +3,7 @@
 #include "coded.h"
 
 #include <string>
-
-#if defined(__GNUC__) && __GNUC__ < 7
-# include <experimental/string_view>
-# define string_view experimental::string_view
-#else
-# include <string_view>
-#endif
-
+#include "string_view.h"
 
 namespace clickhouse {
 
@@ -31,7 +24,7 @@ public:
 
     static void WriteBytes(CodedOutputStream* output, const void* buf, size_t len);
 
-    static void WriteString(CodedOutputStream* output, std::string_view value);
+    static void WriteString(CodedOutputStream* output, string_view value);
 
     static void WriteUInt64(CodedOutputStream* output, const uint64_t value);
 };
@@ -93,7 +86,7 @@ inline void WireFormat::WriteBytes(
 
 inline void WireFormat::WriteString(
     CodedOutputStream* output,
-    std::string_view value)
+    string_view value)
 {
     output->WriteVarint64(value.size());
     output->WriteRaw(value.data(), value.size());
