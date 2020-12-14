@@ -16,12 +16,6 @@ namespace {
 
 using namespace clickhouse;
 
-#if defined(__GNUC__) && __GNUC__ < 7
-using namespace std::experimental::literals::string_view_literals;
-#else
-using namespace std::literals::string_view_literals;
-#endif
-
 static std::vector<uint32_t> MakeNumbers() {
     return std::vector<uint32_t> {1, 2, 3, 7, 11, 13, 17, 19, 23, 29, 31};
 }
