@@ -42,7 +42,7 @@ static std::vector<uint64_t> MakeUUIDs() {
          0x3507213c178649f9llu, 0x9faf035d662f60aellu};
 }
 
-static const auto LOWCARDINALITY_STRING_FOOBAR_10_ITEMS_BINARY =
+static const string_view LOWCARDINALITY_STRING_FOOBAR_10_ITEMS_BINARY =
         "\x01\x00\x00\x00\x00\x00\x00\x00\x00\x06\x00\x00\x00\x00\x00\x00"
         "\x09\x00\x00\x00\x00\x00\x00\x00\x00\x06\x46\x6f\x6f\x42\x61\x72"
         "\x01\x31\x01\x32\x03\x46\x6f\x6f\x01\x34\x03\x42\x61\x72\x01\x37"
