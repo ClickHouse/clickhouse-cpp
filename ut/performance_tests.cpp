@@ -53,7 +53,7 @@ inline string_view generate(const ColumnLowCardinalityT<ColumnFixedString>&, siz
 }
 
 template <typename ColumnType>
-auto ValidateColumnItems(const ColumnType & col, size_t expected_items) {
+void ValidateColumnItems(const ColumnType & col, size_t expected_items) {
     ASSERT_EQ(expected_items, col.Size());
     // validate that appended items match expected
     for (size_t i = 0; i < expected_items; ++i)
@@ -68,16 +68,20 @@ auto ValidateColumnItems(const ColumnType & col, size_t expected_items) {
 template <class ColumnType>
 typename std::enable_if<
     std::is_same<ColumnType, ColumnFixedString>::value ||
-    std::is_same<ColumnType, ColumnLowCardinalityT<ColumnFixedString>>::value , ColumnType>::type InstantiateColumn()
+    std::is_same<ColumnType, ColumnLowCardinalityT<ColumnFixedString>>::value , std::shared_ptr<ColumnType>>::type
+InstantiateColumn()
 {
-    return ColumnType(8);
+    return std::make_shared<ColumnType>(8);
 }
 
 template <class ColumnType>
 typename std::enable_if<
     !std::is_same<ColumnType, ColumnFixedString>::value &&
-    !std::is_same<ColumnType, ColumnLowCardinalityT<ColumnFixedString>>::value , ColumnType>::type
-InstantiateColumn() { return ColumnType(); }
+    !std::is_same<ColumnType, ColumnLowCardinalityT<ColumnFixedString>>::value , std::shared_ptr<ColumnType>>::type
+InstantiateColumn()
+{
+    return std::make_shared<ColumnType>();
+}
 
 template <typename ColumnType>
 class ColumnPerformanceTest : public ::testing::Test {
@@ -95,7 +99,8 @@ TYPED_TEST_CASE_P(ColumnPerformanceTest);
 TYPED_TEST_P(ColumnPerformanceTest, SaveAndLoad) {
     SKIP_IN_DEBUG_BUILDS();
 
-    auto column = InstantiateColumn<TypeParam>();
+    auto column_ptr = InstantiateColumn<TypeParam>();
+    auto & column = *column_ptr;
     using Timer = Timer<std::chrono::microseconds>;
 
     const size_t ITEMS_COUNT = 1'000'000;
@@ -177,7 +182,9 @@ TYPED_TEST_P(ColumnPerformanceTest, InsertAndSelect) {
     const std::string table_name = "PerformanceTests.ColumnTest";
     const std::string column_name = "column";
 
-    auto column = InstantiateColumn<ColumnType>();
+    auto column_ptr = InstantiateColumn<ColumnType>();
+    auto & column = *column_ptr;
+
     Client client(ClientOptions().SetHost("localhost"));
     client.Execute("CREATE DATABASE IF NOT EXISTS PerformanceTests");
     client.Execute("DROP TABLE IF EXISTS PerformanceTests.ColumnTest");
