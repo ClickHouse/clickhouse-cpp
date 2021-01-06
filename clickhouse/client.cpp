@@ -203,18 +203,20 @@ void Client::Impl::ExecuteQuery(Query query) {
 
 std::string NameToQueryString(const std::string &input)
 {
-    std::string output = "\"";
-    const char *c = input.c_str();
-    while (*c) {
-        if(*c == '"'){
-            //escape " with ""
-            output.append("\"\"");
-        }else{
-            output.push_back(*c);
+    std::string output;
+    output.reserve(input.size() + 2);
+    output += '`';
+
+    for (const auto & c : input) {
+        if (c == '`') {
+            //escape ` with ``
+            output.append("``");
+        } else {
+            output.push_back(c);
         }
-        ++c;
     }
-    output += "\"";
+
+    output += '`';
     return output;
 }
 
