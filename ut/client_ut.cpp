@@ -718,9 +718,9 @@ TEST_P(ClientCase, Decimal) {
 
 // Test special chars in names
 TEST_P(ClientCase, ColEscapeNameTest) {
-    client_->Execute("DROP TABLE IF EXISTS test_clickhouse_cpp.\"col_escape_name_test\";");
+    client_->Execute("DROP TABLE IF EXISTS test_clickhouse_cpp.\"col_escape_\"\"name_test\";");
 
-    client_->Execute("CREATE TABLE IF NOT EXISTS test_clickhouse_cpp.\"col_escape_name_test\" (\"test space\" UInt64, \"test \"\" quote\" UInt64, \"test \"\"`'[]&_\\ all\" UInt64) ENGINE = Memory");
+    client_->Execute("CREATE TABLE IF NOT EXISTS test_clickhouse_cpp.\"col_escape_\"\"name_test\" (\"test space\" UInt64, \"test \"\" quote\" UInt64, \"test \"\"`'[]&_\\ all\" UInt64) ENGINE = Memory");
 
     auto col1 = std::make_shared<ColumnUInt64>();
     col1->Append(1);
@@ -732,26 +732,26 @@ TEST_P(ClientCase, ColEscapeNameTest) {
     col3->Append(16);
     col3->Append(32);
 
-	Block block;
-	block.AppendColumn("test space", col1);
-	block.AppendColumn("test \" quote", col2);
-	block.AppendColumn("test \"`'[]&_\\ all", col3);
+    Block block;
+    block.AppendColumn("test space", col1);
+    block.AppendColumn("test \" quote", col2);
+    block.AppendColumn("test \"`'[]&_\\ all", col3);
 
-	client_->Insert("test_clickhouse_cpp.col_escape_name_test", block);
-	client_->Select("SELECT * FROM test_clickhouse_cpp.\"col_escape_name_test\"", [] ([[maybe_unused]]const Block& sblock)
-	{
-		int row = sblock.GetRowCount();
-		if (row <= 0) {return;}
-		int col = sblock.GetColumnCount();
-		EXPECT_EQ(col, 3);
-		EXPECT_EQ(row, 2);
-		EXPECT_EQ(sblock[0]->As<ColumnUInt64>()->At(0), 1U);
-		EXPECT_EQ(sblock[0]->As<ColumnUInt64>()->At(1), 2U);
-		EXPECT_EQ(sblock[1]->As<ColumnUInt64>()->At(0), 4U);
-		EXPECT_EQ(sblock[1]->As<ColumnUInt64>()->At(1), 8U);
-		EXPECT_EQ(sblock[2]->As<ColumnUInt64>()->At(0), 16U);
-		EXPECT_EQ(sblock[2]->As<ColumnUInt64>()->At(1), 32U);
-	});
+    client_->Insert("test_clickhouse_cpp.\"col_escape_\"\"name_test\"", block);
+    client_->Select("SELECT * FROM test_clickhouse_cpp.\"col_escape_\"\"name_test\"", [] (const Block& sblock)
+    {
+        int row = sblock.GetRowCount();
+        if (row <= 0) {return;}
+        int col = sblock.GetColumnCount();
+        EXPECT_EQ(col, 3);
+        EXPECT_EQ(row, 2);
+        EXPECT_EQ(sblock[0]->As<ColumnUInt64>()->At(0), 1u);
+        EXPECT_EQ(sblock[0]->As<ColumnUInt64>()->At(1), 2u);
+        EXPECT_EQ(sblock[1]->As<ColumnUInt64>()->At(0), 4u);
+        EXPECT_EQ(sblock[1]->As<ColumnUInt64>()->At(1), 8u);
+        EXPECT_EQ(sblock[2]->As<ColumnUInt64>()->At(0), 16u);
+        EXPECT_EQ(sblock[2]->As<ColumnUInt64>()->At(1), 32u);
+    });
 }
 
 // Test roundtrip of DateTime64 values
