@@ -15,6 +15,7 @@ public:
     ColumnVector();
 
     explicit ColumnVector(const std::vector<T>& data);
+    explicit ColumnVector(std::vector<T> && data);
 
     /// Appends one element to the end of column.
     void Append(const T& value);
@@ -24,6 +25,8 @@ public:
 
     /// Returns element at given row number.
     const T& operator [] (size_t n) const;
+
+    void Erase(size_t pos, size_t count = 1);
 
 public:
     /// Appends content of given column to the end of current one.
@@ -43,12 +46,16 @@ public:
 
     /// Makes slice of the current column.
     ColumnRef Slice(size_t begin, size_t len) override;
+    void Swap(Column& other) override;
+
+    ItemView GetItem(size_t index) const override;
 
 private:
     std::vector<T> data_;
 };
 
 using Int128 = __int128;
+using Int64 = int64_t;
 
 using ColumnUInt8   = ColumnVector<uint8_t>;
 using ColumnUInt16  = ColumnVector<uint16_t>;

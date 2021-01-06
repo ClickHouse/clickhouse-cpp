@@ -78,4 +78,13 @@ ColumnRef ColumnIPv4::Slice(size_t begin, size_t len) {
     return std::make_shared<ColumnIPv4>(data_->Slice(begin, len));
 }
 
+void ColumnIPv4::Swap(Column& other) {
+    auto & col = dynamic_cast<ColumnIPv4 &>(other);
+    data_.swap(col.data_);
+}
+
+ItemView ColumnIPv4::GetItem(size_t index) const {
+    return data_->GetItem(index);
+}
+
 }

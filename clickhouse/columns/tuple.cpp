@@ -44,4 +44,9 @@ void ColumnTuple::Clear() {
     columns_.clear();
 }
 
+void ColumnTuple::Swap(Column& other) {
+    auto & col = dynamic_cast<ColumnTuple &>(other);
+    columns_.swap(col.columns_);
+}
+
 }

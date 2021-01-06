@@ -42,6 +42,9 @@ public:
 
     /// Makes slice of the current column.
     ColumnRef Slice(size_t begin, size_t len) override;
+    void Swap(Column&) override;
+
+    ItemView GetItem(size_t) const override;
 
 private:
     ColumnRef nested_;

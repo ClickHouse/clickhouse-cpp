@@ -12,12 +12,16 @@ namespace clickhouse {
 struct TypeAst {
     enum Meta {
         Array,
+        Assign,
         Null,
         Nullable,
         Number,
+        String,
         Terminal,
         Tuple,
         Enum,
+        LowCardinality,
+        SimpleAggregateFunction
     };
 
     /// Type's category.
@@ -29,9 +33,15 @@ struct TypeAst {
     /// Value associated with the node,
     /// used for fixed-width types and enum values.
     int64_t value = 0;
+    std::string value_string;
     /// Subelements of the type.
     /// Used to store enum's names and values as well.
     std::vector<TypeAst> elements;
+
+    bool operator==(const TypeAst & other) const;
+    inline bool operator!=(const TypeAst & other) const {
+        return !(*this == other);
+    }
 };
 
 
@@ -40,11 +50,14 @@ class TypeParser {
     struct Token {
         enum Type {
             Invalid = 0,
+            Assign,
             Name,
             Number,
+            String,
             LPar,
             RPar,
             Comma,
+            QuotedString, // string with quotation marks included
             EOS,
         };
 

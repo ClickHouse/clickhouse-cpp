@@ -21,8 +21,9 @@
 
 #define DBMS_NAME                                       "ClickHouse"
 #define DBMS_VERSION_MAJOR                              1
-#define DBMS_VERSION_MINOR                              1
-#define REVISION                                        54126
+#define DBMS_VERSION_MINOR                              2
+
+#define REVISION                                        54405
 
 #define DBMS_MIN_REVISION_WITH_TEMPORARY_TABLES         50264
 #define DBMS_MIN_REVISION_WITH_TOTAL_ROWS_IN_PROGRESS   51554
@@ -30,6 +31,12 @@
 #define DBMS_MIN_REVISION_WITH_CLIENT_INFO              54032
 #define DBMS_MIN_REVISION_WITH_SERVER_TIMEZONE          54058
 #define DBMS_MIN_REVISION_WITH_QUOTA_KEY_IN_CLIENT_INFO 54060
+//#define DBMS_MIN_REVISION_WITH_TABLES_STATUS            54226
+//#define DBMS_MIN_REVISION_WITH_TIME_ZONE_PARAMETER_IN_DATETIME_DATA_TYPE 54337
+#define DBMS_MIN_REVISION_WITH_SERVER_DISPLAY_NAME      54372
+#define DBMS_MIN_REVISION_WITH_VERSION_PATCH            54401
+#define DBMS_MIN_REVISION_WITH_LOW_CARDINALITY_TYPE     54405
+#define DBMS_MIN_REVISION_WITH_TIME_ZONE_PARAMETER_IN_DATETIME_DATA_TYPE 54337
 
 namespace clickhouse {
 
@@ -45,15 +52,8 @@ struct ClientInfo {
     std::string initial_address = "[::ffff:127.0.0.1]:0";
     uint64_t client_version_major = 0;
     uint64_t client_version_minor = 0;
+    uint64_t client_version_patch = 0;
     uint32_t client_revision = 0;
-};
-
-struct ServerInfo {
-    std::string name;
-    std::string timezone;
-    uint64_t    version_major;
-    uint64_t    version_minor;
-    uint64_t    revision;
 };
 
 std::ostream& operator<<(std::ostream& os, const ClientOptions& opt) {
@@ -81,6 +81,8 @@ public:
     void Ping();
 
     void ResetConnection();
+
+    const ServerInfo& GetServerInfo() const;
 
 private:
     bool Handshake();
@@ -164,7 +166,7 @@ Client::Impl::Impl(const ClientOptions& opts)
 {
     // TODO: throw on big-endianness of platform
 
-    for (int i = 0; ; ) {
+    for (unsigned int i = 0; ; ) {
         try {
             ResetConnection();
             break;
@@ -264,8 +266,15 @@ void Client::Impl::Insert(const std::string& table_name, const Block& block) {
     SendData(Block());
 
     // Wait for EOS.
-    while (ReceivePacket()) {
+    uint64_t eos_packet{0};
+    while (ReceivePacket(&eos_packet)) {
         ;
+    }
+
+    if (eos_packet != ServerCodes::EndOfStream && eos_packet != ServerCodes::Exception
+        && eos_packet != ServerCodes::Log && options_.rethrow_exceptions) {
+        throw std::runtime_error(std::string{"unexpected packet from server while receiving end of query, expected (expected Exception, EndOfStream or Log, got: "}
+                            + (eos_packet ? std::to_string(eos_packet) : "nothing") + ")");
     }
 }
 
@@ -303,6 +312,10 @@ void Client::Impl::ResetConnection() {
     if (!Handshake()) {
         throw std::runtime_error("fail to connect to " + options_.host);
     }
+}
+
+const ServerInfo& Client::Impl::GetServerInfo() const {
+    return server_info_;
 }
 
 bool Client::Impl::Handshake() {
@@ -507,23 +520,29 @@ bool Client::Impl::ReceiveException(bool rethrow) {
     std::unique_ptr<Exception> e(new Exception);
     Exception* current = e.get();
 
+    bool exception_received = true;
     do {
         bool has_nested = false;
 
         if (!WireFormat::ReadFixed(&input_, &current->code)) {
-            return false;
+           exception_received = false;
+           break;
         }
         if (!WireFormat::ReadString(&input_, &current->name)) {
-            return false;
+            exception_received = false;
+            break;
         }
         if (!WireFormat::ReadString(&input_, &current->display_text)) {
-            return false;
+            exception_received = false;
+            break;
         }
         if (!WireFormat::ReadString(&input_, &current->stack_trace)) {
-            return false;
+            exception_received = false;
+            break;
         }
         if (!WireFormat::ReadFixed(&input_, &has_nested)) {
-            return false;
+            exception_received = false;
+            break;
         }
 
         if (has_nested) {
@@ -542,7 +561,7 @@ bool Client::Impl::ReceiveException(bool rethrow) {
         throw ServerException(std::move(e));
     }
 
-    return true;
+    return exception_received;
 }
 
 void Client::Impl::SendCancel() {
@@ -580,6 +599,9 @@ void Client::Impl::SendQuery(const std::string& query) {
 
         if (server_info_.revision >= DBMS_MIN_REVISION_WITH_QUOTA_KEY_IN_CLIENT_INFO)
             WireFormat::WriteString(&output_, info.quota_key);
+        if (server_info_.revision >= DBMS_MIN_REVISION_WITH_VERSION_PATCH) {
+            WireFormat::WriteUInt64(&output_, info.client_version_patch);
+        }
     }
 
     /// Per query settings.
@@ -714,6 +736,18 @@ bool Client::Impl::ReceiveHello() {
             }
         }
 
+        if (server_info_.revision >= DBMS_MIN_REVISION_WITH_SERVER_DISPLAY_NAME) {
+            if (!WireFormat::ReadString(&input_, &server_info_.display_name)) {
+                return false;
+            }
+        }
+
+        if (server_info_.revision >= DBMS_MIN_REVISION_WITH_VERSION_PATCH) {
+            if (!WireFormat::ReadUInt64(&input_, &server_info_.version_patch)) {
+                return false;
+            }
+        }
+
         return true;
     } else if (packet_type == ServerCodes::Exception) {
         ReceiveException(true);
@@ -724,7 +758,7 @@ bool Client::Impl::ReceiveHello() {
 }
 
 void Client::Impl::RetryGuard(std::function<void()> func) {
-    for (int i = 0; i <= options_.send_retries; ++i) {
+    for (unsigned int i = 0; ; ++i) {
         try {
             func();
             return;
@@ -738,7 +772,7 @@ void Client::Impl::RetryGuard(std::function<void()> func) {
                 ok = false;
             }
 
-            if (!ok) {
+            if (!ok && i == options_.send_retries) {
                 throw;
             }
         }
@@ -780,6 +814,10 @@ void Client::Ping() {
 
 void Client::ResetConnection() {
     impl_->ResetConnection();
+}
+
+const ServerInfo& Client::GetServerInfo() const {
+    return impl_->GetServerInfo();
 }
 
 }

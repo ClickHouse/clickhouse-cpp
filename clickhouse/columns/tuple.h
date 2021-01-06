@@ -38,6 +38,7 @@ public:
 
     /// Makes slice of the current column.
     ColumnRef Slice(size_t, size_t) override { return ColumnRef(); }
+    void Swap(Column& other) override;
 
 private:
     std::vector<ColumnRef> columns_;

@@ -274,3 +274,7 @@ BUCKAROO_DEPS
 
 # Visual Studio Code
 /.vscode/
+
+# Vim
+*.swp
+*.swo

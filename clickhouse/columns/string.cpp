@@ -3,8 +3,7 @@
 
 #include "../base/wire_format.h"
 
-namespace
-{
+namespace {
 const size_t DEFAULT_BLOCK_SIZE = 4096;
 
 template <typename Container>
@@ -32,7 +31,13 @@ ColumnFixedString::ColumnFixedString(size_t n)
 }
 
 void ColumnFixedString::Append(std::string_view str) {
-    if (data_.capacity() < str.size())
+    if (str.size() > string_size_) {
+        throw std::runtime_error("Expected string of length not greater than "
+                                 + std::to_string(string_size_) + " bytes, received "
+                                 + std::to_string(str.size()) + " bytes.");
+    }
+
+    if (data_.capacity() - data_.size() < str.size())
     {
         // round up to the next block size
         const auto new_size = (((data_.size() + string_size_) / DEFAULT_BLOCK_SIZE) + 1) * DEFAULT_BLOCK_SIZE;
@@ -40,6 +45,9 @@ void ColumnFixedString::Append(std::string_view str) {
     }
 
     data_.insert(data_.size(), str);
+    // Pad up to string_size_ with zeroes.
+    const auto padding_size = string_size_ - str.size();
+    data_.resize(data_.size() + padding_size, char(0));
 }
 
 void ColumnFixedString::Clear() {
@@ -96,6 +104,16 @@ ColumnRef ColumnFixedString::Slice(size_t begin, size_t len) {
     }
 
     return result;
+}
+
+void ColumnFixedString::Swap(Column& other) {
+    auto & col = dynamic_cast<ColumnFixedString &>(other);
+    std::swap(string_size_, col.string_size_);
+    data_.swap(col.data_);
+}
+
+ItemView ColumnFixedString::GetItem(size_t index) const {
+    return ItemView{Type::FixedString, this->At(index)};
 }
 
 struct ColumnString::Block
@@ -251,6 +269,16 @@ ColumnRef ColumnString::Slice(size_t begin, size_t len) {
     }
 
     return result;
+}
+
+void ColumnString::Swap(Column& other) {
+    auto & col = dynamic_cast<ColumnString &>(other);
+    items_.swap(col.items_);
+    blocks_.swap(col.blocks_);
+}
+
+ItemView ColumnString::GetItem(size_t index) const {
+    return ItemView{Type::String, this->At(index)};
 }
 
 }

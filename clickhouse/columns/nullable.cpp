@@ -74,4 +74,20 @@ ColumnRef ColumnNullable::Slice(size_t begin, size_t len) {
     return std::make_shared<ColumnNullable>(nested_->Slice(begin, len), nulls_->Slice(begin, len));
 }
 
+void ColumnNullable::Swap(Column& other) {
+    auto & col = dynamic_cast<ColumnNullable &>(other);
+    if (!nested_->Type()->IsEqual(col.nested_->Type()))
+        throw std::runtime_error("Can't swap() Nullable columns of different types.");
+
+    nested_.swap(col.nested_);
+    nulls_.swap(col.nulls_);
+}
+
+ItemView ColumnNullable::GetItem(size_t index) const  {
+    if (IsNull(index))
+        return ItemView();
+
+    return nested_->GetItem(index);
+}
+
 }
