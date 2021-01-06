@@ -425,9 +425,10 @@ bool Client::Impl::ReadBlock(Block* block, CodedInputStream* input) {
         return false;
     }
 
-    std::string name;
-    std::string type;
     for (size_t i = 0; i < num_columns; ++i) {
+	std::string name;
+	std::string type;
+
         if (!WireFormat::ReadString(input, &name)) {
             return false;
         }
