@@ -548,6 +548,43 @@ TEST_P(ClientCase, Decimal) {
     });
 }
 
+TEST_P(ClientCase, ColEscapeNameTest) {
+    client_->Execute("DROP TABLE IF EXISTS test_clickhouse_cpp.\"col_escape_name_test\";");
+
+    client_->Execute("CREATE TABLE IF NOT EXISTS test_clickhouse_cpp.\"col_escape_name_test\" (\"test space\" UInt64, \"test \"\" quote\" UInt64, \"test \"\"`'[]&_\\ all\" UInt64) ENGINE = Memory");
+
+    auto col1 = std::make_shared<ColumnUInt64>();
+    col1->Append(1);
+    col1->Append(2);
+    auto col2 = std::make_shared<ColumnUInt64>();
+    col2->Append(4);
+    col2->Append(8);
+    auto col3 = std::make_shared<ColumnUInt64>();
+    col3->Append(16);
+    col3->Append(32);
+
+	Block block;
+	block.AppendColumn("test space", col1);
+	block.AppendColumn("test \" quote", col2);
+	block.AppendColumn("test \"`'[]&_\\ all", col3);
+
+	client_->Insert("test_clickhouse_cpp.col_escape_name_test", block);
+	client_->Select("SELECT * FROM test_clickhouse_cpp.\"col_escape_name_test\"", [] ([[maybe_unused]]const Block& sblock)
+	{
+		int row = sblock.GetRowCount();
+		if (row <= 0) {return;}
+		int col = sblock.GetColumnCount();
+		EXPECT_EQ(col, 3);
+		EXPECT_EQ(row, 2);
+		EXPECT_EQ(sblock[0]->As<ColumnUInt64>()->At(0), 1U);
+		EXPECT_EQ(sblock[0]->As<ColumnUInt64>()->At(1), 2U);
+		EXPECT_EQ(sblock[1]->As<ColumnUInt64>()->At(0), 4U);
+		EXPECT_EQ(sblock[1]->As<ColumnUInt64>()->At(1), 8U);
+		EXPECT_EQ(sblock[2]->As<ColumnUInt64>()->At(0), 16U);
+		EXPECT_EQ(sblock[2]->As<ColumnUInt64>()->At(1), 32U);
+	});
+}
+
 INSTANTIATE_TEST_CASE_P(
     Client, ClientCase,
     ::testing::Values(
