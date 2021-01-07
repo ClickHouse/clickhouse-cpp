@@ -718,9 +718,9 @@ TEST_P(ClientCase, Decimal) {
 
 // Test special chars in names
 TEST_P(ClientCase, ColEscapeNameTest) {
-    client_->Execute("DROP TABLE IF EXISTS test_clickhouse_cpp.\"col_escape_\"\"name_test\";");
+    client_->Execute(R"sql(DROP TABLE IF EXISTS test_clickhouse_cpp."col_escape_""name_test";)sql");
 
-    client_->Execute("CREATE TABLE IF NOT EXISTS test_clickhouse_cpp.\"col_escape_\"\"name_test\" (\"test space\" UInt64, \"test \"\" quote\" UInt64, \"test \"\"`'[]&_\\ all\" UInt64) ENGINE = Memory");
+    client_->Execute(R"sql(CREATE TABLE IF NOT EXISTS test_clickhouse_cpp."col_escape_""name_test" ("test space" UInt64, "test "" quote" UInt64, "test ""`'[]&_\ all" UInt64) ENGINE = Memory)sql");
 
     auto col1 = std::make_shared<ColumnUInt64>();
     col1->Append(1);
@@ -732,18 +732,28 @@ TEST_P(ClientCase, ColEscapeNameTest) {
     col3->Append(16);
     col3->Append(32);
 
-    Block block;
-    block.AppendColumn("test space", col1);
-    block.AppendColumn("test \" quote", col2);
-    block.AppendColumn("test \"`'[]&_\\ all", col3);
+    static const std::string column_names[] = {
+        "test space",
+        R"sql(test " quote)sql",
+        R"sql(test "`'[]&_\ all)sql"
+    };
+    static const auto columns_count = sizeof(column_names)/sizeof(column_names[0]);
 
-    client_->Insert("test_clickhouse_cpp.\"col_escape_\"\"name_test\"", block);
-    client_->Select("SELECT * FROM test_clickhouse_cpp.\"col_escape_\"\"name_test\"", [] (const Block& sblock)
+    Block block;
+    block.AppendColumn(column_names[0], col1);
+    block.AppendColumn(column_names[1], col2);
+    block.AppendColumn(column_names[2], col3);
+
+    client_->Insert(R"sql(test_clickhouse_cpp."col_escape_""name_test")sql", block);
+    client_->Select(R"sql(SELECT * FROM test_clickhouse_cpp."col_escape_""name_test")sql", [] (const Block& sblock)
     {
         int row = sblock.GetRowCount();
         if (row <= 0) {return;}
-        int col = sblock.GetColumnCount();
-        EXPECT_EQ(col, 3);
+        ASSERT_EQ(columns_count, sblock.GetColumnCount());
+        for (size_t i = 0; i < columns_count; ++i) {
+            EXPECT_EQ(column_names[i], sblock.GetColumnName(i));
+        }
+
         EXPECT_EQ(row, 2);
         EXPECT_EQ(sblock[0]->As<ColumnUInt64>()->At(0), 1u);
         EXPECT_EQ(sblock[0]->As<ColumnUInt64>()->At(1), 2u);
