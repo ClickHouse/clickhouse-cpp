@@ -201,6 +201,25 @@ void Client::Impl::ExecuteQuery(Query query) {
     }
 }
 
+std::string NameToQueryString(const std::string &input)
+{
+    std::string output;
+    output.reserve(input.size() + 2);
+    output += '`';
+
+    for (const auto & c : input) {
+        if (c == '`') {
+            //escape ` with ``
+            output.append("``");
+        } else {
+            output.push_back(c);
+        }
+    }
+
+    output += '`';
+    return output;
+}
+
 void Client::Impl::Insert(const std::string& table_name, const Block& block) {
     if (options_.ping_before_query) {
         RetryGuard([this]() { Ping(); });
@@ -211,7 +230,7 @@ void Client::Impl::Insert(const std::string& table_name, const Block& block) {
 
     // Enumerate all fields
     for (unsigned int i = 0; i < block.GetColumnCount(); i++) {
-        fields.push_back(block.GetColumnName(i));
+        fields.push_back(NameToQueryString(block.GetColumnName(i)));
     }
 
     std::stringstream fields_section;
