@@ -304,6 +304,9 @@ void Client::Impl::ResetConnection() {
                           options_.tcp_keepalive_intvl.count(),
                           options_.tcp_keepalive_cnt);
     }
+    if (options_.tcp_nodelay) {
+        s.SetTcpNoDelay(options_.tcp_nodelay);
+    }
 
     socket_ = std::move(s);
     socket_input_ = SocketInput(socket_);
