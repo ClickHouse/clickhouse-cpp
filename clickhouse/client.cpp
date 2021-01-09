@@ -36,6 +36,7 @@
 #define DBMS_MIN_REVISION_WITH_SERVER_DISPLAY_NAME      54372
 #define DBMS_MIN_REVISION_WITH_VERSION_PATCH            54401
 #define DBMS_MIN_REVISION_WITH_LOW_CARDINALITY_TYPE     54405
+#define DBMS_MIN_REVISION_WITH_TIME_ZONE_PARAMETER_IN_DATETIME_DATA_TYPE 54337
 
 namespace clickhouse {
 
@@ -200,6 +201,25 @@ void Client::Impl::ExecuteQuery(Query query) {
     }
 }
 
+std::string NameToQueryString(const std::string &input)
+{
+    std::string output;
+    output.reserve(input.size() + 2);
+    output += '`';
+
+    for (const auto & c : input) {
+        if (c == '`') {
+            //escape ` with ``
+            output.append("``");
+        } else {
+            output.push_back(c);
+        }
+    }
+
+    output += '`';
+    return output;
+}
+
 void Client::Impl::Insert(const std::string& table_name, const Block& block) {
     if (options_.ping_before_query) {
         RetryGuard([this]() { Ping(); });
@@ -210,9 +230,9 @@ void Client::Impl::Insert(const std::string& table_name, const Block& block) {
 
     for (unsigned int i = 0; i < num_columns; ++i) {
         if (i == num_columns - 1) {
-            fields_section << block.GetColumnName(i);
+            fields_section << NameToQueryString(block.GetColumnName(i));
         } else {
-            fields_section << block.GetColumnName(i) << ",";
+            fields_section << NameToQueryString(block.GetColumnName(i)) << ",";
         }
     }
 
@@ -241,8 +261,15 @@ void Client::Impl::Insert(const std::string& table_name, const Block& block) {
     SendData(Block());
 
     // Wait for EOS.
-    while (ReceivePacket()) {
+    uint64_t eos_packet{0};
+    while (ReceivePacket(&eos_packet)) {
         ;
+    }
+
+    if (eos_packet != ServerCodes::EndOfStream && eos_packet != ServerCodes::Exception
+        && eos_packet != ServerCodes::Log && options_.rethrow_exceptions) {
+        throw std::runtime_error(std::string{"unexpected packet from server while receiving end of query, expected (expected Exception, EndOfStream or Log, got: "}
+                            + (eos_packet ? std::to_string(eos_packet) : "nothing") + ")");
     }
 }
 
@@ -425,10 +452,9 @@ bool Client::Impl::ReadBlock(Block* block, CodedInputStream* input) {
         return false;
     }
 
+    std::string name;
+    std::string type;
     for (size_t i = 0; i < num_columns; ++i) {
-        std::string name;
-        std::string type;
-
         if (!WireFormat::ReadString(input, &name)) {
             return false;
         }
@@ -486,23 +512,29 @@ bool Client::Impl::ReceiveException(bool rethrow) {
     std::unique_ptr<Exception> e(new Exception);
     Exception* current = e.get();
 
+    bool exception_received = true;
     do {
         bool has_nested = false;
 
         if (!WireFormat::ReadFixed(&input_, &current->code)) {
-            return false;
+           exception_received = false;
+           break;
         }
         if (!WireFormat::ReadString(&input_, &current->name)) {
-            return false;
+            exception_received = false;
+            break;
         }
         if (!WireFormat::ReadString(&input_, &current->display_text)) {
-            return false;
+            exception_received = false;
+            break;
         }
         if (!WireFormat::ReadString(&input_, &current->stack_trace)) {
-            return false;
+            exception_received = false;
+            break;
         }
         if (!WireFormat::ReadFixed(&input_, &has_nested)) {
-            return false;
+            exception_received = false;
+            break;
         }
 
         if (has_nested) {
@@ -521,7 +553,7 @@ bool Client::Impl::ReceiveException(bool rethrow) {
         throw ServerException(std::move(e));
     }
 
-    return true;
+    return exception_received;
 }
 
 void Client::Impl::SendCancel() {

@@ -139,7 +139,7 @@ TEST_P(ClientCase, Date) {
 
     /// Create a table.
     client_->Execute(
-            "CREATE TABLE IF NOT EXISTS test_clickhouse_cpp.date (d DateTime) "
+            "CREATE TABLE IF NOT EXISTS test_clickhouse_cpp.date (d DateTime('UTC')) "
             "ENGINE = Memory");
 
     auto d = std::make_shared<ColumnDateTime>();
@@ -159,6 +159,7 @@ TEST_P(ClientCase, Date) {
                 auto col = block[0]->As<ColumnDateTime>();
                 std::time_t t = col->As<ColumnDateTime>()->At(c);
                 EXPECT_EQ(now, t);
+                EXPECT_EQ(col->Timezone(), "UTC");
             }
         }
     );
@@ -712,6 +713,54 @@ TEST_P(ClientCase, Decimal) {
         EXPECT_EQ("123456789", int128_to_string(decimal(4, 5)));
         EXPECT_EQ("123456789012345678", int128_to_string(decimal(5, 5)));
         EXPECT_EQ("12345678901234567890123456789012345678", int128_to_string(decimal(6, 5)));
+    });
+}
+
+// Test special chars in names
+TEST_P(ClientCase, ColEscapeNameTest) {
+    client_->Execute(R"sql(DROP TABLE IF EXISTS test_clickhouse_cpp."col_escape_""name_test";)sql");
+
+    client_->Execute(R"sql(CREATE TABLE IF NOT EXISTS test_clickhouse_cpp."col_escape_""name_test" ("test space" UInt64, "test "" quote" UInt64, "test ""`'[]&_\ all" UInt64) ENGINE = Memory)sql");
+
+    auto col1 = std::make_shared<ColumnUInt64>();
+    col1->Append(1);
+    col1->Append(2);
+    auto col2 = std::make_shared<ColumnUInt64>();
+    col2->Append(4);
+    col2->Append(8);
+    auto col3 = std::make_shared<ColumnUInt64>();
+    col3->Append(16);
+    col3->Append(32);
+
+    static const std::string column_names[] = {
+        "test space",
+        R"sql(test " quote)sql",
+        R"sql(test "`'[]&_\ all)sql"
+    };
+    static const auto columns_count = sizeof(column_names)/sizeof(column_names[0]);
+
+    Block block;
+    block.AppendColumn(column_names[0], col1);
+    block.AppendColumn(column_names[1], col2);
+    block.AppendColumn(column_names[2], col3);
+
+    client_->Insert(R"sql(test_clickhouse_cpp."col_escape_""name_test")sql", block);
+    client_->Select(R"sql(SELECT * FROM test_clickhouse_cpp."col_escape_""name_test")sql", [] (const Block& sblock)
+    {
+        int row = sblock.GetRowCount();
+        if (row <= 0) {return;}
+        ASSERT_EQ(columns_count, sblock.GetColumnCount());
+        for (size_t i = 0; i < columns_count; ++i) {
+            EXPECT_EQ(column_names[i], sblock.GetColumnName(i));
+        }
+
+        EXPECT_EQ(row, 2);
+        EXPECT_EQ(sblock[0]->As<ColumnUInt64>()->At(0), 1u);
+        EXPECT_EQ(sblock[0]->As<ColumnUInt64>()->At(1), 2u);
+        EXPECT_EQ(sblock[1]->As<ColumnUInt64>()->At(0), 4u);
+        EXPECT_EQ(sblock[1]->As<ColumnUInt64>()->At(1), 8u);
+        EXPECT_EQ(sblock[2]->As<ColumnUInt64>()->At(0), 16u);
+        EXPECT_EQ(sblock[2]->As<ColumnUInt64>()->At(1), 32u);
     });
 }
 
