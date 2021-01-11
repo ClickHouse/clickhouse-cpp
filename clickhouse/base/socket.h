@@ -62,6 +62,9 @@ public:
     ///         before dropping the connection.
     void SetTcpKeepAlive(int idle, int intvl, int cnt) noexcept;
 
+    /// @params nodelay whether to enable TCP_NODELAY
+    void SetTcpNoDelay(bool nodelay) noexcept;
+
     SocketHolder& operator = (SocketHolder&& other) noexcept;
 
     operator SOCKET () const noexcept;

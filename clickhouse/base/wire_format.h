@@ -13,6 +13,7 @@ public:
     static bool ReadFixed(CodedInputStream* input, T* value);
 
     static bool ReadString(CodedInputStream* input, std::string* value);
+    static bool SkipString(CodedInputStream* input);
 
     static bool ReadBytes(CodedInputStream* input, void* buf, size_t len);
 
@@ -49,6 +50,21 @@ inline bool WireFormat::ReadString(
         }
         value->resize((size_t)len);
         return input->ReadRaw(&(*value)[0], (size_t)len);
+    }
+
+    return false;
+}
+
+inline bool WireFormat::SkipString(
+    CodedInputStream* input)
+{
+    uint64_t len;
+
+    if (input->ReadVarint64(&len)) {
+        if (len > 0x00FFFFFFULL) {
+            return false;
+        }
+        return input->Skip((size_t)len);
     }
 
     return false;

@@ -201,26 +201,38 @@ void Client::Impl::ExecuteQuery(Query query) {
     }
 }
 
+std::string NameToQueryString(const std::string &input)
+{
+    std::string output;
+    output.reserve(input.size() + 2);
+    output += '`';
+
+    for (const auto & c : input) {
+        if (c == '`') {
+            //escape ` with ``
+            output.append("``");
+        } else {
+            output.push_back(c);
+        }
+    }
+
+    output += '`';
+    return output;
+}
+
 void Client::Impl::Insert(const std::string& table_name, const Block& block) {
     if (options_.ping_before_query) {
         RetryGuard([this]() { Ping(); });
     }
 
-    std::vector<std::string> fields;
-    fields.reserve(block.GetColumnCount());
-
-    // Enumerate all fields
-    for (unsigned int i = 0; i < block.GetColumnCount(); i++) {
-        fields.push_back(block.GetColumnName(i));
-    }
-
     std::stringstream fields_section;
+		const auto num_columns = block.GetColumnCount();
 
-    for (auto elem = fields.begin(); elem != fields.end(); ++elem) {
-        if (std::distance(elem, fields.end()) == 1) {
-            fields_section << *elem;
+    for (unsigned int i = 0; i < num_columns; ++i) {
+        if (i == num_columns - 1) {
+            fields_section << NameToQueryString(block.GetColumnName(i));
         } else {
-            fields_section << *elem << ",";
+            fields_section << NameToQueryString(block.GetColumnName(i)) << ",";
         }
     }
 
@@ -284,6 +296,9 @@ void Client::Impl::ResetConnection() {
         s.SetTcpKeepAlive(options_.tcp_keepalive_idle.count(),
                           options_.tcp_keepalive_intvl.count(),
                           options_.tcp_keepalive_cnt);
+    }
+    if (options_.tcp_nodelay) {
+        s.SetTcpNoDelay(options_.tcp_nodelay);
     }
 
     socket_ = std::move(s);
@@ -440,10 +455,9 @@ bool Client::Impl::ReadBlock(Block* block, CodedInputStream* input) {
         return false;
     }
 
+    std::string name;
+    std::string type;
     for (size_t i = 0; i < num_columns; ++i) {
-        std::string name;
-        std::string type;
-
         if (!WireFormat::ReadString(input, &name)) {
             return false;
         }
@@ -469,9 +483,7 @@ bool Client::Impl::ReceiveData() {
     Block block;
 
     if (REVISION >= DBMS_MIN_REVISION_WITH_TEMPORARY_TABLES) {
-        std::string table_name;
-
-        if (!WireFormat::ReadString(&input_, &table_name)) {
+        if (!WireFormat::SkipString(&input_)) {
             return false;
         }
     }
@@ -652,7 +664,7 @@ void Client::Impl::SendData(const Block& block) {
                 buf.resize(9 + LZ4_compressBound(tmp.size()));
 
                 // Compress data
-                int size = LZ4_compress((const char*)tmp.data(), (char*)buf.data() + 9, tmp.size());
+                int size = LZ4_compress_default((const char*)tmp.data(), (char*)buf.data() + 9, tmp.size(), buf.size() - 9);
                 buf.resize(9 + size);
 
                 // Fill header
