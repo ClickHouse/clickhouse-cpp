@@ -73,7 +73,7 @@ public:
         buf_ = static_cast<uint8_t*>(buf);
 
 #pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Werror" //array bounds false positive
+#pragma GCC diagnostic ignored "-Warray-bounds" //array bounds false positive in gcc
         end_ = buf_ + len;
 #pragma GCC diagnostic pop
     }

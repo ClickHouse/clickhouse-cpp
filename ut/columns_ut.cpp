@@ -520,7 +520,7 @@ TEST(ColumnsCase, DISABLED_ColumnLowCardinalityString_Save) {
     const auto left_margin = buffer;
 
 #pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Werror" //array bounds false positive
+#pragma GCC diagnostic ignored "-Warray-bounds" //array bounds false positive
     const auto right_margin = write_pos + expected_output_size;
 #pragma GCC diagnostic pop
 
