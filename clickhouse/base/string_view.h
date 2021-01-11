@@ -7,9 +7,11 @@
 #if defined(__GNUC__) && __GNUC__ < 7
 # include <experimental/string_view>
 using string_view = std::experimental::string_view;
+using std::experimental::string_view_literals::operator""sv;
 #else
 # include <string_view>
 using string_view = std::string_view;
+using std::literals::string_view_literals::operator""sv;
 #endif
 
 /**

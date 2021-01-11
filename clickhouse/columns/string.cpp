@@ -236,7 +236,7 @@ bool ColumnString::Load(CodedInputStream* input, size_t rows) {
         if (blocks_.size() == 0 || len > block->GetAvailble())
         {
             blocks_.emplace_back(std::max<size_t>(DEFAULT_BLOCK_SIZE, len));
-            block = &(*blocks_.rbegin());
+            block = &blocks_.back();
         }
 
         if (!WireFormat::ReadBytes(input, block->GetCurrentWritePos(), len))
