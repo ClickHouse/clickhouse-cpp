@@ -250,14 +250,10 @@ auto Load(ColumnRef new_dictionary_column, CodedInputStream* input, size_t rows)
 
 bool ColumnLowCardinality::Load(CodedInputStream* input, size_t rows) {
     try {
-        //auto res = ::Load(dictionary_column_->Slice(0, 0), input, rows);
-        //dictionary_column_->Swap(*std::get<0>(res));
-        //index_column_.swap(std::get<1>(res));
-        //unique_items_map_.swap(std::get<2>(res));
-        auto [new_dictionary, new_index, new_unique_items_map] = ::Load(dictionary_column_->Slice(0, 0), input, rows);
-        dictionary_column_->Swap(*new_dictionary);
-        index_column_.swap(new_index);
-        unique_items_map_.swap(new_unique_items_map);
+        auto res = ::Load(dictionary_column_->Slice(0, 0), input, rows);
+        dictionary_column_->Swap(*std::get<0>(res));
+        index_column_.swap(std::get<1>(res));
+        unique_items_map_.swap(std::get<2>(res));
 
         return true;
     } catch (...) {
