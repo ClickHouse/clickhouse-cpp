@@ -7,7 +7,13 @@
 #if defined(__GNUC__) && __GNUC__ < 7
 # include <experimental/string_view>
 using string_view = std::experimental::string_view;
+
+#if defined(__APPLE__) //AppleClang fix
+using std::string_view_literals::operator""sv;
+#else
 using std::experimental::string_view_literals::operator""sv;
+#endif
+
 #else
 # include <string_view>
 using string_view = std::string_view;
