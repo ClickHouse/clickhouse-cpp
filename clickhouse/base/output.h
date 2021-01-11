@@ -71,7 +71,11 @@ public:
     /// Initializes this stream with a new memory block.
     inline void Reset(void* buf, size_t len) noexcept {
         buf_ = static_cast<uint8_t*>(buf);
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Werror" //array bounds false positive
         end_ = buf_ + len;
+#pragma GCC diagnostic pop
     }
 
 protected:

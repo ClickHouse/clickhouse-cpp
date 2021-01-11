@@ -518,7 +518,11 @@ TEST(ColumnsCase, DISABLED_ColumnLowCardinalityString_Save) {
     // Since overflow from left side is less likely to happen, leave only tiny margin there.
     auto write_pos = buffer + left_margin_size;
     const auto left_margin = buffer;
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Werror" //array bounds false positive
     const auto right_margin = write_pos + expected_output_size;
+#pragma GCC diagnostic pop
 
     output.Reset(write_pos, expected_output_size);
 

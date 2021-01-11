@@ -68,19 +68,19 @@ void ValidateColumnItems(const ColumnType & col, size_t expected_items) {
 template <class ColumnType>
 typename std::enable_if<
     std::is_same<ColumnType, ColumnFixedString>::value ||
-    std::is_same<ColumnType, ColumnLowCardinalityT<ColumnFixedString>>::value , std::shared_ptr<ColumnType>>::type
+    std::is_same<ColumnType, ColumnLowCardinalityT<ColumnFixedString>>::value , std::unique_ptr<ColumnType>>::type
 InstantiateColumn()
 {
-    return std::make_shared<ColumnType>(8);
+    return std::make_unique<ColumnType>(8);
 }
 
 template <class ColumnType>
 typename std::enable_if<
     !std::is_same<ColumnType, ColumnFixedString>::value &&
-    !std::is_same<ColumnType, ColumnLowCardinalityT<ColumnFixedString>>::value , std::shared_ptr<ColumnType>>::type
+    !std::is_same<ColumnType, ColumnLowCardinalityT<ColumnFixedString>>::value , std::unique_ptr<ColumnType>>::type
 InstantiateColumn()
 {
-    return std::make_shared<ColumnType>();
+    return std::make_unique<ColumnType>();
 }
 
 template <typename ColumnType>
