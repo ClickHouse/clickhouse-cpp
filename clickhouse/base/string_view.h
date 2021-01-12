@@ -14,10 +14,8 @@
 #   if defined(__llvm__) || defined(__clang__) // linux clang 6.0
         using std::experimental::string_view_literals::operator""sv;
 #   else // gcc 6.
-#       pragma GCC diagnostic push
-#       pragma GCC diagnostic ignored "-Wliteral-suffix"
-            using std::experimental::string_view_literals::operator""sv;
-#       pragma GCC diagnostic pop
+    #define OLD_GCC 1
+    // no operator sv in gcc-6
 #   endif
 #else
 #   include <string_view>
