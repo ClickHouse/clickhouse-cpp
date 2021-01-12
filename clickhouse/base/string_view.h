@@ -13,7 +13,12 @@ using std::string_view_literals::operator""sv;
 #else
 # include <experimental/string_view>
 using string_view = std::experimental::string_view;
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wliteral-suffix"
 using std::experimental::string_view_literals::operator""sv;
+#pragma GCC diagnostic pop
+
 #endif
 
 #else
