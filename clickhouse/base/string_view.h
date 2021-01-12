@@ -5,6 +5,7 @@
 #include <string>
 
 #if defined(__GNUC__) && __GNUC__ < 7
+
 #if defined(__APPLE__) //AppleClang fix
 #include <string_view>
 using string_view = std::string_view;
@@ -16,9 +17,15 @@ using std::experimental::string_view_literals::operator""sv;
 #endif
 
 #else
+
 # include <string_view>
 using string_view = std::string_view;
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wliteral-suffix"
 using std::literals::string_view_literals::operator""sv;
+#pragma GCC diagnostic pop
+
 #endif
 
 /**
