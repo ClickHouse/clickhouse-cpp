@@ -4,33 +4,22 @@
 #include <stdexcept>
 #include <string>
 
-#if defined(__GNUC__) && __GNUC__ < 7
+#if defined(__APPLE__)
+    #include <string_view>
+    using string_view = std::string_view;
+    using std::string_view_literals::operator""sv;
+#elif defined(__GNUC__) && __GNUC__ < 7
+    #include <experimental/string_view>
+    using string_view = std::experimental::string_view;
 
-#if defined(__APPLE__) //AppleClang fix
-#include <string_view>
-using string_view = std::string_view;
-using std::string_view_literals::operator""sv;
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wliteral-suffix"
+        using std::experimental::string_view_literals::operator""sv;
+    #pragma GCC diagnostic pop
 #else
-# include <experimental/string_view>
-using string_view = std::experimental::string_view;
-
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wliteral-suffix"
-using std::experimental::string_view_literals::operator""sv;
-#pragma GCC diagnostic pop
-
-#endif
-
-#else
-
-# include <string_view>
-using string_view = std::string_view;
-
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wliteral-suffix"
-using std::literals::string_view_literals::operator""sv;
-#pragma GCC diagnostic pop
-
+    #include <string_view>
+    using string_view = std::string_view;
+    using std::literals::string_view_literals::operator""sv;
 #endif
 
 /**
