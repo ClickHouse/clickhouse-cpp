@@ -97,7 +97,7 @@ public:
     ~Client();
 
     /// Intends for execute arbitrary queries.
-    void Execute(Query& query);
+    void Execute(const Query& query);
 
     /// Intends for execute select queries.  Data will be returned with
     /// one or more call of \p cb.
@@ -108,7 +108,7 @@ public:
     void SelectCancelable(const std::string& query, SelectCancelableCallback cb);
 
     /// Alias for Execute.
-    void Select(Query& query);
+    void Select(const Query& query);
 
     /// Intends for insert block of data into a table \p table_name.
     void Insert(const std::string& table_name, const Block& block);

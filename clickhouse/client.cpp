@@ -72,13 +72,13 @@ public:
      Impl(const ClientOptions& opts);
     ~Impl();
 
-    void ExecuteQuery(Query &query);
+    void ExecuteQuery(const Query& query);
 
     void SendCancel();
 
     void Insert(const std::string& table_name, const Block& block);
 
-    void InsertQuery(Query &query);
+    void InsertQuery(const Query& query);
 
     void InsertData(const Block& block);
 
@@ -119,7 +119,7 @@ private:
 private:
     class EnsureNull {
     public:
-        inline EnsureNull(QueryEvents* ev, QueryEvents** ptr)
+        inline EnsureNull(const QueryEvents* ev, const QueryEvents** ptr)
             : ptr_(ptr)
         {
             if (ptr_) {
@@ -134,13 +134,13 @@ private:
         }
 
     private:
-        QueryEvents** ptr_;
+        const QueryEvents** ptr_;
 
     };
 
 
     const ClientOptions options_;
-    QueryEvents* events_;
+    const QueryEvents* events_;
     int compression_ = CompressionState::Disable;
 
     SocketHolder socket_;
@@ -191,8 +191,8 @@ Client::Impl::Impl(const ClientOptions& opts)
 Client::Impl::~Impl()
 { }
 
-void Client::Impl::ExecuteQuery(Query &query) {
-    EnsureNull en(static_cast<QueryEvents*>(&query), &events_);
+void Client::Impl::ExecuteQuery(const Query& query) {
+    EnsureNull en(static_cast<const QueryEvents*>(&query), &events_);
 
     if (options_.ping_before_query) {
         RetryGuard([this]() { Ping(); });
@@ -236,14 +236,13 @@ void Client::Impl::Insert(const std::string& table_name, const Block& block) {
         }
     }
 
-    Query query("INSERT INTO " + table_name + " ( " + fields_section.str() + " ) VALUES");
-    this->InsertQuery(query);
+    this->InsertQuery("INSERT INTO " + table_name + " ( " + fields_section.str() + " ) VALUES");
 
     this->InsertData(block);
 }
 
-void Client::Impl::InsertQuery(Query &query) {
-    EnsureNull en(static_cast<QueryEvents*>(&query), &events_);
+void Client::Impl::InsertQuery(const Query& query) {
+    EnsureNull en(static_cast<const QueryEvents*>(&query), &events_);
 
     if (options_.ping_before_query) {
         RetryGuard([this]() { Ping(); });
@@ -798,7 +797,7 @@ Client::Client(const ClientOptions& opts)
 Client::~Client()
 { }
 
-void Client::Execute(Query& query) {
+void Client::Execute(const Query& query) {
     impl_->ExecuteQuery(query);
 }
 
@@ -810,8 +809,8 @@ void Client::SelectCancelable(const std::string& query, SelectCancelableCallback
     Execute(Query(query).OnDataCancelable(cb));
 }
 
-void Client::Select(Query& query) {
-    Execute(query);
+void Client::Select(const Query& query) {
+    Execute(std::move(query));
 }
 
 void Client::Insert(const std::string& table_name, const Block& block) {
