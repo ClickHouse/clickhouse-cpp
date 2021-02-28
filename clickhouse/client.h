@@ -93,7 +93,7 @@ std::ostream& operator<<(std::ostream& os, const ClientOptions& options);
  */
 class Client {
 public:
-     Client(const ClientOptions& opts);
+     explicit Client(const ClientOptions& opts);
     ~Client();
 
     /// Intends for execute arbitrary queries.
@@ -112,6 +112,10 @@ public:
 
     /// Intends for insert block of data into a table \p table_name.
     void Insert(const std::string& table_name, const Block& block);
+
+    void InsertQuery(const std::string& query, SelectCallback cb);
+
+    void InsertData(const Block& block);
 
     /// Ping server for aliveness.
     void Ping();
