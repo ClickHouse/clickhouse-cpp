@@ -54,8 +54,11 @@ private:
     std::vector<T> data_;
 };
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic"
 using Int128 = __int128;
 using Int64 = int64_t;
+#pragma GCC diagnostic pop
 
 using ColumnUInt8   = ColumnVector<uint8_t>;
 using ColumnUInt16  = ColumnVector<uint16_t>;
