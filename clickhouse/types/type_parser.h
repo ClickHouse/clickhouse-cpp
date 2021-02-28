@@ -34,7 +34,7 @@ struct TypeAst {
     /// used for fixed-width types and enum values.
     int64_t value = 0;
     std::string value_string;
-    /// Subelements of the type.
+    /// Sub-elements of the type.
     /// Used to store enum's names and values as well.
     std::vector<TypeAst> elements;
 
@@ -61,7 +61,7 @@ class TypeParser {
             EOS,
         };
 
-        Type type;
+        Type type = Type::Invalid;
         StringView value;
     };
 

@@ -278,3 +278,7 @@ BUCKAROO_DEPS
 # Vim
 *.swp
 *.swo
+
+# CLion
+build/
+cmake-build*
