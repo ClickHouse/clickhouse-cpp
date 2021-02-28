@@ -72,13 +72,13 @@ public:
      Impl(const ClientOptions& opts);
     ~Impl();
 
-    void ExecuteQuery(Query query);
+    void ExecuteQuery(Query &query);
 
     void SendCancel();
 
     void Insert(const std::string& table_name, const Block& block);
 
-    void InsertQuery(Query query);
+    void InsertQuery(Query &query);
 
     void InsertData(const Block& block);
 
@@ -191,7 +191,7 @@ Client::Impl::Impl(const ClientOptions& opts)
 Client::Impl::~Impl()
 { }
 
-void Client::Impl::ExecuteQuery(Query query) {
+void Client::Impl::ExecuteQuery(Query &query) {
     EnsureNull en(static_cast<QueryEvents*>(&query), &events_);
 
     if (options_.ping_before_query) {
@@ -225,10 +225,6 @@ std::string NameToQueryString(const std::string &input)
 }
 
 void Client::Impl::Insert(const std::string& table_name, const Block& block) {
-    if (options_.ping_before_query) {
-        RetryGuard([this]() { Ping(); });
-    }
-
     std::stringstream fields_section;
 		const auto num_columns = block.GetColumnCount();
 
@@ -240,44 +236,13 @@ void Client::Impl::Insert(const std::string& table_name, const Block& block) {
         }
     }
 
-    SendQuery("INSERT INTO " + table_name + " ( " + fields_section.str() + " ) VALUES");
+    Query query("INSERT INTO " + table_name + " ( " + fields_section.str() + " ) VALUES");
+    this->InsertQuery(query);
 
-    uint64_t server_packet;
-    // Receive data packet.
-    while (true) {
-        bool ret = ReceivePacket(&server_packet);
-
-        if (!ret) {
-            throw std::runtime_error("fail to receive data packet");
-        }
-        if (server_packet == ServerCodes::Data) {
-            break;
-        }
-        if (server_packet == ServerCodes::Progress) {
-            continue;
-        }
-    }
-
-    // Send data.
-    SendData(block);
-    // Send empty block as marker of
-    // end of data.
-    SendData(Block());
-
-    // Wait for EOS.
-    uint64_t eos_packet{0};
-    while (ReceivePacket(&eos_packet)) {
-        ;
-    }
-
-    if (eos_packet != ServerCodes::EndOfStream && eos_packet != ServerCodes::Exception
-        && eos_packet != ServerCodes::Log && options_.rethrow_exceptions) {
-        throw std::runtime_error(std::string{"unexpected packet from server while receiving end of query, expected (expected Exception, EndOfStream or Log, got: "}
-                            + (eos_packet ? std::to_string(eos_packet) : "nothing") + ")");
-    }
+    this->InsertData(block);
 }
 
-void Client::Impl::InsertQuery(Query query) {
+void Client::Impl::InsertQuery(Query &query) {
     EnsureNull en(static_cast<QueryEvents*>(&query), &events_);
 
     if (options_.ping_before_query) {
@@ -311,8 +276,15 @@ void Client::Impl::InsertData(const Block& block) {
     SendData(Block());
 
     // Wait for EOS.
-    while (ReceivePacket()) {
+    uint64_t eos_packet{0};
+    while (ReceivePacket(&eos_packet)) {
         ;
+    }
+
+    if (eos_packet != ServerCodes::EndOfStream && eos_packet != ServerCodes::Exception
+        && eos_packet != ServerCodes::Log && options_.rethrow_exceptions) {
+        throw std::runtime_error(std::string{"unexpected packet from server while receiving end of query, expected (expected Exception, EndOfStream or Log, got: "}
+                            + (eos_packet ? std::to_string(eos_packet) : "nothing") + ")");
     }
 }
 
@@ -826,7 +798,7 @@ Client::Client(const ClientOptions& opts)
 Client::~Client()
 { }
 
-void Client::Execute(const Query& query) {
+void Client::Execute(Query& query) {
     impl_->ExecuteQuery(query);
 }
 
@@ -838,7 +810,7 @@ void Client::SelectCancelable(const std::string& query, SelectCancelableCallback
     Execute(Query(query).OnDataCancelable(cb));
 }
 
-void Client::Select(const Query& query) {
+void Client::Select(Query& query) {
     Execute(query);
 }
 
