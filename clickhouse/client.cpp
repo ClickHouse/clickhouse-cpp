@@ -810,7 +810,7 @@ void Client::SelectCancelable(const std::string& query, SelectCancelableCallback
 }
 
 void Client::Select(const Query& query) {
-    Execute(std::move(query));
+    Execute(query);
 }
 
 void Client::Insert(const std::string& table_name, const Block& block) {
