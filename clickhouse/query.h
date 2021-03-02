@@ -66,16 +66,16 @@ public:
     { }
 
     /// Some data was received.
-    virtual void OnData(const Block& block) = 0;
-    virtual bool OnDataCancelable(const Block& block) = 0;
+    virtual void OnData(const Block& block) const = 0;
+    virtual bool OnDataCancelable(const Block& block) const = 0;
 
-    virtual void OnServerException(const Exception& e) = 0;
+    virtual void OnServerException(const Exception& e) const = 0;
 
-    virtual void OnProfile(const Profile& profile) = 0;
+    virtual void OnProfile(const Profile& profile) const = 0;
 
-    virtual void OnProgress(const Progress& progress) = 0;
+    virtual void OnProgress(const Progress& progress) const = 0;
 
-    virtual void OnFinish() = 0;
+    virtual void OnFinish() const = 0;
 };
 
 
@@ -122,13 +122,13 @@ public:
     }
 
 private:
-    void OnData(const Block& block) override {
+    void OnData(const Block& block) const override {
         if (select_cb_) {
             select_cb_(block);
         }
     }
 
-    bool OnDataCancelable(const Block& block) override {
+    bool OnDataCancelable(const Block& block) const override {
         if (select_cancelable_cb_) {
             return select_cancelable_cb_(block);
         } else {
@@ -136,23 +136,23 @@ private:
         }
     }
 
-    void OnServerException(const Exception& e) override {
+    void OnServerException(const Exception& e) const override {
         if (exception_cb_) {
             exception_cb_(e);
         }
     }
 
-    void OnProfile(const Profile& profile) override {
+    void OnProfile(const Profile& profile) const override {
         (void)profile;
     }
 
-    void OnProgress(const Progress& progress) override {
+    void OnProgress(const Progress& progress) const override {
         if (progress_cb_) {
             progress_cb_(progress);
         }
     }
 
-    void OnFinish() override {
+    void OnFinish() const override {
     }
 
 private:

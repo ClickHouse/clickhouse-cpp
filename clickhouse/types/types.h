@@ -279,10 +279,13 @@ inline TypeRef Type::CreateSimple<int64_t>() {
     return TypeRef(new Type(Int64));
 }
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic"
 template <>
 inline TypeRef Type::CreateSimple<__int128>() {
     return TypeRef(new Type(Int128));
 }
+#pragma GCC diagnostic pop
 
 template <>
 inline TypeRef Type::CreateSimple<uint8_t>() {

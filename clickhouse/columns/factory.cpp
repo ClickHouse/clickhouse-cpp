@@ -2,15 +2,12 @@
 
 #include "array.h"
 #include "date.h"
-#include "decimal.h"
 #include "enum.h"
 #include "ip4.h"
 #include "ip6.h"
 #include "lowcardinality.h"
 #include "nothing.h"
 #include "nullable.h"
-#include "numeric.h"
-#include "string.h"
 #include "tuple.h"
 #include "uuid.h"
 
@@ -21,7 +18,7 @@
 namespace clickhouse {
 namespace {
 
-static ColumnRef CreateTerminalColumn(const TypeAst& ast) {
+ColumnRef CreateTerminalColumn(const TypeAst& ast) {
     switch (ast.code) {
     case Type::Void:
         return std::make_shared<ColumnNothing>();
@@ -94,7 +91,7 @@ static ColumnRef CreateTerminalColumn(const TypeAst& ast) {
     }
 }
 
-static ColumnRef CreateColumnFromAst(const TypeAst& ast) {
+ColumnRef CreateColumnFromAst(const TypeAst& ast) {
     switch (ast.meta) {
         case TypeAst::Array: {
             return std::make_shared<ColumnArray>(
@@ -133,9 +130,8 @@ static ColumnRef CreateColumnFromAst(const TypeAst& ast) {
 
             enum_items.reserve(ast.elements.size() / 2);
             for (size_t i = 0; i < ast.elements.size(); i += 2) {
-                enum_items.push_back(
-                    Type::EnumItem{ast.elements[i].value_string,
-                                   (int16_t)ast.elements[i + 1].value});
+                enum_items.emplace_back(ast.elements[i].value_string,
+                                   (int16_t)ast.elements[i + 1].value);
             }
 
             if (ast.code == Type::Enum8) {

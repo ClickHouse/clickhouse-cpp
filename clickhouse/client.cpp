@@ -72,11 +72,15 @@ public:
      Impl(const ClientOptions& opts);
     ~Impl();
 
-    void ExecuteQuery(Query query);
+    void ExecuteQuery(const Query& query);
 
     void SendCancel();
 
     void Insert(const std::string& table_name, const Block& block);
+
+    void InsertQuery(const Query& query);
+
+    void InsertData(const Block& block);
 
     void Ping();
 
@@ -115,7 +119,7 @@ private:
 private:
     class EnsureNull {
     public:
-        inline EnsureNull(QueryEvents* ev, QueryEvents** ptr)
+        inline EnsureNull(const QueryEvents* ev, const QueryEvents** ptr)
             : ptr_(ptr)
         {
             if (ptr_) {
@@ -130,13 +134,13 @@ private:
         }
 
     private:
-        QueryEvents** ptr_;
+        const QueryEvents** ptr_;
 
     };
 
 
     const ClientOptions options_;
-    QueryEvents* events_;
+    const QueryEvents* events_;
     int compression_ = CompressionState::Disable;
 
     SocketHolder socket_;
@@ -187,8 +191,8 @@ Client::Impl::Impl(const ClientOptions& opts)
 Client::Impl::~Impl()
 { }
 
-void Client::Impl::ExecuteQuery(Query query) {
-    EnsureNull en(static_cast<QueryEvents*>(&query), &events_);
+void Client::Impl::ExecuteQuery(const Query& query) {
+    EnsureNull en(static_cast<const QueryEvents*>(&query), &events_);
 
     if (options_.ping_before_query) {
         RetryGuard([this]() { Ping(); });
@@ -221,10 +225,6 @@ std::string NameToQueryString(const std::string &input)
 }
 
 void Client::Impl::Insert(const std::string& table_name, const Block& block) {
-    if (options_.ping_before_query) {
-        RetryGuard([this]() { Ping(); });
-    }
-
     std::stringstream fields_section;
 		const auto num_columns = block.GetColumnCount();
 
@@ -236,7 +236,19 @@ void Client::Impl::Insert(const std::string& table_name, const Block& block) {
         }
     }
 
-    SendQuery("INSERT INTO " + table_name + " ( " + fields_section.str() + " ) VALUES");
+    this->InsertQuery("INSERT INTO " + table_name + " ( " + fields_section.str() + " ) VALUES");
+
+    this->InsertData(block);
+}
+
+void Client::Impl::InsertQuery(const Query& query) {
+    EnsureNull en(static_cast<const QueryEvents*>(&query), &events_);
+
+    if (options_.ping_before_query) {
+        RetryGuard([this]() { Ping(); });
+    }
+
+    SendQuery(query.GetText());
 
     uint64_t server_packet;
     // Receive data packet.
@@ -253,7 +265,9 @@ void Client::Impl::Insert(const std::string& table_name, const Block& block) {
             continue;
         }
     }
+}
 
+void Client::Impl::InsertData(const Block& block) {
     // Send data.
     SendData(block);
     // Send empty block as marker of
@@ -801,6 +815,14 @@ void Client::Select(const Query& query) {
 
 void Client::Insert(const std::string& table_name, const Block& block) {
     impl_->Insert(table_name, block);
+}
+
+void Client::InsertQuery(const std::string& query, SelectCallback cb) {
+    impl_->InsertQuery(Query(query).OnData(cb));
+}
+
+void Client::InsertData(const Block& block) {
+    impl_->InsertData(block);
 }
 
 void Client::Ping() {

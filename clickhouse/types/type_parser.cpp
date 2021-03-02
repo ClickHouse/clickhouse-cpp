@@ -40,6 +40,7 @@ static const std::unordered_map<std::string, Type::Code> kTypeCode = {
     { "UUID",        Type::UUID },
     { "IPv4",        Type::IPv4 },
     { "IPv6",        Type::IPv6 },
+    { "Int128",      Type::Int128 },
     { "Decimal",     Type::Decimal },
     { "Decimal32",   Type::Decimal32 },
     { "Decimal64",   Type::Decimal64 },
@@ -146,7 +147,7 @@ bool TypeParser::Parse(TypeAst* type) {
                 break;
             case Token::EOS:
             {
-                // Ubalanced braces, brackets, etc is an error.
+                // Unbalanced braces, brackets, etc is an error.
                 if (open_elements_.size() != 1)
                     return false;
                 return true;
