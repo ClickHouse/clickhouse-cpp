@@ -455,6 +455,9 @@ bool Client::Impl::ReadBlock(Block* block, CodedInputStream* input) {
         return false;
     }
 
+    CreateColumnByTypeSettings create_column_settings;
+    create_column_settings.low_cardinality_as_wrapped_column = options_.backward_compatibility_lowcardinality_as_wrapped_column;
+
     std::string name;
     std::string type;
     for (size_t i = 0; i < num_columns; ++i) {
@@ -465,7 +468,7 @@ bool Client::Impl::ReadBlock(Block* block, CodedInputStream* input) {
             return false;
         }
 
-        if (ColumnRef col = CreateColumnByType(type)) {
+        if (ColumnRef col = CreateColumnByType(type, create_column_settings)) {
             if (num_rows && !col->Load(input, num_rows)) {
                 throw std::runtime_error("can't load");
             }

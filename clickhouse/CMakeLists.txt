@@ -14,6 +14,7 @@ SET ( clickhouse-cpp-lib-src
     columns/ip4.cpp
     columns/ip6.cpp
     columns/lowcardinality.cpp
+    columns/lowcardinalityadaptor.h
     columns/nullable.cpp
     columns/numeric.cpp
     columns/string.cpp
