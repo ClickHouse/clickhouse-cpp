@@ -4,6 +4,28 @@
 #include <stdexcept>
 #include <string>
 
+#if defined(__APPLE__) // AppleClang
+#   include <string_view>
+    using string_view = std::string_view;
+    using std::string_view_literals::operator""sv;
+#elif defined(__GNUC__) && __GNUC__ < 7
+#   include <experimental/string_view>
+    using string_view = std::experimental::string_view;
+#   if defined(__llvm__) || defined(__clang__) // linux clang 6.0
+        using std::experimental::string_view_literals::operator""sv;
+#   else // gcc 6.
+    #define OLD_GCC 1
+    // no operator sv in gcc-6
+#   endif
+#else
+#   include <string_view>
+    using string_view = std::string_view;
+#   pragma GCC diagnostic push
+#   pragma GCC diagnostic ignored "-Wliteral-suffix" // gcc 7
+    using std::literals::string_view_literals::operator""sv;
+#   pragma GCC diagnostic pop
+#endif
+
 /**
  * A lightweight non-owning read-only view into a subsequence of a string.
  */

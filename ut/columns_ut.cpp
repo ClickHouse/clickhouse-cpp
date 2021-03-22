@@ -10,18 +10,14 @@
 
 #include <contrib/gtest/gtest.h>
 #include "utils.h"
-
-#include <string_view>
-
+#include "../clickhouse/base/string_view.h"
 
 namespace {
 
 using namespace clickhouse;
-using namespace std::literals::string_view_literals;
 
 static std::vector<uint32_t> MakeNumbers() {
-    return std::vector<uint32_t>
-        {1, 2, 3, 7, 11, 13, 17, 19, 23, 29, 31};
+    return std::vector<uint32_t> {1, 2, 3, 7, 11, 13, 17, 19, 23, 29, 31};
 }
 
 static std::vector<uint8_t> MakeBools() {
@@ -46,12 +42,24 @@ static std::vector<uint64_t> MakeUUIDs() {
          0x3507213c178649f9llu, 0x9faf035d662f60aellu};
 }
 
-static const auto LOWCARDINALITY_STRING_FOOBAR_10_ITEMS_BINARY =
+#if defined(OLD_GCC)
+
+#define SV(x) string_view(x, sizeof(x))
+
+static const string_view LOWCARDINALITY_STRING_FOOBAR_10_ITEMS_BINARY =
+    SV("\x01\x00\x00\x00\x00\x00\x00\x00\x00\x06\x00\x00\x00\x00\x00\x00"
+        "\x09\x00\x00\x00\x00\x00\x00\x00\x00\x06\x46\x6f\x6f\x42\x61\x72"
+        "\x01\x31\x01\x32\x03\x46\x6f\x6f\x01\x34\x03\x42\x61\x72\x01\x37"
+        "\x01\x38\x0a\x00\x00\x00\x00\x00\x00\x00\x01\x02\x03\x04\x05\x06"
+        "\x04\x07\x08\x04");
+#else
+static const string_view LOWCARDINALITY_STRING_FOOBAR_10_ITEMS_BINARY =
         "\x01\x00\x00\x00\x00\x00\x00\x00\x00\x06\x00\x00\x00\x00\x00\x00"
         "\x09\x00\x00\x00\x00\x00\x00\x00\x00\x06\x46\x6f\x6f\x42\x61\x72"
         "\x01\x31\x01\x32\x03\x46\x6f\x6f\x01\x34\x03\x42\x61\x72\x01\x37"
         "\x01\x38\x0a\x00\x00\x00\x00\x00\x00\x00\x01\x02\x03\x04\x05\x06"
         "\x04\x07\x08\x04"sv;
+#endif
 
 template <typename Generator>
 auto GenerateVector(size_t items, Generator && gen) {
@@ -522,20 +530,24 @@ TEST(ColumnsCase, DISABLED_ColumnLowCardinalityString_Save) {
     // Since overflow from left side is less likely to happen, leave only tiny margin there.
     auto write_pos = buffer + left_margin_size;
     const auto left_margin = buffer;
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Warray-bounds" //array bounds false positive
     const auto right_margin = write_pos + expected_output_size;
+#pragma GCC diagnostic pop
 
     output.Reset(write_pos, expected_output_size);
 
     EXPECT_NO_THROW(col.Save(&output_stream));
 
     // Left margin should be blank
-    EXPECT_EQ(std::string_view(margin_content, left_margin_size), std::string_view(left_margin, left_margin_size));
+    EXPECT_EQ(string_view(margin_content, left_margin_size), string_view(left_margin, left_margin_size));
     // Right margin should be blank too
-    EXPECT_EQ(std::string_view(margin_content, right_margin_size), std::string_view(right_margin, right_margin_size));
+    EXPECT_EQ(string_view(margin_content, right_margin_size), string_view(right_margin, right_margin_size));
 
     // TODO: right now LC columns do not write indexes in the most compact way possible, so binary representation is a bit different
     // (there might be other inconsistances too)
-    EXPECT_EQ(LOWCARDINALITY_STRING_FOOBAR_10_ITEMS_BINARY, std::string_view(write_pos, expected_output_size));
+    EXPECT_EQ(LOWCARDINALITY_STRING_FOOBAR_10_ITEMS_BINARY, string_view(write_pos, expected_output_size));
 }
 
 TEST(ColumnsCase, ColumnLowCardinalityString_SaveAndLoad) {

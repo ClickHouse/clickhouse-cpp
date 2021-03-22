@@ -30,7 +30,7 @@ ColumnFixedString::ColumnFixedString(size_t n)
 {
 }
 
-void ColumnFixedString::Append(std::string_view str) {
+void ColumnFixedString::Append(string_view str) {
     if (str.size() > string_size_) {
         throw std::runtime_error("Expected string of length not greater than "
                                  + std::to_string(string_size_) + " bytes, received "
@@ -44,7 +44,7 @@ void ColumnFixedString::Append(std::string_view str) {
         data_.reserve(new_size);
     }
 
-    data_.insert(data_.size(), str);
+    data_.insert(data_.size(), str.data(), str.size());
     // Pad up to string_size_ with zeroes.
     const auto padding_size = string_size_ - str.size();
     data_.resize(data_.size() + padding_size, char(0));
@@ -54,14 +54,14 @@ void ColumnFixedString::Clear() {
     data_.clear();
 }
 
-std::string_view ColumnFixedString::At(size_t n) const {
+string_view ColumnFixedString::At(size_t n) const {
     const auto pos = n * string_size_;
-    return std::string_view(&data_.at(pos), string_size_);
+    return {&data_.at(pos), string_size_};
 }
 
-std::string_view ColumnFixedString::operator [](size_t n) const {
+string_view ColumnFixedString::operator [](size_t n) const {
     const auto pos = n * string_size_;
-    return std::string_view(&data_[pos], string_size_);
+    return {&data_[pos], string_size_};
 }
 
 size_t ColumnFixedString::FixedSize() const
@@ -131,14 +131,14 @@ struct ColumnString::Block
         return capacity - size;
     }
 
-    std::string_view AppendUnsafe(std::string_view str)
+    string_view AppendUnsafe(string_view str)
     {
         const auto pos = &data_[size];
 
         memcpy(pos, str.data(), str.size());
         size += str.size();
 
-        return std::string_view(pos, str.size());
+        return {pos, str.size()};
     }
 
     auto GetCurrentWritePos()
@@ -146,11 +146,11 @@ struct ColumnString::Block
         return &data_[size];
     }
 
-    std::string_view ConsumeTailAsStringViewUnsafe(size_t len)
+    string_view ConsumeTailAsStringViewUnsafe(size_t len)
     {
         const auto start = &data_[size];
         size += len;
-        return std::string_view(start, len);
+        return {start, len};
     }
 
     size_t size;
@@ -178,7 +178,7 @@ ColumnString::ColumnString(const std::vector<std::string> & data)
 ColumnString::~ColumnString()
 {}
 
-void ColumnString::Append(std::string_view str) {
+void ColumnString::Append(string_view str) {
     if (blocks_.size() == 0 || blocks_.back().GetAvailble() < str.length())
     {
         blocks_.emplace_back(std::max(DEFAULT_BLOCK_SIZE, str.size()));
@@ -187,7 +187,7 @@ void ColumnString::Append(std::string_view str) {
     items_.emplace_back(blocks_.back().AppendUnsafe(str));
 }
 
-void ColumnString::AppendUnsafe(std::string_view str)
+void ColumnString::AppendUnsafe(string_view str)
 {
     items_.emplace_back(blocks_.back().AppendUnsafe(str));
 }
@@ -197,11 +197,11 @@ void ColumnString::Clear() {
     blocks_.clear();
 }
 
-std::string_view ColumnString::At(size_t n) const {
+string_view ColumnString::At(size_t n) const {
     return items_.at(n);
 }
 
-std::string_view ColumnString::operator [] (size_t n) const {
+string_view ColumnString::operator [] (size_t n) const {
     return items_[n];
 }
 
@@ -234,7 +234,10 @@ bool ColumnString::Load(CodedInputStream* input, size_t rows) {
             return false;
 
         if (blocks_.size() == 0 || len > block->GetAvailble())
-            block = &blocks_.emplace_back(std::max<size_t>(DEFAULT_BLOCK_SIZE, len));
+        {
+            blocks_.emplace_back(std::max<size_t>(DEFAULT_BLOCK_SIZE, len));
+            block = &blocks_.back();
+        }
 
         if (!WireFormat::ReadBytes(input, block->GetCurrentWritePos(), len))
             return false;

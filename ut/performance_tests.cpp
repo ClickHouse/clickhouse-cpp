@@ -11,8 +11,10 @@
 #include <contrib/gtest/gtest.h>
 
 #include <string>
+#include <type_traits>
 
 #include "utils.h"
+#include "../clickhouse/base/string_view.h"
 
 using namespace clickhouse;
 
@@ -22,36 +24,36 @@ inline std::uint64_t generate(const ColumnUInt64&, size_t index) {
 }
 
 template <size_t RESULT_SIZE=8>
-inline std::string_view generate_string_view(size_t index) {
+inline string_view generate_string_view(size_t index) {
     static const char result_template[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
                                           "9876543210ZYXWVUTSRQPONMLKJIHGFEDCBAzyxwvutsrqponmlkjihgfedcba"; // to double number of unique combinations
     const auto template_size = sizeof(result_template) - 1;
 
     const auto start_pos = index % (template_size - RESULT_SIZE);
-    return std::string_view(&result_template[start_pos], RESULT_SIZE);
+    return {&result_template[start_pos], RESULT_SIZE};
 }
 
-inline std::string_view generate(const ColumnString&, size_t index) {
+inline string_view generate(const ColumnString&, size_t index) {
     // ColumString stores item lengts,and on 1M etnries that builds up to extra 1M bytes,
     // comparing to 8M bytes of serialized data for ColumnFixedString and ColumUInt64.
     // So in order to make comparison mode fair, reducing size of data item.
     return generate_string_view<7>(index);
 }
 
-inline std::string_view generate(const ColumnFixedString&, size_t index) {
+inline string_view generate(const ColumnFixedString&, size_t index) {
     return generate_string_view<8>(index);
 }
 
-inline std::string_view generate(const ColumnLowCardinalityT<ColumnString>&, size_t index) {
+inline string_view generate(const ColumnLowCardinalityT<ColumnString>&, size_t index) {
     return generate_string_view<7>(index);
 }
 
-inline std::string_view generate(const ColumnLowCardinalityT<ColumnFixedString>&, size_t index) {
+inline string_view generate(const ColumnLowCardinalityT<ColumnFixedString>&, size_t index) {
     return generate_string_view<8>(index);
 }
 
 template <typename ColumnType>
-auto ValidateColumnItems(const ColumnType & col, size_t expected_items) {
+void ValidateColumnItems(const ColumnType & col, size_t expected_items) {
     ASSERT_EQ(expected_items, col.Size());
     // validate that appended items match expected
     for (size_t i = 0; i < expected_items; ++i)
@@ -63,15 +65,22 @@ auto ValidateColumnItems(const ColumnType & col, size_t expected_items) {
     }
 };
 
-template <typename ColumnType>
-ColumnType InstantiateColumn() {
-    if constexpr (std::is_same_v<ColumnType, ColumnFixedString>) {
-        return ColumnType(8);
-    } else if constexpr (std::is_same_v<ColumnType, ColumnLowCardinalityT<ColumnFixedString>>) {
-        return ColumnType(8);
-    } else {
-        return ColumnType();
-    }
+template <class ColumnType>
+typename std::enable_if<
+    std::is_same<ColumnType, ColumnFixedString>::value ||
+    std::is_same<ColumnType, ColumnLowCardinalityT<ColumnFixedString>>::value , std::unique_ptr<ColumnType>>::type
+InstantiateColumn()
+{
+    return std::make_unique<ColumnType>(8);
+}
+
+template <class ColumnType>
+typename std::enable_if<
+    !std::is_same<ColumnType, ColumnFixedString>::value &&
+    !std::is_same<ColumnType, ColumnLowCardinalityT<ColumnFixedString>>::value , std::unique_ptr<ColumnType>>::type
+InstantiateColumn()
+{
+    return std::make_unique<ColumnType>();
 }
 
 template <typename ColumnType>
@@ -90,7 +99,8 @@ TYPED_TEST_CASE_P(ColumnPerformanceTest);
 TYPED_TEST_P(ColumnPerformanceTest, SaveAndLoad) {
     SKIP_IN_DEBUG_BUILDS();
 
-    auto column = InstantiateColumn<TypeParam>();
+    auto column_ptr = InstantiateColumn<TypeParam>();
+    auto & column = *column_ptr;
     using Timer = Timer<std::chrono::microseconds>;
 
     const size_t ITEMS_COUNT = 1'000'000;
@@ -172,7 +182,9 @@ TYPED_TEST_P(ColumnPerformanceTest, InsertAndSelect) {
     const std::string table_name = "PerformanceTests.ColumnTest";
     const std::string column_name = "column";
 
-    auto column = InstantiateColumn<ColumnType>();
+    auto column_ptr = InstantiateColumn<ColumnType>();
+    auto & column = *column_ptr;
+
     Client client(ClientOptions().SetHost("localhost"));
     client.Execute("CREATE DATABASE IF NOT EXISTS PerformanceTests");
     client.Execute("DROP TABLE IF EXISTS PerformanceTests.ColumnTest");

@@ -2,10 +2,20 @@
 
 #include "../types/types.h"
 
-#include <string_view>
+#include <sstream>
 #include <stdexcept>
+#include <type_traits>
+#include "../base/string_view.h"
 
 namespace clickhouse {
+
+template <class T>
+static typename std::enable_if<std::is_same<string_view, T>::value || std::is_same<std::string, T>::value,
+    string_view>::type ConvertToStorageValue(const T& t) { return {t}; }
+
+template <class T>
+static typename std::enable_if<std::is_fundamental<T>::value, string_view>::type
+    ConvertToStorageValue(const T& t) { return {reinterpret_cast<const char*>(&t), sizeof(T)}; }
 
 /** ItemView is a view on a data stored in Column, safe-ish interface for reading values from Column.
  *
@@ -16,23 +26,10 @@ namespace clickhouse {
  *
  */
 struct ItemView {
-    using DataType = std::string_view;
+    using DataType = string_view;
 
     const Type::Code type;
     const DataType data;
-
-private:
-    template <typename T>
-    inline auto ConvertToStorageValue(const T& t) {
-        if constexpr (std::is_same_v<std::string_view, T> || std::is_same_v<std::string, T>) {
-            return std::string_view{t};
-        } else if constexpr (std::is_fundamental_v<T>) {
-            return std::string_view{reinterpret_cast<const char*>(&t), sizeof(T)};
-        } else {
-            // will caue error at compile-time
-            return;
-        }
-    }
 
 public:
     ItemView(Type::Code type, DataType data)
@@ -51,20 +48,23 @@ public:
         : ItemView(type, ConvertToStorageValue(value))
     {}
 
-    template <typename T>
-    T get() const {
-        if constexpr (std::is_same_v<std::string_view, T> || std::is_same_v<std::string, T>) {
-            return data;
-        } else if constexpr (std::is_fundamental_v<T>) {
-            if (sizeof(T) == data.size()) {
-                return *reinterpret_cast<const T*>(data.data());
-            } else {
-                throw std::runtime_error("Incompatitable value type and size.");
-            }
+    template <class T>
+    typename std::enable_if<
+        std::is_same<string_view, T>::value ||
+        std::is_same<std::string, T>::value, T>::type
+    get() const { return data; }
+
+    template <class T>
+    typename std::enable_if<std::is_fundamental<T>::value>::type
+    get() const {
+        if (sizeof(T) == data.size()) {
+            return *reinterpret_cast<const T*>(data.data());
+        } else {
+            throw std::runtime_error("Incompatitable value type and size.");
         }
     }
 
-    inline std::string_view AsBinaryData() const {
+    inline string_view AsBinaryData() const {
         return data;
     }
 

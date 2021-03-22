@@ -1,4 +1,5 @@
 #include <clickhouse/client.h>
+#include <clickhouse/base/string_view.h>
 #include <contrib/gtest/gtest.h>
 
 #include <cmath>
@@ -202,7 +203,7 @@ TEST_P(ClientCase, LowCardinality_InsertAfterClear) {
     auto lc = createTableWithOneColumn<ColumnLowCardinalityT<ColumnString>>(block);
 
     // Add some data, but don't care about it much.
-    lc->AppendMany(std::vector<std::string_view>{"abc", "def", "123", "abc", "123", "def", "ghi"});
+    lc->AppendMany(std::vector<string_view>{"abc", "def", "123", "abc", "123", "def", "ghi"});
     EXPECT_GT(lc->Size(), 0u);
     EXPECT_GT(lc->GetDictionarySize(), 0u);
 

@@ -7,9 +7,7 @@
 #include <cityhash/city.h>
 
 #include <functional>
-#include <string_view>
 #include <type_traits>
-
 #include <cassert>
 
 namespace {
@@ -97,10 +95,10 @@ inline auto VisitIndexColumn(Vizitor && vizitor, ColumnType && col) {
 inline void AppendToDictionary(Column& dictionary, const ItemView & item) {
     switch (dictionary.GetType().GetCode()) {
         case Type::FixedString:
-            column_down_cast<ColumnFixedString>(dictionary).Append(item.get<std::string_view>());
+            column_down_cast<ColumnFixedString>(dictionary).Append(item.get<string_view>());
             return;
         case Type::String:
-            column_down_cast<ColumnString>(dictionary).Append(item.get<std::string_view>());
+            column_down_cast<ColumnString>(dictionary).Append(item.get<string_view>());
             return;
         default:
             throw std::runtime_error("Unexpected dictionary column type: " + dictionary.GetType().GetName());
@@ -113,7 +111,7 @@ inline auto GetNullItemForDictionary(const ColumnRef dictionary) {
     if (auto n = dictionary->As<ColumnNullable>()) {
         return ItemView{};
     } else {
-        return ItemView{dictionary->Type()->GetCode(), std::string_view{}};
+        return ItemView{dictionary->Type()->GetCode(), string_view{}};
     }
 }
 
@@ -252,11 +250,10 @@ auto Load(ColumnRef new_dictionary_column, CodedInputStream* input, size_t rows)
 
 bool ColumnLowCardinality::Load(CodedInputStream* input, size_t rows) {
     try {
-        auto [new_dictionary, new_index, new_unique_items_map] = ::Load(dictionary_column_->Slice(0, 0), input, rows);
-
-        dictionary_column_->Swap(*new_dictionary);
-        index_column_.swap(new_index);
-        unique_items_map_.swap(new_unique_items_map);
+        auto res = ::Load(dictionary_column_->Slice(0, 0), input, rows);
+        dictionary_column_->Swap(*std::get<0>(res));
+        index_column_.swap(std::get<1>(res));
+        unique_items_map_.swap(std::get<2>(res));
 
         return true;
     } catch (...) {
@@ -332,7 +329,11 @@ void ColumnLowCardinality::AppendUnsafe(const ItemView & value) {
     const auto key = computeHashKey(value);
     const auto initial_index_size = index_column_->Size();
     // If the value is unique, then we are going to append it to a dictionary, hence new index is Size().
-    auto [iterator, is_new_item] = unique_items_map_.try_emplace(key, dictionary_column_->Size());
+    decltype(unique_items_map_)::iterator iterator;
+    bool is_new_item;
+
+    std::tie(iterator, is_new_item) = unique_items_map_.try_emplace(key, dictionary_column_->Size());
+
     try {
         // Order is important, adding to dictionary last, since it is much (MUCH!!!!) harder
         // to remove item from dictionary column than from index column

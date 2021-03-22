@@ -1,9 +1,7 @@
 #pragma once
 
 #include "column.h"
-
-#include <string>
-#include <string_view>
+#include "../base/string_view.h"
 #include <utility>
 #include <vector>
 
@@ -14,7 +12,7 @@ namespace clickhouse {
  */
 class ColumnFixedString : public Column {
 public:
-    using ValueType = std::string_view;
+    using ValueType = string_view;
 
     explicit ColumnFixedString(size_t n);
 
@@ -27,13 +25,13 @@ public:
     }
 
     /// Appends one element to the column.
-    void Append(std::string_view str);
+    void Append(string_view str);
 
     /// Returns element at given row number.
-    std::string_view At(size_t n) const;
+    string_view At(size_t n) const;
 
     /// Returns element at given row number.
-    std::string_view operator [] (size_t n) const;
+    string_view operator [] (size_t n) const;
 
     /// Returns the max size of the fixed string
     size_t FixedSize() const;
@@ -72,7 +70,7 @@ private:
 class ColumnString : public Column {
 public:
     // Type this column takes as argument of Append and returns with At() and operator[]
-    using ValueType = std::string_view;
+    using ValueType = string_view;
 
     ColumnString();
     ~ColumnString();
@@ -82,13 +80,13 @@ public:
     ColumnString(const ColumnString&) = delete;
 
     /// Appends one element to the column.
-    void Append(std::string_view str);
+    void Append(string_view str);
 
     /// Returns element at given row number.
-    std::string_view At(size_t n) const;
+    string_view At(size_t n) const;
 
     /// Returns element at given row number.
-    std::string_view operator [] (size_t n) const;
+    string_view operator [] (size_t n) const;
 
 public:
     /// Appends content of given column to the end of current one.
@@ -112,12 +110,12 @@ public:
     ItemView GetItem(size_t) const override;
 
 private:
-    void AppendUnsafe(std::string_view);
+    void AppendUnsafe(string_view);
 
 private:
     struct Block;
 
-    std::vector<std::string_view> items_;
+    std::vector<string_view> items_;
     std::vector<Block> blocks_;
 };
 
