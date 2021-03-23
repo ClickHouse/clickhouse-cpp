@@ -20,7 +20,6 @@ void ItemView::ValidateData(Type::Code type, DataType data) {
         ANY, /*String*/
         ANY, /*FixedString*/
         4,   /*DateTime*/
-        8,   /*DateTime64*/
         2,   /*Date*/
         ERR, /*Array*/
         ERR, /*Nullable*/
@@ -36,6 +35,7 @@ void ItemView::ValidateData(Type::Code type, DataType data) {
         8,   /*Decimal64*/
         16,  /*Decimal128*/
         ERR, /*LowCardinality*/
+        8,   /*DateTime64*/
     };
 
     if (type >= sizeof(value_size_by_type)/sizeof(value_size_by_type[0]) || type < 0) {

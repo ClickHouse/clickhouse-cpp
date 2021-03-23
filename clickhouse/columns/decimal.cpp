@@ -1,7 +1,5 @@
 #include "decimal.h"
 
-#include <iostream>
-
 namespace
 {
 using namespace clickhouse;
