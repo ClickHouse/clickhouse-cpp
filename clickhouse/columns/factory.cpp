@@ -44,6 +44,8 @@ static ColumnRef CreateTerminalColumn(const TypeAst& ast) {
         return std::make_shared<ColumnInt32>();
     case Type::Int64:
         return std::make_shared<ColumnInt64>();
+    case Type::Int128:
+        return std::make_shared<ColumnInt128>();
 
     case Type::Float32:
         return std::make_shared<ColumnFloat32>();
