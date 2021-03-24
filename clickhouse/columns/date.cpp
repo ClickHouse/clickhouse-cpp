@@ -39,7 +39,7 @@ size_t ColumnDate::Size() const {
     return data_->Size();
 }
 
-ColumnRef ColumnDate::Slice(size_t begin, size_t len) {
+ColumnRef ColumnDate::Slice(size_t begin, size_t len) const {
     auto col = data_->Slice(begin, len)->As<ColumnUInt16>();
     auto result = std::make_shared<ColumnDate>();
 
@@ -105,7 +105,7 @@ void ColumnDateTime::Clear() {
     data_->Clear();
 }
 
-ColumnRef ColumnDateTime::Slice(size_t begin, size_t len) {
+ColumnRef ColumnDateTime::Slice(size_t begin, size_t len) const {
     auto col = data_->Slice(begin, len)->As<ColumnUInt32>();
     auto result = std::make_shared<ColumnDateTime>();
 
@@ -191,7 +191,7 @@ void ColumnDateTime64::Swap(Column& other) {
     data_.swap(col.data_);
 }
 
-ColumnRef ColumnDateTime64::Slice(size_t begin, size_t len) {
+ColumnRef ColumnDateTime64::Slice(size_t begin, size_t len) const {
     auto sliced_data = data_->Slice(begin, len)->As<ColumnDecimal>();
 
     return ColumnRef{new ColumnDateTime64(type_, sliced_data)};

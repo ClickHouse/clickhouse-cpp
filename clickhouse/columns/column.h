@@ -52,7 +52,7 @@ public:
     virtual size_t Size() const = 0;
 
     /// Makes slice of the current column.
-    virtual ColumnRef Slice(size_t begin, size_t len) = 0;
+    virtual ColumnRef Slice(size_t begin, size_t len) const = 0;
 
     virtual void Swap(Column&) = 0;
 

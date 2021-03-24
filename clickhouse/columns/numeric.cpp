@@ -76,7 +76,7 @@ size_t ColumnVector<T>::Size() const {
 }
 
 template <typename T>
-ColumnRef ColumnVector<T>::Slice(size_t begin, size_t len) {
+ColumnRef ColumnVector<T>::Slice(size_t begin, size_t len) const {
     return std::make_shared<ColumnVector<T>>(SliceVector(data_, begin, len));
 }
 
