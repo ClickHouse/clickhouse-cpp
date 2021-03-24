@@ -631,6 +631,18 @@ TEST(ColumnsCase, UnmatchedBrackets) {
     ASSERT_EQ(nullptr, CreateColumnByType("Array(LowCardinality(Nullable(FixedString(10000)))"));
 }
 
+TEST(ColumnsCase, LowCardinalityAsWrappedColumn) {
+    CreateColumnByTypeSettings create_column_settings;
+    create_column_settings.low_cardinality_as_wrapped_column = true;
+
+    ASSERT_EQ(Type::String, CreateColumnByType("LowCardinality(String)", create_column_settings)->GetType().GetCode());
+    ASSERT_EQ(Type::String, CreateColumnByType("LowCardinality(String)", create_column_settings)->As<ColumnString>()->GetType().GetCode());
+
+    ASSERT_EQ(Type::FixedString, CreateColumnByType("LowCardinality(FixedString(10000))", create_column_settings)->GetType().GetCode());
+    ASSERT_EQ(Type::FixedString, CreateColumnByType("LowCardinality(FixedString(10000))", create_column_settings)->As<ColumnFixedString>()->GetType().GetCode());
+}
+
+
 class ColumnsCaseWithName : public ::testing::TestWithParam<const char* /*Column Type String*/>
 {};
 

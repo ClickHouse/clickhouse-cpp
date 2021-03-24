@@ -105,7 +105,12 @@ public:
 
     template <typename ...Args>
     explicit ColumnLowCardinalityT(Args &&... args)
-        : ColumnLowCardinality(std::make_shared<DictionaryColumnType>(std::forward<Args>(args)...)),
+        : ColumnLowCardinalityT(std::make_shared<DictionaryColumnType>(std::forward<Args>(args)...))
+    {}
+
+    // Create LC<T> column from existing T-column, making a deep copy of all contents.
+    explicit ColumnLowCardinalityT(std::shared_ptr<DictionaryColumnType> dictionary_col)
+        : ColumnLowCardinality(dictionary_col),
           typed_dictionary_(dynamic_cast<DictionaryColumnType &>(*GetDictionary())),
           type_(typed_dictionary_.Type()->GetCode())
     {}
