@@ -712,7 +712,8 @@ TEST_P(ColumnsCaseWithName, CreateColumnByType)
 INSTANTIATE_TEST_CASE_P(Basic, ColumnsCaseWithName, ::testing::Values(
     "Int8", "Int16", "Int32", "Int64",
     "UInt8", "UInt16", "UInt32", "UInt64",
-    "String", "Date", "DateTime"
+    "String", "Date", "DateTime",
+    "UUID", "Int128"
 ));
 
 INSTANTIATE_TEST_CASE_P(Parametrized, ColumnsCaseWithName, ::testing::Values(

@@ -285,7 +285,7 @@ inline TypeRef Type::CreateSimple<int64_t>() {
 }
 
 template <>
-inline TypeRef Type::CreateSimple<absl::int128>() {
+inline TypeRef Type::CreateSimple<Int128>() {
     return TypeRef(new Type(Int128));
 }
 
