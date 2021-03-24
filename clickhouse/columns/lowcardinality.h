@@ -109,7 +109,7 @@ public:
     {}
 
     // Create LC<T> column from existing T-column, making a deep copy of all contents.
-    explicit ColumnLowCardinalityT(const std::shared_ptr<DictionaryColumnType>& dictionary_col)
+    explicit ColumnLowCardinalityT(std::shared_ptr<DictionaryColumnType> dictionary_col)
         : ColumnLowCardinality(dictionary_col),
           typed_dictionary_(dynamic_cast<DictionaryColumnType &>(*GetDictionary())),
           type_(typed_dictionary_.Type()->GetCode())
