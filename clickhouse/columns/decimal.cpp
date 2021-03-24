@@ -5,7 +5,8 @@ namespace
 using namespace clickhouse;
 
 #ifdef ABSL_HAVE_INTRINSIC_INT128
-inline bool addOverflow(const Int128 & l, const Int128 & r, Int128 * result)
+template <typename T>
+inline bool addOverflow(const Int128 & l, const T & r, Int128 * result)
 {
     __int128 res;
     const auto ret_value = __builtin_add_overflow(static_cast<__int128>(l), static_cast<__int128>(r), &res);
@@ -14,7 +15,8 @@ inline bool addOverflow(const Int128 & l, const Int128 & r, Int128 * result)
     return ret_value;
 }
 
-inline bool mulOverflow(const Int128 & l, const Int128 & r, Int128 * result)
+template <typename T>
+inline bool mulOverflow(const Int128 & l, const T & r, Int128 * result)
 {
     __int128 res;
     const auto ret_value = __builtin_mul_overflow(static_cast<__int128>(l), static_cast<__int128>(r), &res);
@@ -24,7 +26,13 @@ inline bool mulOverflow(const Int128 & l, const Int128 & r, Int128 * result)
 }
 
 #else
-inline bool getSign(const Int128 & v)
+template <typename T>
+inline bool getSignBit(const T & v)
+{
+    return std::signbit(v);
+}
+
+inline bool getSignBit(const Int128 & v)
 {
 //    static constexpr Int128 zero {};
 //    return v < zero;
@@ -36,12 +44,12 @@ inline bool getSign(const Int128 & v)
 inline bool addOverflow(const Int128 & l, const Int128 & r, Int128 * result)
 {
     //    *result = l + r;
-    //    const auto result_sign = getSign(*result);
+    //    const auto result_sign = getSignBit(*result);
     //    return l_sign == r_sign && l_sign != result_sign;
 
     // Based on code from:
     // https://wiki.sei.cmu.edu/confluence/display/c/INT32-C.+Ensure+that+operations+on+signed+integers+do+not+result+in+overflow#INT32C.Ensurethatoperationsonsignedintegersdonotresultinoverflow-CompliantSolution
-    const auto r_positive = !getSign(r);
+    const auto r_positive = !getSignBit(r);
 
     if ((r_positive && (l > (std::numeric_limits<Int128>::max() - r))) ||
         (!r_positive && (l < (std::numeric_limits<Int128>::min() - r)))) {
@@ -52,30 +60,31 @@ inline bool addOverflow(const Int128 & l, const Int128 & r, Int128 * result)
     return false;
 }
 
-inline bool mulOverflow(const Int128 & l, const Int128 & r, Int128 * result)
+template <typename T>
+inline bool mulOverflow(const Int128 & l, const T & r, Int128 * result)
 {
     // Based on code from:
     // https://wiki.sei.cmu.edu/confluence/display/c/INT32-C.+Ensure+that+operations+on+signed+integers+do+not+result+in+overflow#INT32C.Ensurethatoperationsonsignedintegersdonotresultinoverflow-CompliantSolution.3
-    const auto l_positive = !getSign(l);
-    const auto r_positive = !getSign(r);
+    const auto l_positive = !getSignBit(l);
+    const auto r_positive = !getSignBit(r);
 
     if (l_positive) {
         if (r_positive) {
-            if (l > (std::numeric_limits<Int128>::max() / r)) {
+            if (r != 0 && l > (std::numeric_limits<Int128>::max() / r)) {
                 return true;
             }
         } else {
-            if (r < (std::numeric_limits<Int128>::min() / l)) {
+            if (l != 0 && r < (std::numeric_limits<Int128>::min() / l)) {
                 return true;
             }
         }
     } else {
         if (r_positive) {
-            if (l < (std::numeric_limits<Int128>::min() / r)) {
+            if (r != 0 && l < (std::numeric_limits<Int128>::min() / r)) {
                 return true;
             }
         } else {
-            if ( (l != 0) && (r < (std::numeric_limits<Int128>::max() / l))) {
+            if (l != 0 && (r < (std::numeric_limits<Int128>::max() / l))) {
                 return true;
             }
         }
@@ -145,8 +154,8 @@ void ColumnDecimal::Append(const std::string& value) {
 
             has_dot = true;
         } else if (*c >= '0' && *c <= '9') {
-            if (mulOverflow(int_value, Int128(10), &int_value) ||
-                addOverflow(int_value, Int128(*c - '0'), &int_value)) {
+            if (mulOverflow(int_value, 10, &int_value) ||
+                addOverflow(int_value, *c - '0', &int_value)) {
                 throw std::runtime_error("value is too big for 128-bit integer");
             }
         } else {
@@ -160,7 +169,7 @@ void ColumnDecimal::Append(const std::string& value) {
     }
 
     while (zeros) {
-        if (mulOverflow(int_value, Int128(10), &int_value)) {
+        if (mulOverflow(int_value, 10, &int_value)) {
             throw std::runtime_error("value is too big for 128-bit integer");
         }
         --zeros;

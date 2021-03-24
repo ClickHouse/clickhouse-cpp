@@ -135,7 +135,7 @@ void ColumnDateTime64::Append(const Int64& value) {
 
 Int64 ColumnDateTime64::At(size_t n) const {
     // make sure to use Absl's Int128 conversion
-    return static_cast<long long>(data_->At(n));
+    return static_cast<Int64>(data_->At(n));
 }
 
 void ColumnDateTime64::Append(ColumnRef column) {
