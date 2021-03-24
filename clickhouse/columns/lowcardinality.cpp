@@ -297,7 +297,7 @@ size_t ColumnLowCardinality::Size() const {
     return index_column_->Size();
 }
 
-ColumnRef ColumnLowCardinality::Slice(size_t begin, size_t len) {
+ColumnRef ColumnLowCardinality::Slice(size_t begin, size_t len) const {
     begin = std::min(begin, Size());
     len = std::min(len, Size() - begin);
 

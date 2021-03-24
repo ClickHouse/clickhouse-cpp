@@ -94,7 +94,7 @@ size_t ColumnFixedString::Size() const {
     return data_.size() / string_size_;
 }
 
-ColumnRef ColumnFixedString::Slice(size_t begin, size_t len) {
+ColumnRef ColumnFixedString::Slice(size_t begin, size_t len) const {
     auto result = std::make_shared<ColumnFixedString>(string_size_);
 
     if (begin < Size()) {
@@ -255,7 +255,7 @@ size_t ColumnString::Size() const {
     return items_.size();
 }
 
-ColumnRef ColumnString::Slice(size_t begin, size_t len) {
+ColumnRef ColumnString::Slice(size_t begin, size_t len) const {
     auto result = std::make_shared<ColumnString>();
 
     if (begin < items_.size()) {

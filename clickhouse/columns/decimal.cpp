@@ -213,7 +213,7 @@ size_t ColumnDecimal::Size() const {
     return data_->Size();
 }
 
-ColumnRef ColumnDecimal::Slice(size_t begin, size_t len) {
+ColumnRef ColumnDecimal::Slice(size_t begin, size_t len) const {
     // coundn't use std::make_shared since this c-tor is private
     return ColumnRef{new ColumnDecimal(type_, data_->Slice(begin, len))};
 }
