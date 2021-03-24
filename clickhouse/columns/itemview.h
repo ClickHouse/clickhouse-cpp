@@ -29,7 +29,7 @@ private:
         } else if constexpr (std::is_fundamental_v<T> || std::is_same_v<Int128, std::decay_t<T>>) {
             return std::string_view{reinterpret_cast<const char*>(&t), sizeof(T)};
         } else {
-            // will cause a compile-time error
+            static_assert(!std::is_same_v<T, T>, "Unknown type, which can't be stored in ItemView");
             return;
         }
     }
