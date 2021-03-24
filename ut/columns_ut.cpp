@@ -632,7 +632,6 @@ TEST(ColumnsCase, UnmatchedBrackets) {
 }
 
 TEST(ColumnsCase, LowCardinalityAsWrappedColumn) {
-    // When type string has unmatched brackets, CreateColumnByType must return nullptr.
     CreateColumnByTypeSettings create_column_settings;
     create_column_settings.low_cardinality_as_wrapped_column = true;
 
