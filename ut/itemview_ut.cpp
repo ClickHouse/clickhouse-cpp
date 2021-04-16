@@ -1,5 +1,6 @@
 #include <clickhouse/columns/itemview.h>
 #include <clickhouse/columns/numeric.h>
+#include <clickhouse/types/int128.h>
 
 #include <contrib/gtest/gtest.h>
 #include "utils.h"

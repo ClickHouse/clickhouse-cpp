@@ -1,5 +1,7 @@
 #include "decimal.h"
 
+#include "../types/int128.h"
+
 namespace
 {
 using namespace clickhouse;
@@ -117,6 +119,10 @@ ColumnDecimal::ColumnDecimal(TypeRef type, ColumnRef data)
 {
 }
 
+void ColumnDecimal::Append(Int64 value) {
+    Append(static_cast<Int128>(value));
+}
+
 void ColumnDecimal::Append(const Int128& value) {
     if (data_->Type()->GetCode() == Type::Int32) {
         data_->As<ColumnInt32>()->Append(static_cast<ColumnInt32::DataType>(value));
@@ -189,6 +195,10 @@ Int128 ColumnDecimal::At(size_t i) const {
         default:
             throw std::runtime_error("Invalid data_ column type in ColumnDecimal");
     }
+}
+
+Int64 ColumnDecimal::AtAsInt64(size_t i) const {
+    return static_cast<Int64>(At(i));
 }
 
 void ColumnDecimal::Append(ColumnRef column) {

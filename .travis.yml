@@ -49,10 +49,14 @@ before_install: |
   fi
 
 # Build steps
-script:
-  - eval "${MATRIX_EVAL}"
-  - mkdir build
-  - cd build
-  - cmake .. -DBUILD_TESTS=ON && make
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then ./ut/clickhouse-cpp-ut ; fi
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then ./ut/clickhouse-cpp-ut --gtest_filter=-"Client/*:*Performance*" ; fi
+script: |
+  eval "${MATRIX_EVAL}"
+  mkdir build
+  cd build
+  cmake .. -DBUILD_TESTS=ON && cmake --build . --target all
+  if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then ./ut/clickhouse-cpp-ut ; fi
+  if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then ./ut/clickhouse-cpp-ut --gtest_filter=-"Client/*:*Performance*" ; fi
+  # Test clients that do not have absl in the system still can be built
+  cmake --build . --target install . && cmake --build . --target clean
+  cd ./tests/simple && mkdir build && cd ./build
+  cmake .. -DBUILD_SAMPLE_WITH_INT128=ON -DCMAKE_CXX_STANDARD=17 -DCMAKE_CXX_STANDARD_REQUIRED=ON && cmake --build . --target all
