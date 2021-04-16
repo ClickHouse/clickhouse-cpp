@@ -44,15 +44,20 @@ before_install: |
     sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv E0C56BD4
     echo "deb https://repo.clickhouse.tech/deb/stable/ main/" | sudo tee \
         /etc/apt/sources.list.d/clickhouse.list
-    sudo apt-get update -q && sudo apt-get install -q -y --allow-unauthenticated clickhouse-server
+    sudo apt-get update -q
+    sudo apt-get install -q -y --allow-unauthenticated clickhouse-server
     sudo service clickhouse-server start
   fi
 
 # Build steps
-script:
-  - eval "${MATRIX_EVAL}"
-  - mkdir build
-  - cd build
-  - cmake .. -DBUILD_TESTS=ON && make
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then ./ut/clickhouse-cpp-ut ; fi
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then ./ut/clickhouse-cpp-ut --gtest_filter=-"Client/*:*Performance*" ; fi
+script: |
+  eval "${MATRIX_EVAL}"
+  mkdir build
+  cd build
+  cmake .. -DBUILD_TESTS=ON && cmake --build . --target all
+  if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then ./ut/clickhouse-cpp-ut ; fi
+  if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then ./ut/clickhouse-cpp-ut --gtest_filter=-"Client/*:*Performance*" ; fi
+  # Test clients that do not have absl in the system still can be built
+  cmake --install . && cmake --build . --target clean
+  cd ../tests/simple && mkdir build && cd ./build
+  cmake .. -DBUILD_SAMPLE_WITH_INT128=ON -DCMAKE_CXX_STANDARD=17 -DCMAKE_CXX_STANDARD_REQUIRED=ON && cmake --build . --target all

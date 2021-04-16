@@ -10,9 +10,9 @@ PROJECT (CLICKHOUSE-CLIENT)
 
     USE_CXX17()
 
-	IF ("${CMAKE_BUILD_TYPE}" STREQUAL "")
-		set(CMAKE_BUILD_TYPE "Debug")
-	ENDIF()
+    IF ("${CMAKE_BUILD_TYPE}" STREQUAL "")
+        set(CMAKE_BUILD_TYPE "Debug")
+    ENDIF()
 
     IF (UNIX)
         IF (APPLE)
@@ -43,4 +43,4 @@ PROJECT (CLICKHOUSE-CLIENT)
             tests/simple
             ut
         )
-	ENDIF (BUILD_TESTS)
+    ENDIF (BUILD_TESTS)

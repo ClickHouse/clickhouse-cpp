@@ -1,12 +1,15 @@
 #pragma once
 
-#include "absl/numeric/int128.h"
-
 #include <map>
 #include <memory>
 #include <string>
 #include <vector>
 #include <stdexcept>
+
+namespace absl
+{
+class int128;
+}
 
 namespace clickhouse {
 

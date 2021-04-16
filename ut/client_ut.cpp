@@ -1,6 +1,8 @@
 #include <clickhouse/client.h>
 #include <contrib/gtest/gtest.h>
 
+#include <clickhouse/types/int128.h>
+
 #include <cmath>
 
 using namespace clickhouse;

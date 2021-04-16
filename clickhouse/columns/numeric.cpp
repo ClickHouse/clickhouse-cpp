@@ -1,6 +1,8 @@
 #include "numeric.h"
 #include "utils.h"
 
+#include "../types/int128.h"
+
 namespace clickhouse {
 
 template <typename T>

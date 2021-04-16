@@ -1,7 +1,11 @@
 #pragma once
 
 #include "column.h"
-#include "absl/numeric/int128.h"
+
+namespace absl
+{
+class int128;
+}
 
 namespace clickhouse {
 
