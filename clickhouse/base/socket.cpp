@@ -213,6 +213,11 @@ size_t SocketInput::DoRead(void* buf, size_t len) {
             errno, std::system_category(), "closed"
         );
     }
+    
+    // should retry when errno is EAGAIN, EWOULDBLOCK or EINTR
+    if (ret < 0 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)) {
+        return DoRead(buf, len);
+    }
 
     throw std::system_error(
         errno, std::system_category(), "can't receive string data"
