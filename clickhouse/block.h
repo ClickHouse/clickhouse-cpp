@@ -41,10 +41,10 @@ public:
 public:
      Block();
      Block(size_t cols, size_t rows);
-    ~Block();
+    virtual ~Block();
 
     /// Append named column to the block.
-    void AppendColumn(const std::string& name, const ColumnRef& col);
+    virtual void AppendColumn(const std::string& name, const ColumnRef& col);
 
     /// Count of columns in the block.
     size_t GetColumnCount() const;
@@ -52,7 +52,7 @@ public:
     const BlockInfo& Info() const;
 
     /// Count of rows in the block.
-    size_t GetRowCount() const;
+    virtual size_t GetRowCount() const;
 
     size_t RefreshRowCount();
 
@@ -63,7 +63,7 @@ public:
     /// Reference to column by index in the block.
     ColumnRef operator [] (size_t idx) const;
 
-private:
+protected:
     struct ColumnItem {
         std::string name;
         ColumnRef   column;
