@@ -17,9 +17,9 @@ ColumnIPv6::ColumnIPv6(ColumnRef data)
     : Column(Type::CreateIPv6())
     , data_(data->As<ColumnFixedString>())
 {
-    if (data_->Size() != 0) {
-        throw std::runtime_error("number of entries must be even (two 64-bit numbers for each IPv6)");
-    }
+    // if (data_->Size() != 0) {
+    //     throw std::runtime_error("number of entries must be even (two 64-bit numbers for each IPv6)");
+    // }
 }
 
 void ColumnIPv6::Append(const std::string& ip) {
