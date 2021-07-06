@@ -19,9 +19,9 @@ ColumnIPv4::ColumnIPv4(ColumnRef data)
     : Column(Type::CreateIPv4())
     , data_(data->As<ColumnUInt32>())
 {
-    if (data_->Size() != 0) {
-        throw std::runtime_error("number of entries must be even (32-bit numbers for each IPv4)");
-    }
+    // if (data_->Size() != 0) {
+    //     throw std::runtime_error("number of entries must be even (32-bit numbers for each IPv4)");
+    // }
 }
 
 void ColumnIPv4::Append(const std::string& str) {
