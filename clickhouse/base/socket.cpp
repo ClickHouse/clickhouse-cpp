@@ -202,26 +202,28 @@ SocketInput::SocketInput(SOCKET s)
 SocketInput::~SocketInput() = default;
 
 size_t SocketInput::DoRead(void* buf, size_t len) {
-    const ssize_t ret = ::recv(s_, (char*)buf, (int)len, 0);
+    do {
+        const ssize_t ret = ::recv(s_, (char*)buf, (int)len, 0);
+        // should retry when errno is EAGAIN, EWOULDBLOCK or EINTR
+        if (ret < 0 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)) {
+            return DoRead(buf, len);
+        }
 
-    if (ret > 0) {
-        return (size_t)ret;
-    }
+        if (ret > 0) {
+            return (size_t)ret;
+        }
 
-    if (ret == 0) {
+        if (ret == 0) {
+            throw std::system_error(
+                errno, std::system_category(), "closed"
+            );
+        }
+
         throw std::system_error(
-            errno, std::system_category(), "closed"
+            errno, std::system_category(), "can't receive string data"
         );
-    }
+    } while (true);
     
-    // should retry when errno is EAGAIN, EWOULDBLOCK or EINTR
-    if (ret < 0 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)) {
-        return DoRead(buf, len);
-    }
-
-    throw std::system_error(
-        errno, std::system_category(), "can't receive string data"
-    );
 }
 
 
