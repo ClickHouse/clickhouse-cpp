@@ -25,11 +25,11 @@ ColumnIPv4::ColumnIPv4(ColumnRef data)
 }
 
 void ColumnIPv4::Append(const std::string& str) {
-    in_addr_t addr = inet_addr(str.c_str());
-    if (addr == INADDR_NONE) {
+    struct in_addr addr;
+    if (inet_aton(str.c_str(),&addr) == 0) {
         throw std::runtime_error("invalid IPv4 format, ip: " + str);
     }
-    data_->Append(htonl(addr));
+    data_->Append(htonl(addr.s_addr));
 }
 
 void ColumnIPv4::Append(uint32_t ip) {
