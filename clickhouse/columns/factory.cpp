@@ -161,6 +161,19 @@ static ColumnRef CreateColumnFromAst(const TypeAst& ast, CreateColumnByTypeSetti
                         return std::make_shared<LowCardinalitySerializationAdaptor<ColumnString>>();
                     case Type::FixedString:
                         return std::make_shared<LowCardinalitySerializationAdaptor<ColumnFixedString>>(nested.elements.front().value);
+                    case Type::Nullable:
+                    {
+                        auto nullable_nested = nested.elements.front();
+                        switch (nullable_nested.code)
+                        {
+                        case Type::String:
+                            return std::make_shared<LowCardinalitySerializationAdaptor<ColumnString>>();
+                        case Type::FixedString:
+                            return std::make_shared<LowCardinalitySerializationAdaptor<ColumnFixedString>>(nullable_nested.elements.front().value);
+                        default:
+                            throw std::runtime_error("LowCardinality(Nullable(" + nullable_nested.name + ")) is not supported");
+                        }
+                    }
                     default:
                         throw std::runtime_error("LowCardinality(" + nested.name + ") is not supported");
                 }
@@ -172,6 +185,19 @@ static ColumnRef CreateColumnFromAst(const TypeAst& ast, CreateColumnByTypeSetti
                         return std::make_shared<ColumnLowCardinalityT<ColumnString>>();
                     case Type::FixedString:
                         return std::make_shared<ColumnLowCardinalityT<ColumnFixedString>>(nested.elements.front().value);
+                    case Type::Nullable:
+                    {
+                        auto nullable_nested = nested.elements.front();
+                        switch (nullable_nested.code)
+                        {
+                        case Type::String:
+                            return std::make_shared<ColumnLowCardinalityT<ColumnString>>();
+                        case Type::FixedString:
+                            return std::make_shared<ColumnLowCardinalityT<ColumnFixedString>>(nullable_nested.elements.front().value);
+                        default:
+                            throw std::runtime_error("LowCardinality(Nullable(" + nullable_nested.name + ")) is not supported");
+                        }
+                    }
                     default:
                         throw std::runtime_error("LowCardinality(" + nested.name + ") is not supported");
                 }

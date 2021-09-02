@@ -120,8 +120,8 @@ inline auto GetNullItemForDictionary(const ColumnRef dictionary) {
 }
 
 namespace clickhouse {
-ColumnLowCardinality::ColumnLowCardinality(ColumnRef dictionary_column)
-    : Column(Type::CreateLowCardinality(dictionary_column->Type())),
+ColumnLowCardinality::ColumnLowCardinality(ColumnRef dictionary_column, bool is_nullable)
+    : Column(is_nullable ? Type::CreateLowCardinality(Type::CreateNullable(dictionary_column->Type())) : Type::CreateLowCardinality(dictionary_column->Type())),
       dictionary_column_(dictionary_column->Slice(0, 0)), // safe way to get an column of the same type.
       index_column_(std::make_shared<ColumnUInt32>())
 {

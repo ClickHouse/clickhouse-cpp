@@ -48,7 +48,7 @@ private:
 
 public:
     // c-tor makes a deep copy of the dictionary_column.
-    explicit ColumnLowCardinality(ColumnRef dictionary_column);
+    ColumnLowCardinality(ColumnRef dictionary_column, bool is_nullable = false);
     ~ColumnLowCardinality();
 
     /// Appends another LowCardinality column to the end of this one, updating dictionary.
