@@ -10,7 +10,7 @@
 
 namespace clickhouse {
 
-template <typename NestedColumnType>
+template <typename NestedColumnType, bool is_nullable=false>
 class ColumnLowCardinalityT;
 
 namespace details {
@@ -36,7 +36,7 @@ class ColumnLowCardinality : public Column {
 public:
     using UniqueItems = std::unordered_map<details::LowCardinalityHashKey, size_t /*dictionary index*/, details::LowCardinalityHashKeyHash>;
 
-    template <typename T>
+    template <typename T, bool is_nullable>
     friend class ColumnLowCardinalityT;
 
 private:
@@ -48,7 +48,7 @@ private:
 
 public:
     // c-tor makes a deep copy of the dictionary_column.
-    explicit ColumnLowCardinality(ColumnRef dictionary_column);
+    ColumnLowCardinality(ColumnRef dictionary_column, bool is_nullable=false);
     ~ColumnLowCardinality();
 
     /// Appends another LowCardinality column to the end of this one, updating dictionary.
@@ -92,7 +92,7 @@ public:
 
 /** Type-aware wrapper that provides simple convenience interface for accessing/appending individual items.
  */
-template <typename DictionaryColumnType>
+template <typename DictionaryColumnType, bool is_nullable>
 class ColumnLowCardinalityT : public ColumnLowCardinality {
 
     DictionaryColumnType& typed_dictionary_;
@@ -110,7 +110,7 @@ public:
 
     // Create LC<T> column from existing T-column, making a deep copy of all contents.
     explicit ColumnLowCardinalityT(std::shared_ptr<DictionaryColumnType> dictionary_col)
-        : ColumnLowCardinality(dictionary_col),
+        : ColumnLowCardinality(dictionary_col, is_nullable),
           typed_dictionary_(dynamic_cast<DictionaryColumnType &>(*GetDictionary())),
           type_(typed_dictionary_.Type()->GetCode())
     {}

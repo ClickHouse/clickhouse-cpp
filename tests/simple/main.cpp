@@ -147,10 +147,10 @@ inline void DateTime64Example(Client& client) {
 
     auto d = std::make_shared<ColumnDateTime64>(6);
     d->Append(std::time(nullptr) * 1000000 + 123456);
-    b.AppendColumn("d", d);
+    b.AppendColumn("dt64", d);
     client.Insert("test.datetime64", b);
 
-    client.Select("SELECT d FROM test.date", [](const Block& block)
+    client.Select("SELECT dt64 FROM test.datetime64", [](const Block& block)
         {
             for (size_t c = 0; c < block.GetRowCount(); ++c) {
                 auto col = block[0]->As<ColumnDateTime64>();
@@ -477,6 +477,99 @@ inline void IPExample(Client &client) {
     client.Execute("DROP TABLE test.ips");
 }
 
+inline void LowcardinalityString(Client& client) {
+    /// Create a table.
+    client.Execute("CREATE TABLE IF NOT EXISTS test.client (id UInt64, text LowCardinality(String)) ENGINE = Memory");
+
+    /// Insert some values.
+    {
+        Block block;
+
+        {
+            auto id = std::make_shared<ColumnUInt64>();
+            id->Append(1);
+            id->Append(2);
+
+            block.AppendColumn("id", id);
+        }
+
+        {
+            auto text = std::make_shared<ColumnString>();
+            text->Append("one");
+            text->Append("two");
+
+            auto lowcard_text = std::make_shared<ColumnLowCardinality>(text);
+            block.AppendColumn("text", lowcard_text);
+        }
+
+        client.Insert("test.client", block);
+    }
+
+    // Select values inserted in the previous step.
+    client.Select("SELECT id, text FROM test.client", [](const Block& block)
+        {
+            for (size_t c = 0; c < block.GetRowCount(); ++c) {
+                auto col_id   = block[0]->As<ColumnUInt64>();
+                std::cerr << "id " << col_id->At(c);
+
+                auto col_text = block[1]->As<ColumnString>();
+                std::cerr << " text " << col_text->GetItem(c).get<std::string_view>() << std::endl;
+            }
+        }
+    );
+
+    /// Delete table.
+    client.Execute("DROP TABLE test.client");
+}
+
+inline void LowcardinalityNullaleString(Client& client) {
+    /// Create a table.
+    client.Execute("CREATE TABLE IF NOT EXISTS test.client (id UInt64, text LowCardinality(Nullable(String))) ENGINE = Memory");
+
+    /// Insert some values.
+    {
+        Block block;
+
+        {
+            auto id = std::make_shared<ColumnUInt64>();
+            id->Append(1);
+            id->Append(2);
+            id->Append(3);
+
+            block.AppendColumn("id", id);
+        }
+
+        {
+            auto text = std::make_shared<ColumnString>();
+            text->Append("one");
+            text->Append("");
+            text->Append("three");
+
+            auto nulltext = std::make_shared<ColumnLowCardinality>(text, true);
+
+            block.AppendColumn("text", nulltext);
+        }
+
+        client.Insert("test.client", block);
+    }
+
+    // Select values inserted in the previous step.
+    client.Select("SELECT id, text FROM test.client", [](const Block& block)
+        {
+            for (size_t c = 0; c < block.GetRowCount(); ++c) {
+                auto col_id   = block[0]->As<ColumnUInt64>();
+                std::cerr << "id " << col_id->At(c);
+
+                auto col_text = block[1]->As<ColumnString>();
+                std::cerr << " text " << col_text->GetItem(c).get<std::string_view>() << std::endl;
+            }
+        }
+    );
+
+    /// Delete table.
+    client.Execute("DROP TABLE test.client");
+}
+
 static void RunTests(Client& client) {
     ArrayExample(client);
     CancelableExample(client);
@@ -491,6 +584,8 @@ static void RunTests(Client& client) {
     NullableExample(client);
     NumbersExample(client);
     SelectNull(client);
+    LowcardinalityString(client);
+    LowcardinalityNullaleString(client);
     ShowTables(client);
 }
 
