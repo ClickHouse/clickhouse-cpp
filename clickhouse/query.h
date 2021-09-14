@@ -6,6 +6,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <utility>
 
 namespace clickhouse {
 
@@ -63,7 +64,7 @@ struct Progress {
 class QueryEvents {
 public:
     virtual ~QueryEvents()
-    { }
+    = default;
 
     /// Some data was received.
     virtual void OnData(const Block& block) = 0;
@@ -83,41 +84,47 @@ using ExceptionCallback        = std::function<void(const Exception& e)>;
 using ProgressCallback         = std::function<void(const Progress& progress)>;
 using SelectCallback           = std::function<void(const Block& block)>;
 using SelectCancelableCallback = std::function<bool(const Block& block)>;
+using FinishCallback = std::function<void()>;
 
 
 class Query : public QueryEvents {
 public:
      Query();
-     Query(const char* query);
-     Query(const std::string& query);
-    ~Query();
+     explicit Query(const char* query);
+     explicit Query(const std::string& query);
+    ~Query() override;
 
     ///
-    inline std::string GetText() const {
+    [[nodiscard]] inline std::string GetText() const {
         return query_;
     }
 
     /// Set handler for receiving result data.
     inline Query& OnData(SelectCallback cb) {
-        select_cb_ = cb;
+        select_cb_ = std::move(cb);
         return *this;
     }
 
     inline Query& OnDataCancelable(SelectCancelableCallback cb) {
-        select_cancelable_cb_ = cb;
+        select_cancelable_cb_ = std::move(cb);
         return *this;
     }
 
     /// Set handler for receiving server's exception.
     inline Query& OnException(ExceptionCallback cb) {
-        exception_cb_ = cb;
+        exception_cb_ = std::move(cb);
         return *this;
     }
 
 
     /// Set handler for receiving a progress of query exceution.
     inline Query& OnProgress(ProgressCallback cb) {
-        progress_cb_ = cb;
+        progress_cb_ = std::move(cb);
+        return *this;
+    }
+
+    inline Query& OnFinish(FinishCallback cb){
+        finish_cb_ = std::move(cb);
         return *this;
     }
 
@@ -153,6 +160,9 @@ private:
     }
 
     void OnFinish() override {
+        if(finish_cb_){
+            finish_cb_();
+        }
     }
 
 private:
@@ -161,6 +171,7 @@ private:
     ProgressCallback progress_cb_;
     SelectCallback select_cb_;
     SelectCancelableCallback select_cancelable_cb_;
+    FinishCallback finish_cb_;
 };
 
 }
