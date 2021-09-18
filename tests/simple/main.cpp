@@ -442,6 +442,7 @@ inline void IPExample(Client &client) {
 
         auto v4 = std::make_shared<ColumnIPv4>();
         v4->Append("127.0.0.1");
+        v4->Append("255.255.255.255");
         v4->Append(3585395774);
         v4->Append(0);
 
