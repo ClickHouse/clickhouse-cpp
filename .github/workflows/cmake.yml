@@ -9,6 +9,7 @@ on:
 env:
   # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
   BUILD_TYPE: Release
+  CH_SERVER_VERSION: 21.3.17.2
 
 jobs:
   build:
@@ -30,13 +31,16 @@ jobs:
       # Build your program with the given configuration
       run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} --target all
 
-    - name: Setup ClickHouse
+    - name: Start ClickHouse server
       run: |
         sudo apt-get install apt-transport-https ca-certificates dirmngr
         sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv E0C56BD4
         echo "deb https://repo.clickhouse.com/deb/stable/ main/" | sudo tee /etc/apt/sources.list.d/clickhouse.list
         sudo apt-get update
-        sudo apt-get install -y clickhouse-server clickhouse-client
+        sudo apt-get install -y \
+            clickhouse-server=${{env.BUILD_TYPE}} \
+            clickhouse-client=${{env.BUILD_TYPE}} \
+            clickhouse-common-static=${{env.BUILD_TYPE}}
         sudo service clickhouse-server start
 
     - name: Test
