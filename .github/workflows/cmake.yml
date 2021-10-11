@@ -30,10 +30,19 @@ jobs:
       # Build your program with the given configuration
       run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} --target all
 
+    - name: Setup ClickHouse
+      run: |
+        sudo apt-get install apt-transport-https ca-certificates dirmngr
+        sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv E0C56BD4
+        echo "deb https://repo.clickhouse.com/deb/stable/ main/" | sudo tee /etc/apt/sources.list.d/clickhouse.list
+        sudo apt-get update
+        sudo apt-get install -y clickhouse-server clickhouse-client
+        sudo service clickhouse-server start
+
     - name: Test
       working-directory: ${{github.workspace}}/build/ut
       # Execute tests defined by the CMake configuration.  
       # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
       #run: ctest -C ${{env.BUILD_TYPE}}
       run: ./clickhouse-cpp-ut "${{env.GTEST_FILTER}}"
-      
+
