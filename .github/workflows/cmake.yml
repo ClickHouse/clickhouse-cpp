@@ -38,9 +38,9 @@ jobs:
         echo "deb https://repo.clickhouse.com/deb/stable/ main/" | sudo tee /etc/apt/sources.list.d/clickhouse.list
         sudo apt-get update
         sudo apt-get install -y \
-            clickhouse-server=${{env.BUILD_TYPE}} \
-            clickhouse-client=${{env.BUILD_TYPE}} \
-            clickhouse-common-static=${{env.BUILD_TYPE}}
+            clickhouse-server=${{env.CH_SERVER_VERSION}} \
+            clickhouse-client=${{env.CH_SERVER_VERSION}} \
+            clickhouse-common-static=${{env.CH_SERVER_VERSION}}
         sudo service clickhouse-server start
 
     - name: Test
