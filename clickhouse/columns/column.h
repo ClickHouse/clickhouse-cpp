@@ -6,6 +6,7 @@
 #include "../columns/itemview.h"
 
 #include <memory>
+#include <stdexcept>
 
 namespace clickhouse {
 
