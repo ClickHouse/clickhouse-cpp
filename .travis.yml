@@ -38,17 +38,25 @@ matrix:
       osx_image: xcode9.4
       compiler: clang
 
-before_install:
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then echo 'deb http://repo.yandex.ru/clickhouse/deb/stable main/' | sudo tee /etc/apt/sources.list.d/clickhouse.list ; fi
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then sudo apt-key adv --keyserver keyserver.ubuntu.com --recv E0C56BD4 ; fi
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then sudo apt-get update -q && sudo apt-get install -q -y --allow-unauthenticated clickhouse-server-common ; fi
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then sudo service clickhouse-server start ; fi
+before_install: |
+  if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
+    export CH_SERVER_VERSION="21.3.17.2"
+    sudo apt-get install apt-transport-https ca-certificates dirmngr
+    sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv E0C56BD4
+    echo "deb https://repo.clickhouse.com/deb/stable/ main/" | sudo tee /etc/apt/sources.list.d/clickhouse.list
+    sudo apt-get update
+    sudo apt-get install -y \
+        clickhouse-server=${CH_SERVER_VERSION} \
+        clickhouse-client=${CH_SERVER_VERSION} \
+        clickhouse-common-static=${CH_SERVER_VERSION}
+    sudo service clickhouse-server start
+  fi
 
 # Build steps
-script:
-  - eval "${MATRIX_EVAL}"
-  - mkdir build
-  - cd build
-  - cmake .. -DBUILD_TESTS=ON && make
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then ./ut/clickhouse-cpp-ut ; fi
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then ./ut/clickhouse-cpp-ut --gtest_filter=-"Client/*:*Performance*" ; fi
+script: |
+  eval "${MATRIX_EVAL}"
+  mkdir build
+  cd build
+  cmake .. -DBUILD_TESTS=ON && make
+  if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then ./ut/clickhouse-cpp-ut ; fi
+  if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then ./ut/clickhouse-cpp-ut --gtest_filter=-"Client/*:*Performance*" ; fi
