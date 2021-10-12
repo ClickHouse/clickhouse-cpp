@@ -3,6 +3,7 @@
 #include "../types/types.h"
 
 #include <string_view>
+#include <stdexcept>
 
 namespace clickhouse {
 
