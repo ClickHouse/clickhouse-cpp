@@ -20,15 +20,17 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        os: [ubuntu-latest, ubuntu-latest]
+        build: [gcc-7, clang-6]
         include:
-        - os: ubuntu-latest
-          C-COMPILER: gcc-7
-          CXX-COMPILER: g++-7
+        - build: gcc-7
+          os: ubuntu-latest
+          C_COMPILER: gcc-7
+          CXX_COMPILER: g++-7
 
-        - os: ubuntu-latest
-          C-COMPILER: clang++-6
-          CXX-COMPILER: clang++-6
+        - build: clang-6
+          os: ubuntu-latest
+          C_COMPILER: clang++-6
+          CXX_COMPILER: clang++-6
 
     steps:
     - uses: actions/checkout@v2
