@@ -31,8 +31,8 @@ jobs:
         - build: clang-6
           os: ubuntu-latest
           INSTALL: clang-6.0
-          C_COMPILER: clang-6
-          CXX_COMPILER: clang++-6
+          C_COMPILER: clang-6.0
+          CXX_COMPILER: clang++-6.0
 
     steps:
     - uses: actions/checkout@v2
