@@ -24,11 +24,13 @@ jobs:
         include:
         - build: gcc-7
           os: ubuntu-latest
+          INSTALL: gcc-7
           C_COMPILER: gcc-7
           CXX_COMPILER: g++-7
 
         - build: clang-6
           os: ubuntu-latest
+          INSTALL: clang-6.0
           C_COMPILER: clang-6
           CXX_COMPILER: clang++-6
 
@@ -37,8 +39,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        sudo apt-get install -y \
-          ${{ matrix.C_COMPILER }}
+        sudo apt-get install -y ${{ matrix.INSTALL }}
 
     - name: Configure CMake
       # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
