@@ -169,6 +169,15 @@ void SocketHolder::SetTcpKeepAlive(int idle, int intvl, int cnt) noexcept {
 #endif
 }
 
+void SocketHolder::SetTcpNoDelay(bool nodelay) noexcept {
+    int val = nodelay;
+#if defined(_unix_)
+    setsockopt(handle_, IPPROTO_TCP, TCP_NODELAY, &val, sizeof(val));
+#else
+    setsockopt(handle_, IPPROTO_TCP, TCP_NODELAY, (const char*)&val, sizeof(val));
+#endif
+}
+
 SocketHolder& SocketHolder::operator = (SocketHolder&& other) noexcept {
     if (this != &other) {
         Close();
@@ -304,11 +313,10 @@ SOCKET SocketConnect(const NetworkAddress& addr) {
 
 ssize_t Poll(struct pollfd* fds, int nfds, int timeout) noexcept {
 #if defined(_win_)
-    int rval = WSAPoll(fds, nfds, timeout);
+    return WSAPoll(fds, nfds, timeout);
 #else
     return poll(fds, nfds, timeout);
 #endif
-    return -1;
 }
 
 }

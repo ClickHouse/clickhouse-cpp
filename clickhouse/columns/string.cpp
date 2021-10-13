@@ -31,7 +31,13 @@ ColumnFixedString::ColumnFixedString(size_t n)
 }
 
 void ColumnFixedString::Append(std::string_view str) {
-    if (data_.capacity() < str.size())
+    if (str.size() > string_size_) {
+        throw std::runtime_error("Expected string of length not greater than "
+                                 + std::to_string(string_size_) + " bytes, received "
+                                 + std::to_string(str.size()) + " bytes.");
+    }
+
+    if (data_.capacity() - data_.size() < str.size())
     {
         // round up to the next block size
         const auto new_size = (((data_.size() + string_size_) / DEFAULT_BLOCK_SIZE) + 1) * DEFAULT_BLOCK_SIZE;
@@ -39,6 +45,9 @@ void ColumnFixedString::Append(std::string_view str) {
     }
 
     data_.insert(data_.size(), str);
+    // Pad up to string_size_ with zeroes.
+    const auto padding_size = string_size_ - str.size();
+    data_.resize(data_.size() + padding_size, char(0));
 }
 
 void ColumnFixedString::Clear() {
@@ -85,7 +94,7 @@ size_t ColumnFixedString::Size() const {
     return data_.size() / string_size_;
 }
 
-ColumnRef ColumnFixedString::Slice(size_t begin, size_t len) {
+ColumnRef ColumnFixedString::Slice(size_t begin, size_t len) const {
     auto result = std::make_shared<ColumnFixedString>(string_size_);
 
     if (begin < Size()) {
@@ -246,7 +255,7 @@ size_t ColumnString::Size() const {
     return items_.size();
 }
 
-ColumnRef ColumnString::Slice(size_t begin, size_t len) {
+ColumnRef ColumnString::Slice(size_t begin, size_t len) const {
     auto result = std::make_shared<ColumnString>();
 
     if (begin < items_.size()) {

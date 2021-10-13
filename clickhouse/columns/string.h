@@ -18,6 +18,14 @@ public:
 
     explicit ColumnFixedString(size_t n);
 
+    template <typename Values>
+    ColumnFixedString(size_t n, const Values & values)
+        : ColumnFixedString(n)
+    {
+        for (const auto & v : values)
+            Append(v);
+    }
+
     /// Appends one element to the column.
     void Append(std::string_view str);
 
@@ -47,7 +55,7 @@ public:
     size_t Size() const override;
 
     /// Makes slice of the current column.
-    ColumnRef Slice(size_t begin, size_t len) override;
+    ColumnRef Slice(size_t begin, size_t len) const override;
 
     void Swap(Column& other) override;
 
@@ -99,7 +107,7 @@ public:
     size_t Size() const override;
 
     /// Makes slice of the current column.
-    ColumnRef Slice(size_t begin, size_t len) override;
+    ColumnRef Slice(size_t begin, size_t len) const override;
     void Swap(Column& other) override;
     ItemView GetItem(size_t) const override;
 

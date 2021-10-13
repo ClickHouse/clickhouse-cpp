@@ -3,6 +3,7 @@ ADD_EXECUTABLE (clickhouse-cpp-ut
 
     client_ut.cpp
     columns_ut.cpp
+    itemview_ut.cpp
     socket_ut.cpp
     stream_ut.cpp
     type_parser_ut.cpp

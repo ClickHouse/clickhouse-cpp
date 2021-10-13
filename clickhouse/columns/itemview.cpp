@@ -3,51 +3,69 @@
 namespace clickhouse {
 
 void ItemView::ValidateData(Type::Code type, DataType data) {
-    static const int ANY = -1; // value can be of any size
-    static const int ERR = -2; // value is not allowed inside ItemView
-    static const int value_size_by_type[] = {
-        0,   /*Void*/
-        1,   /*Int8*/
-        2,   /*Int16*/
-        4,   /*Int32*/
-        8,   /*Int64*/
-        1,   /*UInt8*/
-        2,   /*UInt16*/
-        4,   /*UInt32*/
-        8,   /*UInt64*/
-        4,   /*Float32*/
-        8,   /*Float64*/
-        ANY, /*String*/
-        ANY, /*FixedString*/
-        4,   /*DateTime*/
-        2,   /*Date*/
-        ERR, /*Array*/
-        ERR, /*Nullable*/
-        ERR, /*Tuple*/
-        1,   /*Enum8*/
-        2,   /*Enum16*/
-        16,  /*UUID*/
-        4,   /*IPv4*/
-        8,   /*IPv6*/
-        16,  /*Int128*/
-        16,  /*Decimal*/
-        4,   /*Decimal32*/
-        8,   /*Decimal64*/
-        16,  /*Decimal128*/
-        ERR, /*LowCardinality*/
-    };
+    int expected_size = 0;
+    switch (type) {
+        case Type::Code::Void:
+            expected_size = 0;
+            break;
 
-    if (type >= sizeof(value_size_by_type)/sizeof(value_size_by_type[0]) || type < 0) {
-        throw std::runtime_error("Unknon type code:" + std::to_string(static_cast<int>(type)));
-    } else {
-        const auto expected_size = value_size_by_type[type];
-        if (expected_size == ERR) {
+        case Type::Code::Int8:
+        case Type::Code::UInt8:
+        case Type::Code::Enum8:
+            expected_size = 1;
+            break;
+
+        case Type::Code::Int16:
+        case Type::Code::UInt16:
+        case Type::Code::Date:
+        case Type::Code::Enum16:
+            expected_size = 2;
+            break;
+
+        case Type::Code::Int32:
+        case Type::Code::UInt32:
+        case Type::Code::Float32:
+        case Type::Code::DateTime:
+        case Type::Code::IPv4:
+        case Type::Code::Decimal32:
+            expected_size = 4;
+            break;
+
+        case Type::Code::Int64:
+        case Type::Code::UInt64:
+        case Type::Code::Float64:
+        case Type::Code::DateTime64:
+        case Type::Code::IPv6:
+        case Type::Code::Decimal64:
+            expected_size = 8;
+            break;
+
+        case Type::Code::String:
+        case Type::Code::FixedString:
+            // value can be of any size
+            return;
+
+        case Type::Code::Array:
+        case Type::Code::Nullable:
+        case Type::Code::Tuple:
+        case Type::Code::LowCardinality:
             throw std::runtime_error("Unsupported type in ItemView: " + std::to_string(static_cast<int>(type)));
-        } else if (expected_size != ANY && expected_size != static_cast<int>(data.size())) {
-            throw std::runtime_error("Value size mismatch for type "
-                    + std::to_string(static_cast<int>(type)) + " expected: "
-                    + std::to_string(expected_size) + ", got: " + std::to_string(data.size()));
-        }
+
+        case Type::Code::UUID:
+        case Type::Code::Int128:
+        case Type::Code::Decimal:
+        case Type::Code::Decimal128:
+            expected_size = 16;
+            break;
+
+        default:
+            throw std::runtime_error("Unknon type code:" + std::to_string(static_cast<int>(type)));
+    }
+
+    if (expected_size != static_cast<int>(data.size())) {
+        throw std::runtime_error("Value size mismatch for type "
+                + std::to_string(static_cast<int>(type)) + " expected: "
+                + std::to_string(expected_size) + ", got: " + std::to_string(data.size()));
     }
 }
 

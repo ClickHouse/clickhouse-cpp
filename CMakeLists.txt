@@ -28,6 +28,7 @@ PROJECT (CLICKHOUSE-CLIENT)
 
     SUBDIRS (
         clickhouse
+        contrib/absl
         contrib/cityhash
         contrib/lz4
     )

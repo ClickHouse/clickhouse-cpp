@@ -23,6 +23,16 @@
 
 namespace clickhouse {
 
+struct ServerInfo {
+    std::string name;
+    std::string timezone;
+    std::string display_name;
+    uint64_t    version_major;
+    uint64_t    version_minor;
+    uint64_t    version_patch;
+    uint64_t    revision;
+};
+
 /// Methods of block compression.
 enum class CompressionMethod {
     None    = -1,
@@ -40,7 +50,7 @@ struct ClientOptions {
     /// Hostname of the server.
     DECLARE_FIELD(host, std::string, SetHost, std::string());
     /// Service port.
-    DECLARE_FIELD(port, int, SetPort, 9000);
+    DECLARE_FIELD(port, unsigned int, SetPort, 9000);
 
     /// Default database.
     DECLARE_FIELD(default_database, std::string, SetDefaultDatabase, "default");
@@ -57,7 +67,7 @@ struct ClientOptions {
     /// Ping server every time before execute any query.
     DECLARE_FIELD(ping_before_query, bool, SetPingBeforeQuery, false);
     /// Count of retry to send request to server.
-    DECLARE_FIELD(send_retries, int, SetSendRetries, 1);
+    DECLARE_FIELD(send_retries, unsigned int, SetSendRetries, 1);
     /// Amount of time to wait before next retry.
     DECLARE_FIELD(retry_timeout, std::chrono::seconds, SetRetryTimeout, std::chrono::seconds(5));
 
@@ -68,7 +78,18 @@ struct ClientOptions {
     DECLARE_FIELD(tcp_keepalive, bool, TcpKeepAlive, false);
     DECLARE_FIELD(tcp_keepalive_idle, std::chrono::seconds, SetTcpKeepAliveIdle, std::chrono::seconds(60));
     DECLARE_FIELD(tcp_keepalive_intvl, std::chrono::seconds, SetTcpKeepAliveInterval, std::chrono::seconds(5));
-    DECLARE_FIELD(tcp_keepalive_cnt, int, SetTcpKeepAliveCount, 3);
+    DECLARE_FIELD(tcp_keepalive_cnt, unsigned int, SetTcpKeepAliveCount, 3);
+
+    // TCP options
+    DECLARE_FIELD(tcp_nodelay, bool, TcpNoDelay, true);
+
+    /** It helps to ease migration of the old codebases, which can't afford to switch
+    * to using ColumnLowCardinalityT or ColumnLowCardinality directly,
+    * but still want to benefit from smaller on-wire LowCardinality bandwidth footprint.
+    *
+    * @see LowCardinalitySerializationAdaptor, CreateColumnByType
+    */
+    DECLARE_FIELD(backward_compatibility_lowcardinality_as_wrapped_column, bool, SetBakcwardCompatibilityFeatureLowCardinalityAsWrappedColumn, true);
 
 #undef DECLARE_FIELD
 };
@@ -105,6 +126,8 @@ public:
 
     /// Reset connection with initial params.
     void ResetConnection();
+
+    const ServerInfo& GetServerInfo() const;
 
 private:
     ClientOptions options_;

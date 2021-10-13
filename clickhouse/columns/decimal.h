@@ -23,9 +23,12 @@ public:
     void Save(CodedOutputStream* output) override;
     void Clear() override;
     size_t Size() const override;
-    ColumnRef Slice(size_t begin, size_t len) override;
+    ColumnRef Slice(size_t begin, size_t len) const override;
     void Swap(Column& other) override;
     ItemView GetItem(size_t index) const override;
+
+    size_t GetScale() const;
+    size_t GetPrecision() const;
 
 private:
     /// Depending on a precision it can be one of:
@@ -34,7 +37,7 @@ private:
     ///  - ColumnInt128
     ColumnRef data_;
 
-    explicit ColumnDecimal(TypeRef type); // for `Slice(…)`
+    explicit ColumnDecimal(TypeRef type, ColumnRef data);
 };
 
 }

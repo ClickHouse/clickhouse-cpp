@@ -74,7 +74,7 @@ size_t ColumnIPv6::Size() const {
     return data_->Size();
 }
 
-ColumnRef ColumnIPv6::Slice(size_t begin, size_t len) {
+ColumnRef ColumnIPv6::Slice(size_t begin, size_t len) const {
     return std::make_shared<ColumnIPv6>(data_->Slice(begin, len));
 }
 

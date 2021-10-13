@@ -55,7 +55,7 @@ size_t ColumnUUID::Size() const {
     return data_->Size() / 2;
 }
 
-ColumnRef ColumnUUID::Slice(size_t begin, size_t len) {
+ColumnRef ColumnUUID::Slice(size_t begin, size_t len) const {
     return std::make_shared<ColumnUUID>(data_->Slice(begin * 2, len * 2));
 }
 

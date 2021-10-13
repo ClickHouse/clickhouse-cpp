@@ -1,11 +1,17 @@
 #pragma once
 
+#include "absl/numeric/int128.h"
+
 #include <map>
 #include <memory>
 #include <string>
 #include <vector>
+#include <stdexcept>
 
 namespace clickhouse {
+
+using Int128 = absl::int128;
+using Int64 = int64_t;
 
 using TypeRef = std::shared_ptr<class Type>;
 
@@ -41,6 +47,7 @@ public:
         Decimal64,
         Decimal128,
         LowCardinality,
+        DateTime64,
     };
 
     using EnumItem = std::pair<std::string /* name */, int16_t /* value */>;
@@ -74,7 +81,9 @@ public:
 
     static TypeRef CreateDate();
 
-    static TypeRef CreateDateTime();
+    static TypeRef CreateDateTime(std::string timezone = std::string());
+
+    static TypeRef CreateDateTime64(size_t precision, std::string timezone = std::string());
 
     static TypeRef CreateDecimal(size_t precision, size_t scale);
 
@@ -137,11 +146,47 @@ public:
     DecimalType(size_t precision, size_t scale);
 
     std::string GetName() const;
+    friend class EnumType;
+    friend class DateTimeType;
 
     inline size_t GetScale() const { return scale_; }
+    inline size_t GetPrecision() const { return precision_; }
 
 private:
     const size_t precision_, scale_;
+};
+
+namespace details
+{
+class TypeWithTimeZoneMixin
+{
+public:
+    TypeWithTimeZoneMixin(std::string timezone);
+
+    /// Timezone associated with a data column.
+    const std::string & Timezone() const;
+
+private:
+    std::string timezone_;
+};
+}
+
+class DateTimeType : public Type, public details::TypeWithTimeZoneMixin {
+public:
+    explicit DateTimeType(std::string timezone);
+
+    std::string GetName() const;
+};
+
+class DateTime64Type: public Type, public details::TypeWithTimeZoneMixin {
+public:
+    explicit DateTime64Type(size_t precision, std::string timezone_);
+
+    std::string GetName() const;
+
+    inline size_t GetPrecision() const { return precision_; }
+private:
+    size_t precision_;
 };
 
 class EnumType : public Type {
@@ -240,7 +285,7 @@ inline TypeRef Type::CreateSimple<int64_t>() {
 }
 
 template <>
-inline TypeRef Type::CreateSimple<__int128>() {
+inline TypeRef Type::CreateSimple<Int128>() {
     return TypeRef(new Type(Int128));
 }
 

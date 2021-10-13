@@ -26,10 +26,10 @@ private:
     inline auto ConvertToStorageValue(const T& t) {
         if constexpr (std::is_same_v<std::string_view, T> || std::is_same_v<std::string, T>) {
             return std::string_view{t};
-        } else if constexpr (std::is_fundamental_v<T>) {
+        } else if constexpr (std::is_fundamental_v<T> || std::is_same_v<Int128, std::decay_t<T>>) {
             return std::string_view{reinterpret_cast<const char*>(&t), sizeof(T)};
         } else {
-            // will caue error at compile-time
+            static_assert(!std::is_same_v<T, T>, "Unknown type, which can't be stored in ItemView");
             return;
         }
     }
@@ -55,7 +55,7 @@ public:
     T get() const {
         if constexpr (std::is_same_v<std::string_view, T> || std::is_same_v<std::string, T>) {
             return data;
-        } else if constexpr (std::is_fundamental_v<T>) {
+        } else if constexpr (std::is_fundamental_v<T> || std::is_same_v<Int128, T>) {
             if (sizeof(T) == data.size()) {
                 return *reinterpret_cast<const T*>(data.data());
             } else {

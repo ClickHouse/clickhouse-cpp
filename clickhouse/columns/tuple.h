@@ -37,7 +37,7 @@ public:
     size_t Size() const override;
 
     /// Makes slice of the current column.
-    ColumnRef Slice(size_t, size_t) override { return ColumnRef(); }
+    ColumnRef Slice(size_t, size_t) const override { return ColumnRef(); }
     void Swap(Column& other) override;
 
 private:

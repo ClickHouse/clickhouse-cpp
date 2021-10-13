@@ -10,9 +10,16 @@ ColumnVector<T>::ColumnVector()
 }
 
 template <typename T>
-ColumnVector<T>::ColumnVector(const std::vector<T>& data)
+ColumnVector<T>::ColumnVector(const std::vector<T> & data)
     : Column(Type::CreateSimple<T>())
     , data_(data)
+{
+}
+
+template <typename T>
+ColumnVector<T>::ColumnVector(std::vector<T> && data)
+    : Column(Type::CreateSimple<T>())
+    , data_(std::move(data))
 {
 }
 
@@ -69,7 +76,7 @@ size_t ColumnVector<T>::Size() const {
 }
 
 template <typename T>
-ColumnRef ColumnVector<T>::Slice(size_t begin, size_t len) {
+ColumnRef ColumnVector<T>::Slice(size_t begin, size_t len) const {
     return std::make_shared<ColumnVector<T>>(SliceVector(data_, begin, len));
 }
 

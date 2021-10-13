@@ -1,6 +1,7 @@
 #pragma once
 
 #include "column.h"
+#include "absl/numeric/int128.h"
 
 namespace clickhouse {
 
@@ -15,6 +16,7 @@ public:
     ColumnVector();
 
     explicit ColumnVector(const std::vector<T>& data);
+    explicit ColumnVector(std::vector<T> && data);
 
     /// Appends one element to the end of column.
     void Append(const T& value);
@@ -44,7 +46,7 @@ public:
     size_t Size() const override;
 
     /// Makes slice of the current column.
-    ColumnRef Slice(size_t begin, size_t len) override;
+    ColumnRef Slice(size_t begin, size_t len) const override;
     void Swap(Column& other) override;
 
     ItemView GetItem(size_t index) const override;
@@ -53,7 +55,8 @@ private:
     std::vector<T> data_;
 };
 
-using Int128 = __int128;
+using Int128 = absl::int128;
+using Int64 = int64_t;
 
 using ColumnUInt8   = ColumnVector<uint8_t>;
 using ColumnUInt16  = ColumnVector<uint16_t>;

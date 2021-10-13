@@ -53,12 +53,12 @@ public:
     virtual size_t Size() const = 0;
 
     /// Makes slice of the current column.
-    virtual ColumnRef Slice(size_t begin, size_t len) = 0;
+    virtual ColumnRef Slice(size_t begin, size_t len) const = 0;
 
     virtual void Swap(Column&) = 0;
 
     /// Get a view on raw item data if it is supported by column, will throw an exception if index is out of range.
-    /// Please note that view is invalidated once column is items are added or deleted, column is loaded from strean or destroyed.
+    /// Please note that view is invalidated once column items are added or deleted, column is loaded from strean or destroyed.
     virtual ItemView GetItem(size_t) const {
         throw std::runtime_error("GetItem() is not supported for column of " + type_->GetName());
     }

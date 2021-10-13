@@ -35,7 +35,7 @@ public:
 	std::nullptr_t operator [] (size_t) const { return nullptr; };
 
     /// Makes slice of the current column.
-    ColumnRef Slice(size_t, size_t len) override {
+    ColumnRef Slice(size_t, size_t len) const override {
 		return std::make_shared<ColumnNothing>(len);
 	}
 

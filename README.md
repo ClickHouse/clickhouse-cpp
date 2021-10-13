@@ -1,13 +1,14 @@
 ClickHouse C++ client [![Build Status](https://travis-ci.org/ClickHouse/clickhouse-cpp.svg?branch=master)](https://travis-ci.org/ClickHouse/clickhouse-cpp)
 =====
 
-C++ client for [Yandex ClickHouse](https://clickhouse.yandex/)
+C++ client for [ClickHouse](https://clickhouse.tech/).
 
 ## Supported data types
 
 * Array(T)
 * Date
-* DateTime
+* DateTime, DateTime64
+* DateTime([timezone]), DateTime64(N, [timezone])
 * Decimal32, Decimal64, Decimal128
 * Enum8, Enum16
 * FixedString(N)
@@ -15,8 +16,11 @@ C++ client for [Yandex ClickHouse](https://clickhouse.yandex/)
 * IPv4, IPv6
 * Nullable(T)
 * String
+* LowCardinality(String) or LowCardinality(FixedString(N))
 * Tuple
 * UInt8, UInt16, UInt32, UInt64, Int8, Int16, Int32, Int64
+* Int128
+* UUID
 
 ## Building
 
