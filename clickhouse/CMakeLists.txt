@@ -100,3 +100,4 @@ INSTALL(FILES columns/uuid.h DESTINATION include/clickhouse/columns/)
 # types
 INSTALL(FILES types/type_parser.h DESTINATION include/clickhouse/types/)
 INSTALL(FILES types/types.h DESTINATION include/clickhouse/types/)
+INSTALL(FILES types/int128.h DESTINATION include/clickhouse/types/)

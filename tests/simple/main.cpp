@@ -2,6 +2,10 @@
 #include <clickhouse/error_codes.h>
 #include <clickhouse/types/type_parser.h>
 
+#if WITH_INT128
+#include <clickhouse/types/int128.h>
+#endif
+
 #include <stdexcept>
 #include <iostream>
 #include <cmath>
@@ -145,12 +149,15 @@ inline void DateTime64Example(Client& client) {
     /// Create a table.
     client.Execute("CREATE TABLE IF NOT EXISTS test.datetime64 (dt64 DateTime64(6)) ENGINE = Memory");
 
-    auto d = std::make_shared<ColumnDateTime64>(6);
-    d->Append(std::time(nullptr) * 1000000 + 123456);
-    b.AppendColumn("d", d);
+    {
+        auto dt64 = std::make_shared<ColumnDateTime64>(6);
+        dt64->Append(std::time(nullptr) * 1000000 + 123456);
+        b.AppendColumn("dt64", dt64);
+    }
+
     client.Insert("test.datetime64", b);
 
-    client.Select("SELECT d FROM test.date", [](const Block& block)
+    client.Select("SELECT dt64 FROM test.datetime64", [](const Block& block)
         {
             for (size_t c = 0; c < block.GetRowCount(); ++c) {
                 auto col = block[0]->As<ColumnDateTime64>();
@@ -183,7 +190,7 @@ inline void DecimalExample(Client& client) {
         {
             for (size_t c = 0; c < block.GetRowCount(); ++c) {
                 auto col = block[0]->As<ColumnDecimal>();
-                cout << (int)col->At(c) << endl;
+                cout << (int)col->AtAsInt64(c) << endl;
             }
         }
     );
@@ -192,7 +199,7 @@ inline void DecimalExample(Client& client) {
         {
             for (size_t c = 0; c < block.GetRowCount(); ++c) {
                 auto col = block[0]->As<ColumnDecimal>();
-                cout << (int)col->At(c) << endl;
+                cout << (int)col->AtAsInt64(c) << endl;
             }
         }
     );
@@ -478,6 +485,7 @@ inline void IPExample(Client &client) {
 }
 
 static void RunTests(Client& client) {
+    client.Execute("CREATE DATABASE IF NOT EXISTS test");
     ArrayExample(client);
     CancelableExample(client);
     DateExample(client);

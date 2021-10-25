@@ -1,5 +1,7 @@
 #include "date.h"
 
+#include "../types/int128.h"
+
 namespace clickhouse {
 
 ColumnDate::ColumnDate()

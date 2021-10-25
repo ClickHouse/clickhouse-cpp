@@ -7,6 +7,7 @@
 #include <clickhouse/columns/numeric.h>
 #include <clickhouse/columns/string.h>
 #include <clickhouse/columns/uuid.h>
+#include <clickhouse/types/int128.h>
 
 #include <contrib/gtest/gtest.h>
 #include "utils.h"

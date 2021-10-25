@@ -12,10 +12,12 @@ class ColumnDecimal : public Column {
 public:
     ColumnDecimal(size_t precision, size_t scale);
 
+    void Append(Int64 value); /// When Int128 is not supported by\not available to users.
     void Append(const Int128& value);
     void Append(const std::string& value);
 
     Int128 At(size_t i) const;
+    Int64 AtAsInt64(size_t i) const; /// result will overflow if value doesn't fit into Int64.
 
 public:
     void Append(ColumnRef column) override;

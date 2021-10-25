@@ -16,6 +16,7 @@
 #include "uuid.h"
 
 #include "../types/type_parser.h"
+#include "../types/int128.h"
 
 #include <stdexcept>
 
