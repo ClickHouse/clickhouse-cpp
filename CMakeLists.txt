@@ -2,17 +2,20 @@ CMAKE_MINIMUM_REQUIRED(VERSION 3.0.2)
 
 INCLUDE (cmake/cpp17.cmake)
 INCLUDE (cmake/subdirs.cmake)
+INCLUDE (cmake/openssl.cmake)
 
 OPTION(BUILD_BENCHMARK "Build benchmark" OFF)
 OPTION(BUILD_TESTS "Build tests" OFF)
+OPTION(WITH_OPENSSL "Use OpenSSL for TLS connections" OFF)
 
 PROJECT (CLICKHOUSE-CLIENT)
 
     USE_CXX17()
+    USE_OPENSSL()
 
-	IF ("${CMAKE_BUILD_TYPE}" STREQUAL "")
-		set(CMAKE_BUILD_TYPE "Debug")
-	ENDIF()
+    IF ("${CMAKE_BUILD_TYPE}" STREQUAL "")
+        set(CMAKE_BUILD_TYPE "Debug")
+    ENDIF()
 
     IF (UNIX)
         IF (APPLE)
@@ -43,4 +46,4 @@ PROJECT (CLICKHOUSE-CLIENT)
             tests/simple
             ut
         )
-	ENDIF (BUILD_TESTS)
+    ENDIF (BUILD_TESTS)

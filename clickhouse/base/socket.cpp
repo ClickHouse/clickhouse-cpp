@@ -73,10 +73,66 @@ void SetNonBlock(SOCKET fd, bool value) {
 #endif
 }
 
+ssize_t Poll(struct pollfd* fds, int nfds, int timeout) noexcept {
+#if defined(_win_)
+    return WSAPoll(fds, nfds, timeout);
+#else
+    return poll(fds, nfds, timeout);
+#endif
+}
+
+SOCKET SocketConnect(const NetworkAddress& addr) {
+    int last_err = 0;
+    for (auto res = addr.Info(); res != nullptr; res = res->ai_next) {
+        SOCKET s(socket(res->ai_family, res->ai_socktype, res->ai_protocol));
+
+        if (s == -1) {
+            continue;
+        }
+
+        SetNonBlock(s, true);
+
+        if (connect(s, res->ai_addr, (int)res->ai_addrlen) != 0) {
+            int err = errno;
+            if (err == EINPROGRESS || err == EAGAIN || err == EWOULDBLOCK) {
+                pollfd fd;
+                fd.fd = s;
+                fd.events = POLLOUT;
+                fd.revents = 0;
+                ssize_t rval = Poll(&fd, 1, 5000);
+
+                if (rval == -1) {
+                    throw std::system_error(errno, std::system_category(), "fail to connect");
+                }
+                if (rval > 0) {
+                    socklen_t len = sizeof(err);
+                    getsockopt(s, SOL_SOCKET, SO_ERROR, (char*)&err, &len);
+
+                    if (!err) {
+                        SetNonBlock(s, false);
+                        return s;
+                    }
+                   last_err = err;
+                }
+            }
+        } else {
+            SetNonBlock(s, false);
+            return s;
+        }
+    }
+    if (last_err > 0) {
+        throw std::system_error(last_err, std::system_category(), "fail to connect");
+    }
+    throw std::system_error(
+        errno, std::system_category(), "fail to connect"
+    );
+}
+
 } // namespace
 
 NetworkAddress::NetworkAddress(const std::string& host, const std::string& port)
-    : info_(nullptr)
+    : host_(host),
+      info_(nullptr)
 {
     struct addrinfo hints;
     memset(&hints, 0, sizeof(hints));
@@ -112,29 +168,37 @@ NetworkAddress::~NetworkAddress() {
 const struct addrinfo* NetworkAddress::Info() const {
     return info_;
 }
-
-
-SocketHolder::SocketHolder()
-    : handle_(-1)
-{
+const std::string & NetworkAddress::Host() const {
+    return host_;
 }
 
-SocketHolder::SocketHolder(SOCKET s)
-    : handle_(s)
-{
-}
 
-SocketHolder::SocketHolder(SocketHolder&& other) noexcept
+Socket::Socket(const NetworkAddress& addr)
+    : handle_(SocketConnect(addr))
+{}
+
+Socket::Socket(Socket&& other) noexcept
     : handle_(other.handle_)
 {
     other.handle_ = -1;
 }
 
-SocketHolder::~SocketHolder() {
+Socket& Socket::operator=(Socket&& other) noexcept {
+    if (this != &other) {
+        Close();
+
+        handle_ = other.handle_;
+        other.handle_ = -1;
+    }
+
+    return *this;
+}
+
+Socket::~Socket() {
     Close();
 }
 
-void SocketHolder::Close() noexcept {
+void Socket::Close() {
     if (handle_ != -1) {
 #if defined(_win_)
         closesocket(handle_);
@@ -145,11 +209,7 @@ void SocketHolder::Close() noexcept {
     }
 }
 
-bool SocketHolder::Closed() const noexcept {
-    return handle_ == -1;
-}
-
-void SocketHolder::SetTcpKeepAlive(int idle, int intvl, int cnt) noexcept {
+void Socket::SetTcpKeepAlive(int idle, int intvl, int cnt) noexcept {
     int val = 1;
 
 #if defined(_unix_)
@@ -169,7 +229,7 @@ void SocketHolder::SetTcpKeepAlive(int idle, int intvl, int cnt) noexcept {
 #endif
 }
 
-void SocketHolder::SetTcpNoDelay(bool nodelay) noexcept {
+void Socket::SetTcpNoDelay(bool nodelay) noexcept {
     int val = nodelay;
 #if defined(_unix_)
     setsockopt(handle_, IPPROTO_TCP, TCP_NODELAY, &val, sizeof(val));
@@ -178,21 +238,13 @@ void SocketHolder::SetTcpNoDelay(bool nodelay) noexcept {
 #endif
 }
 
-SocketHolder& SocketHolder::operator = (SocketHolder&& other) noexcept {
-    if (this != &other) {
-        Close();
-
-        handle_ = other.handle_;
-        other.handle_ = -1;
-    }
-
-    return *this;
+std::unique_ptr<InputStream> Socket::makeInputStream() const {
+    return std::make_unique<SocketInput>(handle_);
 }
 
-SocketHolder::operator SOCKET () const noexcept {
-    return handle_;
+std::unique_ptr<OutputStream> Socket::makeOutputStream() const {
+    return std::make_unique<SocketOutput>(handle_);
 }
-
 
 SocketInput::SocketInput(SOCKET s)
     : s_(s)
@@ -260,63 +312,6 @@ NetrworkInitializer::NetrworkInitializer() {
 
 
     (void)Singleton<NetrworkInitializerImpl>();
-}
-
-
-SOCKET SocketConnect(const NetworkAddress& addr) {
-    int last_err = 0;
-    for (auto res = addr.Info(); res != nullptr; res = res->ai_next) {
-        SOCKET s(socket(res->ai_family, res->ai_socktype, res->ai_protocol));
-
-        if (s == -1) {
-            continue;
-        }
-
-        SetNonBlock(s, true);
-
-        if (connect(s, res->ai_addr, (int)res->ai_addrlen) != 0) {
-            int err = errno;
-            if (err == EINPROGRESS || err == EAGAIN || err == EWOULDBLOCK) {
-                pollfd fd;
-                fd.fd = s;
-                fd.events = POLLOUT;
-                fd.revents = 0;
-                ssize_t rval = Poll(&fd, 1, 5000);
-
-                if (rval == -1) {
-                    throw std::system_error(errno, std::system_category(), "fail to connect");
-                }
-                if (rval > 0) {
-                    socklen_t len = sizeof(err);
-                    getsockopt(s, SOL_SOCKET, SO_ERROR, (char*)&err, &len);
-
-                    if (!err) {
-                        SetNonBlock(s, false);
-                        return s;
-                    }
-                   last_err = err;
-                }
-            }
-        } else {
-            SetNonBlock(s, false);
-            return s;
-        }
-    }
-    if (last_err > 0) {
-        throw std::system_error(last_err, std::system_category(), "fail to connect");
-    }
-    throw std::system_error(
-        errno, std::system_category(), "fail to connect"
-    );
-}
-
-
-ssize_t Poll(struct pollfd* fds, int nfds, int timeout) noexcept {
-#if defined(_win_)
-    return WSAPoll(fds, nfds, timeout);
-#else
-    return poll(fds, nfds, timeout);
-#endif
 }
 
 }

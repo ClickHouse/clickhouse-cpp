@@ -31,6 +31,10 @@ SET ( clickhouse-cpp-lib-src
     query.cpp
 )
 
+if (WITH_OPENSSL)
+    LIST(APPEND clickhouse-cpp-lib-src base/sslsocket.cpp)
+endif()
+
 ADD_LIBRARY (clickhouse-cpp-lib SHARED ${clickhouse-cpp-lib-src})
 SET_TARGET_PROPERTIES(clickhouse-cpp-lib PROPERTIES LINKER_LANGUAGE CXX)
 TARGET_LINK_LIBRARIES (clickhouse-cpp-lib
@@ -100,3 +104,8 @@ INSTALL(FILES columns/uuid.h DESTINATION include/clickhouse/columns/)
 # types
 INSTALL(FILES types/type_parser.h DESTINATION include/clickhouse/types/)
 INSTALL(FILES types/types.h DESTINATION include/clickhouse/types/)
+
+if (WITH_OPENSSL)
+    target_link_libraries(clickhouse-cpp-lib OpenSSL::SSL)
+    target_link_libraries(clickhouse-cpp-lib-static OpenSSL::SSL)
+endif()
