@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <ratio>
+#include <vector>
 #include <ostream>
 #include <vector>
 

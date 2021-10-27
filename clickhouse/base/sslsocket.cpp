@@ -203,8 +203,8 @@ SSLSocketOutput::SSLSocketOutput(SSL *ssl)
     : ssl_(ssl)
 {}
 
-void SSLSocketOutput::DoWrite(const void* data, size_t len) {
-    HANDLE_SSL_ERROR(ssl_, SSL_write(ssl_, data, len));
+size_t SSLSocketOutput::DoWrite(const void* data, size_t len) {
+    return static_cast<size_t>(HANDLE_SSL_ERROR(ssl_, SSL_write(ssl_, data, len)));
 }
 
 #undef HANDLE_SSL_ERROR

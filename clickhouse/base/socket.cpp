@@ -271,6 +271,10 @@ size_t SocketInput::DoRead(void* buf, size_t len) {
     );
 }
 
+bool SocketInput::Skip(size_t /*bytes*/) {
+    return false;
+}
+
 
 SocketOutput::SocketOutput(SOCKET s)
     : s_(s)
@@ -279,7 +283,7 @@ SocketOutput::SocketOutput(SOCKET s)
 
 SocketOutput::~SocketOutput() = default;
 
-void SocketOutput::DoWrite(const void* data, size_t len) {
+size_t SocketOutput::DoWrite(const void* data, size_t len) {
 #if defined (_linux_)
     static const int flags = MSG_NOSIGNAL;
 #else
@@ -288,9 +292,11 @@ void SocketOutput::DoWrite(const void* data, size_t len) {
 
     if (::send(s_, (const char*)data, (int)len, flags) != (int)len) {
         throw std::system_error(
-            errno, std::system_category(), "fail to send data"
+            errno, std::system_category(), "fail to send " + std::to_string(len) + " bytes of data"
         );
     }
+
+    return len;
 }
 
 

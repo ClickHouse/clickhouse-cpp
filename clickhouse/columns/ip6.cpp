@@ -62,11 +62,11 @@ void ColumnIPv6::Append(ColumnRef column) {
     }
 }
 
-bool ColumnIPv6::Load(CodedInputStream* input, size_t rows) {
+bool ColumnIPv6::Load(InputStream* input, size_t rows) {
     return data_->Load(input, rows);
 }
 
-void ColumnIPv6::Save(CodedOutputStream* output) {
+void ColumnIPv6::Save(OutputStream* output) {
     data_->Save(output);
 }
 

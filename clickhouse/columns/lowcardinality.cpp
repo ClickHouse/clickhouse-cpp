@@ -191,7 +191,7 @@ void ColumnLowCardinality::Append(ColumnRef col) {
 
 namespace {
 
-auto Load(ColumnRef new_dictionary_column, CodedInputStream* input, size_t rows) {
+auto Load(ColumnRef new_dictionary_column, InputStream* input, size_t rows) {
     // This code tries to follow original implementation of ClickHouse's LowCardinality serialization with
     // NativeBlockOutputStream::writeData() for DataTypeLowCardinality
     // (see corresponding serializeBinaryBulkStateSuffix, serializeBinaryBulkStatePrefix, and serializeBinaryBulkWithMultipleStreams),
@@ -250,7 +250,7 @@ auto Load(ColumnRef new_dictionary_column, CodedInputStream* input, size_t rows)
 
 }
 
-bool ColumnLowCardinality::Load(CodedInputStream* input, size_t rows) {
+bool ColumnLowCardinality::Load(InputStream* input, size_t rows) {
     try {
         auto [new_dictionary, new_index, new_unique_items_map] = ::Load(dictionary_column_->Slice(0, 0), input, rows);
 
@@ -264,7 +264,7 @@ bool ColumnLowCardinality::Load(CodedInputStream* input, size_t rows) {
     }
 }
 
-void ColumnLowCardinality::Save(CodedOutputStream* output) {
+void ColumnLowCardinality::Save(OutputStream* output) {
     // prefix
     const uint64_t version = static_cast<uint64_t>(KeySerializationVersion::SharedDictionariesWithAdditionalKeys);
     WireFormat::WriteFixed(output, version);

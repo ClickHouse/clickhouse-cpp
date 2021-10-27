@@ -127,8 +127,7 @@ TYPED_TEST_P(ColumnPerformanceTest, SaveAndLoad) {
 
         for (int i = 0; i < LOAD_AND_SAVE_REPEAT_TIMES; ++i) {
             buffer.clear();
-            BufferOutput bufferOutput(&buffer);
-            CodedOutputStream ostr(&bufferOutput);
+            BufferOutput ostr(&buffer);
 
             Timer timer;
             column.Save(&ostr);
@@ -147,8 +146,7 @@ TYPED_TEST_P(ColumnPerformanceTest, SaveAndLoad) {
         Timer::DurationType total{0};
 
         for (int i = 0; i < LOAD_AND_SAVE_REPEAT_TIMES; ++i) {
-            ArrayInput arrayInput(buffer.data(), buffer.size());
-            CodedInputStream istr(&arrayInput);
+            ArrayInput istr(buffer.data(), buffer.size());
             column.Clear();
 
             Timer timer;

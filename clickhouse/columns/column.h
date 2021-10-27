@@ -1,7 +1,5 @@
 #pragma once
 
-#include "../base/coded.h"
-#include "../base/input.h"
 #include "../types/types.h"
 #include "../columns/itemview.h"
 
@@ -9,6 +7,9 @@
 #include <stdexcept>
 
 namespace clickhouse {
+
+class InputStream;
+class OutputStream;
 
 using ColumnRef = std::shared_ptr<class Column>;
 
@@ -41,10 +42,10 @@ public:
     virtual void Append(ColumnRef column) = 0;
 
     /// Loads column data from input stream.
-    virtual bool Load(CodedInputStream* input, size_t rows) = 0;
+    virtual bool Load(InputStream* input, size_t rows) = 0;
 
     /// Saves column data to output stream.
-    virtual void Save(CodedOutputStream* output) = 0;
+    virtual void Save(OutputStream* output) = 0;
 
     /// Clear column data .
     virtual void Clear() = 0;

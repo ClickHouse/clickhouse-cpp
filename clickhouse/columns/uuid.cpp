@@ -43,11 +43,11 @@ void ColumnUUID::Append(ColumnRef column) {
     }
 }
 
-bool ColumnUUID::Load(CodedInputStream* input, size_t rows) {
+bool ColumnUUID::Load(InputStream* input, size_t rows) {
     return data_->Load(input, rows * 2);
 }
 
-void ColumnUUID::Save(CodedOutputStream* output) {
+void ColumnUUID::Save(OutputStream* output) {
     data_->Save(output);
 }
 

@@ -1,4 +1,5 @@
 #include "array.h"
+#include "numeric.h"
 #include <stdexcept>
 
 namespace clickhouse {
@@ -54,7 +55,7 @@ void ColumnArray::Append(ColumnRef column) {
     }
 }
 
-bool ColumnArray::Load(CodedInputStream* input, size_t rows) {
+bool ColumnArray::Load(InputStream* input, size_t rows) {
     if (!rows) {
         return true;
     }
@@ -67,7 +68,7 @@ bool ColumnArray::Load(CodedInputStream* input, size_t rows) {
     return true;
 }
 
-void ColumnArray::Save(CodedOutputStream* output) {
+void ColumnArray::Save(OutputStream* output) {
     offsets_->Save(output);
     data_->Save(output);
 }
