@@ -1053,37 +1053,37 @@ INSTANTIATE_TEST_CASE_P(
     }
 ));
 
-// Special test that require properly configured TLS-enabled version of CH running locally
-INSTANTIATE_TEST_CASE_P(
-    LocalhostTLS_None, ReadonlyClientTest,
-    ::testing::Values(std::tuple<ClientOptions, std::vector<std::string> > {
-        ClientOptions()
-            .SetHost("127.0.0.1")
-            .SetPort(9440)
-            .SetUser("default")
-            .SetPingBeforeQuery(true)
-            .SetCompressionMethod(CompressionMethod::None)
-            .SetSSLOptions(ClientOptions::SSLOptions()
-                    .PathToCADirectory("./CA/")
-                    .UseSNI(false)),
-        QUERIES
-    }
-));
+//// Special test that require properly configured TLS-enabled version of CH running locally
+//INSTANTIATE_TEST_CASE_P(
+//    LocalhostTLS_None, ReadonlyClientTest,
+//    ::testing::Values(std::tuple<ClientOptions, std::vector<std::string> > {
+//        ClientOptions()
+//            .SetHost("127.0.0.1")
+//            .SetPort(9440)
+//            .SetUser("default")
+//            .SetPingBeforeQuery(true)
+//            .SetCompressionMethod(CompressionMethod::None)
+//            .SetSSLOptions(ClientOptions::SSLOptions()
+//                    .PathToCADirectory("./CA/")
+//                    .UseSNI(false)),
+//        QUERIES
+//    }
+//));
 
-INSTANTIATE_TEST_CASE_P(
-    LocalhostTLS_LZ4, ReadonlyClientTest,
-    ::testing::Values(std::tuple<ClientOptions, std::vector<std::string> > {
-        ClientOptions()
-            .SetHost("127.0.0.1")
-            .SetPort(9440)
-            .SetUser("default")
-            .SetPingBeforeQuery(true)
-            .SetCompressionMethod(CompressionMethod::LZ4)
-            .SetSSLOptions(ClientOptions::SSLOptions()
-                    .PathToCADirectory("./CA/")
-                    .UseSNI(false)),
-        QUERIES
-    }
-));
+//INSTANTIATE_TEST_CASE_P(
+//    LocalhostTLS_LZ4, ReadonlyClientTest,
+//    ::testing::Values(std::tuple<ClientOptions, std::vector<std::string> > {
+//        ClientOptions()
+//            .SetHost("127.0.0.1")
+//            .SetPort(9440)
+//            .SetUser("default")
+//            .SetPingBeforeQuery(true)
+//            .SetCompressionMethod(CompressionMethod::LZ4)
+//            .SetSSLOptions(ClientOptions::SSLOptions()
+//                    .PathToCADirectory("./CA/")
+//                    .UseSNI(false)),
+//        QUERIES
+//    }
+//));
 
 #endif

@@ -1,7 +1,6 @@
 #include "client.h"
 #include "protocol.h"
 
-#include "base/coded.h"
 #include "base/compressed.h"
 #include "base/socket.h"
 #include "base/wire_format.h"
