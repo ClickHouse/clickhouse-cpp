@@ -18,7 +18,7 @@
 #include <sstream>
 #include <stdexcept>
 
-#if WITH_OPENSSL
+#if defined(WITH_OPENSSL)
 #include "base/sslsocket.h"
 #endif
 
@@ -65,7 +65,7 @@ std::ostream& operator<<(std::ostream& os, const ClientOptions& opt) {
        << " retry_timeout:" << opt.retry_timeout.count()
        << " compression_method:"
        << (opt.compression_method == CompressionMethod::LZ4 ? "LZ4" : "None");
-#if WITH_OPENSSL
+#if defined(WITH_OPENSSL)
     if (opt.ssl_options.use_ssl) {
         const auto & ssl_options = opt.ssl_options;
         os << " SSL ("
@@ -166,7 +166,7 @@ private:
 
     std::unique_ptr<Socket> socket_;
 
-#if WITH_OPENSSL
+#if defined(WITH_OPENSSL)
     std::unique_ptr<SSLContext> ssl_context_;
 #endif
 
@@ -304,7 +304,7 @@ void Client::Impl::ResetConnection() {
     std::unique_ptr<Socket> socket;
 
     const auto address = NetworkAddress(options_.host, std::to_string(options_.port));
-#if WITH_OPENSSL
+#if defined(WITH_OPENSSL)
     // TODO: maybe do not re-create context multiple times upon reconnection - that doesn't make sense.
     std::unique_ptr<SSLContext> ssl_context;
     if (options_.ssl_options.use_ssl) {
@@ -355,7 +355,7 @@ void Client::Impl::ResetConnection() {
     std::swap(output, output_);
     std::swap(socket, socket_);
 
-#if WITH_OPENSSL
+#if defined(WITH_OPENSSL)
     std::swap(ssl_context_, ssl_context);
 #endif
 

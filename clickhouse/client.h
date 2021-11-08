@@ -21,7 +21,7 @@
 #include <ostream>
 #include <string>
 
-#if WITH_OPENSSL
+#if defined(WITH_OPENSSL)
 typedef struct ssl_ctx_st SSL_CTX;
 #endif
 
@@ -95,7 +95,17 @@ struct ClientOptions {
     */
     DECLARE_FIELD(backward_compatibility_lowcardinality_as_wrapped_column, bool, SetBakcwardCompatibilityFeatureLowCardinalityAsWrappedColumn, true);
 
-#if WITH_OPENSSL
+    /** Set max size data to compress if compression enabled.
+     *
+     *  Allows choosing tradeoff betwen RAM\CPU:
+     *  - Lower value reduces RAM usage, but slightly increases CPU usage.
+     *  - Higher value increases RAM usage but slightly decreases CPU usage.
+     *
+     *  Default is 0, use natural implementation-defined chunk size.
+     */
+    DECLARE_FIELD(max_compression_chunk_size, unsigned int, SetMaxCompressionChunkSize, 65535);
+
+#if defined(WITH_OPENSSL)
     struct SSLOptions {
         bool use_ssl = true; // not expected to be set manually.
 
@@ -110,7 +120,7 @@ struct ClientOptions {
          *  other options, like path_to_ca_files, path_to_ca_directory, use_default_ca_locations, etc.
          */
         SSL_CTX * ssl_context = nullptr;
-        auto & UseExternalSSLContext(SSL_CTX * new_ssl_context) {
+        auto & SetExternalSSLContext(SSL_CTX * new_ssl_context) {
             ssl_context = new_ssl_context;
             return *this;
         }
@@ -120,31 +130,31 @@ struct ClientOptions {
          *  See https://www.openssl.org/docs/man1.1.1/man3/SSL_CTX_set_default_verify_paths.html
         */
         /// Load deafult CA certificates from deafult locations.
-        DECLARE_FIELD(use_default_ca_locations, bool, UseDefaultCaLocations, true);
+        DECLARE_FIELD(use_default_ca_locations, bool, SetUseDefaultCALocations, true);
         /// Path to the CA files to verify server certificate, may be empty.
-        DECLARE_FIELD(path_to_ca_files, std::vector<std::string>, PathToCAFiles, {});
+        DECLARE_FIELD(path_to_ca_files, std::vector<std::string>, SetPathToCAFiles, {});
         /// Path to the directory with CA files used to validate server certificate, may be empty.
-        DECLARE_FIELD(path_to_ca_directory, std::string, PathToCADirectory, "");
+        DECLARE_FIELD(path_to_ca_directory, std::string, SetPathToCADirectory, "");
 
         /** Min and max protocol versions to use, set with SSL_CTX_set_min_proto_version and SSL_CTX_set_max_proto_version
          *  for details see https://www.openssl.org/docs/man1.1.1/man3/SSL_CTX_set_min_proto_version.html
          */
-        DECLARE_FIELD(min_protocol_version, int, MinProtocolVersion, DEFAULT_VALUE);
-        DECLARE_FIELD(max_protocol_version, int, MaxProtocolVersion, DEFAULT_VALUE);
+        DECLARE_FIELD(min_protocol_version, int, SetMinProtocolVersion, DEFAULT_VALUE);
+        DECLARE_FIELD(max_protocol_version, int, SetMaxProtocolVersion, DEFAULT_VALUE);
 
         /** Options to be set with SSL_CTX_set_options,
          * for details see https://www.openssl.org/docs/man1.1.1/man3/SSL_CTX_set_options.html
         */
-        DECLARE_FIELD(context_options, int, ContextOptions, DEFAULT_VALUE);
+        DECLARE_FIELD(context_options, int, SetContextOptions, DEFAULT_VALUE);
 
         /** Use SNI at ClientHello and verify that certificate is issued to the hostname we are trying to connect to
          */
-        DECLARE_FIELD(use_sni, bool, UseSNI, true);
+        DECLARE_FIELD(use_sni, bool, SetUseSNI, true);
 
         static const int DEFAULT_VALUE = -1;
     };
 
-    // By default SSL is turned off.
+    // By default SSL is turned off, hence the `{false}`
     DECLARE_FIELD(ssl_options, SSLOptions, SetSSLOptions, {false});
 #endif
 

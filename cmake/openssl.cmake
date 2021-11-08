@@ -1,9 +1,8 @@
 MACRO (USE_OPENSSL)
 
-    if (WITH_OPENSSL)
-        find_package(OpenSSL REQUIRED)
-        message("Found OpenSSL version: ${OPENSSL_VERSION} at ${OPENSSL_INCLUDE_DIR}")
-        add_compile_definitions(WITH_OPENSSL=1)
-    endif()
+    IF (WITH_OPENSSL)
+        FIND_PACKAGE (OpenSSL REQUIRED)
+        ADD_COMPILE_DEFINITIONS (WITH_OPENSSL=1)
+    ENDIF ()
 
-ENDMACRO(USE_OPENSSL)
+ENDMACRO ()

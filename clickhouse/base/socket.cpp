@@ -131,8 +131,8 @@ SOCKET SocketConnect(const NetworkAddress& addr) {
 } // namespace
 
 NetworkAddress::NetworkAddress(const std::string& host, const std::string& port)
-    : host_(host),
-      info_(nullptr)
+    : host_(host)
+    , info_(nullptr)
 {
     struct addrinfo hints;
     memset(&hints, 0, sizeof(hints));

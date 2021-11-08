@@ -2,6 +2,8 @@
 
 #include "socket.h"
 
+#include <memory>
+
 typedef struct ssl_ctx_st SSL_CTX;
 typedef struct ssl_st SSL;
 
@@ -23,7 +25,7 @@ class SSLContext
 public:
     explicit SSLContext(SSL_CTX & context);
     explicit SSLContext(const SSLParams & context_params);
-    ~SSLContext();
+    ~SSLContext() = default;
 
     SSLContext(const SSLContext &) = delete;
     SSLContext& operator=(const SSLContext &) = delete;
@@ -35,14 +37,14 @@ private:
     SSL_CTX * getContext();
 
 private:
-    SSL_CTX * const context_;
+    std::unique_ptr<SSL_CTX, void (*)(SSL_CTX*)> context_;
 };
 
 class SSLSocket : public Socket {
 public:
     explicit SSLSocket(const NetworkAddress& addr, const SSLParams & ssl_params, SSLContext& context);
     SSLSocket(SSLSocket &&) = default;
-    ~SSLSocket();
+    ~SSLSocket() = default;
 
     SSLSocket(const SSLSocket & ) = delete;
     SSLSocket& operator=(const SSLSocket & ) = delete;
@@ -51,30 +53,33 @@ public:
     std::unique_ptr<OutputStream> makeOutputStream() const override;
 
 private:
-    SSL *ssl_;
+    std::unique_ptr<SSL, void (*)(SSL *s)> ssl_ptr_;
+    SSL *ssl_; // for convinience with SSL API
 };
 
 class SSLSocketInput : public InputStream {
 public:
     explicit SSLSocketInput(SSL *ssl);
-    ~SSLSocketInput();
+    ~SSLSocketInput() = default;
 
 protected:
     size_t DoRead(void* buf, size_t len) override;
 
 private:
+    // Not owning
     SSL *ssl_;
 };
 
 class SSLSocketOutput : public OutputStream {
 public:
     explicit SSLSocketOutput(SSL *ssl);
-    ~SSLSocketOutput();
+    ~SSLSocketOutput() = default;
 
 protected:
     void DoWrite(const void* data, size_t len) override;
 
 private:
+    // Not owning
     SSL *ssl_;
 };
 

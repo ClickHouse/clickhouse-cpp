@@ -3,8 +3,13 @@
 #include <chrono>
 #include <ratio>
 #include <ostream>
+#include <vector>
 
 #include <time.h>
+
+namespace clickhouse {
+    class Block;
+}
 
 template <typename ChronoDurationType>
 struct Timer
@@ -43,7 +48,7 @@ private:
 };
 
 template <typename R>
-const char * getPrefix() {
+inline const char * getPrefix() {
     const char * prefix = "?";
     if constexpr (std::ratio_equal_v<R, std::nano>) {
         prefix = "n";
@@ -64,7 +69,39 @@ const char * getPrefix() {
 
 namespace std {
 template <typename R, typename P>
-ostream & operator<<(ostream & ostr, const chrono::duration<R, P> & d) {
+inline ostream & operator<<(ostream & ostr, const chrono::duration<R, P> & d) {
     return ostr << d.count() << ::getPrefix<P>() << "s";
 }
 }
+
+template <typename MeasureFunc>
+class MeasuresCollector {
+public:
+    using Result = std::result_of_t<MeasureFunc()>;
+    explicit MeasuresCollector(MeasureFunc && measurment_func, const size_t preallocate_results = 10)
+        : measurment_func_(std::move(measurment_func))
+    {
+        results_.reserve(preallocate_results);
+    }
+
+    template <typename NameType>
+    void Add(NameType && name) {
+        results_.emplace_back(name, measurment_func_());
+    }
+
+    const auto & GetResults() const {
+        return results_;
+    }
+
+private:
+    MeasureFunc measurment_func_;
+    std::vector<std::pair<std::string, Result>> results_;
+};
+
+template <typename MeasureFunc>
+MeasuresCollector<MeasureFunc> collect(MeasureFunc && f)
+{
+    return MeasuresCollector<MeasureFunc>(std::forward<MeasureFunc>(f));
+}
+
+std::ostream& operator<<(std::ostream & ostr, const clickhouse::Block & block);

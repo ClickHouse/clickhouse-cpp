@@ -4,9 +4,9 @@ INCLUDE (cmake/cpp17.cmake)
 INCLUDE (cmake/subdirs.cmake)
 INCLUDE (cmake/openssl.cmake)
 
-OPTION(BUILD_BENCHMARK "Build benchmark" OFF)
-OPTION(BUILD_TESTS "Build tests" OFF)
-OPTION(WITH_OPENSSL "Use OpenSSL for TLS connections" OFF)
+OPTION (BUILD_BENCHMARK "Build benchmark" OFF)
+OPTION (BUILD_TESTS "Build tests" OFF)
+OPTION (WITH_OPENSSL "Use OpenSSL for TLS connections" OFF)
 
 PROJECT (CLICKHOUSE-CLIENT)
 
@@ -14,20 +14,20 @@ PROJECT (CLICKHOUSE-CLIENT)
     USE_OPENSSL()
 
     IF ("${CMAKE_BUILD_TYPE}" STREQUAL "")
-        set(CMAKE_BUILD_TYPE "Debug")
+        SET (CMAKE_BUILD_TYPE "Debug")
     ENDIF()
 
     IF (UNIX)
         IF (APPLE)
             SET (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -Wall -Wextra -Werror")
         ELSE ()
-            SET (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -pthread -Wall -Wextra -Werror")
+            SET (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -Wall -Wextra -Werror")
         ENDIF ()
         SET (CMAKE_EXE_LINKER_FLAGS, "${CMAKE_EXE_LINKER_FLAGS} -lpthread")
     ENDIF ()
 
-    INCLUDE_DIRECTORIES(.)
-    INCLUDE_DIRECTORIES(contrib)
+    INCLUDE_DIRECTORIES (.)
+    INCLUDE_DIRECTORIES (contrib)
 
     SUBDIRS (
         clickhouse

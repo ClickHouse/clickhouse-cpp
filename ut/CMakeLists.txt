@@ -1,4 +1,4 @@
-ADD_EXECUTABLE (clickhouse-cpp-ut
+SET ( clickhouse-cpp-ut-src
     main.cpp
 
     client_ut.cpp
@@ -12,6 +12,16 @@ ADD_EXECUTABLE (clickhouse-cpp-ut
     performance_tests.cpp
     tcp_server.cpp
     utils.cpp
+    readonly_client_ut.cpp
+    connection_failed_client_ut.cpp
+)
+
+IF (WITH_OPENSSL)
+    LIST (APPEND clickhouse-cpp-ut-src ssl_ut.cpp)
+ENDIF ()
+
+ADD_EXECUTABLE (clickhouse-cpp-ut
+    ${clickhouse-cpp-ut-src}
 )
 
 TARGET_LINK_LIBRARIES (clickhouse-cpp-ut

@@ -30,7 +30,7 @@ struct addrinfo;
 
 namespace clickhouse {
 
-/**
+/** Address of a host to establish connection to.
  *
  */
 class NetworkAddress {

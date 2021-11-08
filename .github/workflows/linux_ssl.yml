@@ -12,5 +12,5 @@ jobs:
     uses: Enmk/clickhouse-cpp/.github/workflows/linux.yml@master
     with:
       extra_cmake_flags: -DWITH_OPENSSL=ON
-      extra_install: libssl1.1 libssl-dev
-      gtest_args: --gtest_filter="-*LocalhostTLS*"
+      extra_install: libssl-dev
+#      gtest_args: --gtest_filter="-*LocalhostTLS*"
