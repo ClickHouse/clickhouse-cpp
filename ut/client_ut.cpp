@@ -2,7 +2,6 @@
 #include <contrib/gtest/gtest.h>
 
 #include <cmath>
-#include <initializer_list>
 
 using namespace clickhouse;
 

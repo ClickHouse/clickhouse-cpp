@@ -12,8 +12,8 @@ SET ( clickhouse-cpp-ut-src
     performance_tests.cpp
     tcp_server.cpp
     utils.cpp
-    readonly_client_ut.cpp
-    connection_failed_client_ut.cpp
+    readonly_client_test.cpp
+    connection_failed_client_test.cpp
 )
 
 IF (WITH_OPENSSL)

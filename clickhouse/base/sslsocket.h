@@ -53,8 +53,7 @@ public:
     std::unique_ptr<OutputStream> makeOutputStream() const override;
 
 private:
-    std::unique_ptr<SSL, void (*)(SSL *s)> ssl_ptr_;
-    SSL *ssl_; // for convinience with SSL API
+    std::unique_ptr<SSL, void (*)(SSL *s)> ssl_;
 };
 
 class SSLSocketInput : public InputStream {

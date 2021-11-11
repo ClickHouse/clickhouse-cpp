@@ -120,9 +120,9 @@ SSL_CTX * SSLContext::getContext() {
 }
 
 // Allows caller to use returned value of `statement` if there was no error, throws exception otherwise.
-#define HANDLE_SSL_ERROR(statement) [&] { \
+#define HANDLE_SSL_ERROR(SSL_PTR, statement) [&] { \
     if (const auto ret_code = (statement); ret_code <= 0) { \
-        throwSSLError(ssl_, SSL_get_error(ssl_, ret_code), LOCATION, #statement); \
+        throwSSLError(SSL_PTR, SSL_get_error(SSL_PTR, ret_code), LOCATION, #statement); \
         return static_cast<decltype(ret_code)>(0); \
     } \
     else \
@@ -137,25 +137,25 @@ SSL_CTX * SSLContext::getContext() {
 */
 SSLSocket::SSLSocket(const NetworkAddress& addr, const SSLParams & ssl_params, SSLContext& context)
     : Socket(addr)
-    , ssl_ptr_(SSL_new(context.getContext()), &SSL_free)
-    , ssl_(ssl_ptr_.get())
+    , ssl_(SSL_new(context.getContext()), &SSL_free)
 {
-    if (!ssl_)
+    auto ssl = ssl_.get();
+    if (!ssl)
         throw std::runtime_error("Failed to create SSL instance");
 
-    HANDLE_SSL_ERROR(SSL_set_fd(ssl_, handle_));
+    HANDLE_SSL_ERROR(ssl, SSL_set_fd(ssl, handle_));
     if (ssl_params.use_SNI)
-        HANDLE_SSL_ERROR(SSL_set_tlsext_host_name(ssl_, addr.Host().c_str()));
+        HANDLE_SSL_ERROR(ssl, SSL_set_tlsext_host_name(ssl, addr.Host().c_str()));
 
-    SSL_set_connect_state(ssl_);
-    HANDLE_SSL_ERROR(SSL_connect(ssl_));
-    HANDLE_SSL_ERROR(SSL_set_mode(ssl_, SSL_MODE_AUTO_RETRY));
-    auto peer_certificate = SSL_get_peer_certificate(ssl_);
+    SSL_set_connect_state(ssl);
+    HANDLE_SSL_ERROR(ssl, SSL_connect(ssl));
+    HANDLE_SSL_ERROR(ssl, SSL_set_mode(ssl, SSL_MODE_AUTO_RETRY));
+    auto peer_certificate = SSL_get_peer_certificate(ssl);
 
     if (!peer_certificate)
         throw std::runtime_error("Failed to verify SSL connection: server provided no ceritificate.");
 
-    if (const auto verify_result = SSL_get_verify_result(ssl_); verify_result != X509_V_OK) {
+    if (const auto verify_result = SSL_get_verify_result(ssl); verify_result != X509_V_OK) {
         auto error_message = X509_verify_cert_error_string(verify_result);
         throw std::runtime_error("Failed to verify SSL connection, X509_v error: "
                 + std::to_string(verify_result)
@@ -170,23 +170,23 @@ SSLSocket::SSLSocket(const NetworkAddress& addr, const SSLParams & ssl_params, S
         std::unique_ptr<ASN1_OCTET_STRING, decltype(&ASN1_OCTET_STRING_free)> addr(a2i_IPADDRESS(hostname.c_str()), &ASN1_OCTET_STRING_free);
         if (addr) {
             // if hostname is actually an IP address
-            HANDLE_SSL_ERROR(X509_check_ip(
+            HANDLE_SSL_ERROR(ssl, X509_check_ip(
                     peer_certificate,
                     ASN1_STRING_get0_data(addr.get()),
                     ASN1_STRING_length(addr.get()),
                     0));
         } else {
-            HANDLE_SSL_ERROR(X509_check_host(peer_certificate, hostname.c_str(), hostname.length(), 0, &out_name));
+            HANDLE_SSL_ERROR(ssl, X509_check_host(peer_certificate, hostname.c_str(), hostname.length(), 0, &out_name));
         }
     }
 }
 
 std::unique_ptr<InputStream> SSLSocket::makeInputStream() const {
-    return std::make_unique<SSLSocketInput>(ssl_);
+    return std::make_unique<SSLSocketInput>(ssl_.get());
 }
 
 std::unique_ptr<OutputStream> SSLSocket::makeOutputStream() const {
-    return std::make_unique<SSLSocketOutput>(ssl_);
+    return std::make_unique<SSLSocketOutput>(ssl_.get());
 }
 
 SSLSocketInput::SSLSocketInput(SSL *ssl)
@@ -195,7 +195,7 @@ SSLSocketInput::SSLSocketInput(SSL *ssl)
 
 size_t SSLSocketInput::DoRead(void* buf, size_t len) {
     size_t actually_read;
-    HANDLE_SSL_ERROR(SSL_read_ex(ssl_, buf, len, &actually_read));
+    HANDLE_SSL_ERROR(ssl_, SSL_read_ex(ssl_, buf, len, &actually_read));
     return actually_read;
 }
 
@@ -204,7 +204,9 @@ SSLSocketOutput::SSLSocketOutput(SSL *ssl)
 {}
 
 void SSLSocketOutput::DoWrite(const void* data, size_t len) {
-    HANDLE_SSL_ERROR(SSL_write(ssl_, data, len));
+    HANDLE_SSL_ERROR(ssl_, SSL_write(ssl_, data, len));
 }
+
+#undef HANDLE_SSL_ERROR
 
 }

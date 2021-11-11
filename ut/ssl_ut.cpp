@@ -1,7 +1,7 @@
 /** Collection of integration tests that validate TLS-connectivity to a CH server
  */
-#include "readonly_client_ut.h"
-#include "connection_failed_client_ut.h"
+#include "readonly_client_test.h"
+#include "connection_failed_client_test.h"
 
 #include <openssl/tls1.h>
 #include <openssl/ssl2.h>
@@ -20,6 +20,13 @@ namespace {
     };
 }
 
+#if defined(__linux__)
+// On Ubuntu 20.04 /etc/ssl/certs is a default directory with the CA files
+const auto DEAFULT_CA_DIRECTORY_PATH = "/etc/ssl/certs";
+#elif defined(__APPLE__)
+#elif defined(_win_)
+#endif
+
 INSTANTIATE_TEST_CASE_P(
     RemoteTLS, ReadonlyClientTest,
     ::testing::Values(ReadonlyClientTest::ParamType {
@@ -31,20 +38,12 @@ INSTANTIATE_TEST_CASE_P(
             .SetDefaultDatabase("default")
             .SetSendRetries(1)
             .SetPingBeforeQuery(true)
-            // On Ubuntu 20.04 /etc/ssl/certs is a default directory with the CA files
             .SetCompressionMethod(CompressionMethod::None)
             .SetSSLOptions(ClientOptions::SSLOptions()
-                    .SetPathToCADirectory("/etc/ssl/certs")),
+                    .SetPathToCADirectory(DEAFULT_CA_DIRECTORY_PATH)),
         QUERIES
     }
 ));
-
-#if defined(__linux__)
-// On Ubuntu 20.04 /etc/ssl/certs is a default directory with the CA files
-const auto DEAFULT_CA_DIRECTORY_PATH = "/etc/ssl/certs";
-#elif defined(__APPLE__)
-#elif defined(_win_)
-#endif
 
 INSTANTIATE_TEST_CASE_P(
     Remote_GH_API_TLS, ReadonlyClientTest,
