@@ -8,6 +8,8 @@ namespace clickhouse {
 template <typename T>
 class ColumnEnum : public Column {
 public:
+    using ValueType = T;
+
     ColumnEnum(TypeRef type);
     ColumnEnum(TypeRef type, const std::vector<T>& data);
 

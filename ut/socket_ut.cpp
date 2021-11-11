@@ -17,14 +17,14 @@ TEST(Socketcase, connecterror) {
    server.start();
    std::this_thread::sleep_for(std::chrono::seconds(1));
    try {
-      SocketConnect(addr);
+      Socket socket(addr);
    } catch (const std::system_error& e) {
       FAIL();
    }
    std::this_thread::sleep_for(std::chrono::seconds(1));
    server.stop();
    try {
-      SocketConnect(addr);
+      Socket socket(addr);
       FAIL();
    } catch (const std::system_error& e) {
       ASSERT_NE(EINPROGRESS,e.code().value());

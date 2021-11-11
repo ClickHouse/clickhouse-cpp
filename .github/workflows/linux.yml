@@ -5,18 +5,24 @@ on:
     branches: [ master ]
   pull_request:
     branches: [ master ]
+  workflow_call:
+    inputs:
+      extra_cmake_flags:
+        required: false
+        type: string
+      extra_install:
+        required: false
+        type: string
+      gtest_args:
+        required: false
+        type: string
 
 env:
-  # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
   BUILD_TYPE: Release
   CH_SERVER_VERSION: 21.3.17.2
 
 jobs:
   build:
-    # The CMake configure and build commands are platform agnostic and should work equally
-    # well on Windows or Mac.  You can convert this to a matrix build if you need
-    # cross-platform coverage.
-    # See: https://docs.github.com/en/free-pro-team@latest/actions/learn-github-actions/managing-complex-workflows#using-a-build-matrix
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -39,16 +45,16 @@ jobs:
 
     - name: Install dependencies
       run: |
-        sudo apt-get install -y ${{ matrix.INSTALL }}
+        sudo apt-get install -y ${{ matrix.INSTALL }} ${{ inputs.extra_install }}
 
     - name: Configure CMake
-      # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
-      # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
       run: |
         cmake \
-          -D CMAKE_C_COMPILER=${{ matrix.C_COMPILER}} \
-          -D CMAKE_CXX_COMPILER=${{ matrix.CXX_COMPILER}} \
-          -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DBUILD_TESTS=ON
+          -DCMAKE_C_COMPILER=${{ matrix.C_COMPILER}} \
+          -DCMAKE_CXX_COMPILER=${{ matrix.CXX_COMPILER}} \
+          -B ${{github.workspace}}/build \
+          -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DBUILD_TESTS=ON \
+          ${{ inputs.extra_cmake_flags }}
 
 
     - name: Build
@@ -70,8 +76,4 @@ jobs:
 
     - name: Test
       working-directory: ${{github.workspace}}/build/ut
-      # Execute tests defined by the CMake configuration.  
-      # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
-      #run: ctest -C ${{env.BUILD_TYPE}}
-      run: ./clickhouse-cpp-ut "${{env.GTEST_FILTER}}"
-
+      run: ./clickhouse-cpp-ut "${{ inputs.gtest_args }}"

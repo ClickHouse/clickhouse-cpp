@@ -10,6 +10,8 @@ namespace clickhouse {
 /** */
 class ColumnDate : public Column {
 public:
+    using ValueType = std::time_t;
+
     ColumnDate();
 
     /// Appends one element to the end of column.
@@ -49,6 +51,8 @@ private:
 /** */
 class ColumnDateTime : public Column {
 public:
+    using ValueType = std::time_t;
+
     ColumnDateTime();
     explicit ColumnDateTime(std::string timezone);
 
@@ -92,6 +96,8 @@ private:
 /** */
 class ColumnDateTime64 : public Column {
 public:
+    using ValueType = Int64;
+
     explicit ColumnDateTime64(size_t precision);
     ColumnDateTime64(size_t precision, std::string timezone);
 

@@ -10,6 +10,8 @@ namespace clickhouse {
  */
 class ColumnDecimal : public Column {
 public:
+    using ValueType = Int128;
+
     ColumnDecimal(size_t precision, size_t scale);
 
     void Append(const Int128& value);

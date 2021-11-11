@@ -21,6 +21,10 @@
 #include <ostream>
 #include <string>
 
+#if defined(WITH_OPENSSL)
+typedef struct ssl_ctx_st SSL_CTX;
+#endif
+
 namespace clickhouse {
 
 struct ServerInfo {
@@ -40,9 +44,9 @@ enum class CompressionMethod {
 };
 
 struct ClientOptions {
-#define DECLARE_FIELD(name, type, setter, default) \
-    type name = default; \
-    inline ClientOptions& setter(const type& value) { \
+#define DECLARE_FIELD(name, type, setter, default_value) \
+    type name = default_value; \
+    inline auto & setter(const type& value) { \
         name = value; \
         return *this; \
     }
@@ -91,6 +95,59 @@ struct ClientOptions {
     */
     DECLARE_FIELD(backward_compatibility_lowcardinality_as_wrapped_column, bool, SetBakcwardCompatibilityFeatureLowCardinalityAsWrappedColumn, true);
 
+#if defined(WITH_OPENSSL)
+    struct SSLOptions {
+        bool use_ssl = true; // not expected to be set manually.
+
+        /** There are two ways to configure an SSL connection:
+         *  - provide a pre-configured SSL_CTX, which is not modified and not owned by the Client.
+         *  - provide a set of options and allow the Client to create and configure SSL_CTX by itself.
+         */
+
+        /** Pre-configured SSL-context for SSL-connection.
+         *  If NOT null client DONES NOT take ownership of context and it must be valid for client lifetime.
+         *  If null client initlaizes OpenSSL and creates his own context, initializes it using
+         *  other options, like path_to_ca_files, path_to_ca_directory, use_default_ca_locations, etc.
+         */
+        SSL_CTX * ssl_context = nullptr;
+        auto & SetExternalSSLContext(SSL_CTX * new_ssl_context) {
+            ssl_context = new_ssl_context;
+            return *this;
+        }
+
+        /** Means to validate the server-supplied certificate against trusted Certificate Authority (CA).
+         *  If no CAs are configured, the server's identity can't be validated, and the Client would err.
+         *  See https://www.openssl.org/docs/man1.1.1/man3/SSL_CTX_set_default_verify_paths.html
+        */
+        /// Load deafult CA certificates from deafult locations.
+        DECLARE_FIELD(use_default_ca_locations, bool, SetUseDefaultCALocations, true);
+        /// Path to the CA files to verify server certificate, may be empty.
+        DECLARE_FIELD(path_to_ca_files, std::vector<std::string>, SetPathToCAFiles, {});
+        /// Path to the directory with CA files used to validate server certificate, may be empty.
+        DECLARE_FIELD(path_to_ca_directory, std::string, SetPathToCADirectory, "");
+
+        /** Min and max protocol versions to use, set with SSL_CTX_set_min_proto_version and SSL_CTX_set_max_proto_version
+         *  for details see https://www.openssl.org/docs/man1.1.1/man3/SSL_CTX_set_min_proto_version.html
+         */
+        DECLARE_FIELD(min_protocol_version, int, SetMinProtocolVersion, DEFAULT_VALUE);
+        DECLARE_FIELD(max_protocol_version, int, SetMaxProtocolVersion, DEFAULT_VALUE);
+
+        /** Options to be set with SSL_CTX_set_options,
+         * for details see https://www.openssl.org/docs/man1.1.1/man3/SSL_CTX_set_options.html
+        */
+        DECLARE_FIELD(context_options, int, SetContextOptions, DEFAULT_VALUE);
+
+        /** Use SNI at ClientHello and verify that certificate is issued to the hostname we are trying to connect to
+         */
+        DECLARE_FIELD(use_sni, bool, SetUseSNI, true);
+
+        static const int DEFAULT_VALUE = -1;
+    };
+
+    // By default SSL is turned off, hence the `{false}`
+    DECLARE_FIELD(ssl_options, SSLOptions, SetSSLOptions, {false});
+#endif
+
 #undef DECLARE_FIELD
 };
 
@@ -130,7 +187,7 @@ public:
     const ServerInfo& GetServerInfo() const;
 
 private:
-    ClientOptions options_;
+    const ClientOptions options_;
 
     class Impl;
     std::unique_ptr<Impl> impl_;

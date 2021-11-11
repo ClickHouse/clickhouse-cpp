@@ -12,6 +12,7 @@ template <typename T>
 class ColumnVector : public Column {
 public:
     using DataType = T;
+    using ValueType = T;
 
     ColumnVector();
 
