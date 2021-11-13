@@ -6,7 +6,7 @@
 #include <stdexcept>
 
 namespace {
-static const int MAX_VARINT_BYTES = 10;
+constexpr int MAX_VARINT_BYTES = 10;
 }
 
 namespace clickhouse {
@@ -22,12 +22,7 @@ bool WireFormat::ReadAll(InputStream * input, void* buf, size_t len) {
         len -= read_previously;
     }
 
-    // true if all was read successfully
     return !len;
-//    if (len) {
-//        throw std::runtime_error("Failed to read " + std::to_string(original_len)
-//                + " bytes, only read " + std::to_string(original_len - len));
-//    }
 }
 
 void WireFormat::WriteAll(OutputStream* output, const void* buf, size_t len) {
@@ -52,7 +47,7 @@ bool WireFormat::ReadVarint64(InputStream* input, uint64_t* value) {
     *value = 0;
 
     for (size_t i = 0; i < MAX_VARINT_BYTES; ++i) {
-        uint8_t byte;
+        uint8_t byte = 0;
 
         if (!input->ReadByte(&byte)) {
             return false;
@@ -90,7 +85,7 @@ void WireFormat::WriteVarint64(OutputStream* output, uint64_t value) {
 }
 
 bool WireFormat::SkipString(InputStream* input) {
-    uint64_t len;
+    uint64_t len = 0;
 
     if (ReadVarint64(input, &len)) {
         if (len > 0x00FFFFFFULL)

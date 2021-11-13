@@ -1,5 +1,4 @@
 SET ( clickhouse-cpp-lib-src
-    base/coded.cpp
     base/compressed.cpp
     base/input.cpp
     base/output.cpp

@@ -35,8 +35,7 @@ inline bool WireFormat::ReadFixed(InputStream* input, T* value) {
 }
 
 inline bool WireFormat::ReadString(InputStream* input, std::string* value) {
-    uint64_t len;
-
+    uint64_t len = 0;
     if (ReadVarint64(input, &len)) {
         if (len > 0x00FFFFFFULL) {
             return false;

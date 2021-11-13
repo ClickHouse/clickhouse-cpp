@@ -64,6 +64,7 @@ public:
     bool Skip(size_t /*bytes*/) override {
         return false;
     }
+
 protected:
     size_t DoRead(void* buf, size_t len) override;
 

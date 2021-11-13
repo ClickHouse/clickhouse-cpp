@@ -16,7 +16,7 @@ TEST(CodedStreamCase, Varint64) {
 
     {
         ArrayInput input(buf.data(), buf.size());
-        uint64_t value;
+        uint64_t value = 0;
         ASSERT_TRUE(WireFormat::ReadVarint64(&input, &value));
         ASSERT_EQ(value, 18446744071965638648ULL);
     }

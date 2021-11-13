@@ -8,7 +8,7 @@ namespace clickhouse {
 
 class CompressedInput : public ZeroCopyInput {
 public:
-     CompressedInput(InputStream* input);
+    CompressedInput(InputStream* input);
     ~CompressedInput();
 
 protected:
@@ -31,13 +31,15 @@ public:
 protected:
     size_t DoWrite(const void* data, size_t len) override;
     void DoFlush() override;
-    bool Compress(const void * data, size_t len);
 
+private:
+    void Compress(const void * data, size_t len);
+    void PreallocateCompressBuffer(size_t input_size);
 
 private:
     OutputStream * destination_;
+    const size_t max_compressed_chunk_size_;
     Buffer compressed_buffer_;
-    size_t max_compressed_chunk_size_;
 };
 
 }
