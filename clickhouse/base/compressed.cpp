@@ -118,7 +118,7 @@ size_t CompressedOutput::DoWrite(const void* data, size_t len) {
     const size_t original_len = len;
     // what if len > max_compressed_chunk_size_ ?
     const size_t max_chunk_size = max_compressed_chunk_size_ > 0 ? max_compressed_chunk_size_ : len;
-    if (len > max_compressed_chunk_size_) {
+    if (max_chunk_size > max_compressed_chunk_size_) {
         PreallocateCompressBuffer(len);
     }
 
