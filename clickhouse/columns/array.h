@@ -1,5 +1,6 @@
 #pragma once
 
+#include "column.h"
 #include "numeric.h"
 
 namespace clickhouse {
@@ -24,10 +25,10 @@ public:
     void Append(ColumnRef column) override;
 
     /// Loads column data from input stream.
-    bool Load(CodedInputStream* input, size_t rows) override;
+    bool Load(InputStream* input, size_t rows) override;
 
     /// Saves column data to output stream.
-    void Save(CodedOutputStream* output) override;
+    void Save(OutputStream* output) override;
 
     /// Clear column data .
     void Clear() override;

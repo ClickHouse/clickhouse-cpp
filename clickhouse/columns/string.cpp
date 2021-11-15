@@ -77,7 +77,7 @@ void ColumnFixedString::Append(ColumnRef column) {
     }
 }
 
-bool ColumnFixedString::Load(CodedInputStream* input, size_t rows) {
+bool ColumnFixedString::Load(InputStream * input, size_t rows) {
     data_.resize(string_size_ * rows);
     if (!WireFormat::ReadBytes(input, &data_[0], data_.size())) {
         return false;
@@ -86,7 +86,7 @@ bool ColumnFixedString::Load(CodedInputStream* input, size_t rows) {
     return true;
 }
 
-void ColumnFixedString::Save(CodedOutputStream* output) {
+void ColumnFixedString::Save(OutputStream* output) {
     WireFormat::WriteBytes(output, data_.data(), data_.size());
 }
 
@@ -220,7 +220,7 @@ void ColumnString::Append(ColumnRef column) {
     }
 }
 
-bool ColumnString::Load(CodedInputStream* input, size_t rows) {
+bool ColumnString::Load(InputStream* input, size_t rows) {
     items_.clear();
     blocks_.clear();
 
@@ -245,7 +245,7 @@ bool ColumnString::Load(CodedInputStream* input, size_t rows) {
     return true;
 }
 
-void ColumnString::Save(CodedOutputStream* output) {
+void ColumnString::Save(OutputStream* output) {
     for (const auto & item : items_) {
         WireFormat::WriteString(output, item);
     }

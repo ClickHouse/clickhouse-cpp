@@ -95,6 +95,16 @@ struct ClientOptions {
     */
     DECLARE_FIELD(backward_compatibility_lowcardinality_as_wrapped_column, bool, SetBakcwardCompatibilityFeatureLowCardinalityAsWrappedColumn, true);
 
+    /** Set max size data to compress if compression enabled.
+     *
+     *  Allows choosing tradeoff betwen RAM\CPU:
+     *  - Lower value reduces RAM usage, but slightly increases CPU usage.
+     *  - Higher value increases RAM usage but slightly decreases CPU usage.
+     *
+     *  Default is 0, use natural implementation-defined chunk size.
+     */
+    DECLARE_FIELD(max_compression_chunk_size, unsigned int, SetMaxCompressionChunkSize, 65535);
+
 #if defined(WITH_OPENSSL)
     struct SSLOptions {
         bool use_ssl = true; // not expected to be set manually.

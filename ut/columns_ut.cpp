@@ -7,6 +7,8 @@
 #include <clickhouse/columns/numeric.h>
 #include <clickhouse/columns/string.h>
 #include <clickhouse/columns/uuid.h>
+#include <clickhouse/base/input.h>
+#include <clickhouse/base/output.h>
 
 #include <contrib/gtest/gtest.h>
 #include "utils.h"
@@ -546,9 +548,8 @@ TEST(ColumnsCase, ColumnLowCardinalityString_Load) {
 
     const auto & data = LOWCARDINALITY_STRING_FOOBAR_10_ITEMS_BINARY;
     ArrayInput buffer(data.data(), data.size());
-    CodedInputStream stream(&buffer);
 
-    EXPECT_TRUE(col.Load(&stream, items_count));
+    ASSERT_TRUE(col.Load(&buffer, items_count));
 
     for (size_t i = 0; i < items_count; ++i) {
         EXPECT_EQ(col.At(i), FooBarSeq(i)) << " at pos: " << i;
@@ -565,24 +566,23 @@ TEST(ColumnsCase, DISABLED_ColumnLowCardinalityString_Save) {
     }
 
     ArrayOutput output(0, 0);
-    CodedOutputStream output_stream(&output);
 
     const size_t expected_output_size = LOWCARDINALITY_STRING_FOOBAR_10_ITEMS_BINARY.size();
     // Enough space to account for possible overflow from both right and left sides.
-    char buffer[expected_output_size * 10] = {'\0'};
+    std::string buffer(expected_output_size * 10, '\0');// = {'\0'};
     const char margin_content[sizeof(buffer)] = {'\0'};
 
     const size_t left_margin_size = 10;
     const size_t right_margin_size = sizeof(buffer) - left_margin_size - expected_output_size;
 
     // Since overflow from left side is less likely to happen, leave only tiny margin there.
-    auto write_pos = buffer + left_margin_size;
-    const auto left_margin = buffer;
+    auto write_pos = buffer.data() + left_margin_size;
+    const auto left_margin = buffer.data();
     const auto right_margin = write_pos + expected_output_size;
 
     output.Reset(write_pos, expected_output_size);
 
-    EXPECT_NO_THROW(col.Save(&output_stream));
+    EXPECT_NO_THROW(col.Save(&output));
 
     // Left margin should be blank
     EXPECT_EQ(std::string_view(margin_content, left_margin_size), std::string_view(left_margin, left_margin_size));
@@ -606,8 +606,7 @@ TEST(ColumnsCase, ColumnLowCardinalityString_SaveAndLoad) {
     char buffer[256] = {'\0'}; // about 3 times more space than needed for this set of values.
     {
         ArrayOutput output(buffer, sizeof(buffer));
-        CodedOutputStream output_stream(&output);
-        EXPECT_NO_THROW(col.Save(&output_stream));
+        EXPECT_NO_THROW(col.Save(&output));
     }
 
     col.Clear();
@@ -615,8 +614,7 @@ TEST(ColumnsCase, ColumnLowCardinalityString_SaveAndLoad) {
     {
         // Load the data back
         ArrayInput input(buffer, sizeof(buffer));
-        CodedInputStream input_stream(&input);
-        EXPECT_TRUE(col.Load(&input_stream, items.size()));
+        EXPECT_TRUE(col.Load(&input, items.size()));
     }
 
     for (size_t i = 0; i < items.size(); ++i) {

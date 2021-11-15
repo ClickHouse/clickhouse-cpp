@@ -84,6 +84,7 @@ public:
     ~SocketInput();
 
 protected:
+    bool Skip(size_t bytes) override;
     size_t DoRead(void* buf, size_t len) override;
 
 private:
@@ -96,7 +97,7 @@ public:
     ~SocketOutput();
 
 protected:
-    void DoWrite(const void* data, size_t len) override;
+    size_t DoWrite(const void* data, size_t len) override;
 
 private:
     SOCKET s_;

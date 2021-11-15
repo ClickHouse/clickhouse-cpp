@@ -61,6 +61,10 @@ public:
     explicit SSLSocketInput(SSL *ssl);
     ~SSLSocketInput() = default;
 
+    bool Skip(size_t /*bytes*/) override {
+        return false;
+    }
+
 protected:
     size_t DoRead(void* buf, size_t len) override;
 
@@ -75,7 +79,7 @@ public:
     ~SSLSocketOutput() = default;
 
 protected:
-    void DoWrite(const void* data, size_t len) override;
+    size_t DoWrite(const void* data, size_t len) override;
 
 private:
     // Not owning

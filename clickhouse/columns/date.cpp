@@ -27,11 +27,11 @@ void ColumnDate::Append(ColumnRef column) {
     }
 }
 
-bool ColumnDate::Load(CodedInputStream* input, size_t rows) {
+bool ColumnDate::Load(InputStream* input, size_t rows) {
     return data_->Load(input, rows);
 }
 
-void ColumnDate::Save(CodedOutputStream* output) {
+void ColumnDate::Save(OutputStream* output) {
     data_->Save(output);
 }
 
@@ -89,11 +89,11 @@ void ColumnDateTime::Append(ColumnRef column) {
     }
 }
 
-bool ColumnDateTime::Load(CodedInputStream* input, size_t rows) {
+bool ColumnDateTime::Load(InputStream* input, size_t rows) {
     return data_->Load(input, rows);
 }
 
-void ColumnDateTime::Save(CodedOutputStream* output) {
+void ColumnDateTime::Save(OutputStream* output) {
     data_->Save(output);
 }
 
@@ -162,11 +162,11 @@ void ColumnDateTime64::Append(ColumnRef column) {
     }
 }
 
-bool ColumnDateTime64::Load(CodedInputStream* input, size_t rows) {
+bool ColumnDateTime64::Load(InputStream* input, size_t rows) {
     return data_->Load(input, rows);
 }
 
-void ColumnDateTime64::Save(CodedOutputStream* output) {
+void ColumnDateTime64::Save(OutputStream* output) {
     data_->Save(output);
 }
 

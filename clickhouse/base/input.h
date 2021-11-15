@@ -21,6 +21,9 @@ public:
         return DoRead(buf, len);
     }
 
+    // Skips a number of bytes.  Returns false if an underlying read error occurs.
+    virtual bool Skip(size_t bytes) = 0;
+
 protected:
     virtual size_t DoRead(void* buf, size_t len) = 0;
 };
@@ -31,6 +34,8 @@ public:
     inline size_t Next(const void** buf, size_t len) {
         return DoNext(buf, len);
     }
+
+    bool Skip(size_t bytes) override;
 
 protected:
     virtual size_t DoNext(const void** ptr, size_t len) = 0;

@@ -5,6 +5,21 @@
 
 namespace clickhouse {
 
+bool ZeroCopyInput::Skip(size_t bytes) {
+    while (bytes > 0) {
+        const void* ptr;
+        size_t len = Next(&ptr, bytes);
+
+        if (len == 0) {
+            return false;
+        }
+
+        bytes -= len;
+    }
+
+    return true;
+}
+
 size_t ZeroCopyInput::DoRead(void* buf, size_t len) {
     const void* ptr;
     size_t result = DoNext(&ptr, len);

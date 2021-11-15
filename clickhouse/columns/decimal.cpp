@@ -197,11 +197,11 @@ void ColumnDecimal::Append(ColumnRef column) {
     }
 }
 
-bool ColumnDecimal::Load(CodedInputStream* input, size_t rows) {
+bool ColumnDecimal::Load(InputStream * input, size_t rows) {
     return data_->Load(input, rows);
 }
 
-void ColumnDecimal::Save(CodedOutputStream* output) {
+void ColumnDecimal::Save(OutputStream* output) {
     data_->Save(output);
 }
 

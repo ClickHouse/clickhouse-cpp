@@ -21,8 +21,8 @@ public:
 
 public:
     void Append(ColumnRef column) override;
-    bool Load(CodedInputStream* input, size_t rows) override;
-    void Save(CodedOutputStream* output) override;
+    bool Load(InputStream* input, size_t rows) override;
+    void Save(OutputStream* output) override;
     void Clear() override;
     size_t Size() const override;
     ColumnRef Slice(size_t begin, size_t len) const override;

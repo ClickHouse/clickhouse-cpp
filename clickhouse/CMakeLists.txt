@@ -1,10 +1,10 @@
 SET ( clickhouse-cpp-lib-src
-    base/coded.cpp
     base/compressed.cpp
     base/input.cpp
     base/output.cpp
     base/platform.cpp
     base/socket.cpp
+    base/wire_format.cpp
 
     columns/array.cpp
     columns/date.cpp
