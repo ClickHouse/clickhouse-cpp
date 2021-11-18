@@ -1,4 +1,4 @@
-CMAKE_MINIMUM_REQUIRED(VERSION 3.0.2)
+CMAKE_MINIMUM_REQUIRED (VERSION 3.0.2)
 
 INCLUDE (cmake/cpp17.cmake)
 INCLUDE (cmake/subdirs.cmake)
@@ -10,20 +10,19 @@ OPTION (WITH_OPENSSL "Use OpenSSL for TLS connections" OFF)
 
 PROJECT (CLICKHOUSE-CLIENT)
 
-    USE_CXX17()
-    USE_OPENSSL()
+    USE_CXX17 ()
+    USE_OPENSSL ()
 
     IF ("${CMAKE_BUILD_TYPE}" STREQUAL "")
         SET (CMAKE_BUILD_TYPE "Debug")
-    ENDIF()
+    ENDIF ()
 
     IF (UNIX)
-        IF (APPLE)
-            SET (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -Wall -Wextra -Werror")
-        ELSE ()
-            SET (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -Wall -Wextra -Werror")
+        IF (NOT APPLE)
+            SET (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
         ENDIF ()
         SET (CMAKE_EXE_LINKER_FLAGS, "${CMAKE_EXE_LINKER_FLAGS} -lpthread")
+        SET (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Werror")
     ENDIF ()
 
     INCLUDE_DIRECTORIES (.)
@@ -37,11 +36,11 @@ PROJECT (CLICKHOUSE-CLIENT)
     )
 
     IF (BUILD_BENCHMARK)
-        SUBDIRS(bench)
+        SUBDIRS (bench)
     ENDIF (BUILD_BENCHMARK)
 
     IF (BUILD_TESTS)
-        SUBDIRS(
+        SUBDIRS (
             contrib/gtest
             tests/simple
             ut
