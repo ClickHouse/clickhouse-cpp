@@ -286,29 +286,36 @@ void Client::Impl::Ping() {
 }
 
 void Client::Impl::ResetConnection() {
-    SocketHolder s(SocketConnect(NetworkAddress(options_.host, std::to_string(options_.port))));
+    for (size_t i = 0; i < options_.hosts_ports.size(); ++i) {
+        const std::string &host = options_.hosts_ports[i].first;
+        unsigned int port = options_.hosts_ports[i].second.has_value() ? options_.hosts_ports[i].second.value() : options_.port;
+        SocketHolder s(SocketConnect(NetworkAddress(host, std::to_string(port))));
+        if (s.Closed()) {
+            if (i == options_.hosts_ports.size() - 1) {
+                throw std::system_error(errno, std::system_category());
+            }
+            continue;
+        }
 
-    if (s.Closed()) {
-        throw std::system_error(errno, std::system_category());
-    }
+        if (options_.tcp_keepalive) {
+            s.SetTcpKeepAlive(options_.tcp_keepalive_idle.count(), options_.tcp_keepalive_intvl.count(), options_.tcp_keepalive_cnt);
+        }
+        if (options_.tcp_nodelay) {
+            s.SetTcpNoDelay(options_.tcp_nodelay);
+        }
 
-    if (options_.tcp_keepalive) {
-        s.SetTcpKeepAlive(options_.tcp_keepalive_idle.count(),
-                          options_.tcp_keepalive_intvl.count(),
-                          options_.tcp_keepalive_cnt);
-    }
-    if (options_.tcp_nodelay) {
-        s.SetTcpNoDelay(options_.tcp_nodelay);
-    }
+        socket_        = std::move(s);
+        socket_input_  = SocketInput(socket_);
+        socket_output_ = SocketOutput(socket_);
+        buffered_input_.Reset();
+        buffered_output_.Reset();
 
-    socket_ = std::move(s);
-    socket_input_ = SocketInput(socket_);
-    socket_output_ = SocketOutput(socket_);
-    buffered_input_.Reset();
-    buffered_output_.Reset();
-
-    if (!Handshake()) {
-        throw std::runtime_error("fail to connect to " + options_.host);
+        if (!Handshake()) {
+            if (i == options_.hosts_ports.size() - 1) {
+                throw std::runtime_error("fail to connect to " + host);
+            }
+            continue;
+        }
     }
 }
 

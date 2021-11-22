@@ -20,6 +20,7 @@
 #include <memory>
 #include <ostream>
 #include <string>
+#include <utility>
 
 namespace clickhouse {
 
@@ -47,8 +48,18 @@ struct ClientOptions {
         return *this; \
     }
 
+
+    /// List of hostnames with service ports
+#define COMMA ,
+    DECLARE_FIELD(hosts_ports, std::vector<std::pair<std::string COMMA std::optional<unsigned int>>>, SetHost,
+                  std::vector<std::pair<std::string COMMA std::optional<unsigned int>>>{});
     /// Hostname of the server.
-    DECLARE_FIELD(host, std::string, SetHost, std::string());
+    std::string host = std::string();
+    inline ClientOptions& SetHost(const std::string& value) {
+        hosts_ports.emplace_back(value, std::nullopt);
+        host = hosts_ports.back().first;
+        return *this;
+    }
     /// Service port.
     DECLARE_FIELD(port, unsigned int, SetPort, 9000);
 
