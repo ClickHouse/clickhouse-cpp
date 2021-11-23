@@ -24,6 +24,8 @@ namespace {
 // On Ubuntu 20.04 /etc/ssl/certs is a default directory with the CA files
 const auto DEAFULT_CA_DIRECTORY_PATH = "/etc/ssl/certs";
 #elif defined(__APPLE__)
+// On macOS we will rely on Homebrew's OpenSSL installation
+const auto DEAFULT_CA_DIRECTORY_PATH = "/usr/local/etc/openssl@1.1/cert.pem";
 #elif defined(_win_)
 #endif
 
