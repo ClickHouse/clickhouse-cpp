@@ -50,14 +50,19 @@ struct ClientOptions {
 
 
     /// List of hostnames with service ports
-#define COMMA ,
-    DECLARE_FIELD(hosts_ports, std::vector<std::pair<std::string COMMA std::optional<unsigned int>>>, SetHost,
-                  std::vector<std::pair<std::string COMMA std::optional<unsigned int>>>{});
+    struct HostPort {
+        std::string host;
+        std::optional<unsigned int> port;
+
+        explicit HostPort(std::string host, std::optional<unsigned int> port = std::nullopt) : host(std::move(host)), port(std::move(port)) {
+        }
+    };
+    DECLARE_FIELD(hosts_ports, std::vector<HostPort>, SetHost,{});
     /// Hostname of the server.
     std::string host = std::string();
     inline ClientOptions& SetHost(const std::string& value) {
         hosts_ports.emplace_back(value, std::nullopt);
-        host = hosts_ports.back().first;
+        host = hosts_ports.back().host;
         return *this;
     }
     /// Service port.

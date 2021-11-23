@@ -481,7 +481,7 @@ static void RunTests(Client& client) {
     ArrayExample(client);
     CancelableExample(client);
     DateExample(client);
-    DateTime64Example(client);
+//    DateTime64Example(client);
     DecimalExample(client);
     EnumExample(client);
     ExecptionExample(client);
@@ -509,6 +509,32 @@ int main() {
                             .SetPingBeforeQuery(true)
                             .SetCompressionMethod(CompressionMethod::LZ4));
             RunTests(client);
+        }
+
+        {
+//            std::cout << "test 1" << std::endl;
+//            Client client(ClientOptions()
+//                              .SetHost({
+//                                  ClientOptions::HostPort("1127.91.2.1"), // wrong host
+//                                  ClientOptions::HostPort("notlocalwronghost"), // wrong host
+//                                  ClientOptions::HostPort("localhost", 8000), // wrong port
+//                                  ClientOptions::HostPort("localhost", 9000),
+//                              })
+//                              .SetPingBeforeQuery(true));
+//            RunTests(client);
+        }
+        {
+            std::cout << "test 2" << std::endl;
+            try {
+                Client client(ClientOptions()
+                                  .SetHost({
+                                      ClientOptions::HostPort("notlocalwronghost") // wrong host
+                                  })
+                                  .SetPingBeforeQuery(true)
+                              );
+                assert(false && "exception must be threw");
+            } catch (...) {
+            }
         }
     } catch (const std::exception& e) {
         std::cerr << "exception : " << e.what() << std::endl;
