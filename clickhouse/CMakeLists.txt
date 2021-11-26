@@ -56,11 +56,19 @@ IF (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     TARGET_LINK_LIBRARIES (clickhouse-cpp-lib-static gcc_s)
 ENDIF ()
 
+IF (WITH_OPENSSL)
+    TARGET_LINK_LIBRARIES (clickhouse-cpp-lib OpenSSL::SSL)
+    TARGET_LINK_LIBRARIES (clickhouse-cpp-lib-static OpenSSL::SSL)
+ENDIF ()
+
+# binaries
 INSTALL (TARGETS clickhouse-cpp-lib clickhouse-cpp-lib-static
+    EXPORT ClickHouseClientTargets
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
+    RUNTIME DESTINATION bin
+    INCLUDES DESTINATION include
 )
-
 
 # general
 INSTALL(FILES block.h DESTINATION include/clickhouse/)
@@ -71,7 +79,6 @@ INSTALL(FILES protocol.h DESTINATION include/clickhouse/)
 INSTALL(FILES query.h DESTINATION include/clickhouse/)
 
 # base
-INSTALL(FILES base/coded.h DESTINATION include/clickhouse/base/)
 INSTALL(FILES base/buffer.h DESTINATION include/clickhouse/base/)
 INSTALL(FILES base/compressed.h DESTINATION include/clickhouse/base/)
 INSTALL(FILES base/input.h DESTINATION include/clickhouse/base/)
@@ -105,7 +112,36 @@ INSTALL(FILES columns/uuid.h DESTINATION include/clickhouse/columns/)
 INSTALL(FILES types/type_parser.h DESTINATION include/clickhouse/types/)
 INSTALL(FILES types/types.h DESTINATION include/clickhouse/types/)
 
-IF (WITH_OPENSSL)
-    TARGET_LINK_LIBRARIES (clickhouse-cpp-lib OpenSSL::SSL)
-    TARGET_LINK_LIBRARIES (clickhouse-cpp-lib-static OpenSSL::SSL)
-ENDIF ()
+# package configuration files
+INCLUDE (CMakePackageConfigHelpers)
+
+write_basic_package_version_file (
+    "${PROJECT_BINARY_DIR}/ClickHouseClient/ClickHouseClientConfigVersion.cmake"
+    COMPATIBILITY SameMajorVersion
+)
+
+EXPORT (
+    EXPORT ClickHouseClientTargets
+    FILE "${PROJECT_BINARY_DIR}/ClickHouseClient/ClickHouseClientTargets.cmake"
+    NAMESPACE ClickHouse::
+)
+
+CONFIGURE_FILE (
+    "${PROJECT_SOURCE_DIR}/cmake/ClickHouseClientConfig.cmake"
+    "${PROJECT_BINARY_DIR}/ClickHouseClient/ClickHouseClientConfig.cmake"
+    COPYONLY
+)
+
+INSTALL (
+    EXPORT ClickHouseClientTargets
+    FILE ClickHouseClientTargets.cmake
+    NAMESPACE ClickHouse::
+    DESTINATION lib/cmake/ClickHouseClient
+)
+
+INSTALL (
+    FILES "${PROJECT_SOURCE_DIR}/cmake/ClickHouseClientConfig.cmake"
+          "${PROJECT_BINARY_DIR}/ClickHouseClient/ClickHouseClientConfigVersion.cmake"
+    DESTINATION lib/cmake/ClickHouseClient
+    COMPONENT Devel
+)

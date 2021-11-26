@@ -8,7 +8,13 @@ OPTION (BUILD_BENCHMARK "Build benchmark" OFF)
 OPTION (BUILD_TESTS "Build tests" OFF)
 OPTION (WITH_OPENSSL "Use OpenSSL for TLS connections" OFF)
 
-PROJECT (CLICKHOUSE-CLIENT)
+PROJECT (
+    CLICKHOUSE-CLIENT
+    VERSION 1.5.0
+    DESCRIPTION "C++ client library for ClickHouse"
+    HOMEPAGE_URL "https://github.com/ClickHouse/clickhouse-cpp"
+    LANGUAGES C CXX
+)
 
     USE_CXX17()
     USE_OPENSSL()
