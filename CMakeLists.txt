@@ -13,8 +13,8 @@ PROJECT (CLICKHOUSE-CLIENT)
     USE_CXX17 ()
     USE_OPENSSL ()
 
-    IF ("${CMAKE_BUILD_TYPE}" STREQUAL "")
-        SET (CMAKE_BUILD_TYPE "Debug")
+    IF (NOT CMAKE_BUILD_TYPE)
+        SET (CMAKE_BUILD_TYPE "RelWithDebInfo")
     ENDIF ()
 
     IF (UNIX)
