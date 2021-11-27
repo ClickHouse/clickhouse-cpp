@@ -5,26 +5,42 @@ on:
     branches: [ master ]
   pull_request:
     branches: [ master ]
+  workflow_call:
+    inputs:
+      extra_cmake_flags:
+        required: false
+        type: string
+      extra_install:
+        required: false
+        type: string
+      gtest_filter:
+        required: false
+        type: string
+        default: "*"
 
 env:
   BUILD_TYPE: Release
-  # It is impossible to start CH server in docker on macos due to github actions limitations,
-  # so limit tests to ones that do no require server interaction.
-  GTEST_FILTER: --gtest_filter=-"Client/*:*Performance*"
 
 jobs:
   build:
-    runs-on: macos-11
+    runs-on: macos-latest
 
     steps:
     - uses: actions/checkout@v2
 
+    - name: Install dependencies
+      run: brew install cmake ${{inputs.extra_install}}
+
     - name: Configure CMake
-      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DBUILD_TESTS=ON
+      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DBUILD_TESTS=ON ${{inputs.extra_cmake_flags}}
 
     - name: Build
       run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} --target all
 
     - name: Test
       working-directory: ${{github.workspace}}/build/ut
-      run: ./clickhouse-cpp-ut "${{env.GTEST_FILTER}}"
+      env:
+        # It is impossible to start CH server in docker on macOS due to github actions limitations,
+        # so limit tests to ones that do no require server interaction.
+        GTEST_FILTER_ONLY_LOCAL: "-Client/*"
+      run: ./clickhouse-cpp-ut --gtest_filter="${{inputs.gtest_filter}}:${{env.GTEST_FILTER_ONLY_LOCAL}}"
