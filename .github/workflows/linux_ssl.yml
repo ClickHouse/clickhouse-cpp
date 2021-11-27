@@ -9,8 +9,8 @@ on:
 
 jobs:
   build-and-test:
-    uses: Enmk/clickhouse-cpp/.github/workflows/linux.yml@master
+    uses: ClickHouse/clickhouse-cpp/.github/workflows/linux.yml@master
     with:
       extra_cmake_flags: -DWITH_OPENSSL=ON
       extra_install: libssl-dev
-#      gtest_args: --gtest_filter="-*LocalhostTLS*"
+#     gtest_filter: "-*LocalhostTLS*"
