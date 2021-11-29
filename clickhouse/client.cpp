@@ -143,8 +143,8 @@ private:
 
     };
 
-
     const ClientOptions options_;
+    std::vector<ClientOptions::HostPort> timeout_hosts{};
     QueryEvents* events_;
     int compression_ = CompressionState::Disable;
 
@@ -185,7 +185,17 @@ Client::Impl::Impl(const ClientOptions& opts)
             }
 
             std::this_thread::sleep_for(options_.retry_timeout);
+        } catch (const std::runtime_error&) {
+            if (++i > options_.send_retries) {
+                if (timeout_hosts.empty()) {
+                    throw;
+                }
+                SetConnection(timeout_hosts[std::rand() % timeout_hosts.size()]);
+            }
+
+            std::this_thread::sleep_for(options_.retry_timeout);
         }
+
     }
 
     if (options_.compression_method != CompressionMethod::None) {
@@ -200,7 +210,14 @@ void Client::Impl::ExecuteQuery(Query query) {
     EnsureNull en(static_cast<QueryEvents*>(&query), &events_);
 
     if (options_.ping_before_query) {
-        RetryGuard([this]() { Ping(); });
+        try {
+            RetryGuard([this]() { Ping(); });
+        } catch (const std::runtime_error &e) {
+            if (timeout_hosts.empty()) {
+                throw;
+            }
+            SetConnection(timeout_hosts[std::rand() % timeout_hosts.size()]);
+        }
     }
 
     SendQuery(query.GetText());
@@ -231,7 +248,14 @@ std::string NameToQueryString(const std::string &input)
 
 void Client::Impl::Insert(const std::string& table_name, const Block& block) {
     if (options_.ping_before_query) {
-        RetryGuard([this]() { Ping(); });
+        try {
+            RetryGuard([this]() { Ping(); });
+        } catch (const std::runtime_error &e) {
+            if (timeout_hosts.empty()) {
+                throw;
+            }
+            SetConnection(timeout_hosts[std::rand() % timeout_hosts.size()]);
+        }
     }
 
     std::stringstream fields_section;
@@ -295,7 +319,8 @@ void Client::Impl::Ping() {
 }
 
 void Client::Impl::SetConnection(const ClientOptions::HostPort& host_port) {
-    SocketHolder s(SocketConnect(NetworkAddress(host_port.host, std::to_string(host_port.port.value_or(options_.port)))));
+    NetworkAddress na = NetworkAddress(host_port.host, std::to_string(host_port.port.value_or(options_.port)));
+    SocketHolder s(SocketConnect(na));
 
     if (s.Closed()) {
         throw std::system_error(errno, std::system_category());
@@ -320,10 +345,8 @@ void Client::Impl::SetConnection(const ClientOptions::HostPort& host_port) {
 }
 
 void Client::Impl::ResetConnection() {
-    std::vector<ClientOptions::HostPort> timeout_hosts_posts{};
-
+    timeout_hosts.clear();
     for (size_t i = 0; i < options_.hosts_ports.size(); ++i) {
-        std::cout << options_.hosts_ports[i].host << options_.hosts_ports[i].port.value_or(13) << std::endl;
         std::mutex mutex;
         std::condition_variable cond_var;
         std::exception_ptr except_ptr = nullptr;
@@ -342,7 +365,7 @@ void Client::Impl::ResetConnection() {
         {
             std::unique_lock<std::mutex> lock(mutex);
             if (cond_var.wait_for(lock, std::chrono::seconds (5)) == std::cv_status::timeout) {
-                timeout_hosts_posts.push_back(options_.hosts_ports[i]);
+                timeout_hosts.emplace_back(options_.hosts_ports[i]);
                 continue;
             }
         }
@@ -351,19 +374,18 @@ void Client::Impl::ResetConnection() {
             try {
                 std::rethrow_exception(except_ptr);
             } catch (...) {
-                std::cout << timeout_hosts_posts.size() << std::endl;
-                if (i == options_.hosts_ports.size() - 1 && timeout_hosts_posts.empty()) {
-                    std::cout << "throw" << std::endl;
+                if (i == options_.hosts_ports.size() - 1 && timeout_hosts.empty()) {
                     throw;
                 }
                 continue;
             }
         }
 
+        // connected successfully
         return;
     }
 
-    SetConnection(timeout_hosts_posts[std::rand() % timeout_hosts_posts.size()]);
+    throw std::runtime_error("Timeout of connection to hosts");
 }
 
 const ServerInfo& Client::Impl::GetServerInfo() const {
