@@ -15,6 +15,7 @@
 #include <vector>
 #include <sstream>
 #include <stdexcept>
+#include <mutex>
 
 #if defined(WITH_OPENSSL)
 #include "base/sslsocket.h"
@@ -162,6 +163,8 @@ private:
 
     std::unique_ptr<Socket> socket_;
 
+    std::recursive_mutex stream_mutex_;
+
 #if defined(WITH_OPENSSL)
     std::unique_ptr<SSLContext> ssl_context_;
 #endif
@@ -198,6 +201,8 @@ Client::Impl::~Impl()
 { }
 
 void Client::Impl::ExecuteQuery(Query query) {
+    auto lock = std::unique_lock(stream_mutex_);
+
     EnsureNull en(static_cast<QueryEvents*>(&query), &events_);
 
     if (options_.ping_before_query) {
@@ -231,6 +236,8 @@ std::string NameToQueryString(const std::string &input)
 }
 
 void Client::Impl::Insert(const std::string& table_name, const Block& block) {
+    auto lock = std::unique_lock(stream_mutex_);
+
     if (options_.ping_before_query) {
         RetryGuard([this]() { Ping(); });
     }
@@ -284,6 +291,8 @@ void Client::Impl::Insert(const std::string& table_name, const Block& block) {
 }
 
 void Client::Impl::Ping() {
+    auto lock = std::unique_lock(stream_mutex_);
+
     WireFormat::WriteUInt64(output_, ClientCodes::Ping);
     output_->Flush();
 
@@ -296,6 +305,7 @@ void Client::Impl::Ping() {
 }
 
 void Client::Impl::ResetConnection() {
+    auto lock = std::unique_lock(stream_mutex_);
 
     std::unique_ptr<Socket> socket;
 
@@ -608,6 +618,7 @@ bool Client::Impl::ReceiveException(bool rethrow) {
 }
 
 void Client::Impl::SendCancel() {
+    auto lock = std::unique_lock(stream_mutex_);
     WireFormat::WriteUInt64(output_, ClientCodes::Cancel);
     output_->Flush();
 }
