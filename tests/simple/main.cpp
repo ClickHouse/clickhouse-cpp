@@ -515,59 +515,62 @@ int main() {
             std::cout << "test 1" << std::endl;
             Client client(ClientOptions()
                               .SetHost({
-                                  ClientOptions::HostPort("1127.91.2.1"), // wrong host
-                                  ClientOptions::HostPort("notlocalwronghost"), // wrong host
-                                  ClientOptions::HostPort("localhost", 8000), // wrong port
-                                  ClientOptions::HostPort("localhost", 9000),
-                              })
+                                           ClientOptions::HostPort("localhost", 8000), // wrong port
+                                           ClientOptions::HostPort("localhost", 7000), // wrong port
+                                           ClientOptions::HostPort("1127.91.2.1"), // wrong host
+                                           ClientOptions::HostPort("1127.91.2.2"), // wrong host
+                                           ClientOptions::HostPort("notlocalwronghost"), // wrong host
+                                           ClientOptions::HostPort("another_notlocalwronghost"), // wrong host
+                                           ClientOptions::HostPort("localhost", 9000),
+                                       })
                               .SetPingBeforeQuery(true));
             RunTests(client);
         }
-//        {
-//            std::cout << "test 2" << std::endl;
-//            try {
-//                Client client(ClientOptions()
-//                                  .SetHost({
-//                                      ClientOptions::HostPort("notlocalwronghost") // wrong host
-//                                  })
-//                                  .SetSendRetries(0)
-//                                  .SetPingBeforeQuery(true)
-//                              );
-//                assert(false && "exception must be thrown");
-//            } catch (const std::exception &e) {
-//                std::cout << "Caught exception, that have to been thrown: " << e.what() << std::endl;
-//            }
-//        }
-//        {
-//            std::cout << "test 3" << std::endl;
-//            try {
-//                Client client(ClientOptions()
-//                                  .SetHost({
-//                                      ClientOptions::HostPort("localhost", 8000), // wrong port
-//                                  })
-//                                  .SetSendRetries(0)
-//                                  .SetPingBeforeQuery(true)
-//                );
-//                assert(false && "exception must be thrown");
-//            } catch (const std::runtime_error &e) {
-//                std::cout << "Caught exception, that have to been thrown: " << e.what() << std::endl;
-//            }
-//        }
-//        {
-//            std::cout << "test 4" << std::endl;
-//            try {
-//                Client client(ClientOptions()
-//                                  .SetHost({
-//                                      ClientOptions::HostPort("1127.91.2.1"), // wrong host
-//                                  })
-//                                  .SetSendRetries(0)
-//                                  .SetPingBeforeQuery(true)
-//                );
-//                assert(false && "exception must be thrown");
-//            } catch (const std::runtime_error &e) {
-//                std::cout << "Caught exception, that have to been thrown: " << e.what() << std::endl;
-//            }
-//        }
+        {
+            std::cout << "test 2" << std::endl;
+            try {
+                Client client(ClientOptions()
+                                  .SetHost({
+                                      ClientOptions::HostPort("notlocalwronghost") // wrong host
+                                  })
+                                  .SetSendRetries(0)
+                                  .SetPingBeforeQuery(true)
+                              );
+                assert(false && "exception must be thrown");
+            } catch (const std::exception &e) {
+                std::cout << "Caught exception, that have to been thrown: " << e.what() << std::endl;
+            }
+        }
+        {
+            std::cout << "test 3" << std::endl;
+            try {
+                Client client(ClientOptions()
+                                  .SetHost({
+                                      ClientOptions::HostPort("localhost", 8000), // wrong port
+                                  })
+                                  .SetSendRetries(0)
+                                  .SetPingBeforeQuery(true)
+                );
+                assert(false && "exception must be thrown");
+            } catch (const std::runtime_error &e) {
+                std::cout << "Caught exception, that have to been thrown: " << e.what() << std::endl;
+            }
+        }
+        {
+            std::cout << "test 4" << std::endl;
+            try {
+                Client client(ClientOptions()
+                                  .SetHost({
+                                      ClientOptions::HostPort("1127.91.2.1"), // wrong host
+                                  })
+                                  .SetSendRetries(0)
+                                  .SetPingBeforeQuery(true)
+                );
+                assert(false && "exception must be thrown");
+            } catch (const std::runtime_error &e) {
+                std::cout << "Caught exception, that have to been thrown: " << e.what() << std::endl;
+            }
+        }
     } catch (const std::exception& e) {
         std::cerr << "exception : " << e.what() << std::endl;
     }

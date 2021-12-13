@@ -1,25 +1,23 @@
 #include "client.h"
-
-#include <assert.h>
-#include <cityhash/city.h>
-#include <lz4/lz4.h>
-
-#include <atomic>
-#include <condition_variable>
-#include <iostream>
-#include <mutex>
-#include <sstream>
-#include <stdexcept>
-#include <system_error>
-#include <thread>
-#include <vector>
+#include "protocol.h"
 
 #include "base/coded.h"
 #include "base/compressed.h"
 #include "base/socket.h"
 #include "base/wire_format.h"
+
 #include "columns/factory.h"
-#include "protocol.h"
+
+#include <cityhash/city.h>
+#include <lz4/lz4.h>
+
+#include <assert.h>
+#include <atomic>
+#include <system_error>
+#include <thread>
+#include <vector>
+#include <sstream>
+#include <stdexcept>
 
 #define DBMS_NAME                                       "ClickHouse"
 #define DBMS_VERSION_MAJOR                              1
@@ -117,10 +115,6 @@ private:
     /// call fuc several times.
     void RetryGuard(std::function<void()> fuc);
 
-    /// Setting connection to one pair host:port. It is called by
-    /// ResetConnection in cycle, which tries to connect to some server
-    void SetConnection(const ClientOptions::HostPort& host_port);
-
 private:
     class EnsureNull {
     public:
@@ -144,7 +138,6 @@ private:
     };
 
     const ClientOptions options_;
-    std::vector<ClientOptions::HostPort> timeout_hosts{};
     QueryEvents* events_;
     int compression_ = CompressionState::Disable;
 
@@ -185,17 +178,7 @@ Client::Impl::Impl(const ClientOptions& opts)
             }
 
             std::this_thread::sleep_for(options_.retry_timeout);
-        } catch (const std::runtime_error&) {
-            if (++i > options_.send_retries) {
-                if (timeout_hosts.empty()) {
-                    throw;
-                }
-                SetConnection(timeout_hosts[std::rand() % timeout_hosts.size()]);
-            }
-
-            std::this_thread::sleep_for(options_.retry_timeout);
         }
-
     }
 
     if (options_.compression_method != CompressionMethod::None) {
@@ -210,14 +193,7 @@ void Client::Impl::ExecuteQuery(Query query) {
     EnsureNull en(static_cast<QueryEvents*>(&query), &events_);
 
     if (options_.ping_before_query) {
-        try {
-            RetryGuard([this]() { Ping(); });
-        } catch (const std::runtime_error &e) {
-            if (timeout_hosts.empty()) {
-                throw;
-            }
-            SetConnection(timeout_hosts[std::rand() % timeout_hosts.size()]);
-        }
+        RetryGuard([this]() { Ping(); });
     }
 
     SendQuery(query.GetText());
@@ -248,14 +224,7 @@ std::string NameToQueryString(const std::string &input)
 
 void Client::Impl::Insert(const std::string& table_name, const Block& block) {
     if (options_.ping_before_query) {
-        try {
-            RetryGuard([this]() { Ping(); });
-        } catch (const std::runtime_error &e) {
-            if (timeout_hosts.empty()) {
-                throw;
-            }
-            SetConnection(timeout_hosts[std::rand() % timeout_hosts.size()]);
-        }
+        RetryGuard([this]() { Ping(); });
     }
 
     std::stringstream fields_section;
@@ -318,74 +287,43 @@ void Client::Impl::Ping() {
     }
 }
 
-void Client::Impl::SetConnection(const ClientOptions::HostPort& host_port) {
-    NetworkAddress na = NetworkAddress(host_port.host, std::to_string(host_port.port.value_or(options_.port)));
-    SocketHolder s(SocketConnect(na));
-
-    if (s.Closed()) {
-        throw std::system_error(errno, std::system_category());
-    }
-
-    if (options_.tcp_keepalive) {
-        s.SetTcpKeepAlive(options_.tcp_keepalive_idle.count(), options_.tcp_keepalive_intvl.count(), options_.tcp_keepalive_cnt);
-    }
-    if (options_.tcp_nodelay) {
-        s.SetTcpNoDelay(options_.tcp_nodelay);
-    }
-
-    socket_        = std::move(s);
-    socket_input_  = SocketInput(socket_);
-    socket_output_ = SocketOutput(socket_);
-    buffered_input_.Reset();
-    buffered_output_.Reset();
-
-    if (!Handshake()) {
-        throw std::runtime_error("fail to connect to " + host_port.host);
-    }
-}
-
 void Client::Impl::ResetConnection() {
-    timeout_hosts.clear();
     for (size_t i = 0; i < options_.hosts_ports.size(); ++i) {
-        std::mutex mutex;
-        std::condition_variable cond_var;
-        std::exception_ptr except_ptr = nullptr;
+        try {
+            const ClientOptions::HostPort& host_port = options_.hosts_ports[i];
+            NetworkAddress na = NetworkAddress(host_port.host, std::to_string(host_port.port.value_or(options_.port)));
+            SocketHolder s(SocketConnect(na));
 
-        std::thread connecting_thread([&cond_var, this, &except_ptr, &i]() {
-            try {
-                SetConnection(options_.hosts_ports[i]);
-            } catch (...) {
-                except_ptr = std::current_exception();
+            if (s.Closed()) {
+                throw std::system_error(errno, std::system_category());
             }
-            cond_var.notify_one();
-        });
 
-        connecting_thread.detach();
-
-        {
-            std::unique_lock<std::mutex> lock(mutex);
-            if (cond_var.wait_for(lock, std::chrono::seconds (5)) == std::cv_status::timeout) {
-                timeout_hosts.emplace_back(options_.hosts_ports[i]);
-                continue;
+            if (options_.tcp_keepalive) {
+                s.SetTcpKeepAlive(options_.tcp_keepalive_idle.count(), options_.tcp_keepalive_intvl.count(), options_.tcp_keepalive_cnt);
             }
-        }
-
-        if (except_ptr) {
-            try {
-                std::rethrow_exception(except_ptr);
-            } catch (...) {
-                if (i == options_.hosts_ports.size() - 1 && timeout_hosts.empty()) {
-                    throw;
-                }
-                continue;
+            if (options_.tcp_nodelay) {
+                s.SetTcpNoDelay(options_.tcp_nodelay);
             }
+
+            socket_ = std::move(s);
+            socket_input_ = SocketInput(socket_);
+            socket_output_ = SocketOutput(socket_);
+            buffered_input_.Reset();
+            buffered_output_.Reset();
+
+            if (!Handshake()) {
+                throw std::runtime_error("fail to connect to " + host_port.host);
+            }
+        } catch (...) {
+            if (i == options_.hosts_ports.size() - 1) {
+                throw;
+            }
+            continue;
         }
 
         // connected successfully
         return;
     }
-
-    throw std::runtime_error("Timeout of connection to hosts");
 }
 
 const ServerInfo& Client::Impl::GetServerInfo() const {

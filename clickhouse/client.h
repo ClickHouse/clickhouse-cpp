@@ -20,7 +20,6 @@
 #include <memory>
 #include <ostream>
 #include <string>
-#include <utility>
 
 namespace clickhouse {
 
@@ -56,10 +55,6 @@ struct ClientOptions {
 
         explicit HostPort(std::string host, std::optional<unsigned int> port = std::nullopt) : host(std::move(host)), port(std::move(port)) {
         }
-//        HostPort(const HostPort &other) = default;
-//        HostPort(HostPort &&other) = default;
-//        HostPort & operator=(const HostPort &other) = default;
-//        HostPort & operator=(HostPort &&other) = default;
     };
     DECLARE_FIELD(hosts_ports, std::vector<HostPort>, SetHost,{});
     /// Hostname of the server.
