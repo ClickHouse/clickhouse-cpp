@@ -137,6 +137,7 @@ private:
 
     };
 
+
     const ClientOptions options_;
     QueryEvents* events_;
     int compression_ = CompressionState::Disable;
@@ -291,8 +292,7 @@ void Client::Impl::ResetConnection() {
     for (size_t i = 0; i < options_.hosts_ports.size(); ++i) {
         try {
             const ClientOptions::HostPort& host_port = options_.hosts_ports[i];
-            NetworkAddress na = NetworkAddress(host_port.host, std::to_string(host_port.port.value_or(options_.port)));
-            SocketHolder s(SocketConnect(na));
+            SocketHolder s(SocketConnect(NetworkAddress(host_port.host, std::to_string(host_port.port.value_or(options_.port)))));
 
             if (s.Closed()) {
                 throw std::system_error(errno, std::system_category());
