@@ -22,7 +22,7 @@ public:
 
 public:
     /// Appends content of given column to the end of current one.
-    void Append(ColumnRef) override { }
+    void Append(ColumnRef column) override;
 
     /// Loads column data from input stream.
     bool Load(InputStream* input, size_t rows) override;

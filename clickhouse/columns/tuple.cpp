@@ -20,6 +20,16 @@ size_t ColumnTuple::TupleSize() const {
     return columns_.size();
 }
 
+void ColumnTuple::Append(ColumnRef column) {
+    if (!this->Type()->IsEqual(column->Type())) {
+        throw std::runtime_error(
+            "can't append column of type " + column->Type()->GetName() + " "
+            "to column type " + this->Type()->GetName());
+    }
+    for (size_t ci = 0; ci < columns_.size(); ci++) {
+        columns_[ci]->Append((*column->As<ColumnTuple>())[ci]);
+    }
+}
 size_t ColumnTuple::Size() const {
     return columns_.empty() ? 0 : columns_[0]->Size();
 }
