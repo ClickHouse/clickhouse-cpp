@@ -33,6 +33,14 @@ void ColumnTuple::Append(ColumnRef column) {
 size_t ColumnTuple::Size() const {
     return columns_.empty() ? 0 : columns_[0]->Size();
 }
+ColumnRef ColumnTuple::Slice(size_t begin, size_t len) const {
+    std::vector<ColumnRef> slicedColumns;
+    for(const auto &column : columns_){
+        slicedColumns.push_back(column->Slice(begin, len));
+    }
+
+    return std::make_shared<ColumnTuple>(slicedColumns);
+}
 
 bool ColumnTuple::Load(InputStream* input, size_t rows) {
     for (auto ci = columns_.begin(); ci != columns_.end(); ++ci) {
