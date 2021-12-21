@@ -512,7 +512,7 @@ int main() {
         }
 
         {
-            std::cout << "test 1" << std::endl;
+            ClientOptions::HostPort correct_host_port = ClientOptions::HostPort("localhost", 9000);
             Client client(ClientOptions()
                               .SetHost({
                                            ClientOptions::HostPort("localhost", 8000), // wrong port
@@ -521,13 +521,15 @@ int main() {
                                            ClientOptions::HostPort("1127.91.2.2"), // wrong host
                                            ClientOptions::HostPort("notlocalwronghost"), // wrong host
                                            ClientOptions::HostPort("another_notlocalwronghost"), // wrong host
-                                           ClientOptions::HostPort("localhost", 9000),
+                                           correct_host_port,
+                                           ClientOptions::HostPort("localhost", 9001), // wrong port
+                                           ClientOptions::HostPort("1127.911.2.2"), // wrong host
                                        })
                               .SetPingBeforeQuery(true));
+            assert(client.GetConnectedHostPort() == correct_host_port);
             RunTests(client);
         }
         {
-            std::cout << "test 2" << std::endl;
             try {
                 Client client(ClientOptions()
                                   .SetHost({
@@ -542,7 +544,6 @@ int main() {
             }
         }
         {
-            std::cout << "test 3" << std::endl;
             try {
                 Client client(ClientOptions()
                                   .SetHost({
@@ -557,7 +558,6 @@ int main() {
             }
         }
         {
-            std::cout << "test 4" << std::endl;
             try {
                 Client client(ClientOptions()
                                   .SetHost({

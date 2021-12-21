@@ -57,10 +57,28 @@ struct ClientInfo {
 };
 
 std::ostream& operator<<(std::ostream& os, const ClientOptions& opt) {
-    os << "Client(" << opt.user << '@' << "{ ";
-    for (const ClientOptions::HostPort& hp : opt.hosts_ports) {
-        os << hp.host << ":" << opt.port << ",";
+    os << "Client(" << opt.user << '@';
+
+    bool many_hosts = int(opt.hosts_ports.size()) - int(!opt.host.empty()) > 1;
+    if (many_hosts) {
+        os << "{ ";
+        if (!opt.host.empty()) {
+            os << opt.host << ":" << opt.port << ",";
+        }
+        for (size_t i = 0; i < opt.hosts_ports.size(); ++i) {
+            os << opt.hosts_ports[i].host << ":" << opt.hosts_ports[i].port.value_or(opt.port)
+               << (i != opt.hosts_ports.size() - 1 ? "," : "}");
+        }
     }
+    else {
+        if (opt.host.empty()) {
+            os << opt.hosts_ports[0].host << ":" << opt.hosts_ports[0].port.value_or(opt.port);
+        }
+        else {
+            os << opt.host << ":" << opt.port;
+        }
+    }
+
     os << " ping_before_query:" << opt.ping_before_query
        << " send_retries:" << opt.send_retries
        << " retry_timeout:" << opt.retry_timeout.count()
@@ -86,6 +104,8 @@ public:
     void ResetConnection();
 
     const ServerInfo& GetServerInfo() const;
+
+    const std::optional<ClientOptions::HostPort>& GetConnectedHostPort() const;
 
 private:
     bool Handshake();
@@ -153,6 +173,7 @@ private:
     CodedOutputStream output_;
 
     ServerInfo server_info_;
+    std::optional<ClientOptions::HostPort> connected_host_port_;
 };
 
 
@@ -289,9 +310,10 @@ void Client::Impl::Ping() {
 }
 
 void Client::Impl::ResetConnection() {
-    for (size_t i = 0; i < options_.hosts_ports.size(); ++i) {
+    connected_host_port_.reset();
+    for (int i = -1; i < int(options_.hosts_ports.size()); ++i) {
+        const ClientOptions::HostPort& host_port = i == -1 ? ClientOptions::HostPort(options_.host) : options_.hosts_ports[i];
         try {
-            const ClientOptions::HostPort& host_port = options_.hosts_ports[i];
             SocketHolder s(SocketConnect(NetworkAddress(host_port.host, std::to_string(host_port.port.value_or(options_.port)))));
 
             if (s.Closed()) {
@@ -315,19 +337,23 @@ void Client::Impl::ResetConnection() {
                 throw std::runtime_error("fail to connect to " + host_port.host);
             }
         } catch (...) {
-            if (i == options_.hosts_ports.size() - 1) {
+            if (i == int(options_.hosts_ports.size()) - 1) {
                 throw;
             }
             continue;
         }
 
-        // connected successfully
+        connected_host_port_ = host_port;
         return;
     }
 }
 
 const ServerInfo& Client::Impl::GetServerInfo() const {
     return server_info_;
+}
+
+const std::optional<ClientOptions::HostPort>& Client::Impl::GetConnectedHostPort() const {
+    return connected_host_port_;
 }
 
 bool Client::Impl::Handshake() {
@@ -830,6 +856,10 @@ void Client::ResetConnection() {
 
 const ServerInfo& Client::GetServerInfo() const {
     return impl_->GetServerInfo();
+}
+
+const std::optional<ClientOptions::HostPort>& Client::GetConnectedHostPort() const {
+    return impl_->GetConnectedHostPort();
 }
 
 }

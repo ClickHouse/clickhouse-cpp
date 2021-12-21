@@ -55,15 +55,14 @@ struct ClientOptions {
 
         explicit HostPort(std::string host, std::optional<unsigned int> port = std::nullopt) : host(std::move(host)), port(std::move(port)) {
         }
+
+        bool operator==(const HostPort& other) const {
+          return host == other.host && port == other.port;
+        }
     };
     DECLARE_FIELD(hosts_ports, std::vector<HostPort>, SetHost,{});
     /// Hostname of the server.
-    std::string host = std::string();
-    inline ClientOptions& SetHost(const std::string& value) {
-        hosts_ports.emplace_back(value, std::nullopt);
-        host = hosts_ports.back().host;
-        return *this;
-    }
+    DECLARE_FIELD(host, std::string, SetHost, std::string());
     /// Service port.
     DECLARE_FIELD(port, unsigned int, SetPort, 9000);
 
@@ -143,6 +142,8 @@ public:
     void ResetConnection();
 
     const ServerInfo& GetServerInfo() const;
+
+    const std::optional<ClientOptions::HostPort>& GetConnectedHostPort() const;
 
 private:
     ClientOptions options_;
