@@ -29,7 +29,7 @@ inline bool mulOverflow(const Int128 & l, const T & r, Int128 * result)
 template <typename T>
 inline bool getSignBit(const T & v)
 {
-    return std::signbit(v);
+    return v < static_cast<T>(0);
 }
 
 inline bool getSignBit(const Int128 & v)
