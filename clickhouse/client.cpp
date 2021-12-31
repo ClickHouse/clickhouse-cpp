@@ -336,6 +336,16 @@ void Client::Impl::ResetConnection() {
             if (!Handshake()) {
                 throw std::runtime_error("fail to connect to " + host_port.host);
             }
+        } catch (const std::system_error &e) {
+            if (i == int(options_.hosts_ports.size()) - 1) {
+                throw;
+            }
+            continue;
+        } catch (const std::runtime_error &e) {
+            if (i == int(options_.hosts_ports.size()) - 1) {
+                throw;
+            }
+            continue;
         } catch (...) {
             if (i == int(options_.hosts_ports.size()) - 1) {
                 throw;
