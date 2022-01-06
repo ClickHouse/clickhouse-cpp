@@ -11,6 +11,6 @@ jobs:
   build-and-test:
     uses: ClickHouse/clickhouse-cpp/.github/workflows/macos.yml@master
     with:
-      extra_cmake_flags: -DWITH_OPENSSL=ON
+      extra_cmake_flags: -DWITH_OPENSSL=ON -DOPENSSL_ROOT_DIR=/usr/local/opt/openssl/
       extra_install: openssl
 #     gtest_filter: "-*LocalhostTLS*"
