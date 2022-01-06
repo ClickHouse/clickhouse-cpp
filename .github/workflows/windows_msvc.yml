@@ -1,0 +1,31 @@
+name: Windows
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+env:
+  BUILD_TYPE: Release
+  # It is impossible to start CH server in docker on Windows due to github actions limitations,
+  # so limit tests to ones that do no require server interaction.
+  GTEST_FILTER: --gtest_filter=-"Client/*:*Performance*"
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - uses: ilammy/msvc-dev-cmd@v1
+
+    - name: Configure CMake
+      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DBUILD_TESTS=ON
+
+    - name: Build
+      run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
+
+    - name: Test
+      working-directory: ${{github.workspace}}/build/ut
+      run: Release\clickhouse-cpp-ut.exe "${{env.GTEST_FILTER}}"

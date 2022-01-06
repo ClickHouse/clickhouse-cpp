@@ -39,9 +39,8 @@ struct Timer
 private:
     static auto Now()
     {
-        struct timespec ts;
-        clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
-        return std::chrono::nanoseconds(ts.tv_sec * 1000000000LL + ts.tv_nsec);
+        std::chrono::nanoseconds ns = std::chrono::high_resolution_clock::now().time_since_epoch();
+        return ns;
     }
 
 private:

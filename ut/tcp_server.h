@@ -1,5 +1,7 @@
 #pragma once
 
+#include <winsock2.h>
+
 namespace clickhouse {
 
 class LocalTcpServer {
@@ -15,7 +17,7 @@ private:
 
 private:
     int port_;
-    int serverSd_;
+    SOCKET serverSd_;
 };
 
 }

@@ -1,13 +1,22 @@
 #include "tcp_server.h"
 
 #include <iostream>
-#include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/socket.h>
+
+#include <winsock2.h>
+/* 
+#if defined(_win_)
+#   include <winsock2.h>
+#else
+#   include <netinet/in.h>
+#   include <sys/socket.h>
+#   include <unistd.h>
+#endif
+*/ 
+
 #include <thread>
-#include <unistd.h>
 
 namespace clickhouse {
 
@@ -23,7 +32,7 @@ LocalTcpServer::~LocalTcpServer() {
 void LocalTcpServer::start() {
     //setup a socket
     sockaddr_in servAddr;
-    bzero((char*)&servAddr, sizeof(servAddr));
+    memset((char*)&servAddr, 0, sizeof(servAddr));
     servAddr.sin_family = AF_INET;
     servAddr.sin_addr.s_addr = htonl(INADDR_ANY);
     servAddr.sin_port = htons(port_);
@@ -33,7 +42,14 @@ void LocalTcpServer::start() {
         throw std::runtime_error("Error establishing server socket");
     }
     int enable = 1;
-    if (setsockopt(serverSd_, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0) {
+
+#if defined(_unix_)
+    auto res = setsockopt(serverSd_, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable));
+#else
+    auto res = setsockopt(serverSd_, SOL_SOCKET, SO_REUSEADDR, (const char*)&enable, sizeof(enable));
+#endif
+
+    if (res < 0) {
         std::cerr << "setsockopt(SO_REUSEADDR) failed" << std::endl;
     }
     //bind the socket to its local address
@@ -47,8 +63,14 @@ void LocalTcpServer::start() {
 
 void LocalTcpServer::stop() {
     if(serverSd_ > 0) {
+
+#if defined(_unix_)
         shutdown(serverSd_, SHUT_RDWR);
         close(serverSd_);
+#else
+        shutdown(serverSd_, SD_BOTH);
+        closesocket(serverSd_);
+#endif
         serverSd_ = -1;
     }
 }
