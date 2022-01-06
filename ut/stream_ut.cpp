@@ -2,7 +2,7 @@
 #include <clickhouse/base/output.h>
 #include <clickhouse/base/input.h>
 
-#include <contrib/gtest/gtest.h>
+#include <gtest/gtest.h>
 
 using namespace clickhouse;
 

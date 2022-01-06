@@ -10,7 +10,7 @@
 #include <clickhouse/base/input.h>
 #include <clickhouse/base/output.h>
 
-#include <contrib/gtest/gtest.h>
+#include <gtest/gtest.h>
 #include "utils.h"
 
 #include <string_view>
@@ -707,14 +707,14 @@ TEST_P(ColumnsCaseWithName, CreateColumnByType)
     EXPECT_EQ(col->GetType().GetName(), GetParam());
 }
 
-INSTANTIATE_TEST_CASE_P(Basic, ColumnsCaseWithName, ::testing::Values(
+INSTANTIATE_TEST_SUITE_P(Basic, ColumnsCaseWithName, ::testing::Values(
     "Int8", "Int16", "Int32", "Int64",
     "UInt8", "UInt16", "UInt32", "UInt64",
     "String", "Date", "DateTime",
     "UUID", "Int128"
 ));
 
-INSTANTIATE_TEST_CASE_P(Parametrized, ColumnsCaseWithName, ::testing::Values(
+INSTANTIATE_TEST_SUITE_P(Parametrized, ColumnsCaseWithName, ::testing::Values(
     "FixedString(0)", "FixedString(10000)",
     "DateTime('UTC')", "DateTime64(3, 'UTC')",
     "Decimal(9,3)", "Decimal(18,3)",
@@ -723,7 +723,7 @@ INSTANTIATE_TEST_CASE_P(Parametrized, ColumnsCaseWithName, ::testing::Values(
 ));
 
 
-INSTANTIATE_TEST_CASE_P(Nested, ColumnsCaseWithName, ::testing::Values(
+INSTANTIATE_TEST_SUITE_P(Nested, ColumnsCaseWithName, ::testing::Values(
     "Nullable(FixedString(10000))",
     "Nullable(LowCardinality(FixedString(10000)))",
     "Array(Nullable(LowCardinality(FixedString(10000))))",

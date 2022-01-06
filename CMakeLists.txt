@@ -41,6 +41,7 @@ PROJECT (CLICKHOUSE-CLIENT)
     ENDIF (BUILD_BENCHMARK)
 
     IF (BUILD_TESTS)
+        INCLUDE_DIRECTORIES (contrib/gtest/include contrib/gtest)
         SUBDIRS (
             contrib/gtest
             tests/simple

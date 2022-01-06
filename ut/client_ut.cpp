@@ -1,5 +1,5 @@
 #include <clickhouse/client.h>
-#include <contrib/gtest/gtest.h>
+#include <gtest/gtest.h>
 
 #include <cmath>
 
@@ -877,7 +877,7 @@ TEST_P(ClientCase, DateTime64) {
     ASSERT_EQ(total_rows, data.size());
 }
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     Client, ClientCase,
     ::testing::Values(
         ClientOptions()

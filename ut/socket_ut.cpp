@@ -1,7 +1,7 @@
 #include "tcp_server.h"
 
 #include <clickhouse/base/socket.h>
-#include <contrib/gtest/gtest.h>
+#include <gtest/gtest.h>
 
 #include <iostream>
 #include <stdio.h>
