@@ -30,10 +30,10 @@ public:
     void Append(ColumnRef column) override;
 
     /// Loads column data from input stream.
-    bool Load(CodedInputStream* input, size_t rows) override;
+    bool Load(InputStream* input, size_t rows) override;
 
     /// Saves column data to output stream.
-    void Save(CodedOutputStream* output) override;
+    void Save(OutputStream* output) override;
     
     /// Clear column data .
     void Clear() override;
@@ -42,7 +42,7 @@ public:
     size_t Size() const override;
 
     /// Makes slice of the current column.
-    ColumnRef Slice(size_t begin, size_t len) override;
+    ColumnRef Slice(size_t begin, size_t len) const override;
     void Swap(Column& other) override;
 
     ItemView GetItem(size_t) const override;

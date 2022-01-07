@@ -25,10 +25,10 @@ public:
     void Append(ColumnRef) override { }
 
     /// Loads column data from input stream.
-    bool Load(CodedInputStream* input, size_t rows) override;
+    bool Load(InputStream* input, size_t rows) override;
 
     /// Saves column data to output stream.
-    void Save(CodedOutputStream* output) override;
+    void Save(OutputStream* output) override;
 
     /// Clear column data .
     void Clear() override;
@@ -37,7 +37,7 @@ public:
     size_t Size() const override;
 
     /// Makes slice of the current column.
-    ColumnRef Slice(size_t, size_t) override { return ColumnRef(); }
+    ColumnRef Slice(size_t, size_t) const override { return ColumnRef(); }
     void Swap(Column& other) override;
 
 private:

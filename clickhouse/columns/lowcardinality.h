@@ -55,10 +55,10 @@ public:
     void Append(ColumnRef /*column*/) override;
 
     /// Loads column data from input stream.
-    bool Load(CodedInputStream* input, size_t rows) override;
+    bool Load(InputStream* input, size_t rows) override;
 
     /// Saves column data to output stream.
-    void Save(CodedOutputStream* output) override;
+    void Save(OutputStream* output) override;
 
     /// Clear column data.
     void Clear() override;
@@ -67,7 +67,7 @@ public:
     size_t Size() const override;
 
     /// Makes slice of current column, with compacted dictionary
-    ColumnRef Slice(size_t begin, size_t len) override;
+    ColumnRef Slice(size_t begin, size_t len) const override;
 
     void Swap(Column& other) override;
     ItemView GetItem(size_t index) const override;
@@ -105,7 +105,12 @@ public:
 
     template <typename ...Args>
     explicit ColumnLowCardinalityT(Args &&... args)
-        : ColumnLowCardinality(std::make_shared<DictionaryColumnType>(std::forward<Args>(args)...)),
+        : ColumnLowCardinalityT(std::make_shared<DictionaryColumnType>(std::forward<Args>(args)...))
+    {}
+
+    // Create LC<T> column from existing T-column, making a deep copy of all contents.
+    explicit ColumnLowCardinalityT(std::shared_ptr<DictionaryColumnType> dictionary_col)
+        : ColumnLowCardinality(dictionary_col),
           typed_dictionary_(dynamic_cast<DictionaryColumnType &>(*GetDictionary())),
           type_(typed_dictionary_.Type()->GetCode())
     {}

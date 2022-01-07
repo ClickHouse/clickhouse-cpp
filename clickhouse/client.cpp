@@ -1,15 +1,12 @@
 #include "client.h"
 #include "protocol.h"
 
-#include "base/coded.h"
 #include "base/compressed.h"
 #include "base/socket.h"
+#include "base/streamstack.h"
 #include "base/wire_format.h"
 
 #include "columns/factory.h"
-
-#include <cityhash/city.h>
-#include <lz4/lz4.h>
 
 #include <assert.h>
 #include <atomic>
@@ -19,11 +16,13 @@
 #include <sstream>
 #include <stdexcept>
 
+#if defined(WITH_OPENSSL)
+#include "base/sslsocket.h"
+#endif
+
 #define DBMS_NAME                                       "ClickHouse"
 #define DBMS_VERSION_MAJOR                              1
 #define DBMS_VERSION_MINOR                              2
-
-#define REVISION                                        54405
 
 #define DBMS_MIN_REVISION_WITH_TEMPORARY_TABLES         50264
 #define DBMS_MIN_REVISION_WITH_TOTAL_ROWS_IN_PROGRESS   51554
@@ -32,11 +31,12 @@
 #define DBMS_MIN_REVISION_WITH_SERVER_TIMEZONE          54058
 #define DBMS_MIN_REVISION_WITH_QUOTA_KEY_IN_CLIENT_INFO 54060
 //#define DBMS_MIN_REVISION_WITH_TABLES_STATUS            54226
-//#define DBMS_MIN_REVISION_WITH_TIME_ZONE_PARAMETER_IN_DATETIME_DATA_TYPE 54337
+#define DBMS_MIN_REVISION_WITH_TIME_ZONE_PARAMETER_IN_DATETIME_DATA_TYPE 54337
 #define DBMS_MIN_REVISION_WITH_SERVER_DISPLAY_NAME      54372
 #define DBMS_MIN_REVISION_WITH_VERSION_PATCH            54401
 #define DBMS_MIN_REVISION_WITH_LOW_CARDINALITY_TYPE     54405
-#define DBMS_MIN_REVISION_WITH_TIME_ZONE_PARAMETER_IN_DATETIME_DATA_TYPE 54337
+
+#define REVISION  DBMS_MIN_REVISION_WITH_LOW_CARDINALITY_TYPE
 
 namespace clickhouse {
 
@@ -62,8 +62,23 @@ std::ostream& operator<<(std::ostream& os, const ClientOptions& opt) {
        << " send_retries:" << opt.send_retries
        << " retry_timeout:" << opt.retry_timeout.count()
        << " compression_method:"
-       << (opt.compression_method == CompressionMethod::LZ4 ? "LZ4" : "None")
-       << ")";
+       << (opt.compression_method == CompressionMethod::LZ4 ? "LZ4" : "None");
+#if defined(WITH_OPENSSL)
+    if (opt.ssl_options.use_ssl) {
+        const auto & ssl_options = opt.ssl_options;
+        os << " SSL ("
+           << " ssl_context: " << (ssl_options.ssl_context ? "provided by user" : "created internally")
+           << " use_default_ca_locations: " << ssl_options.use_default_ca_locations
+           << " use_default_ca_locations: " << ssl_options.use_default_ca_locations
+           << " path_to_ca_files: " << ssl_options.path_to_ca_files.size() << " items"
+           << " path_to_ca_directory: " << ssl_options.path_to_ca_directory
+           << " min_protocol_version: " << ssl_options.min_protocol_version
+           << " min_protocol_version: " << ssl_options.max_protocol_version
+           << " context_options: " << ssl_options.context_options
+           << ")";
+    }
+#endif
+    os << ")";
     return os;
 }
 
@@ -99,7 +114,7 @@ private:
 
     bool SendHello();
 
-    bool ReadBlock(Block* block, CodedInputStream* input);
+    bool ReadBlock(Block* block, InputStream* input);
 
     bool ReceiveHello();
 
@@ -109,7 +124,7 @@ private:
     /// Reads exception packet form input stream.
     bool ReceiveException(bool rethrow = false);
 
-    void WriteBlock(const Block& block, CodedOutputStream* output);
+    void WriteBlock(const Block& block, OutputStream* output);
 
 private:
     /// In case of network errors tries to reconnect to server and
@@ -143,15 +158,17 @@ private:
     const QueryEvents* events_;
     int compression_ = CompressionState::Disable;
 
-    SocketHolder socket_;
+    InputStreams input_streams_;
+    InputStream* input_;
 
-    SocketInput socket_input_;
-    BufferedInput buffered_input_;
-    CodedInputStream input_;
+    OutputStreams output_streams_;
+    OutputStream* output_;
 
-    SocketOutput socket_output_;
-    BufferedOutput buffered_output_;
-    CodedOutputStream output_;
+    std::unique_ptr<Socket> socket_;
+
+#if defined(WITH_OPENSSL)
+    std::unique_ptr<SSLContext> ssl_context_;
+#endif
 
     ServerInfo server_info_;
 };
@@ -160,13 +177,6 @@ private:
 Client::Impl::Impl(const ClientOptions& opts)
     : options_(opts)
     , events_(nullptr)
-    , socket_(-1)
-    , socket_input_(socket_)
-    , buffered_input_(&socket_input_)
-    , input_(&buffered_input_)
-    , socket_output_(socket_)
-    , buffered_output_(&socket_output_)
-    , output_(&buffered_output_)
 {
     // TODO: throw on big-endianness of platform
 
@@ -288,8 +298,8 @@ void Client::Impl::InsertData(const Block& block) {
 }
 
 void Client::Impl::Ping() {
-    WireFormat::WriteUInt64(&output_, ClientCodes::Ping);
-    output_.Flush();
+    WireFormat::WriteUInt64(output_, ClientCodes::Ping);
+    output_->Flush();
 
     uint64_t server_packet;
     const bool ret = ReceivePacket(&server_packet);
@@ -300,26 +310,63 @@ void Client::Impl::Ping() {
 }
 
 void Client::Impl::ResetConnection() {
-    SocketHolder s(SocketConnect(NetworkAddress(options_.host, std::to_string(options_.port))));
 
-    if (s.Closed()) {
-        throw std::system_error(errno, std::system_category());
+    std::unique_ptr<Socket> socket;
+
+    const auto address = NetworkAddress(options_.host, std::to_string(options_.port));
+#if defined(WITH_OPENSSL)
+    // TODO: maybe do not re-create context multiple times upon reconnection - that doesn't make sense.
+    std::unique_ptr<SSLContext> ssl_context;
+    if (options_.ssl_options.use_ssl) {
+        const auto ssl_options = options_.ssl_options;
+        const auto ssl_params = SSLParams {
+                ssl_options.path_to_ca_files,
+                ssl_options.path_to_ca_directory,
+                ssl_options.use_default_ca_locations,
+                ssl_options.context_options,
+                ssl_options.min_protocol_version,
+                ssl_options.max_protocol_version,
+                ssl_options.use_sni
+        };
+
+        if (ssl_options.ssl_context)
+            ssl_context = std::make_unique<SSLContext>(*ssl_options.ssl_context);
+        else {
+            ssl_context = std::make_unique<SSLContext>(ssl_params);
+        }
+
+        socket = std::make_unique<SSLSocket>(address, ssl_params, *ssl_context);
     }
+    else
+#endif
+        socket = std::make_unique<Socket>(address);
 
     if (options_.tcp_keepalive) {
-        s.SetTcpKeepAlive(options_.tcp_keepalive_idle.count(),
+        socket->SetTcpKeepAlive(options_.tcp_keepalive_idle.count(),
                           options_.tcp_keepalive_intvl.count(),
                           options_.tcp_keepalive_cnt);
     }
     if (options_.tcp_nodelay) {
-        s.SetTcpNoDelay(options_.tcp_nodelay);
+        socket->SetTcpNoDelay(options_.tcp_nodelay);
     }
 
-    socket_ = std::move(s);
-    socket_input_ = SocketInput(socket_);
-    socket_output_ = SocketOutput(socket_);
-    buffered_input_.Reset();
-    buffered_output_.Reset();
+    OutputStreams output_streams;
+    auto socket_output = output_streams.Add(socket->makeOutputStream());
+    auto output = output_streams.AddNew<BufferedOutput>(socket_output);
+
+    InputStreams input_streams;
+    auto socket_input = input_streams.Add(socket->makeInputStream());
+    auto input = input_streams.AddNew<BufferedInput>(socket_input);
+
+    std::swap(output_streams, output_streams_);
+    std::swap(input_streams, input_streams_);
+    std::swap(socket, socket_);
+    output_ = output;
+    input_ = input;
+
+#if defined(WITH_OPENSSL)
+    std::swap(ssl_context_, ssl_context);
+#endif
 
     if (!Handshake()) {
         throw std::runtime_error("fail to connect to " + options_.host);
@@ -343,7 +390,7 @@ bool Client::Impl::Handshake() {
 bool Client::Impl::ReceivePacket(uint64_t* server_packet) {
     uint64_t packet_type = 0;
 
-    if (!input_.ReadVarint64(&packet_type)) {
+    if (!WireFormat::ReadVarint64(input_, &packet_type)) {
         return false;
     }
     if (server_packet) {
@@ -366,22 +413,22 @@ bool Client::Impl::ReceivePacket(uint64_t* server_packet) {
     case ServerCodes::ProfileInfo: {
         Profile profile;
 
-        if (!WireFormat::ReadUInt64(&input_, &profile.rows)) {
+        if (!WireFormat::ReadUInt64(input_, &profile.rows)) {
             return false;
         }
-        if (!WireFormat::ReadUInt64(&input_, &profile.blocks)) {
+        if (!WireFormat::ReadUInt64(input_, &profile.blocks)) {
             return false;
         }
-        if (!WireFormat::ReadUInt64(&input_, &profile.bytes)) {
+        if (!WireFormat::ReadUInt64(input_, &profile.bytes)) {
             return false;
         }
-        if (!WireFormat::ReadFixed(&input_, &profile.applied_limit)) {
+        if (!WireFormat::ReadFixed(input_, &profile.applied_limit)) {
             return false;
         }
-        if (!WireFormat::ReadUInt64(&input_, &profile.rows_before_limit)) {
+        if (!WireFormat::ReadUInt64(input_, &profile.rows_before_limit)) {
             return false;
         }
-        if (!WireFormat::ReadFixed(&input_, &profile.calculated_rows_before_limit)) {
+        if (!WireFormat::ReadFixed(input_, &profile.calculated_rows_before_limit)) {
             return false;
         }
 
@@ -395,14 +442,14 @@ bool Client::Impl::ReceivePacket(uint64_t* server_packet) {
     case ServerCodes::Progress: {
         Progress info;
 
-        if (!WireFormat::ReadUInt64(&input_, &info.rows)) {
+        if (!WireFormat::ReadUInt64(input_, &info.rows)) {
             return false;
         }
-        if (!WireFormat::ReadUInt64(&input_, &info.bytes)) {
+        if (!WireFormat::ReadUInt64(input_, &info.bytes)) {
             return false;
         }
         if (REVISION >= DBMS_MIN_REVISION_WITH_TOTAL_ROWS_IN_PROGRESS) {
-            if (!WireFormat::ReadUInt64(&input_, &info.total_rows)) {
+            if (!WireFormat::ReadUInt64(input_, &info.total_rows)) {
                 return false;
             }
         }
@@ -433,7 +480,7 @@ bool Client::Impl::ReceivePacket(uint64_t* server_packet) {
     return false;
 }
 
-bool Client::Impl::ReadBlock(Block* block, CodedInputStream* input) {
+bool Client::Impl::ReadBlock(Block* block, InputStream* input) {
     // Additional information about block.
     if (REVISION >= DBMS_MIN_REVISION_WITH_BLOCK_INFO) {
         uint64_t num;
@@ -469,6 +516,9 @@ bool Client::Impl::ReadBlock(Block* block, CodedInputStream* input) {
         return false;
     }
 
+    CreateColumnByTypeSettings create_column_settings;
+    create_column_settings.low_cardinality_as_wrapped_column = options_.backward_compatibility_lowcardinality_as_wrapped_column;
+
     std::string name;
     std::string type;
     for (size_t i = 0; i < num_columns; ++i) {
@@ -479,7 +529,7 @@ bool Client::Impl::ReadBlock(Block* block, CodedInputStream* input) {
             return false;
         }
 
-        if (ColumnRef col = CreateColumnByType(type)) {
+        if (ColumnRef col = CreateColumnByType(type, create_column_settings)) {
             if (num_rows && !col->Load(input, num_rows)) {
                 throw std::runtime_error("can't load");
             }
@@ -497,20 +547,18 @@ bool Client::Impl::ReceiveData() {
     Block block;
 
     if (REVISION >= DBMS_MIN_REVISION_WITH_TEMPORARY_TABLES) {
-        if (!WireFormat::SkipString(&input_)) {
+        if (!WireFormat::SkipString(input_)) {
             return false;
         }
     }
 
     if (compression_ == CompressionState::Enable) {
-        CompressedInput compressed(&input_);
-        CodedInputStream coded(&compressed);
-
-        if (!ReadBlock(&block, &coded)) {
+        CompressedInput compressed(input_);
+        if (!ReadBlock(&block, &compressed)) {
             return false;
         }
     } else {
-        if (!ReadBlock(&block, &input_)) {
+        if (!ReadBlock(&block, input_)) {
             return false;
         }
     }
@@ -533,23 +581,23 @@ bool Client::Impl::ReceiveException(bool rethrow) {
     do {
         bool has_nested = false;
 
-        if (!WireFormat::ReadFixed(&input_, &current->code)) {
+        if (!WireFormat::ReadFixed(input_, &current->code)) {
            exception_received = false;
            break;
         }
-        if (!WireFormat::ReadString(&input_, &current->name)) {
+        if (!WireFormat::ReadString(input_, &current->name)) {
             exception_received = false;
             break;
         }
-        if (!WireFormat::ReadString(&input_, &current->display_text)) {
+        if (!WireFormat::ReadString(input_, &current->display_text)) {
             exception_received = false;
             break;
         }
-        if (!WireFormat::ReadString(&input_, &current->stack_trace)) {
+        if (!WireFormat::ReadString(input_, &current->stack_trace)) {
             exception_received = false;
             break;
         }
-        if (!WireFormat::ReadFixed(&input_, &has_nested)) {
+        if (!WireFormat::ReadFixed(input_, &has_nested)) {
             exception_received = false;
             break;
         }
@@ -574,13 +622,13 @@ bool Client::Impl::ReceiveException(bool rethrow) {
 }
 
 void Client::Impl::SendCancel() {
-    WireFormat::WriteUInt64(&output_, ClientCodes::Cancel);
-    output_.Flush();
+    WireFormat::WriteUInt64(output_, ClientCodes::Cancel);
+    output_->Flush();
 }
 
 void Client::Impl::SendQuery(const std::string& query) {
-    WireFormat::WriteUInt64(&output_, ClientCodes::Query);
-    WireFormat::WriteString(&output_, std::string());
+    WireFormat::WriteUInt64(output_, ClientCodes::Query);
+    WireFormat::WriteString(output_, std::string());
 
     /// Client info.
     if (server_info_.revision >= DBMS_MIN_REVISION_WITH_CLIENT_INFO) {
@@ -593,23 +641,23 @@ void Client::Impl::SendQuery(const std::string& query) {
         info.client_revision = REVISION;
 
 
-        WireFormat::WriteFixed(&output_, info.query_kind);
-        WireFormat::WriteString(&output_, info.initial_user);
-        WireFormat::WriteString(&output_, info.initial_query_id);
-        WireFormat::WriteString(&output_, info.initial_address);
-        WireFormat::WriteFixed(&output_, info.iface_type);
+        WireFormat::WriteFixed(output_, info.query_kind);
+        WireFormat::WriteString(output_, info.initial_user);
+        WireFormat::WriteString(output_, info.initial_query_id);
+        WireFormat::WriteString(output_, info.initial_address);
+        WireFormat::WriteFixed(output_, info.iface_type);
 
-        WireFormat::WriteString(&output_, info.os_user);
-        WireFormat::WriteString(&output_, info.client_hostname);
-        WireFormat::WriteString(&output_, info.client_name);
-        WireFormat::WriteUInt64(&output_, info.client_version_major);
-        WireFormat::WriteUInt64(&output_, info.client_version_minor);
-        WireFormat::WriteUInt64(&output_, info.client_revision);
+        WireFormat::WriteString(output_, info.os_user);
+        WireFormat::WriteString(output_, info.client_hostname);
+        WireFormat::WriteString(output_, info.client_name);
+        WireFormat::WriteUInt64(output_, info.client_version_major);
+        WireFormat::WriteUInt64(output_, info.client_version_minor);
+        WireFormat::WriteUInt64(output_, info.client_revision);
 
         if (server_info_.revision >= DBMS_MIN_REVISION_WITH_QUOTA_KEY_IN_CLIENT_INFO)
-            WireFormat::WriteString(&output_, info.quota_key);
+            WireFormat::WriteString(output_, info.quota_key);
         if (server_info_.revision >= DBMS_MIN_REVISION_WITH_VERSION_PATCH) {
-            WireFormat::WriteUInt64(&output_, info.client_version_patch);
+            WireFormat::WriteUInt64(output_, info.client_version_patch);
         }
     }
 
@@ -617,26 +665,26 @@ void Client::Impl::SendQuery(const std::string& query) {
     //if (settings)
     //    settings->serialize(*out);
     //else
-    WireFormat::WriteString(&output_, std::string());
+    WireFormat::WriteString(output_, std::string());
 
-    WireFormat::WriteUInt64(&output_, Stages::Complete);
-    WireFormat::WriteUInt64(&output_, compression_);
-    WireFormat::WriteString(&output_, query);
+    WireFormat::WriteUInt64(output_, Stages::Complete);
+    WireFormat::WriteUInt64(output_, compression_);
+    WireFormat::WriteString(output_, query);
     // Send empty block as marker of
     // end of data
     SendData(Block());
 
-    output_.Flush();
+    output_->Flush();
 }
 
 
-void Client::Impl::WriteBlock(const Block& block, CodedOutputStream* output) {
+void Client::Impl::WriteBlock(const Block& block, OutputStream* output) {
     // Additional information about block.
     if (server_info_.revision >= DBMS_MIN_REVISION_WITH_BLOCK_INFO) {
         WireFormat::WriteUInt64(output, 1);
-        WireFormat::WriteFixed (output, block.Info().is_overflows);
+        WireFormat::WriteFixed<uint8_t>(output, block.Info().is_overflows);
         WireFormat::WriteUInt64(output, 2);
-        WireFormat::WriteFixed (output, block.Info().bucket_num);
+        WireFormat::WriteFixed<int32_t>(output, block.Info().bucket_num);
         WireFormat::WriteUInt64(output, 0);
     }
 
@@ -649,71 +697,39 @@ void Client::Impl::WriteBlock(const Block& block, CodedOutputStream* output) {
 
         bi.Column()->Save(output);
     }
+    output->Flush();
 }
 
 void Client::Impl::SendData(const Block& block) {
-    WireFormat::WriteUInt64(&output_, ClientCodes::Data);
+    WireFormat::WriteUInt64(output_, ClientCodes::Data);
 
     if (server_info_.revision >= DBMS_MIN_REVISION_WITH_TEMPORARY_TABLES) {
-        WireFormat::WriteString(&output_, std::string());
+        WireFormat::WriteString(output_, std::string());
     }
 
     if (compression_ == CompressionState::Enable) {
-        switch (options_.compression_method) {
-            case CompressionMethod::None: {
-                assert(false);
-                break;
-            }
-
-            case CompressionMethod::LZ4: {
-                Buffer tmp;
-                // Serialize block's data
-                {
-                    BufferOutput out(&tmp);
-                    CodedOutputStream coded(&out);
-                    WriteBlock(block, &coded);
-                }
-                // Reserver space for data
-                Buffer buf;
-                buf.resize(9 + LZ4_compressBound(tmp.size()));
-
-                // Compress data
-                int size = LZ4_compress_default((const char*)tmp.data(), (char*)buf.data() + 9, tmp.size(), buf.size() - 9);
-                buf.resize(9 + size);
-
-                // Fill header
-                uint8_t* p = buf.data();
-                // Compression method
-                WriteUnaligned(p, (uint8_t)0x82); p += 1;
-                // Compressed data size with header
-                WriteUnaligned(p, (uint32_t)buf.size()); p += 4;
-                // Original data size
-                WriteUnaligned(p, (uint32_t)tmp.size());
-
-                WireFormat::WriteFixed(&output_, CityHash128(
-                                    (const char*)buf.data(), buf.size()));
-                WireFormat::WriteBytes(&output_, buf.data(), buf.size());
-                break;
-            }
-        }
+        assert(options_.compression_method == CompressionMethod::LZ4);
+        CompressedOutput compressed_ouput(output_, options_.max_compression_chunk_size);
+        BufferedOutput buffered(&compressed_ouput, options_.max_compression_chunk_size);
+        WriteBlock(block, &buffered);
     } else {
-        WriteBlock(block, &output_);
+        WriteBlock(block, output_);
     }
 
-    output_.Flush();
+    output_->Flush();
 }
 
 bool Client::Impl::SendHello() {
-    WireFormat::WriteUInt64(&output_, ClientCodes::Hello);
-    WireFormat::WriteString(&output_, std::string(DBMS_NAME) + " client");
-    WireFormat::WriteUInt64(&output_, DBMS_VERSION_MAJOR);
-    WireFormat::WriteUInt64(&output_, DBMS_VERSION_MINOR);
-    WireFormat::WriteUInt64(&output_, REVISION);
-    WireFormat::WriteString(&output_, options_.default_database);
-    WireFormat::WriteString(&output_, options_.user);
-    WireFormat::WriteString(&output_, options_.password);
+    WireFormat::WriteUInt64(output_, ClientCodes::Hello);
+    WireFormat::WriteString(output_, std::string(DBMS_NAME) + " client");
+    WireFormat::WriteUInt64(output_, DBMS_VERSION_MAJOR);
+    WireFormat::WriteUInt64(output_, DBMS_VERSION_MINOR);
+    WireFormat::WriteUInt64(output_, REVISION);
+    WireFormat::WriteString(output_, options_.default_database);
+    WireFormat::WriteString(output_, options_.user);
+    WireFormat::WriteString(output_, options_.password);
 
-    output_.Flush();
+    output_->Flush();
 
     return true;
 }
@@ -721,38 +737,38 @@ bool Client::Impl::SendHello() {
 bool Client::Impl::ReceiveHello() {
     uint64_t packet_type = 0;
 
-    if (!input_.ReadVarint64(&packet_type)) {
+    if (!WireFormat::ReadVarint64(input_, &packet_type)) {
         return false;
     }
 
     if (packet_type == ServerCodes::Hello) {
-        if (!WireFormat::ReadString(&input_, &server_info_.name)) {
+        if (!WireFormat::ReadString(input_, &server_info_.name)) {
             return false;
         }
-        if (!WireFormat::ReadUInt64(&input_, &server_info_.version_major)) {
+        if (!WireFormat::ReadUInt64(input_, &server_info_.version_major)) {
             return false;
         }
-        if (!WireFormat::ReadUInt64(&input_, &server_info_.version_minor)) {
+        if (!WireFormat::ReadUInt64(input_, &server_info_.version_minor)) {
             return false;
         }
-        if (!WireFormat::ReadUInt64(&input_, &server_info_.revision)) {
+        if (!WireFormat::ReadUInt64(input_, &server_info_.revision)) {
             return false;
         }
 
         if (server_info_.revision >= DBMS_MIN_REVISION_WITH_SERVER_TIMEZONE) {
-            if (!WireFormat::ReadString(&input_, &server_info_.timezone)) {
+            if (!WireFormat::ReadString(input_, &server_info_.timezone)) {
                 return false;
             }
         }
 
         if (server_info_.revision >= DBMS_MIN_REVISION_WITH_SERVER_DISPLAY_NAME) {
-            if (!WireFormat::ReadString(&input_, &server_info_.display_name)) {
+            if (!WireFormat::ReadString(input_, &server_info_.display_name)) {
                 return false;
             }
         }
 
         if (server_info_.revision >= DBMS_MIN_REVISION_WITH_VERSION_PATCH) {
-            if (!WireFormat::ReadUInt64(&input_, &server_info_.version_patch)) {
+            if (!WireFormat::ReadUInt64(input_, &server_info_.version_patch)) {
                 return false;
             }
         }
