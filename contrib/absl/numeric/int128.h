@@ -48,9 +48,6 @@
 #define ABSL_INTERNAL_WCHAR_T wchar_t
 #endif  // defined(_MSC_VER)
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wpedantic"
-
 namespace absl {
 ABSL_NAMESPACE_BEGIN
 
@@ -1089,8 +1086,6 @@ constexpr int64_t BitCastToSigned(uint64_t v) {
 
 ABSL_NAMESPACE_END
 }  // namespace absl
-
-#pragma GCC diagnostic pop
 
 #undef ABSL_INTERNAL_WCHAR_T
 
