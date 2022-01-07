@@ -33,11 +33,11 @@ INSTANTIATE_TEST_SUITE_P(
     RemoteTLS, ReadonlyClientTest,
     ::testing::Values(ReadonlyClientTest::ParamType {
         ClientOptions()
-            .SetHost("github.demo.trial.altinity.cloud")
-            .SetPort(9440)
-            .SetUser("demo")
-            .SetPassword("demo")
-            .SetDefaultDatabase("default")
+            .SetHost(           getEnvOrDefault("CLICKHOUSE_SECURE_HOST",     "github.demo.trial.altinity.cloud"))
+            .SetPort( std::stoi(getEnvOrDefault("CLICKHOUSE_SECURE_PORT",     "9440")))
+            .SetUser(           getEnvOrDefault("CLICKHOUSE_SECURE_USER",     "demo"))
+            .SetPassword(       getEnvOrDefault("CLICKHOUSE_SECURE_PASSWORD", "demo"))
+            .SetDefaultDatabase(getEnvOrDefault("CLICKHOUSE_SECURE_DB",       "default"))
             .SetSendRetries(1)
             .SetPingBeforeQuery(true)
             .SetCompressionMethod(CompressionMethod::None)
@@ -51,9 +51,11 @@ INSTANTIATE_TEST_SUITE_P(
     Remote_GH_API_TLS, ReadonlyClientTest,
     ::testing::Values(ReadonlyClientTest::ParamType {
         ClientOptions()
-            .SetHost("gh-api.clickhouse.tech")
-            .SetPort(9440)
-            .SetUser("explorer")
+            .SetHost(           getEnvOrDefault("CLICKHOUSE_SECURE2_HOST",     "gh-api.clickhouse.tech"))
+            .SetPort( std::stoi(getEnvOrDefault("CLICKHOUSE_SECURE2_PORT",     "9440")))
+            .SetUser(           getEnvOrDefault("CLICKHOUSE_SECURE2_USER",     "explorer"))
+            .SetPassword(       getEnvOrDefault("CLICKHOUSE_SECURE2_PASSWORD", ""))
+            .SetDefaultDatabase(getEnvOrDefault("CLICKHOUSE_SECURE2_DB",       "default"))
             .SetSendRetries(1)
             .SetPingBeforeQuery(true)
             .SetCompressionMethod(CompressionMethod::None)
@@ -67,9 +69,11 @@ INSTANTIATE_TEST_SUITE_P(
     Remote_GH_API_TLS_no_CA, ConnectionFailedClientTest,
     ::testing::Values(ConnectionFailedClientTest::ParamType {
         ClientOptions()
-            .SetHost("gh-api.clickhouse.tech")
-            .SetPort(9440)
-            .SetUser("explorer")
+            .SetHost(           getEnvOrDefault("CLICKHOUSE_SECURE2_HOST",     "gh-api.clickhouse.tech"))
+            .SetPort( std::stoi(getEnvOrDefault("CLICKHOUSE_SECURE2_PORT",     "9440")))
+            .SetUser(           getEnvOrDefault("CLICKHOUSE_SECURE2_USER",     "explorer"))
+            .SetPassword(       getEnvOrDefault("CLICKHOUSE_SECURE2_PASSWORD", ""))
+            .SetDefaultDatabase(getEnvOrDefault("CLICKHOUSE_SECURE2_DB",       "default"))
             .SetSendRetries(1)
             .SetPingBeforeQuery(true)
             .SetCompressionMethod(CompressionMethod::None)
@@ -83,9 +87,11 @@ INSTANTIATE_TEST_SUITE_P(
     Remote_GH_API_TLS_wrong_TLS_version, ConnectionFailedClientTest,
     ::testing::Values(ConnectionFailedClientTest::ParamType {
         ClientOptions()
-            .SetHost("gh-api.clickhouse.tech")
-            .SetPort(9440)
-            .SetUser("explorer")
+            .SetHost(           getEnvOrDefault("CLICKHOUSE_SECURE2_HOST",     "gh-api.clickhouse.tech"))
+            .SetPort( std::stoi(getEnvOrDefault("CLICKHOUSE_SECURE2_PORT",     "9440")))
+            .SetUser(           getEnvOrDefault("CLICKHOUSE_SECURE2_USER",     "explorer"))
+            .SetPassword(       getEnvOrDefault("CLICKHOUSE_SECURE2_PASSWORD", ""))
+            .SetDefaultDatabase(getEnvOrDefault("CLICKHOUSE_SECURE2_DB",       "default"))
             .SetSendRetries(1)
             .SetPingBeforeQuery(true)
             .SetCompressionMethod(CompressionMethod::None)

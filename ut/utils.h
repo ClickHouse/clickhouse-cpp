@@ -106,3 +106,5 @@ MeasuresCollector<MeasureFunc> collect(MeasureFunc && f)
 }
 
 std::ostream& operator<<(std::ostream & ostr, const clickhouse::Block & block);
+
+std::string getEnvOrDefault(const std::string& env, const std::string& default_val);

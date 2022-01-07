@@ -13,6 +13,12 @@
 using namespace clickhouse;
 using namespace std;
 
+std::string getEnvOrDefault(const std::string& env, const std::string& default_val)
+{
+    const char* v = std::getenv(env.c_str());
+    return v ? v : default_val;
+}
+
 inline void PrintBlock(const Block& block) {
     for (Block::Iterator bi(block); bi.IsValid(); bi.Next()) {
         std::cout << bi.Name() << " ";
@@ -498,14 +504,22 @@ int main() {
     try {
         {
             Client client(ClientOptions()
-                            .SetHost("localhost")
+                            .SetHost(           getEnvOrDefault("CLICKHOUSE_HOST",     "localhost"))
+                            .SetPort( std::stoi(getEnvOrDefault("CLICKHOUSE_PORT",     "9000")))
+                            .SetUser(           getEnvOrDefault("CLICKHOUSE_USER",     "default"))
+                            .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", ""))
+                            .SetDefaultDatabase(getEnvOrDefault("CLICKHOUSE_DB",       "default"))
                             .SetPingBeforeQuery(true));
             RunTests(client);
         }
 
         {
             Client client(ClientOptions()
-                            .SetHost("localhost")
+                            .SetHost(           getEnvOrDefault("CLICKHOUSE_HOST",     "localhost"))
+                            .SetPort( std::stoi(getEnvOrDefault("CLICKHOUSE_PORT",     "9000")))
+                            .SetUser(           getEnvOrDefault("CLICKHOUSE_USER",     "default"))
+                            .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", ""))
+                            .SetDefaultDatabase(getEnvOrDefault("CLICKHOUSE_DB",       "default"))
                             .SetPingBeforeQuery(true)
                             .SetCompressionMethod(CompressionMethod::LZ4));
             RunTests(client);

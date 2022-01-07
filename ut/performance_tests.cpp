@@ -171,7 +171,13 @@ TYPED_TEST_P(ColumnPerformanceTest, InsertAndSelect) {
     const std::string column_name = "column";
 
     auto column = InstantiateColumn<ColumnType>();
-    Client client(ClientOptions().SetHost("localhost"));
+    Client client(ClientOptions()
+            .SetHost(           getEnvOrDefault("CLICKHOUSE_HOST",     "localhost"))
+            .SetPort( std::stoi(getEnvOrDefault("CLICKHOUSE_PORT",     "9000")))
+            .SetUser(           getEnvOrDefault("CLICKHOUSE_USER",     "default"))
+            .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", ""))
+            .SetDefaultDatabase(getEnvOrDefault("CLICKHOUSE_DB",       "default"))
+    );
     client.Execute("CREATE DATABASE IF NOT EXISTS PerformanceTests");
     client.Execute("DROP TABLE IF EXISTS PerformanceTests.ColumnTest");
     client.Execute("CREATE TABLE PerformanceTests.ColumnTest (" + column_name + " " + column.Type()->GetName() + ") ENGINE = Memory");
