@@ -32,15 +32,6 @@ inline bool getSignBit(const T & v)
     return v < static_cast<T>(0);
 }
 
-inline bool getSignBit(const Int128 & v)
-{
-//    static constexpr Int128 zero {};
-//    return v < zero;
-
-    // Sign of the whole absl::int128 value is determined by sign of higher 64 bits.
-    return absl::Int128High64(v) < 0;
-}
-
 inline bool addOverflow(const Int128 & l, const Int128 & r, Int128 * result)
 {
     //    *result = l + r;
