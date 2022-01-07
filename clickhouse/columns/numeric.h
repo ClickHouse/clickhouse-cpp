@@ -1,7 +1,6 @@
 #pragma once
 
 #include "column.h"
-#include "absl/numeric/int128.h"
 
 namespace clickhouse {
 
