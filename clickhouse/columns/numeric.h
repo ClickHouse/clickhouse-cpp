@@ -55,7 +55,7 @@ private:
     std::vector<T> data_;
 };
 
-using Int128 = int128_t;
+using Int128 = __int128_t;
 using Int64 = int64_t;
 
 using ColumnUInt8   = ColumnVector<uint8_t>;

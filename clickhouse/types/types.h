@@ -8,7 +8,7 @@
 
 namespace clickhouse {
 
-using Int128 = int128_t;
+using Int128 = __int128_t;
 using Int64 = int64_t;
 
 using TypeRef = std::shared_ptr<class Type>;
