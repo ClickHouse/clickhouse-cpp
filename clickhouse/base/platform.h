@@ -13,6 +13,8 @@
 
 #if defined(_win32_) || defined(_win64_)
 #   define _win_
+#   define _WIN32_WINNT 0x0600    // The WSAPoll function is defined on Windows Vista and later.
+#   define WIN32_LEAN_AND_MEAN 1  // don't include too much header automatically
 #endif
 
 #if defined(_linux_) || defined (_darwin_)

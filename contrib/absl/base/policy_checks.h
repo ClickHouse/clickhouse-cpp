@@ -36,9 +36,11 @@
 // Operating System Check
 // -----------------------------------------------------------------------------
 
+/* it looks like int128 part of absl work correctly on mingw.
 #if defined(__CYGWIN__)
 #error "Cygwin is not supported."
 #endif
+*/
 
 // -----------------------------------------------------------------------------
 // Toolchain Check

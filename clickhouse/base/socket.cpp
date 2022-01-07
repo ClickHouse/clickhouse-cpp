@@ -14,10 +14,32 @@
 #   include <netinet/tcp.h>
 #   include <signal.h>
 #   include <unistd.h>
-#   include <netinet/tcp.h>
 #endif
 
 namespace clickhouse {
+
+#if defined(_win_)
+char const* windowsErrorCategory::name() const noexcept {
+    return "WindowsSocketError";
+}
+
+std::string windowsErrorCategory::message(int c) const {
+    char error[UINT8_MAX];
+    auto len = FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, nullptr, static_cast<DWORD>(c), 0, error, sizeof(error), nullptr);
+    if (len == 0) {
+        return "unknown";
+    }
+    while (len && (error[len - 1] == '\r' || error[len - 1] == '\n')) {
+        --len;
+    }
+    return std::string(error, len);
+}
+
+/*static*/ windowsErrorCategory const& windowsErrorCategory::category() {
+    static windowsErrorCategory c;
+    return c;
+}
+#endif
 
 namespace {
 
@@ -36,6 +58,22 @@ public:
         return find(name) != end();
     }
 };
+
+inline int getSocketErrorCode() {
+#if defined(_win_)
+    return WSAGetLastError();
+#else
+    return errno;
+#endif
+}
+
+const std::error_category& getErrorCategory() noexcept {
+#if defined(_win_)
+    return windowsErrorCategory::category();
+#else
+    return std::system_category();
+#endif
+}
 
 void SetNonBlock(SOCKET fd, bool value) {
 #if defined(_unix_)
@@ -68,8 +106,7 @@ void SetNonBlock(SOCKET fd, bool value) {
     }
 
     if (WSAIoctl(fd, FIONBIO, &inbuf, sizeof(inbuf), &outbuf, sizeof(outbuf), &written, 0, 0) == SOCKET_ERROR) {
-        throw std::system_error(
-            errno, std::system_category(), "fail to set nonblocking mode");
+        throw std::system_error(getSocketErrorCode(), getErrorCategory(), "fail to set nonblocking mode");
     }
 #endif
 }
@@ -94,8 +131,13 @@ SOCKET SocketConnect(const NetworkAddress& addr) {
         SetNonBlock(s, true);
 
         if (connect(s, res->ai_addr, (int)res->ai_addrlen) != 0) {
-            int err = errno;
-            if (err == EINPROGRESS || err == EAGAIN || err == EWOULDBLOCK) {
+            int err = getSocketErrorCode();
+            if (
+                err == EINPROGRESS || err == EAGAIN || err == EWOULDBLOCK
+#if defined(_win_)
+                || err == WSAEWOULDBLOCK || err == WSAEINPROGRESS
+#endif
+            ) {
                 pollfd fd;
                 fd.fd = s;
                 fd.events = POLLOUT;
@@ -103,7 +145,7 @@ SOCKET SocketConnect(const NetworkAddress& addr) {
                 ssize_t rval = Poll(&fd, 1, 5000);
 
                 if (rval == -1) {
-                    throw std::system_error(errno, std::system_category(), "fail to connect");
+                    throw std::system_error(getSocketErrorCode(), getErrorCategory(), "fail to connect");
                 }
                 if (rval > 0) {
                     socklen_t len = sizeof(err);
@@ -122,10 +164,9 @@ SOCKET SocketConnect(const NetworkAddress& addr) {
         }
     }
     if (last_err > 0) {
-        throw std::system_error(last_err, std::system_category(), "fail to connect");
+        throw std::system_error(last_err, getErrorCategory(), "fail to connect");
     }
-    throw std::system_error(
-        errno, std::system_category(), "fail to connect"
+    throw std::system_error(getSocketErrorCode(), getErrorCategory(), "fail to connect"
     );
 }
 

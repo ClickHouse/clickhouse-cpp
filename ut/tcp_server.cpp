@@ -5,16 +5,13 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <winsock2.h>
-/* 
-#if defined(_win_)
+#if defined(__WIN32__) || defined(_WIN32) || defined(_WIN64)
 #   include <winsock2.h>
 #else
 #   include <netinet/in.h>
 #   include <sys/socket.h>
 #   include <unistd.h>
 #endif
-*/ 
 
 #include <thread>
 
@@ -43,10 +40,10 @@ void LocalTcpServer::start() {
     }
     int enable = 1;
 
-#if defined(_unix_)
-    auto res = setsockopt(serverSd_, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable));
-#else
+#if defined(__WIN32__) || defined(_WIN32) || defined(_WIN64)
     auto res = setsockopt(serverSd_, SOL_SOCKET, SO_REUSEADDR, (const char*)&enable, sizeof(enable));
+#else
+    auto res = setsockopt(serverSd_, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable));
 #endif
 
     if (res < 0) {
@@ -64,12 +61,12 @@ void LocalTcpServer::start() {
 void LocalTcpServer::stop() {
     if(serverSd_ > 0) {
 
-#if defined(_unix_)
-        shutdown(serverSd_, SHUT_RDWR);
-        close(serverSd_);
-#else
+#if defined(__WIN32__) || defined(_WIN32) || defined(_WIN64)
         shutdown(serverSd_, SD_BOTH);
         closesocket(serverSd_);
+#else
+        shutdown(serverSd_, SHUT_RDWR);
+        close(serverSd_);
 #endif
         serverSd_ = -1;
     }
