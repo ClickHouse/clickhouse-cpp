@@ -35,7 +35,7 @@ public:
 	std::nullptr_t operator [] (size_t) const { return nullptr; };
 
     /// Makes slice of the current column.
-    ColumnRef Slice(size_t, size_t len) override {
+    ColumnRef Slice(size_t, size_t len) const override {
 		return std::make_shared<ColumnNothing>(len);
 	}
 
@@ -50,14 +50,14 @@ public:
 	}
 
     /// Loads column data from input stream.
-    bool Load(CodedInputStream* input, size_t rows) override {
+    bool Load(InputStream* input, size_t rows) override {
 		input->Skip(rows);
 		size_ += rows;
 		return true;
 	}
 
     /// Saves column data to output stream.
-    void Save(CodedOutputStream*) override {
+    void Save(OutputStream*) override {
         throw std::runtime_error("method Save is not supported for Nothing column");
 	}
 

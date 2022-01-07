@@ -6,7 +6,8 @@
 
 namespace clickhouse {
 
-void ZeroCopyOutput::DoWrite(const void* data, size_t len) {
+size_t ZeroCopyOutput::DoWrite(const void* data, size_t len) {
+    const size_t original_len = len;
     while (len > 0) {
         void* ptr;
         size_t result = DoNext(&ptr, len);
@@ -19,12 +20,15 @@ void ZeroCopyOutput::DoWrite(const void* data, size_t len) {
             break;
         }
     }
+
+    return original_len - len;
 }
 
 
 ArrayOutput::ArrayOutput(void* buf, size_t len)
     : buf_(static_cast<uint8_t*>(buf))
     , end_(buf_ + len)
+    , buffer_size_(len)
 {
 }
 
@@ -105,17 +109,16 @@ size_t BufferedOutput::DoNext(void** data, size_t len) {
 
 }
 
-void BufferedOutput::DoWrite(const void* data, size_t len) {
+size_t BufferedOutput::DoWrite(const void* data, size_t len) {
     if (array_output_.Avail() < len) {
         Flush();
 
         if (len > buffer_.size() / 2) {
-            slave_->Write(data, len);
-            return;
+            return slave_->Write(data, len);
         }
     }
 
-    array_output_.Write(data, len);
+    return array_output_.Write(data, len);
 }
 
 }

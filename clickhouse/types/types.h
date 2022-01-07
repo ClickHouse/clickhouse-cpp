@@ -1,5 +1,7 @@
 #pragma once
 
+#include "absl/numeric/int128.h"
+
 #include <map>
 #include <memory>
 #include <string>
@@ -7,6 +9,9 @@
 #include <stdexcept>
 
 namespace clickhouse {
+
+using Int128 = absl::int128;
+using Int64 = int64_t;
 
 using TypeRef = std::shared_ptr<class Type>;
 
@@ -282,7 +287,7 @@ inline TypeRef Type::CreateSimple<int64_t>() {
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wpedantic"
 template <>
-inline TypeRef Type::CreateSimple<__int128>() {
+inline TypeRef Type::CreateSimple<Int128>() {
     return TypeRef(new Type(Int128));
 }
 #pragma GCC diagnostic pop

@@ -43,11 +43,11 @@ void ColumnUUID::Append(ColumnRef column) {
     }
 }
 
-bool ColumnUUID::Load(CodedInputStream* input, size_t rows) {
+bool ColumnUUID::Load(InputStream* input, size_t rows) {
     return data_->Load(input, rows * 2);
 }
 
-void ColumnUUID::Save(CodedOutputStream* output) {
+void ColumnUUID::Save(OutputStream* output) {
     data_->Save(output);
 }
 
@@ -55,7 +55,7 @@ size_t ColumnUUID::Size() const {
     return data_->Size() / 2;
 }
 
-ColumnRef ColumnUUID::Slice(size_t begin, size_t len) {
+ColumnRef ColumnUUID::Slice(size_t begin, size_t len) const {
     return std::make_shared<ColumnUUID>(data_->Slice(begin * 2, len * 2));
 }
 

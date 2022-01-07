@@ -1,0 +1,76 @@
+name: Linux
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  workflow_call:
+    inputs:
+      extra_cmake_flags:
+        required: false
+        type: string
+      extra_install:
+        required: false
+        type: string
+      gtest_filter:
+        required: false
+        type: string
+        default: "*"
+
+env:
+  BUILD_TYPE: Release
+  CH_SERVER_VERSION: 21.3.17.2
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        build: [gcc-7, clang-6]
+        include:
+        - build: gcc-7
+          os: ubuntu-latest
+          INSTALL: gcc-7 g++-7
+          C_COMPILER: gcc-7
+          CXX_COMPILER: g++-7
+
+        - build: clang-6
+          os: ubuntu-latest
+          INSTALL: clang-6.0
+          C_COMPILER: clang-6.0
+          CXX_COMPILER: clang++-6.0
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Install dependencies
+      run: sudo apt-get install -y cmake ${{ matrix.INSTALL }} ${{ inputs.extra_install }}
+
+    - name: Configure CMake
+      run: |
+        cmake \
+          -DCMAKE_C_COMPILER=${{ matrix.C_COMPILER}} \
+          -DCMAKE_CXX_COMPILER=${{ matrix.CXX_COMPILER}} \
+          -B ${{github.workspace}}/build \
+          -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DBUILD_TESTS=ON \
+          ${{ inputs.extra_cmake_flags }}
+
+    - name: Build
+      run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} --target all
+
+    - name: Start ClickHouse server
+      run: |
+        sudo apt-get install apt-transport-https ca-certificates dirmngr
+        sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv E0C56BD4
+        echo "deb https://repo.clickhouse.com/deb/stable/ main/" | sudo tee /etc/apt/sources.list.d/clickhouse.list
+        sudo apt-get update
+        sudo apt-get install -y \
+            clickhouse-server=${{env.CH_SERVER_VERSION}} \
+            clickhouse-client=${{env.CH_SERVER_VERSION}} \
+            clickhouse-common-static=${{env.CH_SERVER_VERSION}}
+        sudo service clickhouse-server start
+
+    - name: Test
+      working-directory: ${{github.workspace}}/build/ut
+      run: ./clickhouse-cpp-ut --gtest_filter="${{inputs.gtest_filter}}"

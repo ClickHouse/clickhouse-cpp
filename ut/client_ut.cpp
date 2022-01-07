@@ -237,6 +237,54 @@ TEST_P(ClientCase, LowCardinality_InsertAfterClear) {
     ASSERT_EQ(total_rows, data.size());
 }
 
+TEST_P(ClientCase, LowCardinalityString_AsString) {
+    // Validate that LowCardinality(String) column values can be INSERTed from client as ColumnString
+    // and also read on client (enabled by special option) as ColumnString.
+
+    ClientOptions options = GetParam();
+    options.SetBakcwardCompatibilityFeatureLowCardinalityAsWrappedColumn(true);
+
+    client_ = std::make_unique<Client>(GetParam());
+    client_->Execute("CREATE DATABASE IF NOT EXISTS test_clickhouse_cpp");
+
+    Block block;
+    auto col = std::make_shared<ColumnString>();
+
+    client_->Execute("DROP TABLE IF EXISTS " + table_name + ";");
+    client_->Execute("CREATE TABLE IF NOT EXISTS " + table_name + "( " + column_name + " LowCardinality(String) )"
+            "ENGINE = Memory");
+
+    block.AppendColumn("test_column", col);
+
+    const std::vector<std::string> data{{"FooBar", "1", "2", "Foo", "4", "Bar", "Foo", "7", "8", "Foo"}};
+    for (const auto & v : data)
+        col->Append(v);
+
+    block.RefreshRowCount();
+    client_->Insert(table_name, block);
+
+    // Now that we can access data via ColumnString instead of ColumnLowCardinalityT<ColumnString>
+    size_t total_rows = 0;
+    client_->Select(getOneColumnSelectQuery(),
+        [&total_rows, &data](const Block& block) {
+            total_rows += block.GetRowCount();
+            if (block.GetRowCount() == 0) {
+                return;
+            }
+
+            ASSERT_EQ(1U, block.GetColumnCount());
+            if (auto col = block[0]->As<ColumnString>()) {
+                ASSERT_EQ(data.size(), col->Size());
+                for (size_t i = 0; i < col->Size(); ++i) {
+                    EXPECT_EQ(data[i], (*col)[i]) << " at index: " << i;
+                }
+            }
+        }
+    );
+
+    ASSERT_EQ(total_rows, data.size());
+}
+
 TEST_P(ClientCase, Generic) {
     client_->Execute(
             "CREATE TABLE IF NOT EXISTS test_clickhouse_cpp.client (id UInt64, name String) "

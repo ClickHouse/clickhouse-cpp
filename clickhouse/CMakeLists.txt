@@ -1,10 +1,10 @@
 SET ( clickhouse-cpp-lib-src
-    base/coded.cpp
     base/compressed.cpp
     base/input.cpp
     base/output.cpp
     base/platform.cpp
     base/socket.cpp
+    base/wire_format.cpp
 
     columns/array.cpp
     columns/date.cpp
@@ -14,6 +14,7 @@ SET ( clickhouse-cpp-lib-src
     columns/ip4.cpp
     columns/ip6.cpp
     columns/lowcardinality.cpp
+    columns/lowcardinalityadaptor.h
     columns/nullable.cpp
     columns/numeric.cpp
     columns/string.cpp
@@ -30,15 +31,21 @@ SET ( clickhouse-cpp-lib-src
     query.cpp
 )
 
+IF (WITH_OPENSSL)
+    LIST(APPEND clickhouse-cpp-lib-src base/sslsocket.cpp)
+ENDIF ()
+
 ADD_LIBRARY (clickhouse-cpp-lib SHARED ${clickhouse-cpp-lib-src})
 SET_TARGET_PROPERTIES(clickhouse-cpp-lib PROPERTIES LINKER_LANGUAGE CXX)
 TARGET_LINK_LIBRARIES (clickhouse-cpp-lib
+    absl-lib
     cityhash-lib
     lz4-lib
 )
 
 ADD_LIBRARY (clickhouse-cpp-lib-static STATIC ${clickhouse-cpp-lib-src})
 TARGET_LINK_LIBRARIES (clickhouse-cpp-lib-static
+    absl-lib
     cityhash-lib
     lz4-lib
 )
@@ -49,7 +56,7 @@ IF (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     TARGET_LINK_LIBRARIES (clickhouse-cpp-lib-static gcc_s)
 ENDIF ()
 
-INSTALL(TARGETS clickhouse-cpp-lib clickhouse-cpp-lib-static
+INSTALL (TARGETS clickhouse-cpp-lib clickhouse-cpp-lib-static
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
 )
@@ -65,7 +72,6 @@ INSTALL(FILES query.h DESTINATION include/clickhouse/)
 
 # base
 INSTALL(FILES base/buffer.h DESTINATION include/clickhouse/base/)
-INSTALL(FILES base/coded.h DESTINATION include/clickhouse/base/)
 INSTALL(FILES base/compressed.h DESTINATION include/clickhouse/base/)
 INSTALL(FILES base/input.h DESTINATION include/clickhouse/base/)
 INSTALL(FILES base/output.h DESTINATION include/clickhouse/base/)
@@ -97,3 +103,8 @@ INSTALL(FILES columns/uuid.h DESTINATION include/clickhouse/columns/)
 # types
 INSTALL(FILES types/type_parser.h DESTINATION include/clickhouse/types/)
 INSTALL(FILES types/types.h DESTINATION include/clickhouse/types/)
+
+IF (WITH_OPENSSL)
+    TARGET_LINK_LIBRARIES (clickhouse-cpp-lib OpenSSL::SSL)
+    TARGET_LINK_LIBRARIES (clickhouse-cpp-lib-static OpenSSL::SSL)
+ENDIF ()

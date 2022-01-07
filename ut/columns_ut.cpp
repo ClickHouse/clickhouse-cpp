@@ -7,6 +7,8 @@
 #include <clickhouse/columns/numeric.h>
 #include <clickhouse/columns/string.h>
 #include <clickhouse/columns/uuid.h>
+#include <clickhouse/base/input.h>
+#include <clickhouse/base/output.h>
 
 #include <contrib/gtest/gtest.h>
 #include "utils.h"
@@ -447,6 +449,62 @@ TEST(ColumnsCase, UUIDSlice) {
     ASSERT_EQ(sub->At(1), UInt128(0x3507213c178649f9llu, 0x9faf035d662f60aellu));
 }
 
+TEST(ColumnsCase, Int128) {
+    auto col = std::make_shared<ColumnInt128>(std::vector<Int128>{
+            absl::MakeInt128(0xffffffffffffffffll, 0xffffffffffffffffll), // -1
+            absl::MakeInt128(0, 0xffffffffffffffffll),  // 2^64
+            absl::MakeInt128(0xffffffffffffffffll, 0),
+            absl::MakeInt128(0x8000000000000000ll, 0),
+            Int128(0)
+    });
+    EXPECT_EQ(-1, col->At(0));
+    EXPECT_EQ(0xffffffffffffffffll, col->At(1));
+    EXPECT_EQ(0, col->At(4));
+}
+
+TEST(ColumnsCase, ColumnDecimal128_from_string) {
+    auto col = std::make_shared<ColumnDecimal>(38, 0);
+
+    const auto values = {
+        Int128(0),
+        Int128(-1),
+        Int128(1),
+        std::numeric_limits<Int128>::min() + 1,
+        std::numeric_limits<Int128>::max(),
+    };
+
+    for (size_t i = 0; i < values.size(); ++i)
+    {
+        const auto value = values.begin()[i];
+        SCOPED_TRACE(::testing::Message() << "# index: " << i << " Int128 value: " << value);
+
+        {
+            std::stringstream sstr;
+            sstr << value;
+            const auto string_value = sstr.str();
+
+            EXPECT_NO_THROW(col->Append(string_value));
+        }
+
+        ASSERT_EQ(i + 1, col->Size());
+        EXPECT_EQ(value, col->At(i));
+    }
+}
+
+TEST(ColumnsCase, ColumnDecimal128_from_string_overflow) {
+    auto col = std::make_shared<ColumnDecimal>(38, 0);
+
+    // 2^128 overflows
+    EXPECT_ANY_THROW(col->Append("340282366920938463463374607431768211456"));
+    // special case for number bigger than 2^128, ending in zeroes.
+    EXPECT_ANY_THROW(col->Append("400000000000000000000000000000000000000"));
+
+#ifndef ABSL_HAVE_INTRINSIC_INT128
+    // unfortunatelly std::numeric_limits<Int128>::min() overflows when there is no __int128 intrinsic type.
+    EXPECT_ANY_THROW(col->Append("-170141183460469231731687303715884105728"));
+#endif
+}
+
 TEST(ColumnsCase, ColumnLowCardinalityString_Append_and_Read) {
     const size_t items_count = 11;
     ColumnLowCardinalityT<ColumnString> col;
@@ -490,9 +548,8 @@ TEST(ColumnsCase, ColumnLowCardinalityString_Load) {
 
     const auto & data = LOWCARDINALITY_STRING_FOOBAR_10_ITEMS_BINARY;
     ArrayInput buffer(data.data(), data.size());
-    CodedInputStream stream(&buffer);
 
-    EXPECT_TRUE(col.Load(&stream, items_count));
+    ASSERT_TRUE(col.Load(&buffer, items_count));
 
     for (size_t i = 0; i < items_count; ++i) {
         EXPECT_EQ(col.At(i), FooBarSeq(i)) << " at pos: " << i;
@@ -509,24 +566,23 @@ TEST(ColumnsCase, DISABLED_ColumnLowCardinalityString_Save) {
     }
 
     ArrayOutput output(0, 0);
-    CodedOutputStream output_stream(&output);
 
     const size_t expected_output_size = LOWCARDINALITY_STRING_FOOBAR_10_ITEMS_BINARY.size();
     // Enough space to account for possible overflow from both right and left sides.
-    char buffer[expected_output_size * 10] = {'\0'};
+    std::string buffer(expected_output_size * 10, '\0');// = {'\0'};
     const char margin_content[sizeof(buffer)] = {'\0'};
 
     const size_t left_margin_size = 10;
     const size_t right_margin_size = sizeof(buffer) - left_margin_size - expected_output_size;
 
     // Since overflow from left side is less likely to happen, leave only tiny margin there.
-    auto write_pos = buffer + left_margin_size;
-    const auto left_margin = buffer;
+    auto write_pos = buffer.data() + left_margin_size;
+    const auto left_margin = buffer.data();
     const auto right_margin = write_pos + expected_output_size;
 
     output.Reset(write_pos, expected_output_size);
 
-    EXPECT_NO_THROW(col.Save(&output_stream));
+    EXPECT_NO_THROW(col.Save(&output));
 
     // Left margin should be blank
     EXPECT_EQ(std::string_view(margin_content, left_margin_size), std::string_view(left_margin, left_margin_size));
@@ -550,8 +606,7 @@ TEST(ColumnsCase, ColumnLowCardinalityString_SaveAndLoad) {
     char buffer[256] = {'\0'}; // about 3 times more space than needed for this set of values.
     {
         ArrayOutput output(buffer, sizeof(buffer));
-        CodedOutputStream output_stream(&output);
-        EXPECT_NO_THROW(col.Save(&output_stream));
+        EXPECT_NO_THROW(col.Save(&output));
     }
 
     col.Clear();
@@ -559,8 +614,7 @@ TEST(ColumnsCase, ColumnLowCardinalityString_SaveAndLoad) {
     {
         // Load the data back
         ArrayInput input(buffer, sizeof(buffer));
-        CodedInputStream input_stream(&input);
-        EXPECT_TRUE(col.Load(&input_stream, items.size()));
+        EXPECT_TRUE(col.Load(&input, items.size()));
     }
 
     for (size_t i = 0; i < items.size(); ++i) {
@@ -631,6 +685,18 @@ TEST(ColumnsCase, UnmatchedBrackets) {
     ASSERT_EQ(nullptr, CreateColumnByType("Array(LowCardinality(Nullable(FixedString(10000)))"));
 }
 
+TEST(ColumnsCase, LowCardinalityAsWrappedColumn) {
+    CreateColumnByTypeSettings create_column_settings;
+    create_column_settings.low_cardinality_as_wrapped_column = true;
+
+    ASSERT_EQ(Type::String, CreateColumnByType("LowCardinality(String)", create_column_settings)->GetType().GetCode());
+    ASSERT_EQ(Type::String, CreateColumnByType("LowCardinality(String)", create_column_settings)->As<ColumnString>()->GetType().GetCode());
+
+    ASSERT_EQ(Type::FixedString, CreateColumnByType("LowCardinality(FixedString(10000))", create_column_settings)->GetType().GetCode());
+    ASSERT_EQ(Type::FixedString, CreateColumnByType("LowCardinality(FixedString(10000))", create_column_settings)->As<ColumnFixedString>()->GetType().GetCode());
+}
+
+
 class ColumnsCaseWithName : public ::testing::TestWithParam<const char* /*Column Type String*/>
 {};
 
@@ -644,7 +710,8 @@ TEST_P(ColumnsCaseWithName, CreateColumnByType)
 INSTANTIATE_TEST_CASE_P(Basic, ColumnsCaseWithName, ::testing::Values(
     "Int8", "Int16", "Int32", "Int64",
     "UInt8", "UInt16", "UInt32", "UInt64",
-    "String", "Date", "DateTime"
+    "String", "Date", "DateTime",
+    "UUID", "Int128"
 ));
 
 INSTANTIATE_TEST_CASE_P(Parametrized, ColumnsCaseWithName, ::testing::Values(

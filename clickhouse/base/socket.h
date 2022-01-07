@@ -23,11 +23,14 @@
 #   endif
 #endif
 
+#include <memory>
+
+
 struct addrinfo;
 
 namespace clickhouse {
 
-/**
+/** Address of a host to establish connection to.
  *
  */
 class NetworkAddress {
@@ -37,23 +40,21 @@ public:
     ~NetworkAddress();
 
     const struct addrinfo* Info() const;
+    const std::string & Host() const;
 
 private:
+    const std::string host_;
     struct addrinfo* info_;
 };
 
 
-class SocketHolder {
+class Socket {
 public:
-    SocketHolder();
-    SocketHolder(SOCKET s);
-    SocketHolder(SocketHolder&& other) noexcept;
+    Socket(const NetworkAddress& addr);
+    Socket(Socket&& other) noexcept;
+    Socket& operator=(Socket&& other) noexcept;
 
-    ~SocketHolder();
-
-    void Close() noexcept;
-
-    bool Closed() const noexcept;
+    virtual ~Socket();
 
     /// @params idle the time (in seconds) the connection needs to remain
     ///         idle before TCP starts sending keepalive probes.
@@ -65,27 +66,25 @@ public:
     /// @params nodelay whether to enable TCP_NODELAY
     void SetTcpNoDelay(bool nodelay) noexcept;
 
-    SocketHolder& operator = (SocketHolder&& other) noexcept;
+    virtual std::unique_ptr<InputStream> makeInputStream() const;
+    virtual std::unique_ptr<OutputStream> makeOutputStream() const;
 
-    operator SOCKET () const noexcept;
-
-private:
-    SocketHolder(const SocketHolder&) = delete;
-    SocketHolder& operator = (const SocketHolder&) = delete;
+protected:
+    Socket(const Socket&) = delete;
+    Socket& operator = (const Socket&) = delete;
+    void Close();
 
     SOCKET handle_;
 };
 
 
-/**
- *
- */
 class SocketInput : public InputStream {
 public:
     explicit SocketInput(SOCKET s);
     ~SocketInput();
 
 protected:
+    bool Skip(size_t bytes) override;
     size_t DoRead(void* buf, size_t len) override;
 
 private:
@@ -98,7 +97,7 @@ public:
     ~SocketOutput();
 
 protected:
-    void DoWrite(const void* data, size_t len) override;
+    size_t DoWrite(const void* data, size_t len) override;
 
 private:
     SOCKET s_;
@@ -107,10 +106,5 @@ private:
 static struct NetrworkInitializer {
     NetrworkInitializer();
 } gNetrworkInitializer;
-
-///
-SOCKET SocketConnect(const NetworkAddress& addr);
-
-ssize_t Poll(struct pollfd* fds, int nfds, int timeout) noexcept;
 
 }

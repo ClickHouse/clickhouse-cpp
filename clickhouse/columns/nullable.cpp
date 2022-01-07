@@ -50,7 +50,7 @@ void ColumnNullable::Clear() {
     nulls_->Clear();
 }
 
-bool ColumnNullable::Load(CodedInputStream* input, size_t rows) {
+bool ColumnNullable::Load(InputStream* input, size_t rows) {
     if (!nulls_->Load(input, rows)) {
         return false;
     }
@@ -60,7 +60,7 @@ bool ColumnNullable::Load(CodedInputStream* input, size_t rows) {
     return true;
 }
 
-void ColumnNullable::Save(CodedOutputStream* output) {
+void ColumnNullable::Save(OutputStream* output) {
     nulls_->Save(output);
     nested_->Save(output);
 }
@@ -70,7 +70,7 @@ size_t ColumnNullable::Size() const {
     return nulls_->Size();
 }
 
-ColumnRef ColumnNullable::Slice(size_t begin, size_t len) {
+ColumnRef ColumnNullable::Slice(size_t begin, size_t len) const {
     return std::make_shared<ColumnNullable>(nested_->Slice(begin, len), nulls_->Slice(begin, len));
 }
 

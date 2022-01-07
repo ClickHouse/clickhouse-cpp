@@ -1,6 +1,7 @@
 #pragma once
 
 #include "column.h"
+#include "absl/numeric/int128.h"
 
 namespace clickhouse {
 
@@ -11,6 +12,7 @@ template <typename T>
 class ColumnVector : public Column {
 public:
     using DataType = T;
+    using ValueType = T;
 
     ColumnVector();
 
@@ -33,10 +35,10 @@ public:
     void Append(ColumnRef column) override;
 
     /// Loads column data from input stream.
-    bool Load(CodedInputStream* input, size_t rows) override;
+    bool Load(InputStream* input, size_t rows) override;
 
     /// Saves column data to output stream.
-    void Save(CodedOutputStream* output) override;
+    void Save(OutputStream* output) override;
 
     /// Clear column data .
     void Clear() override;
@@ -45,7 +47,7 @@ public:
     size_t Size() const override;
 
     /// Makes slice of the current column.
-    ColumnRef Slice(size_t begin, size_t len) override;
+    ColumnRef Slice(size_t begin, size_t len) const override;
     void Swap(Column& other) override;
 
     ItemView GetItem(size_t index) const override;
@@ -54,11 +56,8 @@ private:
     std::vector<T> data_;
 };
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wpedantic"
-using Int128 = __int128;
+using Int128 = absl::int128;
 using Int64 = int64_t;
-#pragma GCC diagnostic pop
 
 using ColumnUInt8   = ColumnVector<uint8_t>;
 using ColumnUInt16  = ColumnVector<uint16_t>;

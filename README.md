@@ -1,7 +1,7 @@
-ClickHouse C++ client [![Build Status](https://travis-ci.org/ClickHouse/clickhouse-cpp.svg?branch=master)](https://travis-ci.org/ClickHouse/clickhouse-cpp)
+ClickHouse C++ client [![Linux](https://github.com/ClickHouse/clickhouse-cpp/actions/workflows/linux.yml/badge.svg)](https://github.com/ClickHouse/clickhouse-cpp/actions/workflows/linux.yml) [![macOS](https://github.com/ClickHouse/clickhouse-cpp/actions/workflows/macos.yml/badge.svg)](https://github.com/ClickHouse/clickhouse-cpp/actions/workflows/macos.yml)
 =====
 
-C++ client for [Yandex ClickHouse](https://clickhouse.yandex/)
+C++ client for [ClickHouse](https://clickhouse.com/).
 
 ## Supported data types
 
@@ -16,8 +16,11 @@ C++ client for [Yandex ClickHouse](https://clickhouse.yandex/)
 * IPv4, IPv6
 * Nullable(T)
 * String
+* LowCardinality(String) or LowCardinality(FixedString(N))
 * Tuple
 * UInt8, UInt16, UInt32, UInt64, Int8, Int16, Int32, Int64
+* Int128
+* UUID
 
 ## Building
 

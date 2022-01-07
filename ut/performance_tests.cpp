@@ -127,8 +127,7 @@ TYPED_TEST_P(ColumnPerformanceTest, SaveAndLoad) {
 
         for (int i = 0; i < LOAD_AND_SAVE_REPEAT_TIMES; ++i) {
             buffer.clear();
-            BufferOutput bufferOutput(&buffer);
-            CodedOutputStream ostr(&bufferOutput);
+            BufferOutput ostr(&buffer);
 
             Timer timer;
             column.Save(&ostr);
@@ -147,8 +146,7 @@ TYPED_TEST_P(ColumnPerformanceTest, SaveAndLoad) {
         Timer::DurationType total{0};
 
         for (int i = 0; i < LOAD_AND_SAVE_REPEAT_TIMES; ++i) {
-            ArrayInput arrayInput(buffer.data(), buffer.size());
-            CodedInputStream istr(&arrayInput);
+            ArrayInput istr(buffer.data(), buffer.size());
             column.Clear();
 
             Timer timer;
@@ -221,7 +219,21 @@ TYPED_TEST_P(ColumnPerformanceTest, InsertAndSelect) {
             EXPECT_EQ(1u, block.GetColumnCount());
             const auto col = block[0]->As<ColumnType>();
 
-            EXPECT_NO_FATAL_FAILURE(ValidateColumnItems(*col, ITEMS_COUNT));
+            if (col.get() == 0)
+            {
+                // If server doesn't send response back as LowCardinality(X) but rather like X.
+                if constexpr (std::is_base_of_v<ColumnLowCardinality, ColumnType>)
+                {
+                    using NestedColumnType = typename ColumnType::WrappedColumnType;
+                    EXPECT_NO_FATAL_FAILURE(ValidateColumnItems(*block[0]->As<NestedColumnType>(), ITEMS_COUNT));
+                }
+                else
+                    FAIL();
+            }
+            else
+            {
+                EXPECT_NO_FATAL_FAILURE(ValidateColumnItems(*col, ITEMS_COUNT));
+            }
             inner_loop_duration += timer.Elapsed();
         });
 

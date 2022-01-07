@@ -1,0 +1,16 @@
+name: macOS-ssl
+# Almost the same as regular macOS builds, BUT with enabled SSL support, requires OpenSSL installed via Homebrew (openssl@1.1)
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build-and-test:
+    uses: ClickHouse/clickhouse-cpp/.github/workflows/macos.yml@master
+    with:
+      extra_cmake_flags: -DWITH_OPENSSL=ON
+      extra_install: openssl
+#     gtest_filter: "-*LocalhostTLS*"

@@ -1,45 +1,48 @@
-CMAKE_MINIMUM_REQUIRED(VERSION 3.0.2)
+CMAKE_MINIMUM_REQUIRED (VERSION 3.0.2)
 
 INCLUDE (cmake/cpp17.cmake)
 INCLUDE (cmake/subdirs.cmake)
+INCLUDE (cmake/openssl.cmake)
 
-OPTION(BUILD_BENCHMARK "Build benchmark" OFF)
-OPTION(BUILD_TESTS "Build tests" OFF)
+OPTION (BUILD_BENCHMARK "Build benchmark" OFF)
+OPTION (BUILD_TESTS "Build tests" OFF)
+OPTION (WITH_OPENSSL "Use OpenSSL for TLS connections" OFF)
 
 PROJECT (CLICKHOUSE-CLIENT)
 
-    USE_CXX17()
+    USE_CXX17 ()
+    USE_OPENSSL ()
 
-	IF ("${CMAKE_BUILD_TYPE}" STREQUAL "")
-		set(CMAKE_BUILD_TYPE "Debug")
-	ENDIF()
-
-    IF (UNIX)
-        IF (APPLE)
-            SET (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -Wall -Wextra -Werror")
-        ELSE ()
-            SET (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -pthread -Wall -Wextra -Werror")
-        ENDIF ()
-        SET (CMAKE_EXE_LINKER_FLAGS, "${CMAKE_EXE_LINKER_FLAGS} -lpthread")
+    IF (NOT CMAKE_BUILD_TYPE)
+        SET (CMAKE_BUILD_TYPE "RelWithDebInfo")
     ENDIF ()
 
-    INCLUDE_DIRECTORIES(.)
-    INCLUDE_DIRECTORIES(contrib)
+    IF (UNIX)
+        IF (NOT APPLE)
+            SET (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
+        ENDIF ()
+        SET (CMAKE_EXE_LINKER_FLAGS, "${CMAKE_EXE_LINKER_FLAGS} -lpthread")
+        SET (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Werror")
+    ENDIF ()
+
+    INCLUDE_DIRECTORIES (.)
+    INCLUDE_DIRECTORIES (contrib)
 
     SUBDIRS (
         clickhouse
+        contrib/absl
         contrib/cityhash
         contrib/lz4
     )
 
     IF (BUILD_BENCHMARK)
-        SUBDIRS(bench)
+        SUBDIRS (bench)
     ENDIF (BUILD_BENCHMARK)
 
     IF (BUILD_TESTS)
-        SUBDIRS(
+        SUBDIRS (
             contrib/gtest
             tests/simple
             ut
         )
-	ENDIF (BUILD_TESTS)
+    ENDIF (BUILD_TESTS)

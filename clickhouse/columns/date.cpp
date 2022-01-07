@@ -27,11 +27,11 @@ void ColumnDate::Append(ColumnRef column) {
     }
 }
 
-bool ColumnDate::Load(CodedInputStream* input, size_t rows) {
+bool ColumnDate::Load(InputStream* input, size_t rows) {
     return data_->Load(input, rows);
 }
 
-void ColumnDate::Save(CodedOutputStream* output) {
+void ColumnDate::Save(OutputStream* output) {
     data_->Save(output);
 }
 
@@ -39,7 +39,7 @@ size_t ColumnDate::Size() const {
     return data_->Size();
 }
 
-ColumnRef ColumnDate::Slice(size_t begin, size_t len) {
+ColumnRef ColumnDate::Slice(size_t begin, size_t len) const {
     auto col = data_->Slice(begin, len)->As<ColumnUInt16>();
     auto result = std::make_shared<ColumnDate>();
 
@@ -89,11 +89,11 @@ void ColumnDateTime::Append(ColumnRef column) {
     }
 }
 
-bool ColumnDateTime::Load(CodedInputStream* input, size_t rows) {
+bool ColumnDateTime::Load(InputStream* input, size_t rows) {
     return data_->Load(input, rows);
 }
 
-void ColumnDateTime::Save(CodedOutputStream* output) {
+void ColumnDateTime::Save(OutputStream* output) {
     data_->Save(output);
 }
 
@@ -105,7 +105,7 @@ void ColumnDateTime::Clear() {
     data_->Clear();
 }
 
-ColumnRef ColumnDateTime::Slice(size_t begin, size_t len) {
+ColumnRef ColumnDateTime::Slice(size_t begin, size_t len) const {
     auto col = data_->Slice(begin, len)->As<ColumnUInt32>();
     auto result = std::make_shared<ColumnDateTime>();
 
@@ -148,7 +148,8 @@ void ColumnDateTime64::Append(const Int64& value) {
 //}
 
 Int64 ColumnDateTime64::At(size_t n) const {
-    return data_->At(n);
+    // make sure to use Absl's Int128 conversion
+    return static_cast<Int64>(data_->At(n));
 }
 
 std::string ColumnDateTime64::Timezone() const {
@@ -161,11 +162,11 @@ void ColumnDateTime64::Append(ColumnRef column) {
     }
 }
 
-bool ColumnDateTime64::Load(CodedInputStream* input, size_t rows) {
+bool ColumnDateTime64::Load(InputStream* input, size_t rows) {
     return data_->Load(input, rows);
 }
 
-void ColumnDateTime64::Save(CodedOutputStream* output) {
+void ColumnDateTime64::Save(OutputStream* output) {
     data_->Save(output);
 }
 
@@ -190,7 +191,7 @@ void ColumnDateTime64::Swap(Column& other) {
     data_.swap(col.data_);
 }
 
-ColumnRef ColumnDateTime64::Slice(size_t begin, size_t len) {
+ColumnRef ColumnDateTime64::Slice(size_t begin, size_t len) const {
     auto sliced_data = data_->Slice(begin, len)->As<ColumnDecimal>();
 
     return ColumnRef{new ColumnDateTime64(type_, sliced_data)};
