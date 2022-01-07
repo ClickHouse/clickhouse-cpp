@@ -1,7 +1,5 @@
 #pragma once
 
-#include "absl/numeric/int128.h"
-
 #include <map>
 #include <memory>
 #include <string>
@@ -10,7 +8,7 @@
 
 namespace clickhouse {
 
-using Int128 = absl::int128;
+using Int128 = int128_t;
 using Int64 = int64_t;
 
 using TypeRef = std::shared_ptr<class Type>;
