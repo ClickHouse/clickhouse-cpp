@@ -18,6 +18,7 @@
 #endif
 
 namespace clickhouse {
+
 namespace {
 
 class LocalNames : public std::unordered_set<std::string> {
