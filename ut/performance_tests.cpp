@@ -167,7 +167,7 @@ TYPED_TEST_P(ColumnPerformanceTest, InsertAndSelect) {
     using ColumnType = TypeParam;
     using Timer = Timer<std::chrono::microseconds>;
 
-    const std::string table_name = "PerformanceTests.ColumnTest";
+    const std::string table_name = "PerformanceTests_ColumnTest";
     const std::string column_name = "column";
 
     auto column = InstantiateColumn<ColumnType>();
@@ -178,9 +178,9 @@ TYPED_TEST_P(ColumnPerformanceTest, InsertAndSelect) {
             .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", ""))
             .SetDefaultDatabase(getEnvOrDefault("CLICKHOUSE_DB",       "default"))
     );
-    client.Execute("CREATE DATABASE IF NOT EXISTS PerformanceTests");
-    client.Execute("DROP TABLE IF EXISTS PerformanceTests.ColumnTest");
-    client.Execute("CREATE TABLE PerformanceTests.ColumnTest (" + column_name + " " + column.Type()->GetName() + ") ENGINE = Memory");
+    // client.Execute("CREATE DATABASE IF NOT EXISTS PerformanceTests");
+    client.Execute("DROP TEMPORARY TABLE IF EXISTS PerformanceTests_ColumnTest");
+    client.Execute("CREATE TEMPORARY TABLE PerformanceTests_ColumnTest (" + column_name + " " + column.Type()->GetName() + ")");
 
     const size_t ITEMS_COUNT = 1'000'000;
 
@@ -215,7 +215,7 @@ TYPED_TEST_P(ColumnPerformanceTest, InsertAndSelect) {
         size_t total_rows = 0;
         Timer timer;
         Timer::DurationType inner_loop_duration{0};
-        client.Select("SELECT " + column_name +  " FROM " + table_name, [&total_rows, &inner_loop_duration](const Block & block) {
+        client.Select("SELECT " + column_name +  " FROM " + table_name, [&](const Block & block) {
             Timer timer;
             total_rows += block.GetRowCount();
             if (block.GetRowCount() == 0) {
