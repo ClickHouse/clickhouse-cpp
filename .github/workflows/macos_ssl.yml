@@ -14,4 +14,4 @@ jobs:
       extra_cmake_flags: -DWITH_OPENSSL=ON -DOPENSSL_ROOT_DIR=/usr/local/opt/openssl/
       extra_install: openssl
       # There is no CH server running locally, so disable tests that try to connect to it.
-      gtest_filter: "-*ColumnPerformanceTest*:-*ClientCase*"
+      gtest_filter: "-*Client*:*Local*:*ColumnPerformanceTest*"
