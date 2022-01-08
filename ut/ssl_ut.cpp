@@ -2,6 +2,7 @@
  */
 #include "readonly_client_test.h"
 #include "connection_failed_client_test.h"
+#include "utils.h"
 
 #include <openssl/tls1.h>
 #include <openssl/ssl2.h>
