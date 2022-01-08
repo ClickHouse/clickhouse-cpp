@@ -22,6 +22,7 @@ PROJECT (CLICKHOUSE-CLIENT)
             SET (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
         ENDIF ()
         SET (CMAKE_EXE_LINKER_FLAGS, "${CMAKE_EXE_LINKER_FLAGS} -lpthread")
+        # -Wpedantic makes int128 support somewhat harder and less performant (by not allowing builtin __int128)
         SET (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Werror")
     ENDIF ()
 
