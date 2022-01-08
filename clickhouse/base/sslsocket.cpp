@@ -123,7 +123,7 @@ SSL_CTX * SSLContext::getContext() {
 #define HANDLE_SSL_ERROR(SSL_PTR, statement) [&] { \
     if (const auto ret_code = (statement); ret_code <= 0) { \
         throwSSLError(SSL_PTR, SSL_get_error(SSL_PTR, ret_code), LOCATION, #statement); \
-        return static_cast<decltype(ret_code)>(0); \
+        return static_cast<std::decay_t<decltype(ret_code)>>(0); \
     } \
     else \
         return ret_code; \
