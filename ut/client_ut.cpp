@@ -1,4 +1,6 @@
 #include <clickhouse/client.h>
+#include "readonly_client_test.h"
+#include "connection_failed_client_test.h"
 #include <gtest/gtest.h>
 
 #include <cmath>
