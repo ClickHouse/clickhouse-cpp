@@ -75,3 +75,16 @@ client.Select("SELECT id, name FROM test.numbers", [] (const Block& block)
 /// Delete table.
 client.Execute("DROP TABLE test.numbers");
 ```
+
+### Features
+## Multiple host
+It is possible to specify multiple hosts to connect to. The connection
+will be set to the first available host.
+```cpp
+Client client(ClientOptions()
+              .SetHost({
+                  ClientOptions::HostPort("host1.com", 8000),
+                  ClientOptions::HostPort("host2.com"), /// port is ClientOptions.port
+              }));
+              
+```
