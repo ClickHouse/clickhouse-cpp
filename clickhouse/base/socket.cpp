@@ -93,8 +93,7 @@ void SetNonBlock(SOCKET fd, bool value) {
         return ioctl(fd, FIOBIO, &flags);
     #endif
     if (ret == -1) {
-        throw std::system_error(
-            errno, std::system_category(), "fail to set nonblocking mode");
+        throw std::system_error(getSocketErrorCode(), getErrorCategory(), "fail to set nonblocking mode");
     }
 #elif defined(_win_)
     unsigned long inbuf = value;
@@ -166,8 +165,7 @@ SOCKET SocketConnect(const NetworkAddress& addr) {
     if (last_err > 0) {
         throw std::system_error(last_err, getErrorCategory(), "fail to connect");
     }
-    throw std::system_error(getSocketErrorCode(), getErrorCategory(), "fail to connect"
-    );
+    throw std::system_error(getSocketErrorCode(), getErrorCategory(), "fail to connect");
 }
 
 } // namespace
@@ -197,7 +195,7 @@ NetworkAddress::NetworkAddress(const std::string& host, const std::string& port)
     const int error = getaddrinfo(host.c_str(), port.c_str(), &hints, &info_);
 
     if (error) {
-        throw std::system_error(errno, std::system_category());
+        throw std::system_error(getSocketErrorCode(), getErrorCategory());
     }
 }
 
@@ -303,14 +301,10 @@ size_t SocketInput::DoRead(void* buf, size_t len) {
     }
 
     if (ret == 0) {
-        throw std::system_error(
-            errno, std::system_category(), "closed"
-        );
+        throw std::system_error(getSocketErrorCode(), getErrorCategory(), "closed");
     }
 
-    throw std::system_error(
-        errno, std::system_category(), "can't receive string data"
-    );
+    throw std::system_error(getSocketErrorCode(), getErrorCategory(), "can't receive string data");
 }
 
 bool SocketInput::Skip(size_t /*bytes*/) {
@@ -333,9 +327,7 @@ size_t SocketOutput::DoWrite(const void* data, size_t len) {
 #endif
 
     if (::send(s_, (const char*)data, (int)len, flags) != (int)len) {
-        throw std::system_error(
-            errno, std::system_category(), "fail to send " + std::to_string(len) + " bytes of data"
-        );
+        throw std::system_error(getSocketErrorCode(), getErrorCategory(), "fail to send " + std::to_string(len) + " bytes of data");
     }
 
     return len;
