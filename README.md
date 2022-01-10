@@ -76,8 +76,8 @@ client.Select("SELECT id, name FROM test.numbers", [] (const Block& block)
 client.Execute("DROP TABLE test.numbers");
 ```
 
-### Features
-## Multiple host
+## Features
+### Multiple host
 It is possible to specify multiple hosts to connect to. The connection
 will be set to the first available host.
 ```cpp
