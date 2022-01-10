@@ -2,7 +2,7 @@
 
 #include <clickhouse/client.h>
 
-#include <contrib/gtest/gtest.h>
+#include <gtest/gtest.h>
 
 #include <tuple>
 #include <string>

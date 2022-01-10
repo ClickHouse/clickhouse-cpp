@@ -29,7 +29,7 @@ const auto DEAFULT_CA_DIRECTORY_PATH = "/usr/local/etc/openssl@1.1/cert.pem";
 #elif defined(_win_)
 #endif
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     RemoteTLS, ReadonlyClientTest,
     ::testing::Values(ReadonlyClientTest::ParamType {
         ClientOptions()
@@ -47,7 +47,7 @@ INSTANTIATE_TEST_CASE_P(
     }
 ));
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     Remote_GH_API_TLS, ReadonlyClientTest,
     ::testing::Values(ReadonlyClientTest::ParamType {
         ClientOptions()
@@ -63,7 +63,7 @@ INSTANTIATE_TEST_CASE_P(
     }
 ));
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     Remote_GH_API_TLS_no_CA, ConnectionFailedClientTest,
     ::testing::Values(ConnectionFailedClientTest::ParamType {
         ClientOptions()
@@ -79,7 +79,7 @@ INSTANTIATE_TEST_CASE_P(
     }
 ));
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     Remote_GH_API_TLS_wrong_TLS_version, ConnectionFailedClientTest,
     ::testing::Values(ConnectionFailedClientTest::ParamType {
         ClientOptions()
@@ -97,7 +97,7 @@ INSTANTIATE_TEST_CASE_P(
 ));
 
 //// Special test that require properly configured TLS-enabled version of CH running locally
-//INSTANTIATE_TEST_CASE_P(
+//INSTANTIATE_TEST_SUITE_P(
 //    LocalhostTLS_None, ReadonlyClientTest,
 //    ::testing::Values(std::tuple<ClientOptions, std::vector<std::string> > {
 //        ClientOptions()
@@ -113,7 +113,7 @@ INSTANTIATE_TEST_CASE_P(
 //    }
 //));
 
-//INSTANTIATE_TEST_CASE_P(
+//INSTANTIATE_TEST_SUITE_P(
 //    LocalhostTLS_LZ4, ReadonlyClientTest,
 //    ::testing::Values(std::tuple<ClientOptions, std::vector<std::string> > {
 //        ClientOptions()

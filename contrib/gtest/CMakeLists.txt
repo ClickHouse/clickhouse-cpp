@@ -1,3 +1,4 @@
 ADD_LIBRARY (gtest-lib STATIC
-    gtest-all.cc
+    "src/gtest-all.cc"
+    "src/gtest_main.cc"
 )
