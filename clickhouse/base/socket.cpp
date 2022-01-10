@@ -76,7 +76,7 @@ const std::error_category& getErrorCategory() noexcept {
 }
 
 void SetNonBlock(SOCKET fd, bool value) {
-#if defined(_unix_)
+#if defined(_unix_) || defined(__CYGWIN__)
     int flags;
     int ret;
     #if defined(O_NONBLOCK)

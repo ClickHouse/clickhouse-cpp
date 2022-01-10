@@ -8,8 +8,6 @@
 #include <string>
 
 #if defined(_win_)
-#   pragma comment(lib, "Ws2_32.lib")
-
 #   include <winsock2.h>
 #   include <ws2tcpip.h>
 #else
