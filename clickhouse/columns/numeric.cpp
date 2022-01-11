@@ -1,6 +1,8 @@
 #include "numeric.h"
 #include "utils.h"
 
+#include "../base/wire_format.h"
+
 namespace clickhouse {
 
 template <typename T>
@@ -59,15 +61,15 @@ void ColumnVector<T>::Append(ColumnRef column) {
 }
 
 template <typename T>
-bool ColumnVector<T>::Load(CodedInputStream* input, size_t rows) {
+bool ColumnVector<T>::Load(InputStream* input, size_t rows) {
     data_.resize(rows);
 
-    return input->ReadRaw(data_.data(), data_.size() * sizeof(T));
+    return WireFormat::ReadBytes(input, data_.data(), data_.size() * sizeof(T));
 }
 
 template <typename T>
-void ColumnVector<T>::Save(CodedOutputStream* output) {
-    output->WriteRaw(data_.data(), data_.size() * sizeof(T));
+void ColumnVector<T>::Save(OutputStream* output) {
+    WireFormat::WriteBytes(output, data_.data(), data_.size() * sizeof(T));
 }
 
 template <typename T>

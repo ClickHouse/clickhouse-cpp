@@ -18,14 +18,14 @@ public:
         DoFlush();
     }
 
-    inline void Write(const void* data, size_t len) {
-        DoWrite(data, len);
+    inline size_t Write(const void* data, size_t len) {
+        return DoWrite(data, len);
     }
 
 protected:
     virtual void DoFlush() { }
 
-    virtual void DoWrite(const void* data, size_t len) = 0;
+    virtual size_t DoWrite(const void* data, size_t len) = 0;
 };
 
 
@@ -41,7 +41,7 @@ protected:
     // be written to the output.
     virtual size_t DoNext(void** data, size_t len) = 0;
 
-    void DoWrite(const void* data, size_t len) override;
+    size_t DoWrite(const void* data, size_t len) override;
 };
 
 
@@ -72,6 +72,12 @@ public:
     inline void Reset(void* buf, size_t len) noexcept {
         buf_ = static_cast<uint8_t*>(buf);
         end_ = buf_ + len;
+        buffer_size_ = len;
+    }
+
+    /// Number of bytes written to the buffer.
+    inline size_t Size() const noexcept {
+        return buffer_size_ - Avail();
     }
 
 protected:
@@ -80,11 +86,12 @@ protected:
 private:
     uint8_t* buf_;
     uint8_t* end_;
+    size_t buffer_size_;
 };
 
 
 /**
- * A ZeroCopyOutput stream backed by an vector of bytes.
+ * A ZeroCopyOutput stream backed by a vector.
  */
 class BufferOutput : public ZeroCopyOutput {
 public:
@@ -110,7 +117,7 @@ public:
 protected:
     void DoFlush() override;
     size_t DoNext(void** data, size_t len) override;
-    void DoWrite(const void* data, size_t len) override;
+    size_t DoWrite(const void* data, size_t len) override;
 
 private:
     OutputStream* const slave_;

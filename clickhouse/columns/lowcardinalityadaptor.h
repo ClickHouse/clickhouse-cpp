@@ -7,7 +7,7 @@
 
 namespace clickhouse {
 
-class CodedOutputStream;
+class OutputStream;
 class CodedInputStream;
 
 /** Adapts any ColumnType to be serialized\deserialized as LowCardinality,
@@ -28,7 +28,7 @@ public:
     using AdaptedColumnType::AdaptedColumnType;
 
     /// Loads column data from input stream.
-    bool Load(CodedInputStream* input, size_t rows) override {
+    bool Load(InputStream* input, size_t rows) override {
         auto new_data_column = this->Slice(0, 0)->template As<AdaptedColumnType>();
 
         ColumnLowCardinalityT<AdaptedColumnType> low_cardinality_col(new_data_column);
@@ -46,7 +46,7 @@ public:
     }
 
     /// Saves column data to output stream.
-    void Save(CodedOutputStream* output) override {
+    void Save(OutputStream* output) override {
         ColumnLowCardinalityT<AdaptedColumnType>(this->template As<AdaptedColumnType>()).Save(output);
     }
 };

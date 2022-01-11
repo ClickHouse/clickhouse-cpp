@@ -1,7 +1,7 @@
 #include <clickhouse/columns/itemview.h>
 #include <clickhouse/columns/numeric.h>
 
-#include <contrib/gtest/gtest.h>
+#include <gtest/gtest.h>
 #include "utils.h"
 
 #include <string_view>

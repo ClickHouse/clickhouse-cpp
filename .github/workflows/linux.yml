@@ -5,56 +5,70 @@ on:
     branches: [ master ]
   pull_request:
     branches: [ master ]
+  workflow_call:
+    inputs:
+      extra_cmake_flags:
+        required: false
+        type: string
+      extra_install:
+        required: false
+        type: string
+      gtest_filter:
+        required: false
+        type: string
+        default: "*"
 
 env:
-  # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
   BUILD_TYPE: Release
   CH_SERVER_VERSION: 21.3.17.2
-
 jobs:
   build:
-    # The CMake configure and build commands are platform agnostic and should work equally
-    # well on Windows or Mac.  You can convert this to a matrix build if you need
-    # cross-platform coverage.
-    # See: https://docs.github.com/en/free-pro-team@latest/actions/learn-github-actions/managing-complex-workflows#using-a-build-matrix
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        build: [gcc-7, clang-6]
+        build: [clang-6, gcc-7, gcc-8, gcc-9]
         include:
-        - build: gcc-7
-          os: ubuntu-latest
-          INSTALL: gcc-7 g++-7
-          C_COMPILER: gcc-7
-          CXX_COMPILER: g++-7
-
         - build: clang-6
           os: ubuntu-latest
           INSTALL: clang-6.0
           C_COMPILER: clang-6.0
           CXX_COMPILER: clang++-6.0
 
+        - build: gcc-7
+          os: ubuntu-latest
+          INSTALL: gcc-7 g++-7
+          C_COMPILER: gcc-7
+          CXX_COMPILER: g++-7
+
+        - build: gcc-8
+          os: ubuntu-latest
+          INSTALL: gcc-8 g++-8
+          C_COMPILER: gcc-8
+          CXX_COMPILER: g++-8
+
+        - build: gcc-9
+          os: ubuntu-latest
+          INSTALL: gcc-9 g++-9
+          C_COMPILER: gcc-9
+          CXX_COMPILER: g++-9
+
     steps:
     - uses: actions/checkout@v2
 
     - name: Install dependencies
-      run: |
-        sudo apt-get install -y ${{ matrix.INSTALL }}
+      run: sudo apt-get install -y cmake ${{ matrix.INSTALL }} ${{ inputs.extra_install }}
 
     - name: Configure CMake
-      # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
-      # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
       run: |
         cmake \
-          -D CMAKE_C_COMPILER=${{ matrix.C_COMPILER}} \
-          -D CMAKE_CXX_COMPILER=${{ matrix.CXX_COMPILER}} \
-          -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DBUILD_TESTS=ON
-
+          -DCMAKE_C_COMPILER=${{ matrix.C_COMPILER}} \
+          -DCMAKE_CXX_COMPILER=${{ matrix.CXX_COMPILER}} \
+          -B ${{github.workspace}}/build \
+          -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DBUILD_TESTS=ON \
+          ${{ inputs.extra_cmake_flags }}
 
     - name: Build
-      # Build your program with the given configuration
-      run: |
-        cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} --target all
+      run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} --target all
 
     - name: Start ClickHouse server
       run: |
@@ -70,8 +84,4 @@ jobs:
 
     - name: Test
       working-directory: ${{github.workspace}}/build/ut
-      # Execute tests defined by the CMake configuration.  
-      # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
-      #run: ctest -C ${{env.BUILD_TYPE}}
-      run: ./clickhouse-cpp-ut "${{env.GTEST_FILTER}}"
-
+      run: ./clickhouse-cpp-ut --gtest_filter="${{inputs.gtest_filter}}"

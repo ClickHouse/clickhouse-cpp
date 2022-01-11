@@ -73,195 +73,13 @@ void SetNonBlock(SOCKET fd, bool value) {
 #endif
 }
 
-} // namespace
-
-NetworkAddress::NetworkAddress(const std::string& host, const std::string& port)
-    : info_(nullptr)
-{
-    struct addrinfo hints;
-    memset(&hints, 0, sizeof(hints));
-
-    hints.ai_family = PF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
-
-    if (!Singleton<LocalNames>()->IsLocalName(host)) {
-        // https://linux.die.net/man/3/getaddrinfo
-        // If hints.ai_flags includes the AI_ADDRCONFIG flag,
-        // then IPv4 addresses are returned in the list pointed to by res only
-        // if the local system has at least one IPv4 address configured,
-        // and IPv6 addresses are only returned if the local system
-        // has at least one IPv6 address configured.
-        // The loopback address is not considered for this case
-        // as valid as a configured address.
-        hints.ai_flags |= AI_ADDRCONFIG;
-    }
-
-    const int error = getaddrinfo(host.c_str(), port.c_str(), &hints, &info_);
-
-    if (error) {
-        throw std::system_error(errno, std::system_category());
-    }
-}
-
-NetworkAddress::~NetworkAddress() {
-    if (info_) {
-        freeaddrinfo(info_);
-    }
-}
-
-const struct addrinfo* NetworkAddress::Info() const {
-    return info_;
-}
-
-
-SocketHolder::SocketHolder()
-    : handle_(-1)
-{
-}
-
-SocketHolder::SocketHolder(SOCKET s)
-    : handle_(s)
-{
-}
-
-SocketHolder::SocketHolder(SocketHolder&& other) noexcept
-    : handle_(other.handle_)
-{
-    other.handle_ = -1;
-}
-
-SocketHolder::~SocketHolder() {
-    Close();
-}
-
-void SocketHolder::Close() noexcept {
-    if (handle_ != -1) {
+ssize_t Poll(struct pollfd* fds, int nfds, int timeout) noexcept {
 #if defined(_win_)
-        closesocket(handle_);
+    return WSAPoll(fds, nfds, timeout);
 #else
-        close(handle_);
-#endif
-        handle_ = -1;
-    }
-}
-
-bool SocketHolder::Closed() const noexcept {
-    return handle_ == -1;
-}
-
-void SocketHolder::SetTcpKeepAlive(int idle, int intvl, int cnt) noexcept {
-    int val = 1;
-
-#if defined(_unix_)
-    setsockopt(handle_, SOL_SOCKET, SO_KEEPALIVE, &val, sizeof(val));
-#   if defined(_linux_)
-        setsockopt(handle_, IPPROTO_TCP, TCP_KEEPIDLE, &idle, sizeof(idle));
-#   elif defined(_darwin_)
-        setsockopt(handle_, IPPROTO_TCP, TCP_KEEPALIVE, &idle, sizeof(idle));
-#   else
-#       error "platform is not supported"
-#   endif
-    setsockopt(handle_, IPPROTO_TCP, TCP_KEEPINTVL, &intvl, sizeof(intvl));
-    setsockopt(handle_, IPPROTO_TCP, TCP_KEEPCNT, &cnt, sizeof(cnt));
-#else
-    setsockopt(handle_, SOL_SOCKET, SO_KEEPALIVE, (const char*)&val, sizeof(val));
-    std::ignore = idle = intvl = cnt;
+    return poll(fds, nfds, timeout);
 #endif
 }
-
-void SocketHolder::SetTcpNoDelay(bool nodelay) noexcept {
-    int val = nodelay;
-#if defined(_unix_)
-    setsockopt(handle_, IPPROTO_TCP, TCP_NODELAY, &val, sizeof(val));
-#else
-    setsockopt(handle_, IPPROTO_TCP, TCP_NODELAY, (const char*)&val, sizeof(val));
-#endif
-}
-
-SocketHolder& SocketHolder::operator = (SocketHolder&& other) noexcept {
-    if (this != &other) {
-        Close();
-
-        handle_ = other.handle_;
-        other.handle_ = -1;
-    }
-
-    return *this;
-}
-
-SocketHolder::operator SOCKET () const noexcept {
-    return handle_;
-}
-
-
-SocketInput::SocketInput(SOCKET s)
-    : s_(s)
-{
-}
-
-SocketInput::~SocketInput() = default;
-
-size_t SocketInput::DoRead(void* buf, size_t len) {
-    const ssize_t ret = ::recv(s_, (char*)buf, (int)len, 0);
-
-    if (ret > 0) {
-        return (size_t)ret;
-    }
-
-    if (ret == 0) {
-        throw std::system_error(
-            errno, std::system_category(), "closed"
-        );
-    }
-
-    throw std::system_error(
-        errno, std::system_category(), "can't receive string data"
-    );
-}
-
-
-SocketOutput::SocketOutput(SOCKET s)
-    : s_(s)
-{
-}
-
-SocketOutput::~SocketOutput() = default;
-
-void SocketOutput::DoWrite(const void* data, size_t len) {
-#if defined (_linux_)
-    static const int flags = MSG_NOSIGNAL;
-#else
-    static const int flags = 0;
-#endif
-
-    if (::send(s_, (const char*)data, (int)len, flags) != (int)len) {
-        throw std::system_error(
-            errno, std::system_category(), "fail to send data"
-        );
-    }
-}
-
-
-NetrworkInitializer::NetrworkInitializer() {
-    struct NetrworkInitializerImpl {
-        NetrworkInitializerImpl() {
-#if defined (_win_)
-            WSADATA data;
-            const int result = WSAStartup(MAKEWORD(2, 2), &data);
-            if (result) {
-                assert(false);
-                exit(-1);
-            }
-#elif defined(_unix_)
-            signal(SIGPIPE, SIG_IGN);
-#endif
-        }
-    };
-
-
-    (void)Singleton<NetrworkInitializerImpl>();
-}
-
 
 SOCKET SocketConnect(const NetworkAddress& addr) {
     int last_err = 0;
@@ -310,13 +128,196 @@ SOCKET SocketConnect(const NetworkAddress& addr) {
     );
 }
 
+} // namespace
 
-ssize_t Poll(struct pollfd* fds, int nfds, int timeout) noexcept {
+NetworkAddress::NetworkAddress(const std::string& host, const std::string& port)
+    : host_(host)
+    , info_(nullptr)
+{
+    struct addrinfo hints;
+    memset(&hints, 0, sizeof(hints));
+
+    hints.ai_family = PF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+
+    if (!Singleton<LocalNames>()->IsLocalName(host)) {
+        // https://linux.die.net/man/3/getaddrinfo
+        // If hints.ai_flags includes the AI_ADDRCONFIG flag,
+        // then IPv4 addresses are returned in the list pointed to by res only
+        // if the local system has at least one IPv4 address configured,
+        // and IPv6 addresses are only returned if the local system
+        // has at least one IPv6 address configured.
+        // The loopback address is not considered for this case
+        // as valid as a configured address.
+        hints.ai_flags |= AI_ADDRCONFIG;
+    }
+
+    const int error = getaddrinfo(host.c_str(), port.c_str(), &hints, &info_);
+
+    if (error) {
+        throw std::system_error(errno, std::system_category());
+    }
+}
+
+NetworkAddress::~NetworkAddress() {
+    if (info_) {
+        freeaddrinfo(info_);
+    }
+}
+
+const struct addrinfo* NetworkAddress::Info() const {
+    return info_;
+}
+const std::string & NetworkAddress::Host() const {
+    return host_;
+}
+
+
+Socket::Socket(const NetworkAddress& addr)
+    : handle_(SocketConnect(addr))
+{}
+
+Socket::Socket(Socket&& other) noexcept
+    : handle_(other.handle_)
+{
+    other.handle_ = -1;
+}
+
+Socket& Socket::operator=(Socket&& other) noexcept {
+    if (this != &other) {
+        Close();
+
+        handle_ = other.handle_;
+        other.handle_ = -1;
+    }
+
+    return *this;
+}
+
+Socket::~Socket() {
+    Close();
+}
+
+void Socket::Close() {
+    if (handle_ != -1) {
 #if defined(_win_)
-    return WSAPoll(fds, nfds, timeout);
+        closesocket(handle_);
 #else
-    return poll(fds, nfds, timeout);
+        close(handle_);
 #endif
+        handle_ = -1;
+    }
+}
+
+void Socket::SetTcpKeepAlive(int idle, int intvl, int cnt) noexcept {
+    int val = 1;
+
+#if defined(_unix_)
+    setsockopt(handle_, SOL_SOCKET, SO_KEEPALIVE, &val, sizeof(val));
+#   if defined(_linux_)
+        setsockopt(handle_, IPPROTO_TCP, TCP_KEEPIDLE, &idle, sizeof(idle));
+#   elif defined(_darwin_)
+        setsockopt(handle_, IPPROTO_TCP, TCP_KEEPALIVE, &idle, sizeof(idle));
+#   else
+#       error "platform is not supported"
+#   endif
+    setsockopt(handle_, IPPROTO_TCP, TCP_KEEPINTVL, &intvl, sizeof(intvl));
+    setsockopt(handle_, IPPROTO_TCP, TCP_KEEPCNT, &cnt, sizeof(cnt));
+#else
+    setsockopt(handle_, SOL_SOCKET, SO_KEEPALIVE, (const char*)&val, sizeof(val));
+    std::ignore = idle = intvl = cnt;
+#endif
+}
+
+void Socket::SetTcpNoDelay(bool nodelay) noexcept {
+    int val = nodelay;
+#if defined(_unix_)
+    setsockopt(handle_, IPPROTO_TCP, TCP_NODELAY, &val, sizeof(val));
+#else
+    setsockopt(handle_, IPPROTO_TCP, TCP_NODELAY, (const char*)&val, sizeof(val));
+#endif
+}
+
+std::unique_ptr<InputStream> Socket::makeInputStream() const {
+    return std::make_unique<SocketInput>(handle_);
+}
+
+std::unique_ptr<OutputStream> Socket::makeOutputStream() const {
+    return std::make_unique<SocketOutput>(handle_);
+}
+
+SocketInput::SocketInput(SOCKET s)
+    : s_(s)
+{
+}
+
+SocketInput::~SocketInput() = default;
+
+size_t SocketInput::DoRead(void* buf, size_t len) {
+    const ssize_t ret = ::recv(s_, (char*)buf, (int)len, 0);
+
+    if (ret > 0) {
+        return (size_t)ret;
+    }
+
+    if (ret == 0) {
+        throw std::system_error(
+            errno, std::system_category(), "closed"
+        );
+    }
+
+    throw std::system_error(
+        errno, std::system_category(), "can't receive string data"
+    );
+}
+
+bool SocketInput::Skip(size_t /*bytes*/) {
+    return false;
+}
+
+
+SocketOutput::SocketOutput(SOCKET s)
+    : s_(s)
+{
+}
+
+SocketOutput::~SocketOutput() = default;
+
+size_t SocketOutput::DoWrite(const void* data, size_t len) {
+#if defined (_linux_)
+    static const int flags = MSG_NOSIGNAL;
+#else
+    static const int flags = 0;
+#endif
+
+    if (::send(s_, (const char*)data, (int)len, flags) != (int)len) {
+        throw std::system_error(
+            errno, std::system_category(), "fail to send " + std::to_string(len) + " bytes of data"
+        );
+    }
+
+    return len;
+}
+
+
+NetrworkInitializer::NetrworkInitializer() {
+    struct NetrworkInitializerImpl {
+        NetrworkInitializerImpl() {
+#if defined (_win_)
+            WSADATA data;
+            const int result = WSAStartup(MAKEWORD(2, 2), &data);
+            if (result) {
+                assert(false);
+                exit(-1);
+            }
+#elif defined(_unix_)
+            signal(SIGPIPE, SIG_IGN);
+#endif
+        }
+    };
+
+
+    (void)Singleton<NetrworkInitializerImpl>();
 }
 
 }

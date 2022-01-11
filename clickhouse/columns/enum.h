@@ -8,6 +8,8 @@ namespace clickhouse {
 template <typename T>
 class ColumnEnum : public Column {
 public:
+    using ValueType = T;
+
     ColumnEnum(TypeRef type);
     ColumnEnum(TypeRef type, const std::vector<T>& data);
 
@@ -31,10 +33,10 @@ public:
     void Append(ColumnRef column) override;
 
     /// Loads column data from input stream.
-    bool Load(CodedInputStream* input, size_t rows) override;
+    bool Load(InputStream* input, size_t rows) override;
 
     /// Saves column data to output stream.
-    void Save(CodedOutputStream* output) override;
+    void Save(OutputStream* output) override;
     
     /// Clear column data .
     void Clear() override;

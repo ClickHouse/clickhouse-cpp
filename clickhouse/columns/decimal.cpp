@@ -29,7 +29,7 @@ inline bool mulOverflow(const Int128 & l, const T & r, Int128 * result)
 template <typename T>
 inline bool getSignBit(const T & v)
 {
-    return std::signbit(v);
+    return v < static_cast<T>(0);
 }
 
 inline bool getSignBit(const Int128 & v)
@@ -197,11 +197,11 @@ void ColumnDecimal::Append(ColumnRef column) {
     }
 }
 
-bool ColumnDecimal::Load(CodedInputStream* input, size_t rows) {
+bool ColumnDecimal::Load(InputStream * input, size_t rows) {
     return data_->Load(input, rows);
 }
 
-void ColumnDecimal::Save(CodedOutputStream* output) {
+void ColumnDecimal::Save(OutputStream* output) {
     data_->Save(output);
 }
 

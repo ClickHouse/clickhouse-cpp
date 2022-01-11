@@ -8,7 +8,7 @@
 #include <clickhouse/columns/uuid.h>
 #include <clickhouse/client.h>
 
-#include <contrib/gtest/gtest.h>
+#include <gtest/gtest.h>
 
 #include <string>
 
@@ -78,7 +78,7 @@ template <typename ColumnType>
 class ColumnPerformanceTest : public ::testing::Test {
 };
 
-TYPED_TEST_CASE_P(ColumnPerformanceTest);
+TYPED_TEST_SUITE_P(ColumnPerformanceTest);
 
 // Turns out this is the easiest way to skip test with current version of gtest
 #ifndef NDEBUG
@@ -127,8 +127,7 @@ TYPED_TEST_P(ColumnPerformanceTest, SaveAndLoad) {
 
         for (int i = 0; i < LOAD_AND_SAVE_REPEAT_TIMES; ++i) {
             buffer.clear();
-            BufferOutput bufferOutput(&buffer);
-            CodedOutputStream ostr(&bufferOutput);
+            BufferOutput ostr(&buffer);
 
             Timer timer;
             column.Save(&ostr);
@@ -147,8 +146,7 @@ TYPED_TEST_P(ColumnPerformanceTest, SaveAndLoad) {
         Timer::DurationType total{0};
 
         for (int i = 0; i < LOAD_AND_SAVE_REPEAT_TIMES; ++i) {
-            ArrayInput arrayInput(buffer.data(), buffer.size());
-            CodedInputStream istr(&arrayInput);
+            ArrayInput istr(buffer.data(), buffer.size());
             column.Clear();
 
             Timer timer;
@@ -246,11 +244,11 @@ TYPED_TEST_P(ColumnPerformanceTest, InsertAndSelect) {
     }
 }
 
-REGISTER_TYPED_TEST_CASE_P(ColumnPerformanceTest,
+REGISTER_TYPED_TEST_SUITE_P(ColumnPerformanceTest,
     SaveAndLoad, InsertAndSelect);
 
 using SimpleColumnTypes = testing::Types<ColumnUInt64, ColumnString, ColumnFixedString>;
-INSTANTIATE_TYPED_TEST_CASE_P(SimpleColumns, ColumnPerformanceTest, SimpleColumnTypes);
+INSTANTIATE_TYPED_TEST_SUITE_P(SimpleColumns, ColumnPerformanceTest, SimpleColumnTypes);
 
 using LowCardinalityColumnTypes = ::testing::Types<ColumnLowCardinalityT<ColumnString>, ColumnLowCardinalityT<ColumnFixedString>>;
-INSTANTIATE_TYPED_TEST_CASE_P(LowCardinality, ColumnPerformanceTest, LowCardinalityColumnTypes);
+INSTANTIATE_TYPED_TEST_SUITE_P(LowCardinality, ColumnPerformanceTest, LowCardinalityColumnTypes);

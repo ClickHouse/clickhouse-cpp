@@ -10,6 +10,8 @@ namespace clickhouse {
 /** */
 class ColumnDate : public Column {
 public:
+    using ValueType = std::time_t;
+
     ColumnDate();
 
     /// Appends one element to the end of column.
@@ -24,10 +26,10 @@ public:
     void Append(ColumnRef column) override;
 
     /// Loads column data from input stream.
-    bool Load(CodedInputStream* input, size_t rows) override;
+    bool Load(InputStream* input, size_t rows) override;
 
     /// Saves column data to output stream.
-    void Save(CodedOutputStream* output) override;
+    void Save(OutputStream* output) override;
 
     /// Clear column data .
     void Clear() override;
@@ -49,6 +51,8 @@ private:
 /** */
 class ColumnDateTime : public Column {
 public:
+    using ValueType = std::time_t;
+
     ColumnDateTime();
     explicit ColumnDateTime(std::string timezone);
 
@@ -66,13 +70,13 @@ public:
     void Append(ColumnRef column) override;
 
     /// Loads column data from input stream.
-    bool Load(CodedInputStream* input, size_t rows) override;
+    bool Load(InputStream* input, size_t rows) override;
 
     /// Clear column data .
     void Clear() override;
 
     /// Saves column data to output stream.
-    void Save(CodedOutputStream* output) override;
+    void Save(OutputStream* output) override;
 
     /// Returns count of rows in the column.
     size_t Size() const override;
@@ -92,6 +96,8 @@ private:
 /** */
 class ColumnDateTime64 : public Column {
 public:
+    using ValueType = Int64;
+
     explicit ColumnDateTime64(size_t precision);
     ColumnDateTime64(size_t precision, std::string timezone);
 
@@ -112,13 +118,13 @@ public:
     void Append(ColumnRef column) override;
 
     /// Loads column data from input stream.
-    bool Load(CodedInputStream* input, size_t rows) override;
+    bool Load(InputStream* input, size_t rows) override;
 
     /// Clear column data .
     void Clear() override;
 
     /// Saves column data to output stream.
-    void Save(CodedOutputStream* output) override;
+    void Save(OutputStream* output) override;
 
     /// Returns count of rows in the column.
     size_t Size() const override;
