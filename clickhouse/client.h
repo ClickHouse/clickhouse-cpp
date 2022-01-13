@@ -59,10 +59,6 @@ struct ClientOptions {
 
         explicit HostPort(std::string host, std::optional<unsigned int> port = std::nullopt) : host(std::move(host)), port(std::move(port)) {
         }
-
-        bool operator==(const HostPort& other) const {
-          return host == other.host && port == other.port;
-        }
     };
     DECLARE_FIELD(hosts_ports, std::vector<HostPort>, SetHost,{});
     /// Hostname of the server.
