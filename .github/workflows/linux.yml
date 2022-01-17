@@ -48,7 +48,6 @@ jobs:
 
     - name: Configure CMake
       run: |
-        echo ${${{matrix.ssl}}/"#ssl_"/string}
         cmake \
           -DCMAKE_C_COMPILER=${{ matrix.C_COMPILER}} \
           -DCMAKE_CXX_COMPILER=${{ matrix.CXX_COMPILER}} \
