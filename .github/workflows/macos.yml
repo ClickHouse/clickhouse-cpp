@@ -5,37 +5,49 @@ on:
     branches: [ master ]
   pull_request:
     branches: [ master ]
-  workflow_call:
-    inputs:
-      extra_cmake_flags:
-        required: false
-        type: string
-      extra_install:
-        required: false
-        type: string
-      gtest_filter:
-        required: false
-        type: string
-        default: "*"
 
 env:
   BUILD_TYPE: Release
+  CLICKHOUSE_USER: clickhouse_cpp_cicd
+  CLICKHOUSE_PASSWORD: clickhouse_cpp_cicd
 
 jobs:
   build:
     runs-on: macos-latest
 
+    strategy:
+      fail-fast: false
+      matrix:
+        build: [nossl, ssl]
+        include:
+        - build: nossl
+          extra_cmake_flags: -DWITH_OPENSSL=OFF
+          extra_install: 
+
+        - build: ssl
+          extra_cmake_flags: -DWITH_OPENSSL=ON -DOPENSSL_ROOT_DIR=/usr/local/opt/openssl/
+          extra_install: openssl
+
     steps:
     - uses: actions/checkout@v2
 
     - name: Install dependencies
-      run: brew install cmake ${{inputs.extra_install}}
+      run: brew install cmake ${{matrix.extra_install}}
 
     - name: Configure CMake
-      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DBUILD_TESTS=ON ${{inputs.extra_cmake_flags}}
+      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DBUILD_TESTS=ON ${{matrix.extra_cmake_flags}}
 
     - name: Build
       run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} --target all
+
+    - name: Start tls offoader proxy
+      # that mimics non-secure clickhouse running on localhost
+      # by tunneling queries to remote tls server
+      # (needed because we can't start real clickhouse instance on macOS)
+      run: |
+            wget https://github.com/filimonov/go-tlsoffloader/releases/download/v0.1.2/go-tlsoffloader_0.1.2_Darwin_x86_64.tar.gz
+            tar -xvzf go-tlsoffloader_0.1.2_Darwin_x86_64.tar.gz
+            ./go-tlsoffloader -l localhost:9000 -b github.demo.trial.altinity.cloud:9440 &
 
     - name: Test
       working-directory: ${{github.workspace}}/build/ut
@@ -43,4 +55,4 @@ jobs:
         # It is impossible to start CH server in docker on macOS due to github actions limitations,
         # so limit tests to ones that do no require server interaction.
         GTEST_FILTER_ONLY_LOCAL: "-Client/*"
-      run: ./clickhouse-cpp-ut --gtest_filter="${{inputs.gtest_filter}}:${{env.GTEST_FILTER_ONLY_LOCAL}}"
+      run: ./clickhouse-cpp-ut

@@ -5,18 +5,6 @@ on:
     branches: [ master ]
   pull_request:
     branches: [ master ]
-  workflow_call:
-    inputs:
-      extra_cmake_flags:
-        required: false
-        type: string
-      extra_install:
-        required: false
-        type: string
-      gtest_filter:
-        required: false
-        type: string
-        default: "*"
 
 env:
   BUILD_TYPE: Release
@@ -26,37 +14,41 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        build: [clang-6, gcc-7, gcc-8, gcc-9]
+        compiler: [clang-6, gcc-7, gcc-8, gcc-9]
+        ssl: [ssl_ON, ssl_OFF]
         include:
-        - build: clang-6
-          os: ubuntu-latest
+        - compiler: clang-6
           INSTALL: clang-6.0
           C_COMPILER: clang-6.0
           CXX_COMPILER: clang++-6.0
 
-        - build: gcc-7
-          os: ubuntu-latest
+        - compiler: gcc-7
           INSTALL: gcc-7 g++-7
           C_COMPILER: gcc-7
           CXX_COMPILER: g++-7
 
-        - build: gcc-8
-          os: ubuntu-latest
+        - compiler: gcc-8
           INSTALL: gcc-8 g++-8
           C_COMPILER: gcc-8
           CXX_COMPILER: g++-8
 
-        - build: gcc-9
-          os: ubuntu-latest
+        - compiler: gcc-9
           INSTALL: gcc-9 g++-9
           C_COMPILER: gcc-9
           CXX_COMPILER: g++-9
+
+        - ssl: ssl_ON
+          INSTALL_SSL: libssl-dev
+          EXTRA_CMAKE_FLAGS: -DWITH_OPENSSL=ON
+
+        - ssl: ssl_OFF
+          EXTRA_CMAKE_FLAGS: -DWITH_OPENSSL=OFF
 
     steps:
     - uses: actions/checkout@v2
 
     - name: Install dependencies
-      run: sudo apt-get install -y cmake ${{ matrix.INSTALL }} ${{ inputs.extra_install }}
+      run: sudo apt-get install -y cmake ${{ matrix.INSTALL }} ${{ matrix.INSTALL_SSL }}
 
     - name: Configure CMake
       run: |
@@ -65,7 +57,7 @@ jobs:
           -DCMAKE_CXX_COMPILER=${{ matrix.CXX_COMPILER}} \
           -B ${{github.workspace}}/build \
           -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DBUILD_TESTS=ON \
-          ${{ inputs.extra_cmake_flags }}
+          ${{ matrix.EXTRA_CMAKE_FLAGS }}
 
     - name: Build
       run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} --target all
@@ -84,4 +76,4 @@ jobs:
 
     - name: Test
       working-directory: ${{github.workspace}}/build/ut
-      run: ./clickhouse-cpp-ut --gtest_filter="${{inputs.gtest_filter}}"
+      run: ./clickhouse-cpp-ut
