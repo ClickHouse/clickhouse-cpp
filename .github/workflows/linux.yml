@@ -36,9 +36,13 @@ jobs:
           INSTALL: gcc-9 g++-9
           C_COMPILER: gcc-9
           CXX_COMPILER: g++-9
-        
+
         - ssl: ssl_ON
           INSTALL_SSL: libssl-dev
+          EXTRA_CMAKE_FLAGS: -DWITH_OPENSSL=ON
+
+        - ssl: ssl_OFF
+          EXTRA_CMAKE_FLAGS: -DWITH_OPENSSL=OFF
 
     steps:
     - uses: actions/checkout@v2
@@ -53,7 +57,7 @@ jobs:
           -DCMAKE_CXX_COMPILER=${{ matrix.CXX_COMPILER}} \
           -B ${{github.workspace}}/build \
           -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DBUILD_TESTS=ON \
-          -DWITH_OPENSSL=$(echo ${{ matrix.ssl}} | cut -c 5-)
+          ${{ matrix.EXTRA_CMAKE_FLAGS }}
 
     - name: Build
       run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} --target all
