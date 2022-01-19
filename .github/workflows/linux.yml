@@ -14,22 +14,22 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        build: [clang-6-ssl, gcc-7-ssl, gcc-8-ssl, gcc-9-ssl, gcc-9]
-
+        compiler: [clang-6, gcc-7, gcc-8, gcc-9]
+        ssl: [ssl_ON, ssl_OFF]
         include:
-        - build: clang-6-ssl
+        - compiler: clang-6
           INSTALL: clang-6.0
           C_COMPILER: clang-6.0
           CXX_COMPILER: clang++-6.0
           extra_cmake_flags: -DWITH_OPENSSL=ON
 
-        - build: gcc-7-ssl
-          INSTALL: gcc-7 g++-7 libssl-dev
+        - compiler: gcc-7
+          INSTALL: gcc-7 g++-7
           C_COMPILER: gcc-7
           CXX_COMPILER: g++-7
           extra_cmake_flags: -DWITH_OPENSSL=ON
 
-        - build: gcc-8-ssl
+        - compiler: gcc-8
           INSTALL: gcc-8 g++-8
           C_COMPILER: gcc-8
           CXX_COMPILER: g++-8
@@ -41,17 +41,24 @@ jobs:
           CXX_COMPILER: g++-9
           extra_cmake_flags: -DWITH_OPENSSL=ON
 
-        - build: gcc-9
+        - compiler: gcc-9
           INSTALL: gcc-9 g++-9
           C_COMPILER: gcc-9
           CXX_COMPILER: g++-9
           extra_cmake_flags: -DWITH_OPENSSL=OFF
 
+        - ssl: ssl_ON
+          INSTALL_SSL: libssl-dev
+          EXTRA_CMAKE_FLAGS: -DWITH_OPENSSL=ON
+
+        - ssl: ssl_OFF
+          EXTRA_CMAKE_FLAGS: -DWITH_OPENSSL=OFF
+
     steps:
     - uses: actions/checkout@v2
 
     - name: Install dependencies
-      run: sudo apt-get install -y cmake ${{ matrix.INSTALL }}
+      run: sudo apt-get install -y cmake ${{ matrix.INSTALL }} ${{ matrix.INSTALL_SSL }}
 
     - name: Configure CMake
       run: |
@@ -60,7 +67,7 @@ jobs:
           -DCMAKE_CXX_COMPILER=${{ matrix.CXX_COMPILER}} \
           -B ${{github.workspace}}/build \
           -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DBUILD_TESTS=ON \
-          ${{ matrix.extra_cmake_flags }}
+          ${{ matrix.EXTRA_CMAKE_FLAGS }}
 
     - name: Build
       run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} --target all

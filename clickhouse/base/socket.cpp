@@ -35,7 +35,7 @@ std::string windowsErrorCategory::message(int c) const {
     return std::string(error, len);
 }
 
-/*static*/ windowsErrorCategory const& windowsErrorCategory::category() {
+windowsErrorCategory const& windowsErrorCategory::category() {
     static windowsErrorCategory c;
     return c;
 }
@@ -105,7 +105,8 @@ void SetNonBlock(SOCKET fd, bool value) {
     }
 
     if (WSAIoctl(fd, FIONBIO, &inbuf, sizeof(inbuf), &outbuf, sizeof(outbuf), &written, 0, 0) == SOCKET_ERROR) {
-        throw std::system_error(getSocketErrorCode(), getErrorCategory(), "fail to set nonblocking mode");
+        throw std::system_error(getSocketErrorCode(), 
+                                (), "fail to set nonblocking mode");
     }
 #endif
 }

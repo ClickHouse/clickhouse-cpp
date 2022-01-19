@@ -43,7 +43,7 @@ jobs:
     - name: Start tls offoader proxy
       # that mimics non-secure clickhouse running on localhost
       # by tunneling queries to remote tls server
-      # (needed because we can't start real clickhouse instance on windows)
+      # (needed because we can't start real clickhouse instance on macOS)
       run: |
             wget https://github.com/filimonov/go-tlsoffloader/releases/download/v0.1.2/go-tlsoffloader_0.1.2_Darwin_x86_64.tar.gz
             tar -xvzf go-tlsoffloader_0.1.2_Darwin_x86_64.tar.gz
