@@ -105,8 +105,7 @@ void SetNonBlock(SOCKET fd, bool value) {
     }
 
     if (WSAIoctl(fd, FIONBIO, &inbuf, sizeof(inbuf), &outbuf, sizeof(outbuf), &written, 0, 0) == SOCKET_ERROR) {
-        throw std::system_error(getSocketErrorCode(), 
-                                (), "fail to set nonblocking mode");
+        throw std::system_error(getSocketErrorCode(), getErrorCategory(), "fail to set nonblocking mode");
     }
 #endif
 }
