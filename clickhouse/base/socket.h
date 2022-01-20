@@ -1,8 +1,8 @@
 #pragma once
 
+#include "platform.h"
 #include "input.h"
 #include "output.h"
-#include "platform.h"
 
 #include <cstddef>
 #include <string>
@@ -24,7 +24,7 @@
 #endif
 
 #include <memory>
-
+#include <system_error>
 
 struct addrinfo;
 
@@ -47,6 +47,17 @@ private:
     struct addrinfo* info_;
 };
 
+#if defined(_win_)
+
+class windowsErrorCategory : public std::error_category {
+public:
+    char const* name() const noexcept override final;
+    std::string message(int c) const override final;
+
+    static windowsErrorCategory const& category();
+};
+
+#endif
 
 class Socket {
 public:
