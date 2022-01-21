@@ -30,6 +30,12 @@ $ cd build
 $ cmake .. [-DBUILD_TESTS=ON]
 $ make
 ```
+if you want to install system lib directory, you may run 
+```bash
+$ sudo make install
+```
+Then the include and lib will install into system /usr/local/{lib,include} directory
+
 
 ## Example
 
@@ -74,4 +80,15 @@ client.Select("SELECT id, name FROM test.numbers", [] (const Block& block)
 
 /// Delete table.
 client.Execute("DROP TABLE test.numbers");
+```
+
+If you want to build the example to run hello world, try to build with following command
+```
+cd tests/helloworld
+mkdir build
+cd build
+cmake ..
+make 
+export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/local/lib"
+./helloworld
 ```
