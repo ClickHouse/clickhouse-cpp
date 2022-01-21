@@ -22,6 +22,19 @@ C++ client for [ClickHouse](https://clickhouse.com/).
 * Int128
 * UUID
 
+## Requirement
+
+You need gcc cmake libabsl-dev to build this project.
+
+* gcc
+* cmake
+* libabsl-dev
+
+For ubuntu user, you can install them via command:
+```bash
+apt-get install -y cmake gcc libabsl-dev
+```
+
 ## Building
 
 ```sh
