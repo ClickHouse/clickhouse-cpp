@@ -111,7 +111,16 @@ CompressedOutput::CompressedOutput(OutputStream * destination, size_t max_compre
 }
 
 CompressedOutput::~CompressedOutput() {
-    Flush();
+    try
+    {
+        Flush();
+    }
+    catch (...)
+    {
+        // That means we've failed to flush some data e.g. to the socket,
+        // but there is nothing we can do at this point (can't bring the socket back),
+        // and throwing in destructor is really a bad idea.
+    }
 }
 
 size_t CompressedOutput::DoWrite(const void* data, size_t len) {
