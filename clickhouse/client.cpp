@@ -85,6 +85,7 @@ std::ostream& operator<<(std::ostream& os, const ClientOptions& opt) {
 class Client::Impl {
 public:
      Impl(const ClientOptions& opts);
+     Impl(const ClientOptions& opts, std::unique_ptr<Socket> socket);
     ~Impl();
 
     void ExecuteQuery(Query query);
@@ -121,6 +122,8 @@ private:
     bool ReceiveException(bool rethrow = false);
 
     void WriteBlock(const Block& block, OutputStream* output);
+
+    void InitializeStreams(std::unique_ptr<Socket>&& socket);
 
 private:
     /// In case of network errors tries to reconnect to server and
@@ -162,6 +165,8 @@ private:
 
     std::unique_ptr<Socket> socket_;
 
+    bool is_external_socket_initialization_{false};
+
 #if defined(WITH_OPENSSL)
     std::unique_ptr<SSLContext> ssl_context_;
 #endif
@@ -188,6 +193,18 @@ Client::Impl::Impl(const ClientOptions& opts)
             std::this_thread::sleep_for(options_.retry_timeout);
         }
     }
+
+    if (options_.compression_method != CompressionMethod::None) {
+        compression_ = CompressionState::Enable;
+    }
+}
+
+Client::Impl::Impl(const ClientOptions& opts, std::unique_ptr<Socket> socket)
+    : options_(opts)
+    , events_(nullptr)
+{
+    InitializeStreams(std::move(socket));
+    is_external_socket_initialization_ = true;
 
     if (options_.compression_method != CompressionMethod::None) {
         compression_ = CompressionState::Enable;
@@ -295,7 +312,12 @@ void Client::Impl::Ping() {
     }
 }
 
+
+
 void Client::Impl::ResetConnection() {
+    if (is_external_socket_initialization_) {
+        throw std::runtime_error("Can not reset connection, socket was provided externally");
+    }
 
     std::unique_ptr<Socket> socket;
 
@@ -336,19 +358,7 @@ void Client::Impl::ResetConnection() {
         socket->SetTcpNoDelay(options_.tcp_nodelay);
     }
 
-    OutputStreams output_streams;
-    auto socket_output = output_streams.Add(socket->makeOutputStream());
-    auto output = output_streams.AddNew<BufferedOutput>(socket_output);
-
-    InputStreams input_streams;
-    auto socket_input = input_streams.Add(socket->makeInputStream());
-    auto input = input_streams.AddNew<BufferedInput>(socket_input);
-
-    std::swap(output_streams, output_streams_);
-    std::swap(input_streams, input_streams_);
-    std::swap(socket, socket_);
-    output_ = output;
-    input_ = input;
+    InitializeStreams(std::move(socket));
 
 #if defined(WITH_OPENSSL)
     std::swap(ssl_context_, ssl_context);
@@ -705,6 +715,22 @@ void Client::Impl::SendData(const Block& block) {
     output_->Flush();
 }
 
+void Client::Impl::InitializeStreams(std::unique_ptr<Socket>&& socket) {
+    OutputStreams output_streams;
+    auto socket_output = output_streams.Add(socket->makeOutputStream());
+    auto output = output_streams.AddNew<BufferedOutput>(socket_output);
+
+    InputStreams input_streams;
+    auto socket_input = input_streams.Add(socket->makeInputStream());
+    auto input = input_streams.AddNew<BufferedInput>(socket_input);
+
+    std::swap(output_streams, output_streams_);
+    std::swap(input_streams, input_streams_);
+    std::swap(socket, socket_);
+    output_ = output;
+    input_ = input;
+}
+
 bool Client::Impl::SendHello() {
     WireFormat::WriteUInt64(output_, ClientCodes::Hello);
     WireFormat::WriteString(output_, std::string(DBMS_NAME) + " client");
@@ -793,6 +819,12 @@ void Client::Impl::RetryGuard(std::function<void()> func) {
 Client::Client(const ClientOptions& opts)
     : options_(opts)
     , impl_(new Impl(opts))
+{
+}
+
+Client::Client(const ClientOptions& opts, std::unique_ptr<Socket> socket)
+    : options_(opts)
+    , impl_(new Impl(opts, std::move(socket)))
 {
 }
 

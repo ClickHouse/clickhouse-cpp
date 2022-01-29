@@ -163,12 +163,15 @@ struct ClientOptions {
 
 std::ostream& operator<<(std::ostream& os, const ClientOptions& options);
 
+class Socket;
+
 /**
  *
  */
 class Client {
 public:
      Client(const ClientOptions& opts);
+     Client(const ClientOptions& opts, std::unique_ptr<Socket> socket);
     ~Client();
 
     /// Intends for execute arbitrary queries.
