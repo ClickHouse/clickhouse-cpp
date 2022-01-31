@@ -171,7 +171,7 @@ class Socket;
 class Client {
 public:
      Client(const ClientOptions& opts);
-     Client(const ClientOptions& opts, std::unique_ptr<Socket> socket);
+     Client(const ClientOptions& opts, std::unique_ptr<SocketBase> socket);
     ~Client();
 
     /// Intends for execute arbitrary queries.

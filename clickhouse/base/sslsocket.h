@@ -44,7 +44,7 @@ class SSLSocket : public Socket {
 public:
     explicit SSLSocket(const NetworkAddress& addr, const SSLParams & ssl_params, SSLContext& context);
     SSLSocket(SSLSocket &&) = default;
-    ~SSLSocket() = default;
+    ~SSLSocket() override = default;
 
     SSLSocket(const SSLSocket & ) = delete;
     SSLSocket& operator=(const SSLSocket & ) = delete;

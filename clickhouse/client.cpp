@@ -85,7 +85,7 @@ std::ostream& operator<<(std::ostream& os, const ClientOptions& opt) {
 class Client::Impl {
 public:
      Impl(const ClientOptions& opts);
-     Impl(const ClientOptions& opts, std::unique_ptr<Socket> socket);
+     Impl(const ClientOptions& opts, std::unique_ptr<SocketBase> socket);
     ~Impl();
 
     void ExecuteQuery(Query query);
@@ -123,7 +123,7 @@ private:
 
     void WriteBlock(const Block& block, OutputStream* output);
 
-    void InitializeStreams(std::unique_ptr<Socket>&& socket);
+    void InitializeStreams(std::unique_ptr<SocketBase>&& socket);
 
 private:
     /// In case of network errors tries to reconnect to server and
@@ -163,8 +163,7 @@ private:
     OutputStreams output_streams_;
     OutputStream* output_;
 
-    std::unique_ptr<Socket> socket_;
-
+    std::unique_ptr<SocketBase> socket_;
     bool is_external_socket_initialization_{false};
 
 #if defined(WITH_OPENSSL)
@@ -199,7 +198,7 @@ Client::Impl::Impl(const ClientOptions& opts)
     }
 }
 
-Client::Impl::Impl(const ClientOptions& opts, std::unique_ptr<Socket> socket)
+Client::Impl::Impl(const ClientOptions& opts, std::unique_ptr<SocketBase> socket)
     : options_(opts)
     , events_(nullptr)
 {
@@ -715,7 +714,7 @@ void Client::Impl::SendData(const Block& block) {
     output_->Flush();
 }
 
-void Client::Impl::InitializeStreams(std::unique_ptr<Socket>&& socket) {
+void Client::Impl::InitializeStreams(std::unique_ptr<SocketBase>&& socket) {
     OutputStreams output_streams;
     auto socket_output = output_streams.Add(socket->makeOutputStream());
     auto output = output_streams.AddNew<BufferedOutput>(socket_output);
@@ -822,7 +821,7 @@ Client::Client(const ClientOptions& opts)
 {
 }
 
-Client::Client(const ClientOptions& opts, std::unique_ptr<Socket> socket)
+Client::Client(const ClientOptions& opts, std::unique_ptr<SocketBase> socket)
     : options_(opts)
     , impl_(new Impl(opts, std::move(socket)))
 {

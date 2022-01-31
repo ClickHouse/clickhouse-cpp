@@ -47,14 +47,22 @@ private:
     struct addrinfo* info_;
 };
 
+class SocketBase {
+public:
+    virtual ~SocketBase();
 
-class Socket {
+    virtual std::unique_ptr<InputStream> makeInputStream() const = 0;
+    virtual std::unique_ptr<OutputStream> makeOutputStream() const = 0;
+};
+
+
+class Socket : public SocketBase {
 public:
     Socket(const NetworkAddress& addr);
     Socket(Socket&& other) noexcept;
     Socket& operator=(Socket&& other) noexcept;
 
-    virtual ~Socket();
+    ~Socket() override;
 
     /// @params idle the time (in seconds) the connection needs to remain
     ///         idle before TCP starts sending keepalive probes.
@@ -66,8 +74,8 @@ public:
     /// @params nodelay whether to enable TCP_NODELAY
     void SetTcpNoDelay(bool nodelay) noexcept;
 
-    virtual std::unique_ptr<InputStream> makeInputStream() const;
-    virtual std::unique_ptr<OutputStream> makeOutputStream() const;
+    std::unique_ptr<InputStream> makeInputStream() const override;
+    std::unique_ptr<OutputStream> makeOutputStream() const override;
 
 protected:
     Socket(const Socket&) = delete;

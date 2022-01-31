@@ -174,6 +174,9 @@ const std::string & NetworkAddress::Host() const {
 }
 
 
+SocketBase::~SocketBase() = default;
+
+
 Socket::Socket(const NetworkAddress& addr)
     : handle_(SocketConnect(addr))
 {}
