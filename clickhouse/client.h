@@ -163,7 +163,7 @@ struct ClientOptions {
 
 std::ostream& operator<<(std::ostream& os, const ClientOptions& options);
 
-class Socket;
+class SocketBase;
 
 /**
  *
