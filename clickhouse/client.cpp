@@ -328,9 +328,10 @@ void Client::Impl::ResetConnection() {
         socket = std::make_unique<Socket>(address);
 
     if (options_.tcp_keepalive) {
-        socket->SetTcpKeepAlive(options_.tcp_keepalive_idle.count(),
-                          options_.tcp_keepalive_intvl.count(),
-                          options_.tcp_keepalive_cnt);
+        socket->SetTcpKeepAlive(
+                static_cast<int>(options_.tcp_keepalive_idle.count()),
+                static_cast<int>(options_.tcp_keepalive_intvl.count()),
+                static_cast<int>(options_.tcp_keepalive_cnt));
     }
     if (options_.tcp_nodelay) {
         socket->SetTcpNoDelay(options_.tcp_nodelay);
