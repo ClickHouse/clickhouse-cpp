@@ -380,11 +380,11 @@ TEST(ColumnsCase, DateTime64_Swap_EXCEPTION) {
 
 TEST(ColumnsCase, Date2038) {
     auto col1 = std::make_shared<ColumnDate>();
-    std::time_t largeDate(25882ul * 86400ul);
+    const std::time_t largeDate(25882ull * 86400ull);
     col1->Append(largeDate);
 
     ASSERT_EQ(col1->Size(), 1u);
-    ASSERT_EQ(static_cast<std::uint64_t>(col1->At(0)), 25882ul * 86400ul);
+    ASSERT_EQ(largeDate, col1->At(0));
 }
 
 TEST(ColumnsCase, DateTime) {

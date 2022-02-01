@@ -51,7 +51,16 @@ TARGET_LINK_LIBRARIES (clickhouse-cpp-lib-static
 )
 
 IF (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    # there is a problem with __builtin_mul_overflow call at link time
+    # the error looks like: ... undefined reference to `__muloti4' ...
+    # caused by clang bug https://bugs.llvm.org/show_bug.cgi?id=16404
+    # explicit linking to compiler-rt allows to workaround the problem
     set (CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} --rtlib=compiler-rt")
+
+    # some workaround for linking issues on linux:
+    # /usr/bin/ld: CMakeFiles/simple-test.dir/main.cpp.o: undefined reference to symbol '_Unwind_Resume@@GCC_3.0'
+    # /usr/bin/ld: /lib/x86_64-linux-gnu/libgcc_s.so.1: error adding symbols: DSO missing from command line
+    # FIXME: that workaround breaks clang build on mingw
     TARGET_LINK_LIBRARIES (clickhouse-cpp-lib gcc_s)
     TARGET_LINK_LIBRARIES (clickhouse-cpp-lib-static gcc_s)
 ENDIF ()
@@ -107,4 +116,9 @@ INSTALL(FILES types/types.h DESTINATION include/clickhouse/types/)
 IF (WITH_OPENSSL)
     TARGET_LINK_LIBRARIES (clickhouse-cpp-lib OpenSSL::SSL)
     TARGET_LINK_LIBRARIES (clickhouse-cpp-lib-static OpenSSL::SSL)
+ENDIF ()
+
+IF (WIN32 OR MINGW)
+    TARGET_LINK_LIBRARIES (clickhouse-cpp-lib wsock32 ws2_32)
+    TARGET_LINK_LIBRARIES (clickhouse-cpp-lib-static wsock32 ws2_32)
 ENDIF ()
