@@ -30,6 +30,15 @@ bool operator==(const in6_addr & left, const in6_addr & right)
     return memcmp(&left, &right, sizeof(left)) == 0;
 }
 
+in_addr make_IPv4(uint32_t ip)
+{
+    static_assert(sizeof(in_addr) == sizeof(ip));
+    in_addr result;
+    memcpy(&result, &ip, sizeof(ip));
+
+    return result;
+}
+
 std::ostream& operator<<(std::ostream& ostr, const in6_addr & addr)
 {
     char buf[INET6_ADDRSTRLEN];
@@ -539,14 +548,14 @@ TEST(ColumnsCase, ColumnIPv4)
     col.Append("127.0.0.1");
     col.Append(3585395774);
     col.Append(0);
-    const in_addr ip{0x12345678};
+    const in_addr ip = make_IPv4(0x12345678);
     col.Append(ip);
 
     ASSERT_EQ(5u, col.Size());
-    EXPECT_EQ(in_addr{0xffffffff}, col.At(0));
-    EXPECT_EQ(in_addr{0x0100007f}, col.At(1));
-    EXPECT_EQ(in_addr{3585395774}, col.At(2));
-    EXPECT_EQ(in_addr{0},          col.At(3));
+    EXPECT_EQ(make_IPv4(0xffffffff), col.At(0));
+    EXPECT_EQ(make_IPv4(0x0100007f), col.At(1));
+    EXPECT_EQ(make_IPv4(3585395774), col.At(2));
+    EXPECT_EQ(make_IPv4(0),          col.At(3));
     EXPECT_EQ(ip,                  col.At(4));
 
     EXPECT_EQ("255.255.255.255", col.AsString(0));
