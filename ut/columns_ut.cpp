@@ -1,4 +1,5 @@
 #include <clickhouse/columns/array.h>
+#include <clickhouse/columns/tuple.h>
 #include <clickhouse/columns/date.h>
 #include <clickhouse/columns/enum.h>
 #include <clickhouse/columns/factory.h>
@@ -217,6 +218,39 @@ TEST(ColumnsCase, ArrayAppend) {
     ASSERT_EQ(arr1->Size(), 2u);
     //ASSERT_EQ(col->As<ColumnUInt64>()->At(0), 1u);
     //ASSERT_EQ(col->As<ColumnUInt64>()->At(1), 3u);
+}
+
+TEST(ColumnsCase, TupleAppend){
+    auto tuple1 = std::make_shared<ColumnTuple>(std::vector<ColumnRef>({
+                                std::make_shared<ColumnUInt64>(),
+                                std::make_shared<ColumnString>()
+                            }));
+    auto tuple2 = std::make_shared<ColumnTuple>(std::vector<ColumnRef>({
+                                std::make_shared<ColumnUInt64>(),
+                                std::make_shared<ColumnString>()
+                            }));
+    (*tuple1)[0]->As<ColumnUInt64>()->Append(2u);
+    (*tuple1)[1]->As<ColumnString>()->Append("2");
+    tuple2->Append(tuple1);
+
+    ASSERT_EQ((*tuple2)[0]->As<ColumnUInt64>()->At(0), 2u);
+    ASSERT_EQ((*tuple2)[1]->As<ColumnString>()->At(0), "2");
+}
+
+TEST(ColumnsCase, TupleSlice){
+    auto tuple1 = std::make_shared<ColumnTuple>(std::vector<ColumnRef>({
+                                std::make_shared<ColumnUInt64>(),
+                                std::make_shared<ColumnString>()
+                            }));
+
+    (*tuple1)[0]->As<ColumnUInt64>()->Append(2u);
+    (*tuple1)[1]->As<ColumnString>()->Append("2");
+    (*tuple1)[0]->As<ColumnUInt64>()->Append(3u);
+    (*tuple1)[1]->As<ColumnString>()->Append("3");
+    auto tuple2 = tuple1->Slice(1,1)->As<ColumnTuple>();
+
+    ASSERT_EQ((*tuple2)[0]->As<ColumnUInt64>()->At(0), 3u);
+    ASSERT_EQ((*tuple2)[1]->As<ColumnString>()->At(0), "3");
 }
 
 TEST(ColumnsCase, DateAppend) {
