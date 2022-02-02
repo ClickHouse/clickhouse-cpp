@@ -163,8 +163,8 @@ private:
     OutputStreams output_streams_;
     OutputStream* output_;
 
-    std::unique_ptr<SocketBase> socket_;
     bool is_external_socket_initialization_{false};
+    std::unique_ptr<SocketBase> socket_;
 
 #if defined(WITH_OPENSSL)
     std::unique_ptr<SSLContext> ssl_context_;
@@ -201,9 +201,12 @@ Client::Impl::Impl(const ClientOptions& opts)
 Client::Impl::Impl(const ClientOptions& opts, std::unique_ptr<SocketBase> socket)
     : options_(opts)
     , events_(nullptr)
+    , is_external_socket_initialization_(true)
 {
     InitializeStreams(std::move(socket));
-    is_external_socket_initialization_ = true;
+    if (!Handshake()) {
+        throw std::runtime_error("fail to connect to " + options_.host);
+    }
 
     if (options_.compression_method != CompressionMethod::None) {
         compression_ = CompressionState::Enable;
