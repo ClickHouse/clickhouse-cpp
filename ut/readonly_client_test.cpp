@@ -18,6 +18,8 @@ void ReadonlyClientTest::TearDown() {
     client_.reset();
 }
 
+// Sometimes gtest fails to detect that this test is instantiated elsewhere, suppress the error explicitly.
+GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(ReadonlyClientTest);
 TEST_P(ReadonlyClientTest, Select) {
 
     const auto & queries = std::get<1>(GetParam());

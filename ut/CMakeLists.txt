@@ -25,7 +25,7 @@ ADD_EXECUTABLE (clickhouse-cpp-ut
 )
 
 TARGET_LINK_LIBRARIES (clickhouse-cpp-ut
-    clickhouse-cpp-lib
+    clickhouse-cpp-lib-static
     gtest-lib
 )
 IF (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")

@@ -380,11 +380,11 @@ TEST(ColumnsCase, DateTime64_Swap_EXCEPTION) {
 
 TEST(ColumnsCase, Date2038) {
     auto col1 = std::make_shared<ColumnDate>();
-    std::time_t largeDate(25882ul * 86400ul);
+    const std::time_t largeDate(25882ull * 86400ull);
     col1->Append(largeDate);
 
     ASSERT_EQ(col1->Size(), 1u);
-    ASSERT_EQ(static_cast<std::uint64_t>(col1->At(0)), 25882ul * 86400ul);
+    ASSERT_EQ(largeDate, col1->At(0));
 }
 
 TEST(ColumnsCase, DateTime) {
@@ -457,8 +457,17 @@ TEST(ColumnsCase, Int128) {
             absl::MakeInt128(0x8000000000000000ll, 0),
             Int128(0)
     });
+
     EXPECT_EQ(-1, col->At(0));
-    EXPECT_EQ(0xffffffffffffffffll, col->At(1));
+
+    EXPECT_EQ(absl::MakeInt128(0, 0xffffffffffffffffll), col->At(1));
+    EXPECT_EQ(0ll,                   absl::Int128High64(col->At(1)));
+    EXPECT_EQ(0xffffffffffffffffull, absl::Int128Low64(col->At(1)));
+
+    EXPECT_EQ(absl::MakeInt128(0xffffffffffffffffll, 0), col->At(2));
+    EXPECT_EQ(static_cast<int64_t>(0xffffffffffffffffll),  absl::Int128High64(col->At(2)));
+    EXPECT_EQ(0ull,                  absl::Int128Low64(col->At(2)));
+
     EXPECT_EQ(0, col->At(4));
 }
 

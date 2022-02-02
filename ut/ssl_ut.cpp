@@ -23,11 +23,16 @@ namespace {
 
 #if defined(__linux__)
 // On Ubuntu 20.04 /etc/ssl/certs is a default directory with the CA files
-const auto DEAFULT_CA_DIRECTORY_PATH = "/etc/ssl/certs";
+const auto DEFAULT_CA_DIRECTORY_PATH = "/etc/ssl/certs";
 #elif defined(__APPLE__)
 // On macOS we will rely on Homebrew's OpenSSL installation
-const auto DEAFULT_CA_DIRECTORY_PATH = "/usr/local/etc/openssl@1.1/cert.pem";
+const auto DEFAULT_CA_DIRECTORY_PATH = "/usr/local/etc/openssl@1.1/cert.pem";
 #elif defined(_win_)
+// DEBUG ME: mingw - was not able to make it work. Every time it ends with exception:
+// "Failed to verify SSL connection, X509_v error: 20 unable to get local issuer certificate"
+const auto DEFAULT_CA_DIRECTORY_PATH = "/mingw64/ssl/cert.pem";
+// const auto DEFAULT_CA_DIRECTORY_PATH = "/mingw64/ssl/certs";
+// const auto DEFAULT_CA_DIRECTORY_PATH = "/mingw64/ssl/certs/ca-bundle.crt";
 #endif
 
 INSTANTIATE_TEST_SUITE_P(
@@ -43,7 +48,7 @@ INSTANTIATE_TEST_SUITE_P(
             .SetPingBeforeQuery(true)
             .SetCompressionMethod(CompressionMethod::None)
             .SetSSLOptions(ClientOptions::SSLOptions()
-                    .SetPathToCADirectory(DEAFULT_CA_DIRECTORY_PATH)),
+                    .SetPathToCADirectory(DEFAULT_CA_DIRECTORY_PATH)),
         QUERIES
     }
 ));
@@ -61,7 +66,7 @@ INSTANTIATE_TEST_SUITE_P(
             .SetPingBeforeQuery(true)
             .SetCompressionMethod(CompressionMethod::None)
             .SetSSLOptions(ClientOptions::SSLOptions()
-                    .SetPathToCADirectory(DEAFULT_CA_DIRECTORY_PATH)),
+                    .SetPathToCADirectory(DEFAULT_CA_DIRECTORY_PATH)),
         QUERIES
     }
 ));

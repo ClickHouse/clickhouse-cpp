@@ -1,0 +1,85 @@
+name: Windows mingw
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+env:
+  BUILD_TYPE: Release
+  CLICKHOUSE_USER: clickhouse_cpp_cicd
+  CLICKHOUSE_PASSWORD: clickhouse_cpp_cicd
+
+  #
+  # CLICKHOUSE_HOST: localhost
+  # CLICKHOUSE_PORT: 9000
+  # CLICKHOUSE_USER: default
+  # CLICKHOUSE_PASSWORD:
+  # CLICKHOUSE_DB:   default
+  #
+  # CLICKHOUSE_SECURE_HOST:     github.demo.trial.altinity.cloud
+  # CLICKHOUSE_SECURE_PORT:     9440
+  # CLICKHOUSE_SECURE_USER:     demo
+  # CLICKHOUSE_SECURE_PASSWORD: demo
+  # CLICKHOUSE_SECURE_DB:       default
+  #
+  # CLICKHOUSE_SECURE2_HOST:    gh-api.clickhouse.tech
+  # CLICKHOUSE_SECURE2_PORT:    9440
+  # CLICKHOUSE_SECURE2_USER:    explorer
+  # CLICKHOUSE_SECURE2_PASSWORD:
+  # CLICKHOUSE_SECURE2_DB:      default
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { sys: mingw64, env: x86_64 }
+          - { sys: ucrt64,  env: ucrt-x86_64 }  # Experimental!
+         # - { sys: clang64, env: clang-x86_64 } # have issues with linking see comments in Clang-related section in clickhouse/CMakeLists.txt
+
+    defaults:
+      run:
+        shell: msys2 {0}
+
+    steps:
+    - uses: actions/checkout@v2
+    - uses: msys2/setup-msys2@v2
+      with:
+        msystem: ${{ matrix.sys }}
+        update: true
+        install: >-
+          mingw-w64-${{matrix.env}}-cmake
+          mingw-w64-${{matrix.env}}-make
+          mingw-w64-${{matrix.env}}-gcc
+          mingw-w64-${{matrix.env}}-openssl
+          mingw-w64-${{matrix.env}}-ninja
+          mingw-w64-${{matrix.env}}-wget
+          mingw-w64-${{matrix.env}}-ca-certificates
+          tar
+
+    - name: Configure CMake
+      run: cmake -B build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DBUILD_TESTS=ON
+      # -DWITH_OPENSSL=ON was not able to make it work (some strange issues with CA paths, need debug)
+
+    - name: Build
+      run: cmake --build build --config ${{env.BUILD_TYPE}} --target all
+
+    - name: Start tls offoader proxy
+      # that mimics non-secure clickhouse running on localhost
+      # by tunneling queries to remote tls server
+      # (needed because we can't start real clickhouse instance on windows)
+      run: |
+            wget https://github.com/filimonov/go-tlsoffloader/releases/download/v0.1.2/go-tlsoffloader_0.1.2_Windows_x86_64.tar.gz
+            tar -xvzf go-tlsoffloader_0.1.2_Windows_x86_64.tar.gz
+            ./go-tlsoffloader.exe -l localhost:9000 -b github.demo.trial.altinity.cloud:9440 &
+
+    - name: Test
+      run: ./build/ut/clickhouse-cpp-ut.exe
+
+    - name: Test (simple)
+      run: ./build/tests/simple/simple-test.exe

@@ -69,11 +69,10 @@ std::ostream& operator<<(std::ostream& os, const ClientOptions& opt) {
         os << " SSL ("
            << " ssl_context: " << (ssl_options.ssl_context ? "provided by user" : "created internally")
            << " use_default_ca_locations: " << ssl_options.use_default_ca_locations
-           << " use_default_ca_locations: " << ssl_options.use_default_ca_locations
            << " path_to_ca_files: " << ssl_options.path_to_ca_files.size() << " items"
            << " path_to_ca_directory: " << ssl_options.path_to_ca_directory
            << " min_protocol_version: " << ssl_options.min_protocol_version
-           << " min_protocol_version: " << ssl_options.max_protocol_version
+           << " max_protocol_version: " << ssl_options.max_protocol_version
            << " context_options: " << ssl_options.context_options
            << ")";
     }
@@ -352,9 +351,10 @@ void Client::Impl::ResetConnection() {
         socket = std::make_unique<Socket>(address);
 
     if (options_.tcp_keepalive) {
-        socket->SetTcpKeepAlive(options_.tcp_keepalive_idle.count(),
-                          options_.tcp_keepalive_intvl.count(),
-                          options_.tcp_keepalive_cnt);
+        socket->SetTcpKeepAlive(
+                static_cast<int>(options_.tcp_keepalive_idle.count()),
+                static_cast<int>(options_.tcp_keepalive_intvl.count()),
+                static_cast<int>(options_.tcp_keepalive_cnt));
     }
     if (options_.tcp_nodelay) {
         socket->SetTcpNoDelay(options_.tcp_nodelay);

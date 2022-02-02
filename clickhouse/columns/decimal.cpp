@@ -134,7 +134,7 @@ void ColumnDecimal::Append(const std::string& value) {
     bool sign = true;
     bool has_dot = false;
 
-    int zeros = 0;
+    size_t zeros = 0;
 
     while (c != end) {
         if (*c == '-') {

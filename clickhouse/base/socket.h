@@ -1,15 +1,13 @@
 #pragma once
 
+#include "platform.h"
 #include "input.h"
 #include "output.h"
-#include "platform.h"
 
 #include <cstddef>
 #include <string>
 
 #if defined(_win_)
-#   pragma comment(lib, "Ws2_32.lib")
-
 #   include <winsock2.h>
 #   include <ws2tcpip.h>
 #else
@@ -24,7 +22,7 @@
 #endif
 
 #include <memory>
-
+#include <system_error>
 
 struct addrinfo;
 
@@ -46,6 +44,19 @@ private:
     const std::string host_;
     struct addrinfo* info_;
 };
+
+#if defined(_win_)
+
+class windowsErrorCategory : public std::error_category {
+public:
+    char const* name() const noexcept override final;
+    std::string message(int c) const override final;
+
+    static windowsErrorCategory const& category();
+};
+
+#endif
+
 
 class SocketBase {
 public:

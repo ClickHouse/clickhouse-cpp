@@ -153,7 +153,7 @@ SSLSocket::SSLSocket(const NetworkAddress& addr, const SSLParams & ssl_params, S
     auto peer_certificate = SSL_get_peer_certificate(ssl);
 
     if (!peer_certificate)
-        throw std::runtime_error("Failed to verify SSL connection: server provided no ceritificate.");
+        throw std::runtime_error("Failed to verify SSL connection: server provided no certificate.");
 
     if (const auto verify_result = SSL_get_verify_result(ssl); verify_result != X509_V_OK) {
         auto error_message = X509_verify_cert_error_string(verify_result);

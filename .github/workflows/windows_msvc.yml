@@ -1,0 +1,60 @@
+name: Windows
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+env:
+  BUILD_TYPE: Release
+  GTEST_FILTER: --gtest_filter=-"*"
+  CLICKHOUSE_USER: clickhouse_cpp_cicd
+  CLICKHOUSE_PASSWORD: clickhouse_cpp_cicd
+  #
+  # CLICKHOUSE_HOST: localhost
+  # CLICKHOUSE_PORT: 9000
+  # CLICKHOUSE_USER: default
+  # CLICKHOUSE_PASSWORD:
+  # CLICKHOUSE_DB:   default
+  #
+  # CLICKHOUSE_SECURE_HOST:     github.demo.trial.altinity.cloud
+  # CLICKHOUSE_SECURE_PORT:     9440
+  # CLICKHOUSE_SECURE_USER:     demo
+  # CLICKHOUSE_SECURE_PASSWORD: demo
+  # CLICKHOUSE_SECURE_DB:       default
+  #
+  # CLICKHOUSE_SECURE2_HOST:    gh-api.clickhouse.tech
+  # CLICKHOUSE_SECURE2_PORT:    9440
+  # CLICKHOUSE_SECURE2_USER:    explorer
+  # CLICKHOUSE_SECURE2_PASSWORD:
+  # CLICKHOUSE_SECURE2_DB:      default
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - uses: ilammy/msvc-dev-cmd@v1
+
+    - name: Configure CMake
+      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DBUILD_TESTS=ON
+
+    - name: Build
+      run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
+
+    - name: Start tls offoader proxy
+      shell: bash
+      # that mimics non-secure clickhouse running on localhost
+      # by tunneling queries to remote tls server
+      # (needed because we can't start real clickhouse instance on windows)
+      run: |
+            choco install wget
+            wget https://github.com/filimonov/go-tlsoffloader/releases/download/v0.1.2/go-tlsoffloader_0.1.2_Windows_x86_64.tar.gz
+            tar -xvzf go-tlsoffloader_0.1.2_Windows_x86_64.tar.gz
+            ./go-tlsoffloader.exe -l localhost:9000 -b github.demo.trial.altinity.cloud:9440 &
+
+    - name: Test
+      working-directory: ${{github.workspace}}/build/ut
+      run: Release\clickhouse-cpp-ut.exe "${{env.GTEST_FILTER}}"

@@ -36,7 +36,7 @@
 // Operating System Check
 // -----------------------------------------------------------------------------
 
-#if defined(__CYGWIN__)
+#if 0 // defined(__CYGWIN__) // it looks like int128 part of absl we use works correctly on cygwin env.
 #error "Cygwin is not supported."
 #endif
 

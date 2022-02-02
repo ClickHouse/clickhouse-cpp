@@ -142,7 +142,7 @@ void CompressedOutput::Compress(const void * data, size_t len) {
             (const char*)data,
             (char*)compressed_buffer_.data() + HEADER_SIZE,
             len,
-            compressed_buffer_.size() - HEADER_SIZE);
+            static_cast<int>(compressed_buffer_.size() - HEADER_SIZE));
     if (compressed_size <= 0)
         throw std::runtime_error("Failed to compress chunk of " + std::to_string(len) + " bytes, "
                 "LZ4 error: " + std::to_string(compressed_size));
@@ -164,7 +164,7 @@ void CompressedOutput::Compress(const void * data, size_t len) {
 }
 
 void CompressedOutput::PreallocateCompressBuffer(size_t input_size) {
-    const auto estimated_compressed_buffer_size = LZ4_compressBound(input_size);
+    const auto estimated_compressed_buffer_size = LZ4_compressBound(static_cast<int>(input_size));
     if (estimated_compressed_buffer_size <= 0)
         throw std::runtime_error("Failed to estimate compressed buffer size, LZ4 error: " + std::to_string(estimated_compressed_buffer_size));
 
