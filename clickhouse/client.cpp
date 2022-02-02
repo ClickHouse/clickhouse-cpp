@@ -313,8 +313,6 @@ void Client::Impl::Ping() {
     }
 }
 
-
-
 void Client::Impl::ResetConnection() {
     if (is_external_socket_initialization_) {
         throw std::runtime_error("Can not reset connection, socket was provided externally");
