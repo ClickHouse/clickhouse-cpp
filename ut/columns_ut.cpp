@@ -8,6 +8,8 @@
 #include <clickhouse/columns/numeric.h>
 #include <clickhouse/columns/string.h>
 #include <clickhouse/columns/uuid.h>
+#include <clickhouse/columns/ip4.h>
+#include <clickhouse/columns/ip6.h>
 #include <clickhouse/base/input.h>
 #include <clickhouse/base/output.h>
 
@@ -16,6 +18,28 @@
 
 #include <string_view>
 
+#include <clickhouse/base/socket.h> // for ipv4-ipv6 platform-specific stuff
+
+bool operator==(const in_addr & left, const in_addr & right)
+{
+    return memcmp(&left, &right, sizeof(left)) == 0;
+}
+
+bool operator==(const in6_addr & left, const in6_addr & right)
+{
+    return memcmp(&left, &right, sizeof(left)) == 0;
+}
+
+std::ostream& operator<<(std::ostream& ostr, const in6_addr & addr)
+{
+    char buf[INET6_ADDRSTRLEN];
+    const char* ip_str = inet_ntop(AF_INET6, &addr, buf, INET6_ADDRSTRLEN);
+
+    if (!ip_str)
+        return ostr << "<!INVALID IPv6 VALUE!>";
+
+    return ostr << ip_str;
+}
 
 namespace {
 
@@ -216,8 +240,8 @@ TEST(ColumnsCase, ArrayAppend) {
     auto col = arr1->GetAsColumn(1);
 
     ASSERT_EQ(arr1->Size(), 2u);
-    //ASSERT_EQ(col->As<ColumnUInt64>()->At(0), 1u);
-    //ASSERT_EQ(col->As<ColumnUInt64>()->At(1), 3u);
+    ASSERT_EQ(col->As<ColumnUInt64>()->At(0), 1u);
+    ASSERT_EQ(col->As<ColumnUInt64>()->At(1), 3u);
 }
 
 TEST(ColumnsCase, TupleAppend){
@@ -252,6 +276,7 @@ TEST(ColumnsCase, TupleSlice){
     ASSERT_EQ((*tuple2)[0]->As<ColumnUInt64>()->At(0), 3u);
     ASSERT_EQ((*tuple2)[1]->As<ColumnString>()->At(0), "3");
 }
+
 
 TEST(ColumnsCase, DateAppend) {
     auto col1 = std::make_shared<ColumnDate>();
@@ -505,6 +530,68 @@ TEST(ColumnsCase, Int128) {
     EXPECT_EQ(0, col->At(4));
 }
 
+TEST(ColumnsCase, ColumnIPv4)
+{
+    // TODO: split into proper method-level unit-tests
+    auto col = ColumnIPv4();
+
+    col.Append("255.255.255.255");
+    col.Append("127.0.0.1");
+    col.Append(3585395774);
+    col.Append(0);
+    const in_addr ip{0x12345678};
+    col.Append(ip);
+
+    ASSERT_EQ(5u, col.Size());
+    EXPECT_EQ(in_addr{0xffffffff}, col.At(0));
+    EXPECT_EQ(in_addr{0x0100007f}, col.At(1));
+    EXPECT_EQ(in_addr{3585395774}, col.At(2));
+    EXPECT_EQ(in_addr{0},          col.At(3));
+    EXPECT_EQ(ip,                  col.At(4));
+
+    EXPECT_EQ("255.255.255.255", col.AsString(0));
+    EXPECT_EQ("127.0.0.1",       col.AsString(1));
+    EXPECT_EQ("62.204.180.213",  col.AsString(2));
+    EXPECT_EQ("0.0.0.0",         col.AsString(3));
+    EXPECT_EQ("120.86.52.18",    col.AsString(4));
+
+    col.Clear();
+    EXPECT_EQ(0u, col.Size());
+}
+
+TEST(ColumnsCase, ColumnIPv6)
+{
+    // TODO: split into proper method-level unit-tests
+    auto col = ColumnIPv6();
+    col.Append("0:0:0:0:0:0:0:1");
+    col.Append("::");
+    col.Append("::FFFF:204.152.189.116");
+
+    const auto ipv6 = in6_addr{{{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}}};
+    col.Append(ipv6);
+
+    ASSERT_EQ(4u, col.Size());
+    const auto first_val = in6_addr{{{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}}};
+    EXPECT_EQ(first_val, col.At(0));
+
+    const auto second_val = in6_addr{{{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}}};
+    EXPECT_EQ(second_val, col.At(1));
+
+    const auto third_val = in6_addr{{{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff, 204, 152, 189, 116}}};
+    EXPECT_EQ(third_val, col.At(2));
+
+    EXPECT_EQ(ipv6, col.At(3));
+
+
+    EXPECT_EQ("::1",                    col.AsString(0));
+    EXPECT_EQ("::",                     col.AsString(1));
+    EXPECT_EQ("::ffff:204.152.189.116", col.AsString(2));
+    EXPECT_EQ("1:203:405:607:809:a0b:c0d:e0f", col.AsString(3));
+
+    col.Clear();
+    EXPECT_EQ(0u, col.Size());
+}
+
 TEST(ColumnsCase, ColumnDecimal128_from_string) {
     auto col = std::make_shared<ColumnDecimal>(38, 0);
 
@@ -516,8 +603,7 @@ TEST(ColumnsCase, ColumnDecimal128_from_string) {
         std::numeric_limits<Int128>::max(),
     };
 
-    for (size_t i = 0; i < values.size(); ++i)
-    {
+    for (size_t i = 0; i < values.size(); ++i) {
         const auto value = values.begin()[i];
         SCOPED_TRACE(::testing::Message() << "# index: " << i << " Int128 value: " << value);
 

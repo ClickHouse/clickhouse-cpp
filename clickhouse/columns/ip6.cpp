@@ -1,5 +1,6 @@
 
 #include "ip6.h"
+#include "../base/socket.h" // for IPv6 platform-specific stuff
 
 #include <stdexcept>
 
@@ -27,11 +28,15 @@ void ColumnIPv6::Append(const std::string& ip) {
     if (inet_pton(AF_INET6, ip.c_str(), buf) != 1) {
         throw std::runtime_error("invalid IPv6 format, ip: " + ip);
     }
-    data_->Append(std::string((const char*)buf, 16));
+    data_->Append(std::string_view((const char*)buf, 16));
 }
 
 void ColumnIPv6::Append(const in6_addr* addr) {
-    data_->Append(std::string((const char*)addr->s6_addr, 16));
+    data_->Append(std::string_view((const char*)addr->s6_addr, 16));
+}
+
+void ColumnIPv6::Append(const in6_addr& addr) {
+    Append(&addr);
 }
 
 void ColumnIPv6::Clear() {

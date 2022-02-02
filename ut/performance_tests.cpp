@@ -7,6 +7,8 @@
 #include <clickhouse/columns/string.h>
 #include <clickhouse/columns/uuid.h>
 #include <clickhouse/client.h>
+#include <clickhouse/base/output.h>
+#include <clickhouse/base/input.h>
 
 #include <gtest/gtest.h>
 

@@ -2,6 +2,7 @@
 #pragma once
 
 #include "column.h"
+#include "../base/input.h"
 
 #include <stdexcept>
 #include <utility>

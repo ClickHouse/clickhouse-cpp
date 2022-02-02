@@ -1,7 +1,9 @@
 #pragma once
 
 #include "string.h"
-#include "../base/socket.h"
+#include <memory>
+
+struct in6_addr;
 
 namespace clickhouse {
 
@@ -14,6 +16,7 @@ public:
     void Append(const std::string& str);
 
     void Append(const in6_addr* addr);
+    void Append(const in6_addr& addr);
 
     /// Returns element at given row number.
     in6_addr At(size_t n) const;
