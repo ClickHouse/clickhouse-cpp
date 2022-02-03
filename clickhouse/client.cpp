@@ -211,7 +211,7 @@ Client::Impl::Impl(const ClientOptions& opts,
     , socket_factory_(std::move(socket_factory))
     , sleep_impl_(std::move(sleep_impl))
 {
-    for (unsigned int i = 0;; ++i) {
+    for (unsigned int i = 0; ; ) {
         try {
             ResetConnection();
             break;
