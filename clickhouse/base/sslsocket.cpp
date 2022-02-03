@@ -186,6 +186,7 @@ SSLSocket::SSLSocket(const NetworkAddress& addr, const SSLParams & ssl_params,
 
 SSLSocketFactory::~SSLSocketFactory() {}
 
+#if defined(WITH_OPENSSL)
 std::unique_ptr<Socket> SSLSocketFactory::doConnect(const ClientOptions& opts,
                                                     const NetworkAddress& address) {
     std::unique_ptr<SSLContext> ssl_context;
@@ -208,6 +209,7 @@ std::unique_ptr<Socket> SSLSocketFactory::doConnect(const ClientOptions& opts,
 
     return std::make_unique<SSLSocket>(address, ssl_params, std::move(ssl_context));
 }
+#endif
 
 std::unique_ptr<InputStream> SSLSocket::makeInputStream() const {
     return std::make_unique<SSLSocketInput>(ssl_.get());

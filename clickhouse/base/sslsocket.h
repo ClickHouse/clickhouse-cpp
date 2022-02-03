@@ -62,9 +62,11 @@ class SSLSocketFactory : public NonSecureSocketFactory {
 public:
     ~SSLSocketFactory() override;
 
+#if defined(WITH_OPENSSL)
 protected:
     std::unique_ptr<Socket> doConnect(const ClientOptions& opts,
                                       const NetworkAddress& address) override;
+#endif
 };
 
 class SSLSocketInput : public InputStream {
