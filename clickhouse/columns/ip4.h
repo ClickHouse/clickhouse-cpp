@@ -1,7 +1,8 @@
 #pragma once
 
 #include "numeric.h"
-#include "../base/socket.h"
+
+struct in_addr;
 
 namespace clickhouse {
 
@@ -15,6 +16,9 @@ public:
 
     /// @params ip numeric value with host byte order.
     void Append(uint32_t ip);
+
+    ///
+    void Append(in_addr ip);
 
     /// Returns element at given row number.
     in_addr At(size_t n) const;

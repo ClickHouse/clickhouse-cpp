@@ -1,11 +1,7 @@
-
 #include "ip4.h"
 
+#include "../base/socket.h" // for platform-specific IPv4-related functions
 #include <stdexcept>
-
-#if defined(_win_)
-using in_addr_t = unsigned long;
-#endif
 
 namespace clickhouse {
 
@@ -25,15 +21,19 @@ ColumnIPv4::ColumnIPv4(ColumnRef data)
 }
 
 void ColumnIPv4::Append(const std::string& str) {
-    in_addr_t addr = inet_addr(str.c_str());
-    if (addr == INADDR_NONE) {
+    uint32_t address;
+    if (inet_pton(AF_INET, str.c_str(), &address) != 1)
         throw std::runtime_error("invalid IPv4 format, ip: " + str);
-    }
-    data_->Append(htonl(addr));
+    data_->Append(htonl(address));
 }
 
 void ColumnIPv4::Append(uint32_t ip) {
     data_->Append(htonl(ip));
+}
+
+void ColumnIPv4::Append(in_addr ip)
+{
+    data_->Append(htonl(ip.s_addr));
 }
 
 void ColumnIPv4::Clear() {
@@ -41,13 +41,13 @@ void ColumnIPv4::Clear() {
 }
 
 in_addr ColumnIPv4::At(size_t n) const {
-    struct in_addr addr;
+    in_addr addr;
     addr.s_addr = ntohl(data_->At(n));
     return addr;
 }
 
 in_addr ColumnIPv4::operator [] (size_t n) const {
-    struct in_addr addr;
+    in_addr addr;
     addr.s_addr = ntohl(data_->operator[](n));
     return addr;
 }
