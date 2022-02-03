@@ -28,6 +28,8 @@ struct addrinfo;
 
 namespace clickhouse {
 
+struct ClientOptions;
+
 /** Address of a host to establish connection to.
  *
  */
@@ -67,6 +69,14 @@ public:
 };
 
 
+class SocketFactory {
+public:
+    virtual ~SocketFactory();
+
+    virtual std::unique_ptr<SocketBase> connect(const ClientOptions& opts) = 0;
+};
+
+
 class Socket : public SocketBase {
 public:
     Socket(const NetworkAddress& addr);
@@ -94,6 +104,20 @@ protected:
     void Close();
 
     SOCKET handle_;
+};
+
+
+class NonSecureSocketFactory : public SocketFactory {
+public:
+    ~NonSecureSocketFactory() override;
+
+    std::unique_ptr<SocketBase> connect(const ClientOptions& opts) override;
+
+protected:
+    virtual std::unique_ptr<Socket> doConnect(const ClientOptions& opts,
+                                              const NetworkAddress& address);
+
+    void setSocketOptions(Socket& socket, const ClientOptions& opts);
 };
 
 

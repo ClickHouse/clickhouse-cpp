@@ -1,5 +1,6 @@
 #include "socket.h"
 #include "singleton.h"
+#include "../client.h"
 
 #include <assert.h>
 #include <stdexcept>
@@ -215,6 +216,8 @@ const std::string & NetworkAddress::Host() const {
 
 SocketBase::~SocketBase() = default;
 
+SocketFactory::~SocketFactory() = default;
+
 
 Socket::Socket(const NetworkAddress& addr)
     : handle_(SocketConnect(addr))
@@ -287,6 +290,35 @@ std::unique_ptr<InputStream> Socket::makeInputStream() const {
 
 std::unique_ptr<OutputStream> Socket::makeOutputStream() const {
     return std::make_unique<SocketOutput>(handle_);
+}
+
+NonSecureSocketFactory::~NonSecureSocketFactory()  {}
+
+std::unique_ptr<SocketBase> NonSecureSocketFactory::connect(const ClientOptions &opts) {
+    const auto address = NetworkAddress(opts.host, std::to_string(opts.port));
+
+    auto socket = doConnect(opts, address);
+    setSocketOptions(*socket, opts);
+
+    return socket;
+}
+
+std::unique_ptr<Socket> NonSecureSocketFactory::doConnect(const ClientOptions &opts,
+                                                          const NetworkAddress& address) {
+    (void)opts;
+    return std::make_unique<Socket>(address);
+}
+
+void NonSecureSocketFactory::setSocketOptions(Socket &socket, const ClientOptions &opts) {
+    if (opts.tcp_keepalive) {
+        socket.SetTcpKeepAlive(
+                static_cast<int>(opts.tcp_keepalive_idle.count()),
+                static_cast<int>(opts.tcp_keepalive_intvl.count()),
+                static_cast<int>(opts.tcp_keepalive_cnt));
+    }
+    if (opts.tcp_nodelay) {
+        socket.SetTcpNoDelay(opts.tcp_nodelay);
+    }
 }
 
 SocketInput::SocketInput(SOCKET s)

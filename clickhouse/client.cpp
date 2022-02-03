@@ -81,10 +81,36 @@ std::ostream& operator<<(std::ostream& os, const ClientOptions& opt) {
     return os;
 }
 
+
+namespace {
+
+std::unique_ptr<SocketFactory> GetSocketFactory(const ClientOptions& opts) {
+    (void)opts;
+#if defined(WITH_OPENSSL)
+    if (opts.ssl_options.use_ssl)
+        return std::make_unique<SSLSocketFactory>();
+    else
+#endif
+        return std::make_unique<NonSecureSocketFactory>();
+}
+
+std::unique_ptr<SleepImpl> GetDefaultSleepImpl() {
+    return std::make_unique<SleepImpl>();
+}
+
+}
+
+void SleepImpl::sleepFor(const std::chrono::milliseconds &duration) {
+    std::this_thread::sleep_for(duration);
+}
+
+
 class Client::Impl {
 public:
      Impl(const ClientOptions& opts);
-     Impl(const ClientOptions& opts, std::unique_ptr<SocketBase> socket);
+     Impl(const ClientOptions& opts,
+          std::unique_ptr<SocketFactory> socket_factory,
+          std::unique_ptr<SleepImpl> sleep_impl);
     ~Impl();
 
     void ExecuteQuery(Query query);
@@ -162,7 +188,8 @@ private:
     OutputStreams output_streams_;
     OutputStream* output_;
 
-    bool is_external_socket_initialization_{false};
+    std::unique_ptr<SocketFactory> socket_factory_;
+    std::unique_ptr<SleepImpl> sleep_impl_;
     std::unique_ptr<SocketBase> socket_;
 
 #if defined(WITH_OPENSSL)
@@ -174,12 +201,17 @@ private:
 
 
 Client::Impl::Impl(const ClientOptions& opts)
+    : Impl(opts, GetSocketFactory(opts), GetDefaultSleepImpl()) {}
+
+Client::Impl::Impl(const ClientOptions& opts,
+                   std::unique_ptr<SocketFactory> socket_factory,
+                   std::unique_ptr<SleepImpl> sleep_impl)
     : options_(opts)
     , events_(nullptr)
+    , socket_factory_(std::move(socket_factory))
+    , sleep_impl_(std::move(sleep_impl))
 {
-    // TODO: throw on big-endianness of platform
-
-    for (unsigned int i = 0; ; ) {
+    for (unsigned int i = 0;; ++i) {
         try {
             ResetConnection();
             break;
@@ -188,23 +220,8 @@ Client::Impl::Impl(const ClientOptions& opts)
                 throw;
             }
 
-            std::this_thread::sleep_for(options_.retry_timeout);
+            sleep_impl_->sleepFor(options_.retry_timeout);
         }
-    }
-
-    if (options_.compression_method != CompressionMethod::None) {
-        compression_ = CompressionState::Enable;
-    }
-}
-
-Client::Impl::Impl(const ClientOptions& opts, std::unique_ptr<SocketBase> socket)
-    : options_(opts)
-    , events_(nullptr)
-    , is_external_socket_initialization_(true)
-{
-    InitializeStreams(std::move(socket));
-    if (!Handshake()) {
-        throw std::runtime_error("fail to connect to " + options_.host);
     }
 
     if (options_.compression_method != CompressionMethod::None) {
@@ -314,55 +331,7 @@ void Client::Impl::Ping() {
 }
 
 void Client::Impl::ResetConnection() {
-    if (is_external_socket_initialization_) {
-        throw std::runtime_error("Can not reset connection, socket was provided externally");
-    }
-
-    std::unique_ptr<Socket> socket;
-
-    const auto address = NetworkAddress(options_.host, std::to_string(options_.port));
-#if defined(WITH_OPENSSL)
-    // TODO: maybe do not re-create context multiple times upon reconnection - that doesn't make sense.
-    std::unique_ptr<SSLContext> ssl_context;
-    if (options_.ssl_options.use_ssl) {
-        const auto ssl_options = options_.ssl_options;
-        const auto ssl_params = SSLParams {
-                ssl_options.path_to_ca_files,
-                ssl_options.path_to_ca_directory,
-                ssl_options.use_default_ca_locations,
-                ssl_options.context_options,
-                ssl_options.min_protocol_version,
-                ssl_options.max_protocol_version,
-                ssl_options.use_sni
-        };
-
-        if (ssl_options.ssl_context)
-            ssl_context = std::make_unique<SSLContext>(*ssl_options.ssl_context);
-        else {
-            ssl_context = std::make_unique<SSLContext>(ssl_params);
-        }
-
-        socket = std::make_unique<SSLSocket>(address, ssl_params, *ssl_context);
-    }
-    else
-#endif
-        socket = std::make_unique<Socket>(address);
-
-    if (options_.tcp_keepalive) {
-        socket->SetTcpKeepAlive(
-                static_cast<int>(options_.tcp_keepalive_idle.count()),
-                static_cast<int>(options_.tcp_keepalive_intvl.count()),
-                static_cast<int>(options_.tcp_keepalive_cnt));
-    }
-    if (options_.tcp_nodelay) {
-        socket->SetTcpNoDelay(options_.tcp_nodelay);
-    }
-
-    InitializeStreams(std::move(socket));
-
-#if defined(WITH_OPENSSL)
-    std::swap(ssl_context_, ssl_context);
-#endif
+    InitializeStreams(socket_factory_->connect(options_));
 
     if (!Handshake()) {
         throw std::runtime_error("fail to connect to " + options_.host);
@@ -803,7 +772,7 @@ void Client::Impl::RetryGuard(std::function<void()> func) {
             bool ok = true;
 
             try {
-                std::this_thread::sleep_for(options_.retry_timeout);
+                sleep_impl_->sleepFor(options_.retry_timeout);
                 ResetConnection();
             } catch (...) {
                 ok = false;
@@ -822,9 +791,11 @@ Client::Client(const ClientOptions& opts)
 {
 }
 
-Client::Client(const ClientOptions& opts, std::unique_ptr<SocketBase> socket)
+Client::Client(const ClientOptions& opts,
+               std::unique_ptr<SocketFactory> socket_factory,
+               std::unique_ptr<SleepImpl> sleep_impl)
     : options_(opts)
-    , impl_(new Impl(opts, std::move(socket)))
+    , impl_(new Impl(opts, std::move(socket_factory), std::move(sleep_impl)))
 {
 }
 

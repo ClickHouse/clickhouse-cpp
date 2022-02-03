@@ -1,4 +1,5 @@
 #include "sslsocket.h"
+#include "../client.h"
 
 #include <stdexcept>
 
@@ -135,9 +136,11 @@ SSL_CTX * SSLContext::getContext() {
     << "\n\t handshake state: " << SSL_get_state(ssl_) \
     << std::endl
 */
-SSLSocket::SSLSocket(const NetworkAddress& addr, const SSLParams & ssl_params, SSLContext& context)
+SSLSocket::SSLSocket(const NetworkAddress& addr, const SSLParams & ssl_params,
+                     std::unique_ptr<SSLContext> context)
     : Socket(addr)
-    , ssl_(SSL_new(context.getContext()), &SSL_free)
+    , context_(std::move(context))
+    , ssl_(SSL_new(context_->getContext()), &SSL_free)
 {
     auto ssl = ssl_.get();
     if (!ssl)
@@ -179,6 +182,31 @@ SSLSocket::SSLSocket(const NetworkAddress& addr, const SSLParams & ssl_params, S
             HANDLE_SSL_ERROR(ssl, X509_check_host(peer_certificate, hostname.c_str(), hostname.length(), 0, &out_name));
         }
     }
+}
+
+SSLSocketFactory::~SSLSocketFactory() {}
+
+std::unique_ptr<Socket> SSLSocketFactory::doConnect(const ClientOptions& opts,
+                                                    const NetworkAddress& address) {
+    std::unique_ptr<SSLContext> ssl_context;
+    const auto ssl_options = opts.ssl_options;
+    const auto ssl_params = SSLParams{
+            ssl_options.path_to_ca_files,
+            ssl_options.path_to_ca_directory,
+            ssl_options.use_default_ca_locations,
+            ssl_options.context_options,
+            ssl_options.min_protocol_version,
+            ssl_options.max_protocol_version,
+            ssl_options.use_sni
+    };
+
+    if (ssl_options.ssl_context)
+        ssl_context = std::make_unique<SSLContext>(*ssl_options.ssl_context);
+    else {
+        ssl_context = std::make_unique<SSLContext>(ssl_params);
+    }
+
+    return std::make_unique<SSLSocket>(address, ssl_params, std::move(ssl_context));
 }
 
 std::unique_ptr<InputStream> SSLSocket::makeInputStream() const {
