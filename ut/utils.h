@@ -104,6 +104,10 @@ MeasuresCollector<MeasureFunc> collect(MeasureFunc && f)
     return MeasuresCollector<MeasureFunc>(std::forward<MeasureFunc>(f));
 }
 
+struct in_addr;
+struct in6_addr;
 std::ostream& operator<<(std::ostream & ostr, const clickhouse::Block & block);
+std::ostream& operator<<(std::ostream& ostr, const in_addr& addr);
+std::ostream& operator<<(std::ostream& ostr, const in6_addr& addr);
 
 std::string getEnvOrDefault(const std::string& env, const std::string& default_val);

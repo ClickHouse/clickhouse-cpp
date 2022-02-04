@@ -7,6 +7,10 @@
 #include <clickhouse/columns/enum.h>
 #include <clickhouse/columns/numeric.h>
 #include <clickhouse/columns/string.h>
+#include <clickhouse/columns/ip4.h>
+#include <clickhouse/columns/ip6.h>
+
+#include <clickhouse/base/socket.h> // for ipv4-ipv6 platform-specific stuff
 
 namespace {
 using namespace clickhouse;
@@ -41,6 +45,7 @@ bool doPrintValue(const ColumnRef & c, const size_t row, std::ostream & ostr) {
 }
 
 std::ostream & printColumnValue(const ColumnRef& c, const size_t row, std::ostream & ostr) {
+
     const auto r = false
         || doPrintValue<ColumnString>(c, row, ostr)
         || doPrintValue<ColumnFixedString>(c, row, ostr)
@@ -60,8 +65,8 @@ std::ostream & printColumnValue(const ColumnRef& c, const size_t row, std::ostre
         || doPrintValue<ColumnDateTime, DateTimeValue>(c, row, ostr)
         || doPrintValue<ColumnDateTime64, DateTimeValue>(c, row, ostr)
         || doPrintValue<ColumnDecimal>(c, row, ostr)
-    /*    || doPrintValue<ColumnIPv4>(c, row, ostr)
-        || doPrintValue<ColumnIPv6>(c, row, ostr)*/;
+        || doPrintValue<ColumnIPv4>(c, row, ostr)
+        || doPrintValue<ColumnIPv6>(c, row, ostr);
     if (!r)
         ostr << "Unable to print value of type " << c->GetType().GetName();
 
@@ -90,6 +95,28 @@ std::ostream& operator<<(std::ostream & ostr, const Block & block) {
     }
 
     return ostr;
+}
+
+std::ostream& operator<<(std::ostream& ostr, const in_addr& addr)
+{
+    char buf[INET_ADDRSTRLEN];
+    const char* ip_str = inet_ntop(AF_INET, &addr, buf, sizeof(buf));
+
+    if (!ip_str)
+        return ostr << "<!INVALID IPv4 VALUE!>";
+
+    return ostr << ip_str;
+}
+
+std::ostream& operator<<(std::ostream& ostr, const in6_addr& addr)
+{
+    char buf[INET6_ADDRSTRLEN];
+    const char* ip_str = inet_ntop(AF_INET6, &addr, buf, sizeof(buf));
+
+    if (!ip_str)
+        return ostr << "<!INVALID IPv6 VALUE!>";
+
+    return ostr << ip_str;
 }
 
 std::string getEnvOrDefault(const std::string& env, const std::string& default_val)
