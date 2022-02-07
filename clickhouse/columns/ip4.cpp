@@ -13,11 +13,10 @@ ColumnIPv4::ColumnIPv4()
 
 ColumnIPv4::ColumnIPv4(ColumnRef data)
     : Column(Type::CreateIPv4())
-    , data_(data->As<ColumnUInt32>())
+    , data_(data ? data->As<ColumnUInt32>() : nullptr)
 {
-    if (data_->Size() != 0) {
-        throw std::runtime_error("number of entries must be even (32-bit numbers for each IPv4)");
-    }
+    if (!data_)
+        throw std::runtime_error("Expecting ColumnUInt32, got " + (data ? data->GetType().GetName() : "null"));
 }
 
 void ColumnIPv4::Append(const std::string& str) {
@@ -31,8 +30,7 @@ void ColumnIPv4::Append(uint32_t ip) {
     data_->Append(htonl(ip));
 }
 
-void ColumnIPv4::Append(in_addr ip)
-{
+void ColumnIPv4::Append(in_addr ip) {
     data_->Append(htonl(ip.s_addr));
 }
 
@@ -53,7 +51,18 @@ in_addr ColumnIPv4::operator [] (size_t n) const {
 }
 
 std::string ColumnIPv4::AsString(size_t n) const {
-    return inet_ntoa(this->At(n));
+    const auto& addr = this->At(n);
+
+    char buf[INET_ADDRSTRLEN];
+    const char* ip_str = inet_ntop(AF_INET, &addr, buf, INET_ADDRSTRLEN);
+
+    if (ip_str == nullptr) {
+        throw std::system_error(
+                std::error_code(errno, std::generic_category()),
+                "Invalid IPv4 data");
+    }
+
+    return ip_str;
 }
 
 void ColumnIPv4::Append(ColumnRef column) {

@@ -8,7 +8,15 @@ namespace clickhouse {
 
 class ColumnIPv4 : public Column {
 public:
+    using DataType = in_addr;
+    using ValueType = in_addr;
+
     ColumnIPv4();
+    /** Takes ownership of the data, expects ColumnUInt32.
+     * Modifying memory pointed by `data` from outside is UB.
+     *
+     * TODO: deprecate and remove as it is too dangerous and error-prone.
+     */
     explicit ColumnIPv4(ColumnRef data);
 
     /// Appends one element to the column.
