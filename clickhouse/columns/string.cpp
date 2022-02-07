@@ -79,7 +79,7 @@ void ColumnFixedString::Append(ColumnRef column) {
 
 bool ColumnFixedString::Load(InputStream * input, size_t rows) {
     data_.resize(string_size_ * rows);
-    if (!WireFormat::ReadBytes(input, &data_[0], data_.size())) {
+    if (!WireFormat::ReadBytes(*input, &data_[0], data_.size())) {
         return false;
     }
 
@@ -87,7 +87,7 @@ bool ColumnFixedString::Load(InputStream * input, size_t rows) {
 }
 
 void ColumnFixedString::Save(OutputStream* output) {
-    WireFormat::WriteBytes(output, data_.data(), data_.size());
+    WireFormat::WriteBytes(*output, data_.data(), data_.size());
 }
 
 size_t ColumnFixedString::Size() const {
@@ -230,13 +230,13 @@ bool ColumnString::Load(InputStream* input, size_t rows) {
     // TODO(performance): unroll a loop to a first row (to get rid of `blocks_.size() == 0` check) and the rest.
     for (size_t i = 0; i < rows; ++i) {
         uint64_t len;
-        if (!WireFormat::ReadUInt64(input, &len))
+        if (!WireFormat::ReadUInt64(*input, &len))
             return false;
 
         if (blocks_.size() == 0 || len > block->GetAvailble())
             block = &blocks_.emplace_back(std::max<size_t>(DEFAULT_BLOCK_SIZE, len));
 
-        if (!WireFormat::ReadBytes(input, block->GetCurrentWritePos(), len))
+        if (!WireFormat::ReadBytes(*input, block->GetCurrentWritePos(), len))
             return false;
 
         items_.emplace_back(block->ConsumeTailAsStringViewUnsafe(len));
@@ -247,7 +247,7 @@ bool ColumnString::Load(InputStream* input, size_t rows) {
 
 void ColumnString::Save(OutputStream* output) {
     for (const auto & item : items_) {
-        WireFormat::WriteString(output, item);
+        WireFormat::WriteString(*output, item);
     }
 }
 
