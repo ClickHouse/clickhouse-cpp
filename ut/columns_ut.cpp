@@ -95,7 +95,7 @@ static const auto LOWCARDINALITY_STRING_FOOBAR_10_ITEMS_BINARY =
 
 template <typename Generator>
 auto GenerateVector(size_t items, Generator && gen) {
-    std::vector<std::result_of_t<Generator(size_t)>> result;
+    std::vector<my_result_of_t<Generator(size_t)>> result;
     result.reserve(items);
     for (size_t i = 0; i < items; ++i) {
         result.push_back(std::move(gen(i)));
@@ -619,13 +619,13 @@ TEST(ColumnsCase, ColumnIPv4_construct_from_data)
     }
 
     EXPECT_ANY_THROW(ColumnIPv4(nullptr));
-    EXPECT_ANY_THROW(ColumnIPv4(std::make_shared<ColumnInt8>()));
-    EXPECT_ANY_THROW(ColumnIPv4(std::make_shared<ColumnInt32>()));
+    EXPECT_ANY_THROW(ColumnIPv4(ColumnRef(std::make_shared<ColumnInt8>())));
+    EXPECT_ANY_THROW(ColumnIPv4(ColumnRef(std::make_shared<ColumnInt32>())));
 
-    EXPECT_ANY_THROW(ColumnIPv4(std::make_shared<ColumnUInt8>()));
+    EXPECT_ANY_THROW(ColumnIPv4(ColumnRef(std::make_shared<ColumnUInt8>())));
 
-    EXPECT_ANY_THROW(ColumnIPv4(std::make_shared<ColumnInt128>()));
-    EXPECT_ANY_THROW(ColumnIPv4(std::make_shared<ColumnString>()));
+    EXPECT_ANY_THROW(ColumnIPv4(ColumnRef(std::make_shared<ColumnInt128>())));
+    EXPECT_ANY_THROW(ColumnIPv4(ColumnRef(std::make_shared<ColumnString>())));
 }
 
 TEST(ColumnsCase, ColumnIPv6)
@@ -707,16 +707,16 @@ TEST(ColumnsCase, ColumnIPv6_construct_from_data)
 
     // Make sure that column can't be constructed with wrong data columns (wrong size/wrong type or null)
     EXPECT_ANY_THROW(ColumnIPv4(nullptr));
-    EXPECT_ANY_THROW(ColumnIPv6(std::make_shared<ColumnFixedString>(15)));
-    EXPECT_ANY_THROW(ColumnIPv6(std::make_shared<ColumnFixedString>(17)));
+    EXPECT_ANY_THROW(ColumnIPv6(ColumnRef(std::make_shared<ColumnFixedString>(15))));
+    EXPECT_ANY_THROW(ColumnIPv6(ColumnRef(std::make_shared<ColumnFixedString>(17))));
 
-    EXPECT_ANY_THROW(ColumnIPv6(std::make_shared<ColumnInt8>()));
-    EXPECT_ANY_THROW(ColumnIPv6(std::make_shared<ColumnInt32>()));
+    EXPECT_ANY_THROW(ColumnIPv6(ColumnRef(std::make_shared<ColumnInt8>())));
+    EXPECT_ANY_THROW(ColumnIPv6(ColumnRef(std::make_shared<ColumnInt32>())));
 
-    EXPECT_ANY_THROW(ColumnIPv6(std::make_shared<ColumnUInt8>()));
+    EXPECT_ANY_THROW(ColumnIPv6(ColumnRef(std::make_shared<ColumnUInt8>())));
 
-    EXPECT_ANY_THROW(ColumnIPv6(std::make_shared<ColumnInt128>()));
-    EXPECT_ANY_THROW(ColumnIPv6(std::make_shared<ColumnString>()));
+    EXPECT_ANY_THROW(ColumnIPv6(ColumnRef(std::make_shared<ColumnInt128>())));
+    EXPECT_ANY_THROW(ColumnIPv6(ColumnRef(std::make_shared<ColumnString>())));
 }
 
 TEST(ColumnsCase, ColumnDecimal128_from_string) {
