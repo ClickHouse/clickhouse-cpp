@@ -7,6 +7,7 @@
 #include <system_error>
 #include <unordered_set>
 #include <memory.h>
+#include <thread>
 
 #if !defined(_win_)
 #   include <errno.h>
@@ -218,6 +219,10 @@ SocketBase::~SocketBase() = default;
 
 SocketFactory::~SocketFactory() = default;
 
+void SocketFactory::sleepFor(const std::chrono::milliseconds& duration) {
+    std::this_thread::sleep_for(duration);
+}
+
 
 Socket::Socket(const NetworkAddress& addr)
     : handle_(SocketConnect(addr))
@@ -297,15 +302,13 @@ NonSecureSocketFactory::~NonSecureSocketFactory()  {}
 std::unique_ptr<SocketBase> NonSecureSocketFactory::connect(const ClientOptions &opts) {
     const auto address = NetworkAddress(opts.host, std::to_string(opts.port));
 
-    auto socket = doConnect(opts, address);
+    auto socket = doConnect(address);
     setSocketOptions(*socket, opts);
 
     return socket;
 }
 
-std::unique_ptr<Socket> NonSecureSocketFactory::doConnect(const ClientOptions &opts,
-                                                          const NetworkAddress& address) {
-    (void)opts;
+std::unique_ptr<Socket> NonSecureSocketFactory::doConnect(const NetworkAddress& address) {
     return std::make_unique<Socket>(address);
 }
 

@@ -88,20 +88,12 @@ std::unique_ptr<SocketFactory> GetSocketFactory(const ClientOptions& opts) {
     (void)opts;
 #if defined(WITH_OPENSSL)
     if (opts.ssl_options.use_ssl)
-        return std::make_unique<SSLSocketFactory>();
+        return std::make_unique<SSLSocketFactory>(opts);
     else
 #endif
         return std::make_unique<NonSecureSocketFactory>();
 }
 
-std::unique_ptr<SleepImpl> GetDefaultSleepImpl() {
-    return std::make_unique<SleepImpl>();
-}
-
-}
-
-void SleepImpl::sleepFor(const std::chrono::milliseconds &duration) {
-    std::this_thread::sleep_for(duration);
 }
 
 
@@ -109,8 +101,7 @@ class Client::Impl {
 public:
      Impl(const ClientOptions& opts);
      Impl(const ClientOptions& opts,
-          std::unique_ptr<SocketFactory> socket_factory,
-          std::unique_ptr<SleepImpl> sleep_impl);
+          std::unique_ptr<SocketFactory> socket_factory);
     ~Impl();
 
     void ExecuteQuery(Query query);
@@ -189,7 +180,6 @@ private:
     OutputStream* output_;
 
     std::unique_ptr<SocketFactory> socket_factory_;
-    std::unique_ptr<SleepImpl> sleep_impl_;
     std::unique_ptr<SocketBase> socket_;
 
 #if defined(WITH_OPENSSL)
@@ -201,15 +191,13 @@ private:
 
 
 Client::Impl::Impl(const ClientOptions& opts)
-    : Impl(opts, GetSocketFactory(opts), GetDefaultSleepImpl()) {}
+    : Impl(opts, GetSocketFactory(opts)) {}
 
 Client::Impl::Impl(const ClientOptions& opts,
-                   std::unique_ptr<SocketFactory> socket_factory,
-                   std::unique_ptr<SleepImpl> sleep_impl)
+                   std::unique_ptr<SocketFactory> socket_factory)
     : options_(opts)
     , events_(nullptr)
     , socket_factory_(std::move(socket_factory))
-    , sleep_impl_(std::move(sleep_impl))
 {
     for (unsigned int i = 0; ; ) {
         try {
@@ -220,7 +208,7 @@ Client::Impl::Impl(const ClientOptions& opts,
                 throw;
             }
 
-            sleep_impl_->sleepFor(options_.retry_timeout);
+            socket_factory_->sleepFor(options_.retry_timeout);
         }
     }
 
@@ -772,7 +760,7 @@ void Client::Impl::RetryGuard(std::function<void()> func) {
             bool ok = true;
 
             try {
-                sleep_impl_->sleepFor(options_.retry_timeout);
+                socket_factory_->sleepFor(options_.retry_timeout);
                 ResetConnection();
             } catch (...) {
                 ok = false;
@@ -792,10 +780,9 @@ Client::Client(const ClientOptions& opts)
 }
 
 Client::Client(const ClientOptions& opts,
-               std::unique_ptr<SocketFactory> socket_factory,
-               std::unique_ptr<SleepImpl> sleep_impl)
+               std::unique_ptr<SocketFactory> socket_factory)
     : options_(opts)
-    , impl_(new Impl(opts, std::move(socket_factory), std::move(sleep_impl)))
+    , impl_(new Impl(opts, std::move(socket_factory)))
 {
 }
 

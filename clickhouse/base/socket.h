@@ -6,6 +6,7 @@
 
 #include <cstddef>
 #include <string>
+#include <chrono>
 
 #if defined(_win_)
 #   include <winsock2.h>
@@ -73,7 +74,11 @@ class SocketFactory {
 public:
     virtual ~SocketFactory();
 
+    // TODO: move connection-related options to ConnectionOptions structure.
+
     virtual std::unique_ptr<SocketBase> connect(const ClientOptions& opts) = 0;
+
+    virtual void sleepFor(const std::chrono::milliseconds& duration);
 };
 
 
@@ -114,8 +119,7 @@ public:
     std::unique_ptr<SocketBase> connect(const ClientOptions& opts) override;
 
 protected:
-    virtual std::unique_ptr<Socket> doConnect(const ClientOptions& opts,
-                                              const NetworkAddress& address);
+    virtual std::unique_ptr<Socket> doConnect(const NetworkAddress& address);
 
     void setSocketOptions(Socket& socket, const ClientOptions& opts);
 };

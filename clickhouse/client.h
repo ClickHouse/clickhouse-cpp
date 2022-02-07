@@ -165,13 +165,6 @@ std::ostream& operator<<(std::ostream& os, const ClientOptions& options);
 
 class SocketFactory;
 
-class SleepImpl {
-public:
-    virtual ~SleepImpl() = default;
-
-    virtual void sleepFor(const std::chrono::milliseconds& duration);
-};
-
 /**
  *
  */
@@ -179,8 +172,7 @@ class Client {
 public:
      Client(const ClientOptions& opts);
      Client(const ClientOptions& opts,
-            std::unique_ptr<SocketFactory> socket_factory,
-            std::unique_ptr<SleepImpl> sleep_impl);
+            std::unique_ptr<SocketFactory> socket_factory);
     ~Client();
 
     /// Intends for execute arbitrary queries.

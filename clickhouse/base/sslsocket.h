@@ -43,7 +43,7 @@ private:
 class SSLSocket : public Socket {
 public:
     explicit SSLSocket(const NetworkAddress& addr, const SSLParams & ssl_params,
-                       std::unique_ptr<SSLContext> context);
+                       SSLContext& context);
     SSLSocket(SSLSocket &&) = default;
     ~SSLSocket() override = default;
 
@@ -54,19 +54,20 @@ public:
     std::unique_ptr<OutputStream> makeOutputStream() const override;
 
 private:
-    std::unique_ptr<SSLContext> context_;
     std::unique_ptr<SSL, void (*)(SSL *s)> ssl_;
 };
 
 class SSLSocketFactory : public NonSecureSocketFactory {
 public:
+    explicit SSLSocketFactory(const ClientOptions& opts);
     ~SSLSocketFactory() override;
 
-#if defined(WITH_OPENSSL)
 protected:
-    std::unique_ptr<Socket> doConnect(const ClientOptions& opts,
-                                      const NetworkAddress& address) override;
-#endif
+    std::unique_ptr<Socket> doConnect(const NetworkAddress& address) override;
+
+private:
+    const SSLParams ssl_params_;
+    std::unique_ptr<SSLContext> ssl_context_;
 };
 
 class SSLSocketInput : public InputStream {

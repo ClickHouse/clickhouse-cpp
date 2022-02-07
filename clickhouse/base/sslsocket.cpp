@@ -101,6 +101,19 @@ SSL_CTX * prepareSSLContext(const clickhouse::SSLParams & context_params) {
 #undef HANDLE_SSL_CTX_ERROR
 }
 
+clickhouse::SSLParams GetSSLParams(const clickhouse::ClientOptions& opts) {
+    const auto& ssl_options = opts.ssl_options;
+    return clickhouse::SSLParams{
+            ssl_options.path_to_ca_files,
+            ssl_options.path_to_ca_directory,
+            ssl_options.use_default_ca_locations,
+            ssl_options.context_options,
+            ssl_options.min_protocol_version,
+            ssl_options.max_protocol_version,
+            ssl_options.use_sni
+    };
+}
+
 }
 
 namespace clickhouse {
@@ -137,10 +150,9 @@ SSL_CTX * SSLContext::getContext() {
     << std::endl
 */
 SSLSocket::SSLSocket(const NetworkAddress& addr, const SSLParams & ssl_params,
-                     std::unique_ptr<SSLContext> context)
+                     SSLContext& context)
     : Socket(addr)
-    , context_(std::move(context))
-    , ssl_(SSL_new(context_->getContext()), &SSL_free)
+    , ssl_(SSL_new(context.getContext()), &SSL_free)
 {
     auto ssl = ssl_.get();
     if (!ssl)
@@ -184,32 +196,21 @@ SSLSocket::SSLSocket(const NetworkAddress& addr, const SSLParams & ssl_params,
     }
 }
 
-SSLSocketFactory::~SSLSocketFactory() {}
-
-#if defined(WITH_OPENSSL)
-std::unique_ptr<Socket> SSLSocketFactory::doConnect(const ClientOptions& opts,
-                                                    const NetworkAddress& address) {
-    std::unique_ptr<SSLContext> ssl_context;
-    const auto ssl_options = opts.ssl_options;
-    const auto ssl_params = SSLParams{
-            ssl_options.path_to_ca_files,
-            ssl_options.path_to_ca_directory,
-            ssl_options.use_default_ca_locations,
-            ssl_options.context_options,
-            ssl_options.min_protocol_version,
-            ssl_options.max_protocol_version,
-            ssl_options.use_sni
-    };
-
-    if (ssl_options.ssl_context)
-        ssl_context = std::make_unique<SSLContext>(*ssl_options.ssl_context);
-    else {
-        ssl_context = std::make_unique<SSLContext>(ssl_params);
+SSLSocketFactory::SSLSocketFactory(const ClientOptions& opts)
+    : NonSecureSocketFactory()
+    , ssl_params_(GetSSLParams(opts)) {
+    if (opts.ssl_options.ssl_context) {
+        ssl_context_ = std::make_unique<SSLContext>(*opts.ssl_options.ssl_context);
+    } else {
+        ssl_context_ = std::make_unique<SSLContext>(ssl_params_);
     }
-
-    return std::make_unique<SSLSocket>(address, ssl_params, std::move(ssl_context));
 }
-#endif
+
+SSLSocketFactory::~SSLSocketFactory() = default;
+
+std::unique_ptr<Socket> SSLSocketFactory::doConnect(const NetworkAddress& address) {
+    return std::make_unique<SSLSocket>(address, ssl_params_, *ssl_context_);
+}
 
 std::unique_ptr<InputStream> SSLSocket::makeInputStream() const {
     return std::make_unique<SSLSocketInput>(ssl_.get());
