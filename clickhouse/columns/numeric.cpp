@@ -64,12 +64,12 @@ template <typename T>
 bool ColumnVector<T>::Load(InputStream* input, size_t rows) {
     data_.resize(rows);
 
-    return WireFormat::ReadBytes(input, data_.data(), data_.size() * sizeof(T));
+    return WireFormat::ReadBytes(*input, data_.data(), data_.size() * sizeof(T));
 }
 
 template <typename T>
 void ColumnVector<T>::Save(OutputStream* output) {
-    WireFormat::WriteBytes(output, data_.data(), data_.size() * sizeof(T));
+    WireFormat::WriteBytes(*output, data_.data(), data_.size() * sizeof(T));
 }
 
 template <typename T>

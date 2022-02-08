@@ -51,20 +51,20 @@ bool CompressedInput::Decompress() {
     uint32_t original = 0;
     uint8_t method = 0;
 
-    if (!WireFormat::ReadFixed(input_, &hash)) {
+    if (!WireFormat::ReadFixed(*input_, &hash)) {
         return false;
     }
-    if (!WireFormat::ReadFixed(input_, &method)) {
+    if (!WireFormat::ReadFixed(*input_, &method)) {
         return false;
     }
 
     if (method != COMPRESSION_METHOD) {
         throw std::runtime_error("unsupported compression method " + std::to_string(int(method)));
     } else {
-        if (!WireFormat::ReadFixed(input_, &compressed)) {
+        if (!WireFormat::ReadFixed(*input_, &compressed)) {
             return false;
         }
-        if (!WireFormat::ReadFixed(input_, &original)) {
+        if (!WireFormat::ReadFixed(*input_, &original)) {
             return false;
         }
 
@@ -80,9 +80,10 @@ bool CompressedInput::Decompress() {
             out.Write(&method,     sizeof(method));
             out.Write(&compressed, sizeof(compressed));
             out.Write(&original,   sizeof(original));
+            out.Flush();
         }
 
-        if (!WireFormat::ReadBytes(input_, tmp.data() + HEADER_SIZE, compressed - HEADER_SIZE)) {
+        if (!WireFormat::ReadBytes(*input_, tmp.data() + HEADER_SIZE, compressed - HEADER_SIZE)) {
             return false;
         } else {
             if (hash != CityHash128((const char*)tmp.data(), compressed)) {
@@ -110,9 +111,7 @@ CompressedOutput::CompressedOutput(OutputStream * destination, size_t max_compre
     PreallocateCompressBuffer(max_compressed_chunk_size);
 }
 
-CompressedOutput::~CompressedOutput() {
-    Flush();
-}
+CompressedOutput::~CompressedOutput() { }
 
 size_t CompressedOutput::DoWrite(const void* data, size_t len) {
     const size_t original_len = len;
@@ -156,9 +155,9 @@ void CompressedOutput::Compress(const void * data, size_t len) {
         WriteUnaligned(header + 5, static_cast<uint32_t>(len));
     }
 
-    WireFormat::WriteFixed(destination_, CityHash128(
+    WireFormat::WriteFixed(*destination_, CityHash128(
         (const char*)compressed_buffer_.data(), compressed_size + HEADER_SIZE));
-    WireFormat::WriteBytes(destination_, compressed_buffer_.data(), compressed_size + HEADER_SIZE);
+    WireFormat::WriteBytes(*destination_, compressed_buffer_.data(), compressed_size + HEADER_SIZE);
 
     destination_->Flush();
 }

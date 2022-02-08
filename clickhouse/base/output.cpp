@@ -66,26 +66,14 @@ size_t BufferOutput::DoNext(void** data, size_t len) {
 }
 
 
-BufferedOutput::BufferedOutput(OutputStream* slave, size_t buflen)
-    : slave_(slave)
+BufferedOutput::BufferedOutput(std::unique_ptr<OutputStream> destination, size_t buflen)
+    : destination_(std::move(destination))
     , buffer_(buflen)
     , array_output_(buffer_.data(), buflen)
 {
 }
 
-BufferedOutput::~BufferedOutput() {
-    try
-    {
-        Flush();
-    }
-    catch (...)
-    {
-        // That means we've failed to flush some data e.g. to the socket,
-        // but there is nothing we can do at this point (can't bring the socket back),
-        // and throwing in destructor is really a bad idea.
-        // The best we can do is to log the error and ignore it, but currently there is no logging subsystem.
-    }
-}
+BufferedOutput::~BufferedOutput() { }
 
 void BufferedOutput::Reset() {
     array_output_.Reset(buffer_.data(), buffer_.size());
@@ -93,8 +81,8 @@ void BufferedOutput::Reset() {
 
 void BufferedOutput::DoFlush() {
     if (array_output_.Data() != buffer_.data()) {
-        slave_->Write(buffer_.data(), array_output_.Data() - buffer_.data());
-        slave_->Flush();
+        destination_->Write(buffer_.data(), array_output_.Data() - buffer_.data());
+        destination_->Flush();
 
         array_output_.Reset(buffer_.data(), buffer_.size());
     }
@@ -114,7 +102,7 @@ size_t BufferedOutput::DoWrite(const void* data, size_t len) {
         Flush();
 
         if (len > buffer_.size() / 2) {
-            return slave_->Write(data, len);
+            return destination_->Write(data, len);
         }
     }
 
