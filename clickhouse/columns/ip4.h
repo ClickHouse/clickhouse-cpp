@@ -1,13 +1,22 @@
 #pragma once
 
 #include "numeric.h"
-#include "../base/socket.h"
+
+struct in_addr;
 
 namespace clickhouse {
 
 class ColumnIPv4 : public Column {
 public:
+    using DataType = in_addr;
+    using ValueType = in_addr;
+
     ColumnIPv4();
+    /** Takes ownership of the data, expects ColumnUInt32.
+     * Modifying memory pointed by `data` from outside is UB.
+     *
+     * TODO: deprecate and remove as it is too dangerous and error-prone.
+     */
     explicit ColumnIPv4(ColumnRef data);
 
     /// Appends one element to the column.
@@ -15,6 +24,9 @@ public:
 
     /// @params ip numeric value with host byte order.
     void Append(uint32_t ip);
+
+    ///
+    void Append(in_addr ip);
 
     /// Returns element at given row number.
     in_addr At(size_t n) const;

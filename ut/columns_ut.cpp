@@ -1,4 +1,5 @@
 #include <clickhouse/columns/array.h>
+#include <clickhouse/columns/tuple.h>
 #include <clickhouse/columns/date.h>
 #include <clickhouse/columns/enum.h>
 #include <clickhouse/columns/factory.h>
@@ -7,6 +8,8 @@
 #include <clickhouse/columns/numeric.h>
 #include <clickhouse/columns/string.h>
 #include <clickhouse/columns/uuid.h>
+#include <clickhouse/columns/ip4.h>
+#include <clickhouse/columns/ip6.h>
 #include <clickhouse/base/input.h>
 #include <clickhouse/base/output.h>
 
@@ -15,11 +18,46 @@
 
 #include <string_view>
 
+#include <clickhouse/base/socket.h> // for ipv4-ipv6 platform-specific stuff
+
+// only compare PODs of equal size this way
+template <typename L, typename R, typename
+        = std::enable_if_t<sizeof(L) == sizeof(R) && std::conjunction_v<std::is_pod<L>, std::is_pod<R>>>>
+bool operator==(const L & left, const R& right) {
+    return memcmp(&left, &right, sizeof(left)) == 0;
+}
+
+bool operator==(const in6_addr & left, const std::string_view & right) {
+    return right.size() == sizeof(left) && memcmp(&left, right.data(), sizeof(left)) == 0;
+}
+
+bool operator==(const std::string_view & left, const in6_addr & right) {
+    return left.size() == sizeof(right) && memcmp(left.data(), &right, sizeof(right)) == 0;
+}
 
 namespace {
 
 using namespace clickhouse;
 using namespace std::literals::string_view_literals;
+
+in_addr MakeIPv4(uint32_t ip) {
+    static_assert(sizeof(in_addr) == sizeof(ip));
+    in_addr result;
+    memcpy(&result, &ip, sizeof(ip));
+
+    return result;
+}
+
+in6_addr MakeIPv6(uint8_t v0,  uint8_t v1,  uint8_t v2,  uint8_t v3,
+                   uint8_t v4,  uint8_t v5,  uint8_t v6,  uint8_t v7,
+                   uint8_t v8,  uint8_t v9,  uint8_t v10, uint8_t v11,
+                   uint8_t v12, uint8_t v13, uint8_t v14, uint8_t v15) {
+    return in6_addr{{{v0, v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15}}};
+}
+
+in6_addr MakeIPv6(uint8_t v10, uint8_t v11, uint8_t v12, uint8_t v13, uint8_t v14, uint8_t v15) {
+    return in6_addr{{{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, v10, v11, v12, v13, v14, v15}}};
+}
 
 static std::vector<uint32_t> MakeNumbers() {
     return std::vector<uint32_t>
@@ -57,7 +95,7 @@ static const auto LOWCARDINALITY_STRING_FOOBAR_10_ITEMS_BINARY =
 
 template <typename Generator>
 auto GenerateVector(size_t items, Generator && gen) {
-    std::vector<std::result_of_t<Generator(size_t)>> result;
+    std::vector<my_result_of_t<Generator(size_t)>> result;
     result.reserve(items);
     for (size_t i = 0; i < items; ++i) {
         result.push_back(std::move(gen(i)));
@@ -96,8 +134,7 @@ auto AlternateGenerators(Generator1 && gen1, Generator2 && gen2) {
 }
 
 template <typename T>
-std::vector<T> ConcatSequences(std::vector<T> && vec1, std::vector<T> && vec2)
-{
+std::vector<T> ConcatSequences(std::vector<T> && vec1, std::vector<T> && vec2) {
     std::vector<T> result(vec1);
 
     result.reserve(vec1.size() + vec2.size());
@@ -215,9 +252,43 @@ TEST(ColumnsCase, ArrayAppend) {
     auto col = arr1->GetAsColumn(1);
 
     ASSERT_EQ(arr1->Size(), 2u);
-    //ASSERT_EQ(col->As<ColumnUInt64>()->At(0), 1u);
-    //ASSERT_EQ(col->As<ColumnUInt64>()->At(1), 3u);
+    ASSERT_EQ(col->As<ColumnUInt64>()->At(0), 1u);
+    ASSERT_EQ(col->As<ColumnUInt64>()->At(1), 3u);
 }
+
+TEST(ColumnsCase, TupleAppend){
+    auto tuple1 = std::make_shared<ColumnTuple>(std::vector<ColumnRef>({
+                                std::make_shared<ColumnUInt64>(),
+                                std::make_shared<ColumnString>()
+                            }));
+    auto tuple2 = std::make_shared<ColumnTuple>(std::vector<ColumnRef>({
+                                std::make_shared<ColumnUInt64>(),
+                                std::make_shared<ColumnString>()
+                            }));
+    (*tuple1)[0]->As<ColumnUInt64>()->Append(2u);
+    (*tuple1)[1]->As<ColumnString>()->Append("2");
+    tuple2->Append(tuple1);
+
+    ASSERT_EQ((*tuple2)[0]->As<ColumnUInt64>()->At(0), 2u);
+    ASSERT_EQ((*tuple2)[1]->As<ColumnString>()->At(0), "2");
+}
+
+TEST(ColumnsCase, TupleSlice){
+    auto tuple1 = std::make_shared<ColumnTuple>(std::vector<ColumnRef>({
+                                std::make_shared<ColumnUInt64>(),
+                                std::make_shared<ColumnString>()
+                            }));
+
+    (*tuple1)[0]->As<ColumnUInt64>()->Append(2u);
+    (*tuple1)[1]->As<ColumnString>()->Append("2");
+    (*tuple1)[0]->As<ColumnUInt64>()->Append(3u);
+    (*tuple1)[1]->As<ColumnString>()->Append("3");
+    auto tuple2 = tuple1->Slice(1,1)->As<ColumnTuple>();
+
+    ASSERT_EQ((*tuple2)[0]->As<ColumnUInt64>()->At(0), 3u);
+    ASSERT_EQ((*tuple2)[1]->As<ColumnString>()->At(0), "3");
+}
+
 
 TEST(ColumnsCase, DateAppend) {
     auto col1 = std::make_shared<ColumnDate>();
@@ -471,6 +542,183 @@ TEST(ColumnsCase, Int128) {
     EXPECT_EQ(0, col->At(4));
 }
 
+TEST(ColumnsCase, ColumnIPv4)
+{
+    // TODO: split into proper method-level unit-tests
+    auto col = ColumnIPv4();
+
+    col.Append("255.255.255.255");
+    col.Append("127.0.0.1");
+    col.Append(3585395774);
+    col.Append(0);
+    const in_addr ip = MakeIPv4(0x12345678);
+    col.Append(ip);
+
+    ASSERT_EQ(5u, col.Size());
+    EXPECT_EQ(MakeIPv4(0xffffffff), col.At(0));
+    EXPECT_EQ(MakeIPv4(0x0100007f), col.At(1));
+    EXPECT_EQ(MakeIPv4(3585395774), col.At(2));
+    EXPECT_EQ(MakeIPv4(0),          col.At(3));
+    EXPECT_EQ(ip,                  col.At(4));
+
+    EXPECT_EQ("255.255.255.255", col.AsString(0));
+    EXPECT_EQ("127.0.0.1",       col.AsString(1));
+    EXPECT_EQ("62.204.180.213",  col.AsString(2));
+    EXPECT_EQ("0.0.0.0",         col.AsString(3));
+    EXPECT_EQ("120.86.52.18",    col.AsString(4));
+
+    col.Clear();
+    EXPECT_EQ(0u, col.Size());
+}
+
+TEST(ColumnsCase, ColumnIPv4_construct_from_data)
+{
+    const auto vals = {
+        MakeIPv4(0x12345678),
+        MakeIPv4(0x0),
+        MakeIPv4(0x0100007f)
+    };
+
+    {
+        // Column is usable after being initialized with empty data column
+        auto col = ColumnIPv4(std::make_shared<ColumnUInt32>());
+        EXPECT_EQ(0u, col.Size());
+
+        // Make sure that `Append` and `At`/`[]` work properly
+        size_t i = 0;
+        for (const auto & v : vals) {
+            col.Append(v);
+            EXPECT_EQ(v, col[col.Size() - 1]) << "At pos " << i;
+            EXPECT_EQ(v, col.At(col.Size() - 1)) << "At pos " << i;
+            ++i;
+        }
+
+        EXPECT_EQ(vals.size(), col.Size());
+    }
+
+    {
+        // Column reports values from data column exactly, and also can be modified afterwards.
+        const auto values = std::vector<uint32_t>{std::numeric_limits<uint32_t>::min(), 123, 456, 789101112, std::numeric_limits<uint32_t>::max()};
+        auto col = ColumnIPv4(std::make_shared<ColumnUInt32>(values));
+
+        EXPECT_EQ(values.size(), col.Size());
+        for (size_t i = 0; i < values.size(); ++i) {
+            EXPECT_EQ(ntohl(values[i]), col[i]) << " At pos: " << i;
+        }
+
+        // Make sure that `Append` and `At`/`[]` work properly
+        size_t i = 0;
+        for (const auto & v : vals) {
+            col.Append(v);
+            EXPECT_EQ(v, col[col.Size() - 1]) << "At pos " << i;
+            EXPECT_EQ(v, col.At(col.Size() - 1)) << "At pos " << i;
+            ++i;
+        }
+
+        EXPECT_EQ(values.size() + vals.size(), col.Size());
+    }
+
+    EXPECT_ANY_THROW(ColumnIPv4(nullptr));
+    EXPECT_ANY_THROW(ColumnIPv4(ColumnRef(std::make_shared<ColumnInt8>())));
+    EXPECT_ANY_THROW(ColumnIPv4(ColumnRef(std::make_shared<ColumnInt32>())));
+
+    EXPECT_ANY_THROW(ColumnIPv4(ColumnRef(std::make_shared<ColumnUInt8>())));
+
+    EXPECT_ANY_THROW(ColumnIPv4(ColumnRef(std::make_shared<ColumnInt128>())));
+    EXPECT_ANY_THROW(ColumnIPv4(ColumnRef(std::make_shared<ColumnString>())));
+}
+
+TEST(ColumnsCase, ColumnIPv6)
+{
+    // TODO: split into proper method-level unit-tests
+    auto col = ColumnIPv6();
+    col.Append("0:0:0:0:0:0:0:1");
+    col.Append("::");
+    col.Append("::FFFF:204.152.189.116");
+
+    const auto ipv6 = MakeIPv6(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15);
+    col.Append(ipv6);
+
+    ASSERT_EQ(4u, col.Size());
+    EXPECT_EQ(MakeIPv6(0, 0, 0, 0, 0, 1),               col.At(0));
+    EXPECT_EQ(MakeIPv6(0, 0, 0, 0, 0, 0),               col.At(1));
+    EXPECT_EQ(MakeIPv6(0xff, 0xff, 204, 152, 189, 116), col.At(2));
+
+    EXPECT_EQ(ipv6, col.At(3));
+
+    EXPECT_EQ("::1",                    col.AsString(0));
+    EXPECT_EQ("::",                     col.AsString(1));
+    EXPECT_EQ("::ffff:204.152.189.116", col.AsString(2));
+    EXPECT_EQ("1:203:405:607:809:a0b:c0d:e0f", col.AsString(3));
+
+    col.Clear();
+    EXPECT_EQ(0u, col.Size());
+}
+
+TEST(ColumnsCase, ColumnIPv6_construct_from_data)
+{
+    const auto vals = {
+        MakeIPv6(0xff, 0xff, 204, 152, 189, 116),
+        MakeIPv6(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15),
+    };
+
+    {
+        // Column is usable after being initialized with empty data column
+        auto col = ColumnIPv6(std::make_shared<ColumnFixedString>(16));
+        EXPECT_EQ(0u, col.Size());
+
+        // Make sure that `Append` and `At`/`[]` work properly
+        size_t i = 0;
+        for (const auto & v : vals) {
+            col.Append(v);
+            EXPECT_EQ(v, col[col.Size() - 1]) << "At pos " << i;
+            EXPECT_EQ(v, col.At(col.Size() - 1)) << "At pos " << i;
+            ++i;
+        }
+
+        EXPECT_EQ(vals.size(), col.Size());
+    }
+
+    {
+        // Column reports values from data column exactly, and also can be modified afterwards.
+        using namespace std::literals;
+        const auto values = std::vector<std::string_view>{
+                "\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0A\x0B\x0C\x0D\x0E\x0F"sv,
+                "\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1A\x1B\x1C\x1D\x1E\x1F"sv,
+                "\xF0\xF1\xF2\xF3\xF4\xF5\xF6\xF7\xF8\xF9\xFA\xFB\xFC\xFD\xFE\xFF"sv};
+        auto col = ColumnIPv6(std::make_shared<ColumnFixedString>(16, values));
+
+        EXPECT_EQ(values.size(), col.Size());
+        for (size_t i = 0; i < values.size(); ++i) {
+            EXPECT_EQ(values[i], col[i]) << " At pos: " << i;
+        }
+
+        // Make sure that `Append` and `At`/`[]` work properly
+        size_t i = 0;
+        for (const auto & v : vals) {
+            col.Append(v);
+            EXPECT_EQ(v, col[col.Size() - 1]) << "At pos " << i;
+            EXPECT_EQ(v, col.At(col.Size() - 1)) << "At pos " << i;
+            ++i;
+        }
+
+        EXPECT_EQ(values.size() + vals.size(), col.Size());
+    }
+
+    // Make sure that column can't be constructed with wrong data columns (wrong size/wrong type or null)
+    EXPECT_ANY_THROW(ColumnIPv4(nullptr));
+    EXPECT_ANY_THROW(ColumnIPv6(ColumnRef(std::make_shared<ColumnFixedString>(15))));
+    EXPECT_ANY_THROW(ColumnIPv6(ColumnRef(std::make_shared<ColumnFixedString>(17))));
+
+    EXPECT_ANY_THROW(ColumnIPv6(ColumnRef(std::make_shared<ColumnInt8>())));
+    EXPECT_ANY_THROW(ColumnIPv6(ColumnRef(std::make_shared<ColumnInt32>())));
+
+    EXPECT_ANY_THROW(ColumnIPv6(ColumnRef(std::make_shared<ColumnUInt8>())));
+
+    EXPECT_ANY_THROW(ColumnIPv6(ColumnRef(std::make_shared<ColumnInt128>())));
+    EXPECT_ANY_THROW(ColumnIPv6(ColumnRef(std::make_shared<ColumnString>())));
+}
+
 TEST(ColumnsCase, ColumnDecimal128_from_string) {
     auto col = std::make_shared<ColumnDecimal>(38, 0);
 
@@ -482,8 +730,7 @@ TEST(ColumnsCase, ColumnDecimal128_from_string) {
         std::numeric_limits<Int128>::max(),
     };
 
-    for (size_t i = 0; i < values.size(); ++i)
-    {
+    for (size_t i = 0; i < values.size(); ++i) {
         const auto value = values.begin()[i];
         SCOPED_TRACE(::testing::Message() << "# index: " << i << " Int128 value: " << value);
 

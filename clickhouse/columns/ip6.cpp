@@ -1,5 +1,6 @@
 
 #include "ip6.h"
+#include "../base/socket.h" // for IPv6 platform-specific stuff
 
 #include <stdexcept>
 
@@ -15,36 +16,44 @@ ColumnIPv6::ColumnIPv6()
 
 ColumnIPv6::ColumnIPv6(ColumnRef data)
     : Column(Type::CreateIPv6())
-    , data_(data->As<ColumnFixedString>())
+    , data_(data ? data->As<ColumnFixedString>() : nullptr)
 {
-    if (data_->Size() != 0) {
-        throw std::runtime_error("number of entries must be even (two 64-bit numbers for each IPv6)");
-    }
+    if (!data_ || data_->FixedSize() != sizeof(in6_addr))
+        throw std::runtime_error("Expecting ColumnFixedString(16), got " + (data ? data->GetType().GetName() : "null"));
 }
 
-void ColumnIPv6::Append(const std::string& ip) {
+void ColumnIPv6::Append(const std::string_view& str) {
     unsigned char buf[16];
-    if (inet_pton(AF_INET6, ip.c_str(), buf) != 1) {
-        throw std::runtime_error("invalid IPv6 format, ip: " + ip);
+    if (inet_pton(AF_INET6, str.data(), buf) != 1) {
+        throw std::runtime_error("invalid IPv6 format, ip: " + std::string(str));
     }
-    data_->Append(std::string((const char*)buf, 16));
+    data_->Append(std::string_view((const char*)buf, 16));
 }
 
 void ColumnIPv6::Append(const in6_addr* addr) {
-    data_->Append(std::string((const char*)addr->s6_addr, 16));
+    data_->Append(std::string_view((const char*)addr->s6_addr, 16));
+}
+
+void ColumnIPv6::Append(const in6_addr& addr) {
+    Append(&addr);
 }
 
 void ColumnIPv6::Clear() {
     data_->Clear();
 }
 
-std::string ColumnIPv6::AsString (size_t n) const{
-    const auto& addr = data_->At(n);
+std::string ColumnIPv6::AsString (size_t n) const {
+    const auto& addr = this->At(n);
+
     char buf[INET6_ADDRSTRLEN];
-    const char* ip_str = inet_ntop(AF_INET6, addr.data(), buf, INET6_ADDRSTRLEN);
+    const char* ip_str = inet_ntop(AF_INET6, &addr, buf, INET6_ADDRSTRLEN);
+
     if (ip_str == nullptr) {
-        throw std::runtime_error("invalid IPv6 format: " + std::string(addr));
+        throw std::system_error(
+                std::error_code(errno, std::generic_category()),
+                "Invalid IPv6 data");
     }
+
     return ip_str;
 }
 

@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <vector>
+#include <memory>
 
 namespace clickhouse {
 
@@ -84,7 +85,7 @@ private:
 
 class BufferedInput : public ZeroCopyInput {
 public:
-     BufferedInput(InputStream* slave, size_t buflen = 8192);
+    BufferedInput(std::unique_ptr<InputStream> source, size_t buflen = 8192);
     ~BufferedInput() override;
 
     void Reset();
@@ -94,7 +95,7 @@ protected:
     size_t DoNext(const void** ptr, size_t len) override;
 
 private:
-    InputStream* const slave_;
+    std::unique_ptr<InputStream> const source_;
     ArrayInput array_input_;
     std::vector<uint8_t> buffer_;
 };
