@@ -3,6 +3,8 @@
 #include "socket.h"
 
 #include <memory>
+#include <optional>
+#include <vector>
 
 typedef struct ssl_ctx_st SSL_CTX;
 typedef struct ssl_st SSL;
@@ -18,6 +20,10 @@ struct SSLParams
     int min_protocol_version;
     int max_protocol_version;
     bool use_SNI;
+    bool skip_verification;
+    int host_flags;
+    using ConfigurationType = std::vector<std::pair<std::string, std::optional<std::string>>>;
+    ConfigurationType configuration;
 };
 
 class SSLContext

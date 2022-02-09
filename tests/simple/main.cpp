@@ -3,6 +3,8 @@
 #include <clickhouse/types/type_parser.h>
 #include <clickhouse/base/socket.h>
 
+#include <ut/utils.h>
+
 #include <stdexcept>
 #include <iostream>
 #include <cmath>
@@ -14,22 +16,11 @@
 using namespace clickhouse;
 using namespace std;
 
-std::string getEnvOrDefault(const std::string& env, const std::string& default_val)
-{
-    const char* v = std::getenv(env.c_str());
-    return v ? v : default_val;
-}
-
 inline void PrintBlock(const Block& block) {
     for (Block::Iterator bi(block); bi.IsValid(); bi.Next()) {
         std::cout << bi.Name() << " ";
     }
-    std::cout << std::endl;
-
-    for (size_t i = 0; i < block.GetRowCount(); ++i) {
-        std::cout << (*block[0]->As<ColumnUInt64>())[i] << " "
-                  << (*block[1]->As<ColumnString>())[i] << "\n";
-    }
+    std::cout << std::endl << block;
 }
 
 inline void ArrayExample(Client& client) {
@@ -504,26 +495,23 @@ static void RunTests(Client& client) {
 
 int main() {
     try {
+        const auto localHostEndpoint = ClientOptions()
+                .SetHost(           getEnvOrDefault("CLICKHOUSE_HOST",     "localhost"))
+                .SetPort(   getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "9000"))
+                .SetUser(           getEnvOrDefault("CLICKHOUSE_USER",     "default"))
+                .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", ""))
+                .SetDefaultDatabase(getEnvOrDefault("CLICKHOUSE_DB",       "default"));
+
         {
-            Client client(ClientOptions()
-                            .SetHost(           getEnvOrDefault("CLICKHOUSE_HOST",     "localhost"))
-                            .SetPort( std::stoi(getEnvOrDefault("CLICKHOUSE_PORT",     "9000")))
-                            .SetUser(           getEnvOrDefault("CLICKHOUSE_USER",     "default"))
-                            .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", ""))
-                            .SetDefaultDatabase(getEnvOrDefault("CLICKHOUSE_DB",       "default"))
-                            .SetPingBeforeQuery(true));
+            Client client(ClientOptions(localHostEndpoint)
+                    .SetPingBeforeQuery(true));
             RunTests(client);
         }
 
         {
-            Client client(ClientOptions()
-                            .SetHost(           getEnvOrDefault("CLICKHOUSE_HOST",     "localhost"))
-                            .SetPort( std::stoi(getEnvOrDefault("CLICKHOUSE_PORT",     "9000")))
-                            .SetUser(           getEnvOrDefault("CLICKHOUSE_USER",     "default"))
-                            .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", ""))
-                            .SetDefaultDatabase(getEnvOrDefault("CLICKHOUSE_DB",       "default"))
-                            .SetPingBeforeQuery(true)
-                            .SetCompressionMethod(CompressionMethod::LZ4));
+            Client client(ClientOptions(localHostEndpoint)
+                    .SetPingBeforeQuery(true)
+                    .SetCompressionMethod(CompressionMethod::LZ4));
             RunTests(client);
         }
     } catch (const std::exception& e) {

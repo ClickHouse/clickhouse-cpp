@@ -1,9 +1,11 @@
 #pragma once
 
+#include <charconv>
 #include <chrono>
-#include <ratio>
-#include <vector>
+#include <cstring>
 #include <ostream>
+#include <ratio>
+#include <system_error>
 #include <vector>
 
 #include <time.h>
@@ -13,34 +15,28 @@ namespace clickhouse {
 }
 
 template <typename ChronoDurationType>
-struct Timer
-{
+struct Timer {
     using DurationType = ChronoDurationType;
 
     Timer()
         : started_at(Now())
     {}
 
-    void Restart()
-    {
+    void Restart() {
         started_at = Now();
     }
 
-    void Start()
-    {
+    void Start() {
         Restart();
     }
 
-    auto Elapsed() const
-    {
+    auto Elapsed() const {
         return std::chrono::duration_cast<ChronoDurationType>(Now() - started_at);
     }
 
 private:
-    static auto Now()
-    {
-        std::chrono::nanoseconds ns = std::chrono::high_resolution_clock::now().time_since_epoch();
-        return ns;
+    static auto Now() {
+        return std::chrono::high_resolution_clock::now().time_since_epoch();
     }
 
 private:
@@ -99,11 +95,26 @@ private:
 };
 
 template <typename MeasureFunc>
-MeasuresCollector<MeasureFunc> collect(MeasureFunc && f)
-{
+MeasuresCollector<MeasureFunc> collect(MeasureFunc && f) {
     return MeasuresCollector<MeasureFunc>(std::forward<MeasureFunc>(f));
 }
 
 std::ostream& operator<<(std::ostream & ostr, const clickhouse::Block & block);
 
-std::string getEnvOrDefault(const std::string& env, const std::string& default_val);
+
+template <typename ResultType = std::string>
+auto getEnvOrDefault(const std::string& env, const char * default_val) {
+    const char* v = std::getenv(env.c_str());
+    v = v ? v : default_val;
+
+    if constexpr (std::is_same_v<ResultType, std::string>) {
+        return v;
+    } else {
+        ResultType result;
+        const std::from_chars_result status = std::from_chars(v, v + std::strlen(v), result);
+        if (static_cast<int>(status.ec) != 0)
+            throw std::system_error(std::make_error_code(status.ec), "converting string value " + std::string(v) + " to " + typeid(ResultType).name());
+
+        return result;
+    }
+}

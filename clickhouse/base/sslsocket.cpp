@@ -26,7 +26,7 @@ std::string getCertificateInfo(X509* cert)
     return std::string(data, len);
 }
 
-void throwSSLError(SSL * ssl, int error, const char * /*location*/, const char * /*statement*/) {
+void throwSSLError(SSL * ssl, int error, const char * /*location*/, const char * /*statement*/, const std::string prefix = {}) {
     const auto detail_error = ERR_get_error();
     auto reason = ERR_reason_error_string(detail_error);
     reason = reason ? reason : "Unknown SSL error";
@@ -45,7 +45,42 @@ void throwSSLError(SSL * ssl, int error, const char * /*location*/, const char *
 //              << "\n\t last err: " << ERR_peek_last_error()
 //              << std::endl;
 
-    throw std::runtime_error(std::string("OpenSSL error: ") + std::to_string(error) + " : " + reason_str);
+    throw std::runtime_error((prefix.empty() ? "OpenSSL error: " : prefix) + std::to_string(error) + " : " + reason_str);
+}
+
+void configureSSL(const clickhouse::SSLParams::ConfigurationType & configuration, SSL * ssl) {
+    std::unique_ptr<SSL_CONF_CTX, decltype(&SSL_CONF_CTX_free)> conf_ctx_holder(SSL_CONF_CTX_new(), SSL_CONF_CTX_free);
+    auto conf_ctx = conf_ctx_holder.get();
+
+    // To make both cmdline and flag file commands start with no prefix.
+    SSL_CONF_CTX_set1_prefix(conf_ctx, "");
+    // Allow all set of client commands, also turn on proper error reporting to reuse throwSSLError().
+    SSL_CONF_CTX_set_flags(conf_ctx, SSL_CONF_FLAG_CMDLINE | SSL_CONF_FLAG_FILE | SSL_CONF_FLAG_CLIENT | SSL_CONF_FLAG_SHOW_ERRORS | SSL_CONF_FLAG_CERTIFICATE );
+    SSL_CONF_CTX_set_ssl(conf_ctx, ssl);
+
+    for (const auto & kv : configuration)
+    {
+        const int err = SSL_CONF_cmd(conf_ctx, kv.first.c_str(), (kv.second ? kv.second->c_str() : nullptr));
+        // From the documentation:
+        //  2 - both key and value used
+        //  1 - only key used
+        //  0 - error during processing
+        // -2 - key not recodnized
+        // -3 - missing value
+        const bool value_present = !!kv.second;
+        if (err == 2 || (err == 1 && !value_present))
+            continue;
+        else if (err == 0)
+            throwSSLError(ssl, SSL_ERROR_NONE, nullptr, nullptr, "Failed to configure OpenSSL with command '" + kv.first + "' ");
+        else if (err == 1 && value_present)
+            throw std::runtime_error("Failed to configure OpenSSL: command '" + kv.first + "' needs no value");
+        else if (err == -2)
+            throw std::runtime_error("Failed to cofigure OpenSSL: unknown command '" + kv.first + "'");
+        else if (err == -3)
+            throw std::runtime_error("Failed to cofigure OpenSSL: command '" + kv.first + "' requires a value");
+        else
+            throw std::runtime_error("Failed to cofigure OpenSSL: command '" + kv.first + "' unknown error: " + std::to_string(err));
+    }
 }
 
 #define STRINGIFY_HELPER(x) #x
@@ -143,42 +178,42 @@ SSLSocket::SSLSocket(const NetworkAddress& addr, const SSLParams & ssl_params, S
     if (!ssl)
         throw std::runtime_error("Failed to create SSL instance");
 
+    std::unique_ptr<ASN1_OCTET_STRING, decltype(&ASN1_OCTET_STRING_free)> ip_addr(a2i_IPADDRESS(addr.Host().c_str()), &ASN1_OCTET_STRING_free);
+
     HANDLE_SSL_ERROR(ssl, SSL_set_fd(ssl, handle_));
     if (ssl_params.use_SNI)
         HANDLE_SSL_ERROR(ssl, SSL_set_tlsext_host_name(ssl, addr.Host().c_str()));
 
+    HANDLE_SSL_ERROR(ssl, SSL_set1_host(ssl, addr.Host().c_str()));
+    if (ssl_params.host_flags != -1)
+        SSL_set_hostflags(ssl, ssl_params.host_flags);
+
+    if (ssl_params.configuration.size() > 0)
+        configureSSL(ssl_params.configuration, ssl);
+
     SSL_set_connect_state(ssl);
     HANDLE_SSL_ERROR(ssl, SSL_connect(ssl));
     HANDLE_SSL_ERROR(ssl, SSL_set_mode(ssl, SSL_MODE_AUTO_RETRY));
-    auto peer_certificate = SSL_get_peer_certificate(ssl);
 
-    if (!peer_certificate)
-        throw std::runtime_error("Failed to verify SSL connection: server provided no certificate.");
-
-    if (const auto verify_result = SSL_get_verify_result(ssl); verify_result != X509_V_OK) {
+    if (const auto verify_result = SSL_get_verify_result(ssl); !ssl_params.skip_verification && verify_result != X509_V_OK) {
         auto error_message = X509_verify_cert_error_string(verify_result);
         throw std::runtime_error("Failed to verify SSL connection, X509_v error: "
                 + std::to_string(verify_result)
                 + " " + error_message
-                + "\nServer certificate: " + getCertificateInfo(peer_certificate));
+                + "\nServer certificate: " + getCertificateInfo(SSL_get_peer_certificate(ssl)));
     }
 
-    if (ssl_params.use_SNI) {
-        auto hostname = addr.Host();
-        char * out_name = nullptr;
-
-        std::unique_ptr<ASN1_OCTET_STRING, decltype(&ASN1_OCTET_STRING_free)> addr(a2i_IPADDRESS(hostname.c_str()), &ASN1_OCTET_STRING_free);
-        if (addr) {
-            // if hostname is actually an IP address
-            HANDLE_SSL_ERROR(ssl, X509_check_ip(
-                    peer_certificate,
-                    ASN1_STRING_get0_data(addr.get()),
-                    ASN1_STRING_length(addr.get()),
-                    0));
-        } else {
-            HANDLE_SSL_ERROR(ssl, X509_check_host(peer_certificate, hostname.c_str(), hostname.length(), 0, &out_name));
-        }
-    }
+    // Host name verification is done by OpenSSL itself, however if we are connecting to an ip-address,
+    // no verification is made, so we have to do it manually.
+    // Just in case if this is ever required, leave it here commented out.
+//    if (ip_addr) {
+//        // if hostname is actually an IP address
+//        HANDLE_SSL_ERROR(ssl, X509_check_ip(
+//                SSL_get_peer_certificate(ssl),
+//                ASN1_STRING_get0_data(ip_addr.get()),
+//                ASN1_STRING_length(ip_addr.get()),
+//                0));
+//    }
 }
 
 std::unique_ptr<InputStream> SSLSocket::makeInputStream() const {

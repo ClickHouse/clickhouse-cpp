@@ -63,8 +63,8 @@ std::ostream& operator<<(std::ostream& os, const ClientOptions& opt) {
        << " compression_method:"
        << (opt.compression_method == CompressionMethod::LZ4 ? "LZ4" : "None");
 #if defined(WITH_OPENSSL)
-    if (opt.ssl_options.use_ssl) {
-        const auto & ssl_options = opt.ssl_options;
+    if (opt.ssl_options) {
+        const auto & ssl_options = *opt.ssl_options;
         os << " SSL ("
            << " ssl_context: " << (ssl_options.ssl_context ? "provided by user" : "created internally")
            << " use_default_ca_locations: " << ssl_options.use_default_ca_locations
@@ -78,6 +78,17 @@ std::ostream& operator<<(std::ostream& os, const ClientOptions& opt) {
 #endif
     os << ")";
     return os;
+}
+
+ClientOptions& ClientOptions::SetSSLOptions(ClientOptions::SSLOptions options)
+{
+#ifdef WITH_OPENSSL
+    ssl_options = options;
+    return *this;
+#else
+    (void)options;
+    throw std::runtime_error("Library was built with no SSL support");
+#endif
 }
 
 class Client::Impl {
@@ -289,6 +300,15 @@ void Client::Impl::Ping() {
     }
 }
 
+auto convertConfiguration(const decltype(ClientOptions::SSLOptions::configuration) & configuration)
+{
+    auto result = decltype(SSLParams::configuration){};
+    for (const auto & cv : configuration)
+        result.push_back({cv.command, cv.value});
+
+    return result;
+}
+
 void Client::Impl::ResetConnection() {
 
     std::unique_ptr<Socket> socket;
@@ -297,8 +317,8 @@ void Client::Impl::ResetConnection() {
 #if defined(WITH_OPENSSL)
     // TODO: maybe do not re-create context multiple times upon reconnection - that doesn't make sense.
     std::unique_ptr<SSLContext> ssl_context;
-    if (options_.ssl_options.use_ssl) {
-        const auto ssl_options = options_.ssl_options;
+    if (options_.ssl_options) {
+        const auto ssl_options = *options_.ssl_options;
         const auto ssl_params = SSLParams {
                 ssl_options.path_to_ca_files,
                 ssl_options.path_to_ca_directory,
@@ -306,7 +326,10 @@ void Client::Impl::ResetConnection() {
                 ssl_options.context_options,
                 ssl_options.min_protocol_version,
                 ssl_options.max_protocol_version,
-                ssl_options.use_sni
+                ssl_options.use_sni,
+                ssl_options.skip_verification,
+                ssl_options.host_flags,
+                convertConfiguration(ssl_options.configuration)
         };
 
         if (ssl_options.ssl_context)

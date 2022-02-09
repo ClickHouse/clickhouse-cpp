@@ -894,27 +894,31 @@ const auto QUERIES = std::vector<std::string>{"SELECT version()", "SELECT fqdn()
 }
 
 INSTANTIATE_TEST_SUITE_P(ClientLocalReadonly, ReadonlyClientTest,
-                         ::testing::Values(ReadonlyClientTest::ParamType{
-                             ClientOptions()
-                                 .SetHost(           getEnvOrDefault("CLICKHOUSE_HOST",     "localhost"))
-                                 .SetPort( std::stoi(getEnvOrDefault("CLICKHOUSE_PORT",     "9000")))
-                                 .SetUser(           getEnvOrDefault("CLICKHOUSE_USER",     "default"))
-                                 .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", ""))
-                                 .SetDefaultDatabase(getEnvOrDefault("CLICKHOUSE_DB",       "default"))
-                                 .SetSendRetries(1)
-                                 .SetPingBeforeQuery(true)
-                                 .SetCompressionMethod(CompressionMethod::None),
-                             QUERIES}));
+    ::testing::Values(ReadonlyClientTest::ParamType{
+        ClientOptions()
+            .SetHost(           getEnvOrDefault("CLICKHOUSE_HOST",     "localhost"))
+            .SetPort( std::stoi(getEnvOrDefault("CLICKHOUSE_PORT",     "9000")))
+            .SetUser(           getEnvOrDefault("CLICKHOUSE_USER",     "default"))
+            .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", ""))
+            .SetDefaultDatabase(getEnvOrDefault("CLICKHOUSE_DB",       "default"))
+            .SetSendRetries(1)
+            .SetPingBeforeQuery(true)
+            .SetCompressionMethod(CompressionMethod::None),
+        QUERIES
+    }
+));
 
 INSTANTIATE_TEST_SUITE_P(ClientLocalFailed, ConnectionFailedClientTest,
-                         ::testing::Values(ConnectionFailedClientTest::ParamType{
-                             ClientOptions()
-                                 .SetHost(           getEnvOrDefault("CLICKHOUSE_HOST",     "localhost"))
-                                 .SetPort( std::stoi(getEnvOrDefault("CLICKHOUSE_PORT",     "9000")))
-                                 .SetUser("non_existing_user_clickhouse_cpp_test")
-                                 .SetPassword("wrongpwd")
-                                 .SetDefaultDatabase(getEnvOrDefault("CLICKHOUSE_DB",       "default"))
-                                 .SetSendRetries(1)
-                                 .SetPingBeforeQuery(true)
-                                 .SetCompressionMethod(CompressionMethod::None),
-                             "Authentication failed: password is incorrect"}));
+    ::testing::Values(ConnectionFailedClientTest::ParamType{
+        ClientOptions()
+            .SetHost(           getEnvOrDefault("CLICKHOUSE_HOST",     "localhost"))
+            .SetPort( std::stoi(getEnvOrDefault("CLICKHOUSE_PORT",     "9000")))
+            .SetUser("non_existing_user_clickhouse_cpp_test")
+            .SetPassword("wrongpwd")
+            .SetDefaultDatabase(getEnvOrDefault("CLICKHOUSE_DB",       "default"))
+            .SetSendRetries(1)
+            .SetPingBeforeQuery(true)
+            .SetCompressionMethod(CompressionMethod::None),
+        ExpectingException{"Authentication failed: password is incorrect"}
+    }
+));

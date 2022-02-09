@@ -91,9 +91,3 @@ std::ostream& operator<<(std::ostream & ostr, const Block & block) {
 
     return ostr;
 }
-
-std::string getEnvOrDefault(const std::string& env, const std::string& default_val)
-{
-    const char* v = std::getenv(env.c_str());
-    return v ? v : default_val;
-}
