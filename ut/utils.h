@@ -1,9 +1,10 @@
 #pragma once
 
 #include <chrono>
-#include <ratio>
-#include <vector>
+#include <cstring>
 #include <ostream>
+#include <ratio>
+#include <system_error>
 #include <vector>
 
 #include <time.h>
@@ -13,34 +14,28 @@ namespace clickhouse {
 }
 
 template <typename ChronoDurationType>
-struct Timer
-{
+struct Timer {
     using DurationType = ChronoDurationType;
 
     Timer()
         : started_at(Now())
     {}
 
-    void Restart()
-    {
+    void Restart() {
         started_at = Now();
     }
 
-    void Start()
-    {
+    void Start() {
         Restart();
     }
 
-    auto Elapsed() const
-    {
+    auto Elapsed() const {
         return std::chrono::duration_cast<ChronoDurationType>(Now() - started_at);
     }
 
 private:
-    static auto Now()
-    {
-        std::chrono::nanoseconds ns = std::chrono::high_resolution_clock::now().time_since_epoch();
-        return ns;
+    static auto Now() {
+        return std::chrono::high_resolution_clock::now().time_since_epoch();
     }
 
 private:
@@ -109,8 +104,7 @@ private:
 };
 
 template <typename MeasureFunc>
-MeasuresCollector<MeasureFunc> collect(MeasureFunc && f)
-{
+MeasuresCollector<MeasureFunc> collect(MeasureFunc && f) {
     return MeasuresCollector<MeasureFunc>(std::forward<MeasureFunc>(f));
 }
 
@@ -120,4 +114,28 @@ std::ostream& operator<<(std::ostream & ostr, const clickhouse::Block & block);
 std::ostream& operator<<(std::ostream& ostr, const in_addr& addr);
 std::ostream& operator<<(std::ostream& ostr, const in6_addr& addr);
 
-std::string getEnvOrDefault(const std::string& env, const std::string& default_val);
+
+template <typename ResultType = std::string>
+auto getEnvOrDefault(const std::string& env, const char * default_val) {
+    const char* v = std::getenv(env.c_str());
+    const std::string value = v ? v : default_val;
+
+    if constexpr (std::is_same_v<ResultType, std::string>) {
+        return value;
+    } else if constexpr (std::is_integral_v<ResultType>) {
+        // since std::from_chars is not available on GCC-7  on linux
+        if constexpr (std::is_signed_v<ResultType>) {
+            if constexpr (sizeof(ResultType) <= sizeof(int))
+                return std::stoi(value);
+            else if constexpr (sizeof(ResultType) <= sizeof(long))
+                return std::stol(value);
+            else if constexpr (sizeof(ResultType) <= sizeof(long long))
+                return std::stoll(value);
+        } else if constexpr (std::is_unsigned_v<ResultType>) {
+            if constexpr (sizeof(ResultType) <= sizeof(unsigned long))
+                return std::stoul(value);
+            else if constexpr (sizeof(ResultType) <= sizeof(unsigned long long))
+                return std::stoull(value);
+        }
+    }
+}

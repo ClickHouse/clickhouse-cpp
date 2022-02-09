@@ -20,10 +20,9 @@
 #include <memory>
 #include <ostream>
 #include <string>
+#include <optional>
 
-#if defined(WITH_OPENSSL)
 typedef struct ssl_ctx_st SSL_CTX;
-#endif
 
 namespace clickhouse {
 
@@ -105,10 +104,7 @@ struct ClientOptions {
      */
     DECLARE_FIELD(max_compression_chunk_size, unsigned int, SetMaxCompressionChunkSize, 65535);
 
-#if defined(WITH_OPENSSL)
     struct SSLOptions {
-        bool use_ssl = true; // not expected to be set manually.
-
         /** There are two ways to configure an SSL connection:
          *  - provide a pre-configured SSL_CTX, which is not modified and not owned by the Client.
          *  - provide a set of options and allow the Client to create and configure SSL_CTX by itself.
@@ -118,6 +114,9 @@ struct ClientOptions {
          *  If NOT null client DONES NOT take ownership of context and it must be valid for client lifetime.
          *  If null client initlaizes OpenSSL and creates his own context, initializes it using
          *  other options, like path_to_ca_files, path_to_ca_directory, use_default_ca_locations, etc.
+         *
+         *  Either way context is used to create an SSL-connection, which is then configured with
+         *  whatever was provided as `configuration`, `host_flags`, `skip_verification` and `use_sni`.
          */
         SSL_CTX * ssl_context = nullptr;
         auto & SetExternalSSLContext(SSL_CTX * new_ssl_context) {
@@ -147,16 +146,45 @@ struct ClientOptions {
         */
         DECLARE_FIELD(context_options, int, SetContextOptions, DEFAULT_VALUE);
 
-        /** Use SNI at ClientHello and verify that certificate is issued to the hostname we are trying to connect to
+        /** Use SNI at ClientHello
          */
         DECLARE_FIELD(use_sni, bool, SetUseSNI, true);
+
+        /** Skip SSL session verification (server's certificate, etc).
+         *
+         *  WARNING: settig to true will bypass all SSL session checks, which
+         *  is dangerous, but can be used against self-signed certificates, e.g. for testing purposes.
+         */
+        DECLARE_FIELD(skip_verification, bool, SetSkipVerification, false);
+
+        /** Mode of verifying host ssl certificate against name of the host, set with SSL_set_hostflags.
+         *  For details see https://www.openssl.org/docs/man1.1.1/man3/SSL_set_hostflags.html
+         */
+        DECLARE_FIELD(host_flags, int, SetHostVerifyFlags, DEFAULT_VALUE);
+
+        struct CommandAndValue {
+            std::string command;
+            std::optional<std::string> value = std::nullopt;
+        };
+        /** Extra configuration options, set with SSL_CONF_cmd.
+         *  For deatils see https://www.openssl.org/docs/man1.1.1/man3/SSL_CONF_cmd.html
+         *
+         *  Takes multiple pairs of command-value strings, all commands are supported,
+         *  and prefix is empty.
+         *  i.e. pass `sigalgs` or `SignatureAlgorithms` instead of `-sigalgs`.
+         *
+         *  Rewrites any other options/flags if set in other ways.
+         */
+        DECLARE_FIELD(configuration, std::vector<CommandAndValue>, SetConfiguration, {});
 
         static const int DEFAULT_VALUE = -1;
     };
 
-    // By default SSL is turned off, hence the `{false}`
-    DECLARE_FIELD(ssl_options, SSLOptions, SetSSLOptions, {false});
-#endif
+    // By default SSL is turned off.
+    std::optional<SSLOptions> ssl_options = std::nullopt;
+
+    // Will throw an exception if client was built without SSL support.
+    ClientOptions& SetSSLOptions(SSLOptions options);
 
 #undef DECLARE_FIELD
 };

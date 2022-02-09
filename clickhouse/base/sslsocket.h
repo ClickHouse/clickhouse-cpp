@@ -3,6 +3,8 @@
 #include "socket.h"
 
 #include <memory>
+#include <optional>
+#include <vector>
 
 typedef struct ssl_ctx_st SSL_CTX;
 typedef struct ssl_st SSL;
@@ -18,6 +20,10 @@ struct SSLParams
     int min_protocol_version;
     int max_protocol_version;
     bool use_SNI;
+    bool skip_verification;
+    int host_flags;
+    using ConfigurationType = std::vector<std::pair<std::string, std::optional<std::string>>>;
+    ConfigurationType configuration;
 };
 
 class SSLContext
@@ -42,8 +48,7 @@ private:
 
 class SSLSocket : public Socket {
 public:
-    explicit SSLSocket(const NetworkAddress& addr, const SSLParams & ssl_params,
-                       SSLContext& context);
+    explicit SSLSocket(const NetworkAddress& addr, const SSLParams & ssl_params, SSLContext& context);
     SSLSocket(SSLSocket &&) = default;
     ~SSLSocket() override = default;
 
@@ -53,6 +58,7 @@ public:
     std::unique_ptr<InputStream> makeInputStream() const override;
     std::unique_ptr<OutputStream> makeOutputStream() const override;
 
+    static void validateParams(const SSLParams & ssl_params);
 private:
     std::unique_ptr<SSL, void (*)(SSL *s)> ssl_;
 };
