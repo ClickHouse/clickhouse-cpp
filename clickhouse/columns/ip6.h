@@ -7,13 +7,21 @@ struct in6_addr;
 
 namespace clickhouse {
 
-class ColumnIPv6 : public Column{
+class ColumnIPv6 : public Column {
 public:
+    using DataType = in6_addr;
+    using ValueType = in6_addr;
+
     ColumnIPv6();
+    /** Takes ownership of the data, expects ColumnFixedString.
+     * Modifying memory pointed by `data` from outside is UB.
+     *
+     * TODO: deprecate and remove as it is too dangerous and error-prone.
+     */
     explicit ColumnIPv6(ColumnRef data);
 
     /// Appends one element to the column.
-    void Append(const std::string& str);
+    void Append(const std::string_view& str);
 
     void Append(const in6_addr* addr);
     void Append(const in6_addr& addr);

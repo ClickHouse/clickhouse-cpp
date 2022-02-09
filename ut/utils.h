@@ -70,10 +70,20 @@ inline ostream & operator<<(ostream & ostr, const chrono::duration<R, P> & d) {
 }
 }
 
+// Since result_of is deprecated in C++20, and invoke_result_of is unavailable until C++20...
+template <class F, class... ArgTypes>
+using my_result_of_t =
+#if __cplusplus >= 202002L
+    std::invoke_result_of_t<F, ArgTypes...>;
+#else
+    std::result_of_t<F>;
+#endif
+
 template <typename MeasureFunc>
 class MeasuresCollector {
 public:
-    using Result = std::result_of_t<MeasureFunc()>;
+    using Result = my_result_of_t<MeasureFunc()>;
+
     explicit MeasuresCollector(MeasureFunc && measurment_func, const size_t preallocate_results = 10)
         : measurment_func_(std::move(measurment_func))
     {
@@ -99,7 +109,11 @@ MeasuresCollector<MeasureFunc> collect(MeasureFunc && f) {
     return MeasuresCollector<MeasureFunc>(std::forward<MeasureFunc>(f));
 }
 
+struct in_addr;
+struct in6_addr;
 std::ostream& operator<<(std::ostream & ostr, const clickhouse::Block & block);
+std::ostream& operator<<(std::ostream& ostr, const in_addr& addr);
+std::ostream& operator<<(std::ostream& ostr, const in6_addr& addr);
 
 
 template <typename ResultType = std::string>
