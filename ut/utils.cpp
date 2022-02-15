@@ -97,8 +97,7 @@ std::ostream& operator<<(std::ostream & ostr, const Block & block) {
     return ostr;
 }
 
-std::ostream& operator<<(std::ostream& ostr, const in_addr& addr)
-{
+std::ostream& operator<<(std::ostream& ostr, const in_addr& addr) {
     char buf[INET_ADDRSTRLEN];
     const char* ip_str = inet_ntop(AF_INET, &addr, buf, sizeof(buf));
 
@@ -108,8 +107,7 @@ std::ostream& operator<<(std::ostream& ostr, const in_addr& addr)
     return ostr << ip_str;
 }
 
-std::ostream& operator<<(std::ostream& ostr, const in6_addr& addr)
-{
+std::ostream& operator<<(std::ostream& ostr, const in6_addr& addr) {
     char buf[INET6_ADDRSTRLEN];
     const char* ip_str = inet_ntop(AF_INET6, &addr, buf, sizeof(buf));
 
@@ -117,10 +115,4 @@ std::ostream& operator<<(std::ostream& ostr, const in6_addr& addr)
         return ostr << "<!INVALID IPv6 VALUE!>";
 
     return ostr << ip_str;
-}
-
-std::string getEnvOrDefault(const std::string& env, const std::string& default_val)
-{
-    const char* v = std::getenv(env.c_str());
-    return v ? v : default_val;
 }

@@ -63,8 +63,8 @@ std::ostream& operator<<(std::ostream& os, const ClientOptions& opt) {
        << " compression_method:"
        << (opt.compression_method == CompressionMethod::LZ4 ? "LZ4" : "None");
 #if defined(WITH_OPENSSL)
-    if (opt.ssl_options.use_ssl) {
-        const auto & ssl_options = opt.ssl_options;
+    if (opt.ssl_options) {
+        const auto & ssl_options = *opt.ssl_options;
         os << " SSL ("
            << " ssl_context: " << (ssl_options.ssl_context ? "provided by user" : "created internally")
            << " use_default_ca_locations: " << ssl_options.use_default_ca_locations
@@ -80,13 +80,23 @@ std::ostream& operator<<(std::ostream& os, const ClientOptions& opt) {
     return os;
 }
 
+ClientOptions& ClientOptions::SetSSLOptions(ClientOptions::SSLOptions options)
+{
+#ifdef WITH_OPENSSL
+    ssl_options = options;
+    return *this;
+#else
+    (void)options;
+    throw std::runtime_error("Library was built with no SSL support");
+#endif
+}
 
 namespace {
 
 std::unique_ptr<SocketFactory> GetSocketFactory(const ClientOptions& opts) {
     (void)opts;
 #if defined(WITH_OPENSSL)
-    if (opts.ssl_options.use_ssl)
+    if (opts.ssl_options)
         return std::make_unique<SSLSocketFactory>(opts);
     else
 #endif
@@ -94,7 +104,6 @@ std::unique_ptr<SocketFactory> GetSocketFactory(const ClientOptions& opts) {
 }
 
 }
-
 
 class Client::Impl {
 public:

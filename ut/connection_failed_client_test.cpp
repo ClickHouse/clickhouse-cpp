@@ -14,7 +14,7 @@ namespace {
 TEST_P(ConnectionFailedClientTest, ValidateConnectionError) {
 
     const auto & client_options = std::get<0>(GetParam());
-    const auto & exception_message = std::get<1>(GetParam());
+    const auto & ee = std::get<1>(GetParam());
 
     std::unique_ptr<Client> client;
     try {
@@ -22,7 +22,8 @@ TEST_P(ConnectionFailedClientTest, ValidateConnectionError) {
         ASSERT_EQ(nullptr, client.get()) << "Connectiong established but it should have failed";
     } catch (const std::exception & e) {
         const auto message = std::string_view(e.what());
-        ASSERT_TRUE(message.find(exception_message) != std::string_view::npos)
-                << "Actual exception message: " << e.what() << std::endl;
+        ASSERT_TRUE(message.find(ee.exception_message) != std::string_view::npos)
+                << "Expected exception message: " << ee.exception_message << "\n"
+                << "Actual exception message  : " << e.what() << std::endl;
     }
 }
