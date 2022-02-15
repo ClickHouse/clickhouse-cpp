@@ -6,6 +6,7 @@
 
 #include <cstddef>
 #include <string>
+#include <chrono>
 
 #if defined(_win_)
 #   include <winsock2.h>
@@ -27,6 +28,8 @@
 struct addrinfo;
 
 namespace clickhouse {
+
+struct ClientOptions;
 
 /** Address of a host to establish connection to.
  *
@@ -57,13 +60,35 @@ public:
 
 #endif
 
-class Socket {
+
+class SocketBase {
+public:
+    virtual ~SocketBase();
+
+    virtual std::unique_ptr<InputStream> makeInputStream() const = 0;
+    virtual std::unique_ptr<OutputStream> makeOutputStream() const = 0;
+};
+
+
+class SocketFactory {
+public:
+    virtual ~SocketFactory();
+
+    // TODO: move connection-related options to ConnectionOptions structure.
+
+    virtual std::unique_ptr<SocketBase> connect(const ClientOptions& opts) = 0;
+
+    virtual void sleepFor(const std::chrono::milliseconds& duration);
+};
+
+
+class Socket : public SocketBase {
 public:
     Socket(const NetworkAddress& addr);
     Socket(Socket&& other) noexcept;
     Socket& operator=(Socket&& other) noexcept;
 
-    virtual ~Socket();
+    ~Socket() override;
 
     /// @params idle the time (in seconds) the connection needs to remain
     ///         idle before TCP starts sending keepalive probes.
@@ -75,8 +100,8 @@ public:
     /// @params nodelay whether to enable TCP_NODELAY
     void SetTcpNoDelay(bool nodelay) noexcept;
 
-    virtual std::unique_ptr<InputStream> makeInputStream() const;
-    virtual std::unique_ptr<OutputStream> makeOutputStream() const;
+    std::unique_ptr<InputStream> makeInputStream() const override;
+    std::unique_ptr<OutputStream> makeOutputStream() const override;
 
 protected:
     Socket(const Socket&) = delete;
@@ -84,6 +109,19 @@ protected:
     void Close();
 
     SOCKET handle_;
+};
+
+
+class NonSecureSocketFactory : public SocketFactory {
+public:
+    ~NonSecureSocketFactory() override;
+
+    std::unique_ptr<SocketBase> connect(const ClientOptions& opts) override;
+
+protected:
+    virtual std::unique_ptr<Socket> doConnect(const NetworkAddress& address);
+
+    void setSocketOptions(Socket& socket, const ClientOptions& opts);
 };
 
 

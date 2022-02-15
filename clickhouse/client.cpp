@@ -80,9 +80,27 @@ std::ostream& operator<<(std::ostream& os, const ClientOptions& opt) {
     return os;
 }
 
+
+namespace {
+
+std::unique_ptr<SocketFactory> GetSocketFactory(const ClientOptions& opts) {
+    (void)opts;
+#if defined(WITH_OPENSSL)
+    if (opts.ssl_options.use_ssl)
+        return std::make_unique<SSLSocketFactory>(opts);
+    else
+#endif
+        return std::make_unique<NonSecureSocketFactory>();
+}
+
+}
+
+
 class Client::Impl {
 public:
      Impl(const ClientOptions& opts);
+     Impl(const ClientOptions& opts,
+          std::unique_ptr<SocketFactory> socket_factory);
     ~Impl();
 
     void ExecuteQuery(Query query);
@@ -120,6 +138,8 @@ private:
 
     void WriteBlock(const Block& block, OutputStream& output);
 
+    void InitializeStreams(std::unique_ptr<SocketBase>&& socket);
+
 private:
     /// In case of network errors tries to reconnect to server and
     /// call fuc several times.
@@ -152,9 +172,11 @@ private:
     QueryEvents* events_;
     int compression_ = CompressionState::Disable;
 
+    std::unique_ptr<SocketFactory> socket_factory_;
+
     std::unique_ptr<InputStream> input_;
     std::unique_ptr<OutputStream> output_;
-    std::unique_ptr<Socket> socket_;
+    std::unique_ptr<SocketBase> socket_;
 
 #if defined(WITH_OPENSSL)
     std::unique_ptr<SSLContext> ssl_context_;
@@ -165,11 +187,14 @@ private:
 
 
 Client::Impl::Impl(const ClientOptions& opts)
+    : Impl(opts, GetSocketFactory(opts)) {}
+
+Client::Impl::Impl(const ClientOptions& opts,
+                   std::unique_ptr<SocketFactory> socket_factory)
     : options_(opts)
     , events_(nullptr)
+    , socket_factory_(std::move(socket_factory))
 {
-    // TODO: throw on big-endianness of platform
-
     for (unsigned int i = 0; ; ) {
         try {
             ResetConnection();
@@ -179,7 +204,7 @@ Client::Impl::Impl(const ClientOptions& opts)
                 throw;
             }
 
-            std::this_thread::sleep_for(options_.retry_timeout);
+            socket_factory_->sleepFor(options_.retry_timeout);
         }
     }
 
@@ -290,57 +315,7 @@ void Client::Impl::Ping() {
 }
 
 void Client::Impl::ResetConnection() {
-
-    std::unique_ptr<Socket> socket;
-
-    const auto address = NetworkAddress(options_.host, std::to_string(options_.port));
-#if defined(WITH_OPENSSL)
-    // TODO: maybe do not re-create context multiple times upon reconnection - that doesn't make sense.
-    std::unique_ptr<SSLContext> ssl_context;
-    if (options_.ssl_options.use_ssl) {
-        const auto ssl_options = options_.ssl_options;
-        const auto ssl_params = SSLParams {
-                ssl_options.path_to_ca_files,
-                ssl_options.path_to_ca_directory,
-                ssl_options.use_default_ca_locations,
-                ssl_options.context_options,
-                ssl_options.min_protocol_version,
-                ssl_options.max_protocol_version,
-                ssl_options.use_sni
-        };
-
-        if (ssl_options.ssl_context)
-            ssl_context = std::make_unique<SSLContext>(*ssl_options.ssl_context);
-        else {
-            ssl_context = std::make_unique<SSLContext>(ssl_params);
-        }
-
-        socket = std::make_unique<SSLSocket>(address, ssl_params, *ssl_context);
-    }
-    else
-#endif
-        socket = std::make_unique<Socket>(address);
-
-    if (options_.tcp_keepalive) {
-        socket->SetTcpKeepAlive(
-                static_cast<int>(options_.tcp_keepalive_idle.count()),
-                static_cast<int>(options_.tcp_keepalive_intvl.count()),
-                static_cast<int>(options_.tcp_keepalive_cnt));
-    }
-    if (options_.tcp_nodelay) {
-        socket->SetTcpNoDelay(options_.tcp_nodelay);
-    }
-
-    std::unique_ptr<OutputStream> output = std::make_unique<BufferedOutput>(socket->makeOutputStream());
-    std::unique_ptr<InputStream> input = std::make_unique<BufferedInput>(socket->makeInputStream());
-
-    std::swap(input, input_);
-    std::swap(output, output_);
-    std::swap(socket, socket_);
-
-#if defined(WITH_OPENSSL)
-    std::swap(ssl_context_, ssl_context);
-#endif
+    InitializeStreams(socket_factory_->connect(options_));
 
     if (!Handshake()) {
         throw std::runtime_error("fail to connect to " + options_.host);
@@ -695,6 +670,15 @@ void Client::Impl::SendData(const Block& block) {
     output_->Flush();
 }
 
+void Client::Impl::InitializeStreams(std::unique_ptr<SocketBase>&& socket) {
+    std::unique_ptr<OutputStream> output = std::make_unique<BufferedOutput>(socket->makeOutputStream());
+    std::unique_ptr<InputStream> input = std::make_unique<BufferedInput>(socket->makeInputStream());
+
+    std::swap(input, input_);
+    std::swap(output, output_);
+    std::swap(socket, socket_);
+}
+
 bool Client::Impl::SendHello() {
     WireFormat::WriteUInt64(*output_,  ClientCodes::Hello);
     WireFormat::WriteString(*output_,  std::string(DBMS_NAME) + " client");
@@ -767,7 +751,7 @@ void Client::Impl::RetryGuard(std::function<void()> func) {
             bool ok = true;
 
             try {
-                std::this_thread::sleep_for(options_.retry_timeout);
+                socket_factory_->sleepFor(options_.retry_timeout);
                 ResetConnection();
             } catch (...) {
                 ok = false;
@@ -783,6 +767,13 @@ void Client::Impl::RetryGuard(std::function<void()> func) {
 Client::Client(const ClientOptions& opts)
     : options_(opts)
     , impl_(new Impl(opts))
+{
+}
+
+Client::Client(const ClientOptions& opts,
+               std::unique_ptr<SocketFactory> socket_factory)
+    : options_(opts)
+    , impl_(new Impl(opts, std::move(socket_factory)))
 {
 }
 
