@@ -62,6 +62,11 @@ TEST(TypesCase, EnumTypes) {
     ASSERT_EQ((++enum16->As<EnumType>()->BeginValueToName())->second, "Red");
 }
 
+TEST(TypesCase, EnumTypesEmpty) {
+    ASSERT_EQ("Enum8()", Type::CreateEnum8({})->GetName());
+    ASSERT_EQ("Enum16()", Type::CreateEnum16({})->GetName());
+}
+
 TEST(TypesCase, DecimalTypes) {
     // TODO: implement this test.
 }
