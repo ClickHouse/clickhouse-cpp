@@ -75,3 +75,4 @@ client.Select("SELECT id, name FROM test.numbers", [] (const Block& block)
 /// Delete table.
 client.Execute("DROP TABLE test.numbers");
 ```
+Please note that `Client` instance is NOT thread-safe. I.e. you must create a separate `Client` for each thread or utilize some synchronization techniques.
