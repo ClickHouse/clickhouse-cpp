@@ -117,9 +117,9 @@ uint64_t Type::GetTypeUniqueId() const {
         case LowCardinality: {
             // For complex types, exact unique ID depends on nested types and/or parameters,
             // the easiest way is to lazy-compute unique ID from name once.
-            // Here we do not care if multiple thread are computing value simultaneosly since:
-            //   1. it is going to be the same
-            //   2. it is going to be stored atomically
+            // Here we do not care if multiple threads are computing value simultaneosly since it is both:
+            //   1. going to be the same
+            //   2. going to be stored atomically
 
             if (type_unique_id_ == 0) {
                 const auto name = GetName();
@@ -129,6 +129,8 @@ uint64_t Type::GetTypeUniqueId() const {
             return type_unique_id_;
         }
     }
+    assert(false);
+    return 0;
 }
 
 TypeRef Type::CreateArray(TypeRef item_type) {
