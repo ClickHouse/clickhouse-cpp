@@ -99,7 +99,7 @@ uint64_t Type::GetTypeUniqueId() const {
         case IPv4:
         case IPv6:
         case Date:
-            // For non-parametric types, unique ID is the same as Type::Code
+            // For simple types, unique ID is the same as Type::Code
             return code_;
 
         case FixedString:
@@ -115,7 +115,7 @@ uint64_t Type::GetTypeUniqueId() const {
         case Decimal64:
         case Decimal128:
         case LowCardinality: {
-            // For paramatric types, exact unique ID depends on nested types and/or parameters,
+            // For complex types, exact unique ID depends on nested types and/or parameters,
             // the easiest way is to lazy-compute unique ID from name once.
             // Here we do not care if multiple thread are computing value simultaneosly since:
             //   1. it is going to be the same
