@@ -1,10 +1,15 @@
 #include "types.h"
 
+#include <cityhash/city.h>
+
 #include <stdexcept>
 
 namespace clickhouse {
 
-Type::Type(const Code code) : code_(code) {}
+Type::Type(const Code code)
+    : code_(code)
+    , type_unique_id_(0)
+{}
 
 std::string Type::GetName() const {
     switch (code_) {
@@ -70,6 +75,60 @@ std::string Type::GetName() const {
 
     // XXX: NOT REACHED!
     return std::string();
+}
+
+uint64_t Type::GetTypeUniqueId() const {
+    // Helper method to optimize equality checks of types with Type::IsEqual(),
+    // base invariant: types with same names produce same unique id (and hence considered equal).
+    // As an optimization, full type name is constructed at most once, and only for complex types.
+    switch (code_) {
+        case Void:
+        case Int8:
+        case Int16:
+        case Int32:
+        case Int64:
+        case Int128:
+        case UInt8:
+        case UInt16:
+        case UInt32:
+        case UInt64:
+        case UUID:
+        case Float32:
+        case Float64:
+        case String:
+        case IPv4:
+        case IPv6:
+        case Date:
+            // For non-parametric types, unique ID is the same as Type::Code
+            return code_;
+
+        case FixedString:
+        case DateTime:
+        case DateTime64:
+        case Array:
+        case Nullable:
+        case Tuple:
+        case Enum8:
+        case Enum16:
+        case Decimal:
+        case Decimal32:
+        case Decimal64:
+        case Decimal128:
+        case LowCardinality: {
+            // For paramatric types, exact unique ID depends on nested types and/or parameters,
+            // the easiest way is to lazy-compute unique ID from name once.
+            // Here we do not care if multiple thread are computing value simultaneosly since:
+            //   1. it is going to be the same
+            //   2. it is going to be stored atomically
+
+            if (type_unique_id_ == 0) {
+                const auto name = GetName();
+                type_unique_id_ = CityHash64WithSeed(name.c_str(), name.size(), code_);
+            }
+
+            return type_unique_id_;
+        }
+    }
 }
 
 TypeRef Type::CreateArray(TypeRef item_type) {
