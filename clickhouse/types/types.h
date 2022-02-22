@@ -2,6 +2,7 @@
 
 #include "absl/numeric/int128.h"
 
+#include <atomic>
 #include <map>
 #include <memory>
 #include <string>
@@ -73,7 +74,12 @@ public:
     std::string GetName() const;
 
     /// Is given type same as current one.
-    bool IsEqual(const Type& other) const { return this->GetName() == other.GetName(); }
+    bool IsEqual(const Type& other) const {
+        return this == &other
+                // GetTypeUniqueId() is relatively heavy, so avoid calling it when comparing obviously different types.
+                || (this->GetCode() == other.GetCode() && this->GetTypeUniqueId() == other.GetTypeUniqueId());
+    }
+
     bool IsEqual(const TypeRef& other) const { return IsEqual(*other); }
 
 public:
@@ -113,7 +119,10 @@ public:
     static TypeRef CreateLowCardinality(TypeRef item_type);
 
 private:
+    uint64_t GetTypeUniqueId() const;
+
     const Code code_;
+    mutable std::atomic<uint64_t> type_unique_id_;
 };
 
 inline bool operator==(const Type & left, const Type & right) {
