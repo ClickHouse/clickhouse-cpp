@@ -28,7 +28,8 @@ SET ( clickhouse-cpp-lib-src
 
     block.cpp
     client.cpp
-    query.cpp
+        thread_safe_client.cpp
+        query.cpp
 )
 
 IF (WITH_OPENSSL)
