@@ -2,7 +2,6 @@ SET ( clickhouse-cpp-lib-src
     base/compressed.cpp
     base/input.cpp
     base/output.cpp
-    base/platform.cpp
     base/socket.cpp
     base/wire_format.cpp
 
@@ -35,19 +34,20 @@ IF (WITH_OPENSSL)
     LIST(APPEND clickhouse-cpp-lib-src base/sslsocket.cpp)
 ENDIF ()
 
-ADD_LIBRARY (clickhouse-cpp-lib SHARED ${clickhouse-cpp-lib-src})
-SET_TARGET_PROPERTIES(clickhouse-cpp-lib PROPERTIES LINKER_LANGUAGE CXX)
-TARGET_LINK_LIBRARIES (clickhouse-cpp-lib
-    absl-lib
-    cityhash-lib
-    lz4-lib
-)
+ADD_LIBRARY (clickhouse-cpp OBJECT ${clickhouse-cpp-lib-src})
+set_property(TARGET clickhouse-cpp PROPERTY POSITION_INDEPENDENT_CODE ON)
+SET_TARGET_PROPERTIES(clickhouse-cpp PROPERTIES LINKER_LANGUAGE CXX)
 
-ADD_LIBRARY (clickhouse-cpp-lib-static STATIC ${clickhouse-cpp-lib-src})
-TARGET_LINK_LIBRARIES (clickhouse-cpp-lib-static
-    absl-lib
-    cityhash-lib
-    lz4-lib
+ADD_LIBRARY (clickhouse-cpp-lib-static STATIC $<TARGET_OBJECTS:clickhouse-cpp>)
+ADD_LIBRARY (clickhouse-cpp-lib        SHARED $<TARGET_OBJECTS:clickhouse-cpp>)
+
+TARGET_LINK_LIBRARIES(clickhouse-cpp-lib
+    PUBLIC absl-lib
+    PRIVATE cityhash-lib lz4-lib
+)
+TARGET_LINK_LIBRARIES(clickhouse-cpp-lib-static
+    PUBLIC absl-lib
+    PRIVATE cityhash-lib lz4-lib
 )
 
 IF (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
@@ -61,8 +61,7 @@ IF (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     # /usr/bin/ld: CMakeFiles/simple-test.dir/main.cpp.o: undefined reference to symbol '_Unwind_Resume@@GCC_3.0'
     # /usr/bin/ld: /lib/x86_64-linux-gnu/libgcc_s.so.1: error adding symbols: DSO missing from command line
     # FIXME: that workaround breaks clang build on mingw
-    TARGET_LINK_LIBRARIES (clickhouse-cpp-lib gcc_s)
-    TARGET_LINK_LIBRARIES (clickhouse-cpp-lib-static gcc_s)
+    TARGET_LINK_LIBRARIES(clickhouse-cpp PRIVATE gcc_s)
 ENDIF ()
 
 INSTALL (TARGETS clickhouse-cpp-lib clickhouse-cpp-lib-static
@@ -114,11 +113,13 @@ INSTALL(FILES types/type_parser.h DESTINATION include/clickhouse/types/)
 INSTALL(FILES types/types.h DESTINATION include/clickhouse/types/)
 
 IF (WITH_OPENSSL)
-    TARGET_LINK_LIBRARIES (clickhouse-cpp-lib OpenSSL::SSL)
-    TARGET_LINK_LIBRARIES (clickhouse-cpp-lib-static OpenSSL::SSL)
+    TARGET_LINK_LIBRARIES (clickhouse-cpp PUBLIC OpenSSL::SSL)
+    TARGET_LINK_LIBRARIES (clickhouse-cpp-lib PUBLIC OpenSSL::SSL)
+    TARGET_LINK_LIBRARIES (clickhouse-cpp-lib-static PUBLIC OpenSSL::SSL)
 ENDIF ()
 
 IF (WIN32 OR MINGW)
-    TARGET_LINK_LIBRARIES (clickhouse-cpp-lib wsock32 ws2_32)
-    TARGET_LINK_LIBRARIES (clickhouse-cpp-lib-static wsock32 ws2_32)
+    TARGET_LINK_LIBRARIES (clickhouse-cpp PUBLIC wsock32 ws2_32)
+    TARGET_LINK_LIBRARIES (clickhouse-cpp-lib PUBLIC wsock32 ws2_32)
+    TARGET_LINK_LIBRARIES (clickhouse-cpp-lib-static PUBLIC wsock32 ws2_32)
 ENDIF ()
