@@ -890,7 +890,7 @@ TEST_P(ClientCase, Query_ID) {
                     " WHERE type = 'QueryStart' AND query_id == '" + query_id +"'",
         [&total_count](const Block & block) {
             total_count += block.GetRowCount();
-            std::cerr << PrettyPrintBlock{block} << std::endl;
+//            std::cerr << PrettyPrintBlock{block} << std::endl;
     });
 
     // We've executed 5 queries with explicit query_id, hence we expect to see 5 entries in logs.
