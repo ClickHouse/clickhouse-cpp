@@ -58,6 +58,8 @@ inline const char * getPrefix() {
         prefix = "c";
     } else if constexpr (std::ratio_equal_v<R, std::deci>) {
         prefix = "d";
+    } else if constexpr (std::ratio_equal_v<R, std::ratio<1, 1>>) {
+        prefix = "";
     } else {
         static_assert("Unsupported ratio");
     }

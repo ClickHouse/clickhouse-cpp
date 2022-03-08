@@ -1,10 +1,14 @@
 #include <clickhouse/client.h>
+
 #include "readonly_client_test.h"
 #include "connection_failed_client_test.h"
 #include "utils.h"
+
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <thread>
+#include <chrono>
 
 using namespace clickhouse;
 
@@ -882,7 +886,19 @@ TEST_P(ClientCase, Query_ID) {
     client_->SelectCancelable("SELECT 'b', count(*) FROM " + table_name, query_id, [](const Block &) { return true; });
     client_->Execute(Query("TRUNCATE TABLE " + table_name, query_id));
 
-    client_->Execute("SYSTEM FLUSH LOGS");
+    try {
+        client_->Execute("SYSTEM FLUSH LOGS");
+    } catch (const std::exception & e) {
+        // DB::Exception: clickhouse_cpp_cicd: Not enough privileges. To execute this query it's necessary to have grant SYSTEM FLUSH LOGS ON
+        if (std::string(e.what()).find("To execute this query it's necessary to have grant SYSTEM FLUSH LOGS ON") != std::string::npos) {
+            // Insufficient privileges, the only safe way is to wait long enough for system
+            // to flush the logs automaticaly. Usualy it takes 7.5 seconds, so just in case,
+            // wait 3 times that to ensure that all previously executed queries are in the logs now.
+            const auto wait_duration = std::chrono::seconds(23);
+            std::cerr << "Got error while flushing logs, now we wait " << wait_duration << "..." << std::endl;
+            std::this_thread::sleep_for(wait_duration);
+        }
+    }
 
     size_t total_count = 0;
     client_->Select("SELECT type, query_kind, query_id, query "
