@@ -78,7 +78,7 @@ using my_result_of_t =
 #if __cplusplus >= 201703L
     std::invoke_result_t<F, ArgTypes...>;
 #else
-    std::result_of_t<F()>;
+    std::result_of_t<F(ArgTypes...)>;
 #endif
 
 template <typename MeasureFunc>

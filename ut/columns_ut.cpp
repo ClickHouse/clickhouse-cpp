@@ -95,7 +95,7 @@ static const auto LOWCARDINALITY_STRING_FOOBAR_10_ITEMS_BINARY =
 
 template <typename Generator>
 auto GenerateVector(size_t items, Generator && gen) {
-    std::vector<my_result_of_t<Generator(size_t)>> result;
+    std::vector<my_result_of_t<Generator, size_t>> result;
     result.reserve(items);
     for (size_t i = 0; i < items; ++i) {
         result.push_back(std::move(gen(i)));
