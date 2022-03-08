@@ -12,13 +12,14 @@
 #include <clickhouse/columns/ip6.h>
 #include <clickhouse/base/input.h>
 #include <clickhouse/base/output.h>
+#include <clickhouse/base/socket.h> // for ipv4-ipv6 platform-specific stuff
 
 #include <gtest/gtest.h>
 #include "utils.h"
 
 #include <string_view>
+#include <sstream>
 
-#include <clickhouse/base/socket.h> // for ipv4-ipv6 platform-specific stuff
 
 // only compare PODs of equal size this way
 template <typename L, typename R, typename
@@ -95,7 +96,7 @@ static const auto LOWCARDINALITY_STRING_FOOBAR_10_ITEMS_BINARY =
 
 template <typename Generator>
 auto GenerateVector(size_t items, Generator && gen) {
-    std::vector<my_result_of_t<Generator(size_t)>> result;
+    std::vector<my_result_of_t<Generator, size_t>> result;
     result.reserve(items);
     for (size_t i = 0; i < items; ++i) {
         result.push_back(std::move(gen(i)));
@@ -950,6 +951,19 @@ TEST(ColumnsCase, LowCardinalityAsWrappedColumn) {
 
     ASSERT_EQ(Type::FixedString, CreateColumnByType("LowCardinality(FixedString(10000))", create_column_settings)->GetType().GetCode());
     ASSERT_EQ(Type::FixedString, CreateColumnByType("LowCardinality(FixedString(10000))", create_column_settings)->As<ColumnFixedString>()->GetType().GetCode());
+}
+
+TEST(ColumnsCase, ArrayOfDecimal) {
+    auto column = std::make_shared<clickhouse::ColumnDecimal>(18, 10);
+    auto array = std::make_shared<clickhouse::ColumnArray>(column->Slice(0, 0));
+
+    column->Append("1");
+    column->Append("2");
+    EXPECT_EQ(2u, column->Size());
+
+    array->AppendAsColumn(column);
+    ASSERT_EQ(1u, array->Size());
+    EXPECT_EQ(2u, array->GetAsColumn(0)->Size());
 }
 
 

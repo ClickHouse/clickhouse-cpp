@@ -31,7 +31,7 @@ void LocalTcpServer::start() {
     sockaddr_in servAddr;
     memset((char*)&servAddr, 0, sizeof(servAddr));
     servAddr.sin_family = AF_INET;
-    servAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    servAddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
     servAddr.sin_port = htons(port_);
     serverSd_ = socket(AF_INET, SOCK_STREAM, 0);
     if (serverSd_ < 0) {
@@ -52,8 +52,11 @@ void LocalTcpServer::start() {
     //bind the socket to its local address
     int bindStatus = bind(serverSd_, (struct sockaddr*) &servAddr, sizeof(servAddr));
     if (bindStatus < 0) {
-        std::cerr << "Error binding socket to local address" << std::endl;
-        throw std::runtime_error("Error binding socket to local address");
+        auto err = errno;
+        const char * error = strerror(err);
+
+        std::cerr << "Error binding socket to local address: " << error << std::endl;
+        throw std::runtime_error("Error binding socket to local address: " + std::string(error ? error : ""));
     }
     listen(serverSd_, 3);
 }

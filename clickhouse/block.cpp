@@ -10,6 +10,11 @@ Block::Iterator::Iterator(const Block& block)
 {
 }
 
+Block::Iterator::Iterator(const Block& block, Block::Iterator::ConstructAtEndTag /*at_end*/)
+    : block_(block)
+    , idx_(block.GetColumnCount())
+{}
+
 const std::string& Block::Iterator::Name() const {
     return block_.columns_[idx_].name;
 }
@@ -22,8 +27,9 @@ ColumnRef Block::Iterator::Column() const {
     return block_.columns_[idx_].column;
 }
 
-void Block::Iterator::Next() {
+bool Block::Iterator::Next() {
     ++idx_;
+    return IsValid();
 }
 
 bool Block::Iterator::IsValid() const {
@@ -93,6 +99,14 @@ ColumnRef Block::operator [] (size_t idx) const {
     }
 
     throw std::out_of_range("column index is out of range. Index: ["+std::to_string(idx)+"], columns: [" + std::to_string(columns_.size())+"]");
+}
+
+Block::Iterator Block::begin() const {
+    return Iterator(*this);
+}
+
+Block::Iterator Block::end() const {
+    return Iterator(*this, Iterator::ConstructAtEndTag{});
 }
 
 }

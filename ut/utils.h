@@ -1,11 +1,14 @@
 #pragma once
 
+#include <clickhouse/base/platform.h>
+
 #include <chrono>
 #include <cstring>
 #include <ostream>
 #include <ratio>
 #include <system_error>
 #include <vector>
+#include <type_traits>
 
 #include <time.h>
 
@@ -55,6 +58,8 @@ inline const char * getPrefix() {
         prefix = "c";
     } else if constexpr (std::ratio_equal_v<R, std::deci>) {
         prefix = "d";
+    } else if constexpr (std::ratio_equal_v<R, std::ratio<1, 1>>) {
+        prefix = "";
     } else {
         static_assert("Unsupported ratio");
     }
@@ -69,19 +74,19 @@ inline ostream & operator<<(ostream & ostr, const chrono::duration<R, P> & d) {
 }
 }
 
-// Since result_of is deprecated in C++20, and invoke_result_of is unavailable until C++20...
+// Since result_of is deprecated in C++17, and invoke_result_of is unavailable until C++20...
 template <class F, class... ArgTypes>
 using my_result_of_t =
-#if __cplusplus >= 202002L
-    std::invoke_result_of_t<F, ArgTypes...>;
+#if __cplusplus >= 201703L
+    std::invoke_result_t<F, ArgTypes...>;
 #else
-    std::result_of_t<F>;
+    std::result_of_t<F(ArgTypes...)>;
 #endif
 
 template <typename MeasureFunc>
 class MeasuresCollector {
 public:
-    using Result = my_result_of_t<MeasureFunc()>;
+    using Result = my_result_of_t<MeasureFunc>;
 
     explicit MeasuresCollector(MeasureFunc && measurment_func, const size_t preallocate_results = 10)
         : measurment_func_(std::move(measurment_func))
@@ -110,7 +115,13 @@ MeasuresCollector<MeasureFunc> collect(MeasureFunc && f) {
 
 struct in_addr;
 struct in6_addr;
+// Helper for pretty-printing of the Block
+struct PrettyPrintBlock {
+    const clickhouse::Block & block;
+};
+
 std::ostream& operator<<(std::ostream & ostr, const clickhouse::Block & block);
+std::ostream& operator<<(std::ostream & ostr, const PrettyPrintBlock & block);
 std::ostream& operator<<(std::ostream& ostr, const in_addr& addr);
 std::ostream& operator<<(std::ostream& ostr, const in6_addr& addr);
 
@@ -118,6 +129,9 @@ std::ostream& operator<<(std::ostream& ostr, const in6_addr& addr);
 template <typename ResultType = std::string>
 auto getEnvOrDefault(const std::string& env, const char * default_val) {
     const char* v = std::getenv(env.c_str());
+    if (!v && !default_val)
+        throw std::runtime_error("Environment var '" + env + "' is not set.");
+
     const std::string value = v ? v : default_val;
 
     if constexpr (std::is_same_v<ResultType, std::string>) {

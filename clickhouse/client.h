@@ -209,16 +209,19 @@ public:
     /// Intends for execute select queries.  Data will be returned with
     /// one or more call of \p cb.
     void Select(const std::string& query, SelectCallback cb);
+    void Select(const std::string& query, const std::string& query_id, SelectCallback cb);
 
     /// Executes a select query which can be canceled by returning false from
     /// the data handler function \p cb.
     void SelectCancelable(const std::string& query, SelectCancelableCallback cb);
+    void SelectCancelable(const std::string& query, const std::string& query_id, SelectCancelableCallback cb);
 
     /// Alias for Execute.
     void Select(const Query& query);
 
     /// Intends for insert block of data into a table \p table_name.
     void Insert(const std::string& table_name, const Block& block);
+    void Insert(const std::string& table_name, const std::string& query_id, const Block& block);
 
     /// Ping server for aliveness.
     void Ping();

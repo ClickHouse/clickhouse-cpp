@@ -12,6 +12,9 @@
 
 #include <clickhouse/base/socket.h> // for ipv4-ipv6 platform-specific stuff
 
+#include <iomanip>
+#include <sstream>
+
 namespace {
 using namespace clickhouse;
 struct DateTimeValue {
@@ -44,6 +47,28 @@ bool doPrintValue(const ColumnRef & c, const size_t row, std::ostream & ostr) {
     return false;
 }
 
+template <typename ColumnEnumType>
+bool doPrintEnumValue(const ColumnRef & c, const size_t row, std::ostream & ostr) {
+    if (const auto & casted_c = c->As<ColumnEnumType>()) {
+        // via temporary stream to preserve fill and alignment of the ostr
+        std::stringstream sstr;
+        sstr << casted_c->NameAt(row) << " (" << static_cast<int64_t>(casted_c->At(row)) << ")";
+        ostr << sstr.str();
+        return true;
+    }
+    return false;
+}
+
+template <>
+bool doPrintValue<ColumnEnum8>(const ColumnRef & c, const size_t row, std::ostream & ostr) {
+    return doPrintEnumValue<ColumnEnum8>(c, row, ostr);
+}
+
+template <>
+bool doPrintValue<ColumnEnum16>(const ColumnRef & c, const size_t row, std::ostream & ostr) {
+    return doPrintEnumValue<ColumnEnum16>(c, row, ostr);
+}
+
 std::ostream & printColumnValue(const ColumnRef& c, const size_t row, std::ostream & ostr) {
 
     const auto r = false
@@ -73,6 +98,15 @@ std::ostream & printColumnValue(const ColumnRef& c, const size_t row, std::ostre
     return ostr;
 }
 
+struct ColumnValue {
+    const ColumnRef& c;
+    size_t row;
+};
+
+std::ostream & operator<<(std::ostream & ostr, const ColumnValue& v) {
+    return printColumnValue(v.c, v.row, ostr);
+}
+
 }
 
 std::ostream& operator<<(std::ostream & ostr, const Block & block) {
@@ -93,6 +127,59 @@ std::ostream& operator<<(std::ostream & ostr, const Block & block) {
         if (col != block.GetColumnCount() - 1)
             ostr << "\n";
     }
+
+    return ostr;
+}
+
+std::ostream& operator<<(std::ostream & ostr, const PrettyPrintBlock & pretty_print_block) {
+    // Pretty-print block:
+    // - names of each column
+    // - types of each column
+    // - values of column row-by-row
+
+    const auto & block = pretty_print_block.block;
+    if (block.GetRowCount() == 0 || block.GetColumnCount() == 0)
+        return ostr;
+
+    std::vector<int> column_width(block.GetColumnCount());
+    const auto horizontal_bar = '|';
+    const auto cross = '+';
+    const auto vertical_bar = '-';
+
+    std::stringstream sstr;
+    for (auto i = block.begin(); i != block.end(); ++i) {
+        auto width = column_width[i.ColumnIndex()] = std::max(i.Type()->GetName().size(), i.Name().size());
+        sstr << cross << std::setw(width + 2) << std::setfill(vertical_bar) << vertical_bar;
+    }
+    sstr << cross;
+    const std::string split_line(sstr.str());
+
+    ostr << split_line << std::endl;
+    // column name
+    for (auto i = block.begin(); i != block.end(); ++i) {
+        auto width = column_width[i.ColumnIndex()];
+        ostr << horizontal_bar << ' ' << std::setw(width) << i.Name() << ' ';
+    }
+    ostr << horizontal_bar << std::endl;;
+    ostr << split_line << std::endl;
+
+    // column type
+    for (auto i = block.begin(); i != block.end(); ++i) {
+        auto width = column_width[i.ColumnIndex()];
+        ostr << horizontal_bar << ' ' << std::setw(width) << i.Type()->GetName() << ' ';
+    }
+    ostr << horizontal_bar << std::endl;;
+    ostr << split_line << std::endl;
+
+    // values
+    for (size_t row_index = 0; row_index < block.GetRowCount(); ++row_index) {
+        for (auto i = block.begin(); i != block.end(); ++i) {
+            auto width = column_width[i.ColumnIndex()];
+            ostr << horizontal_bar << ' ' << std::setw(width) << ColumnValue{i.Column(), row_index} << ' ';
+        }
+        ostr << horizontal_bar << std::endl;
+    }
+    ostr << split_line << std::endl;
 
     return ostr;
 }

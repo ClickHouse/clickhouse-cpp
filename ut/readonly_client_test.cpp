@@ -31,7 +31,7 @@ TEST_P(ReadonlyClientTest, Select) {
                 std::cout << query << " => "
                           << "\n\trows: " << block.GetRowCount()
                           << ", columns: " << block.GetColumnCount()
-                          << ", data:\n\t" << block << std::endl;
+                          << ", data:\n" << PrettyPrintBlock{block} << std::endl;
             }
         );
     }

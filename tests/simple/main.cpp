@@ -225,7 +225,7 @@ inline void GenericExample(Client& client) {
     /// Select values inserted in the previous step.
     client.Select("SELECT id, name FROM test_client", [](const Block& block)
         {
-            PrintBlock(block);
+            std::cout << PrettyPrintBlock{block} << std::endl;
         }
     );
 

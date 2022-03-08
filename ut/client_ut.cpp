@@ -1,10 +1,14 @@
 #include <clickhouse/client.h>
+
 #include "readonly_client_test.h"
 #include "connection_failed_client_test.h"
 #include "utils.h"
+
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <thread>
+#include <chrono>
 
 using namespace clickhouse;
 
@@ -52,13 +56,9 @@ class ClientCase : public testing::TestWithParam<ClientOptions> {
 protected:
     void SetUp() override {
         client_ = std::make_unique<Client>(GetParam());
-        // client_->Execute("CREATE DATABASE IF NOT EXISTS test_clickhouse_cpp");
     }
 
-    void TearDown() override {
-        //if (client_)
-        //    client_->Execute("DROP DATABASE test_clickhouse_cpp");
-    }
+    void TearDown() override {}
 
     template <typename T>
     std::shared_ptr<T> createTableWithOneColumn(Block & block)
@@ -429,8 +429,7 @@ TEST_P(ClientCase, Numbers) {
 TEST_P(ClientCase, SimpleAggregateFunction) {
     const auto & server_info = client_->GetServerInfo();
     if (versionNumber(server_info) < versionNumber(19, 9)) {
-        std::cout << "Test is skipped since server '" << server_info << "' does not support SimpleAggregateFunction" << std::endl;
-        return;
+        GTEST_SKIP() << "Test is skipped since server '" << server_info << "' does not support SimpleAggregateFunction" << std::endl;
     }
 
     client_->Execute("DROP TEMPORARY TABLE IF EXISTS test_clickhouse_cpp_SimpleAggregateFunction");
@@ -806,8 +805,7 @@ TEST_P(ClientCase, ColEscapeNameTest) {
 TEST_P(ClientCase, DateTime64) {
     const auto & server_info = client_->GetServerInfo();
     if (versionNumber(server_info) < versionNumber(20, 1)) {
-        std::cout << "Test is skipped since server '" << server_info << "' does not support DateTime64" << std::endl;
-        return;
+        GTEST_SKIP() << "Test is skipped since server '" << server_info << "' does not support DateTime64" << std::endl;
     }
 
     Block block;
@@ -864,6 +862,55 @@ TEST_P(ClientCase, DateTime64) {
     );
 
     ASSERT_EQ(total_rows, data.size());
+}
+
+TEST_P(ClientCase, Query_ID) {
+    const auto server_info = client_->GetServerInfo();
+
+    std::srand(std::time(nullptr) + reinterpret_cast<int64_t>(&server_info));
+    const auto * test_info = ::testing::UnitTest::GetInstance()->current_test_info();
+    const std::string query_id = std::to_string(std::rand()) + "-" + test_info->test_suite_name() + "/" + test_info->name();
+
+    SCOPED_TRACE(query_id);
+
+    const std::string table_name = "test_clickhouse_cpp_query_id_test";
+    client_->Execute(Query("CREATE TEMPORARY TABLE IF NOT EXISTS " + table_name + " (a Int64)", query_id));
+
+    {
+        Block b;
+        b.AppendColumn("a", std::make_shared<ColumnInt64>(std::vector<int64_t>{1, 2, 3}));
+        client_->Insert(table_name, query_id, b);
+    }
+
+    client_->Select("SELECT 'a', count(*) FROM " + table_name, query_id, [](const Block &) {});
+    client_->SelectCancelable("SELECT 'b', count(*) FROM " + table_name, query_id, [](const Block &) { return true; });
+    client_->Execute(Query("TRUNCATE TABLE " + table_name, query_id));
+
+    try {
+        client_->Execute("SYSTEM FLUSH LOGS");
+    } catch (const std::exception & e) {
+        // DB::Exception: clickhouse_cpp_cicd: Not enough privileges. To execute this query it's necessary to have grant SYSTEM FLUSH LOGS ON
+        if (std::string(e.what()).find("To execute this query it's necessary to have grant SYSTEM FLUSH LOGS ON") != std::string::npos) {
+            // Insufficient privileges, the only safe way is to wait long enough for system
+            // to flush the logs automaticaly. Usualy it takes 7.5 seconds, so just in case,
+            // wait 3 times that to ensure that all previously executed queries are in the logs now.
+            const auto wait_duration = std::chrono::seconds(23);
+            std::cerr << "Got error while flushing logs, now we wait " << wait_duration << "..." << std::endl;
+            std::this_thread::sleep_for(wait_duration);
+        }
+    }
+
+    size_t total_count = 0;
+    client_->Select("SELECT type, query_kind, query_id, query "
+                    " FROM system.query_log "
+                    " WHERE type = 'QueryStart' AND query_id == '" + query_id +"'",
+        [&total_count](const Block & block) {
+            total_count += block.GetRowCount();
+//            std::cerr << PrettyPrintBlock{block} << std::endl;
+    });
+
+    // We've executed 5 queries with explicit query_id, hence we expect to see 5 entries in logs.
+    EXPECT_EQ(5u, total_count);
 }
 
 const auto LocalHostEndpoint = ClientOptions()

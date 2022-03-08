@@ -1,5 +1,6 @@
 #include <clickhouse/types/types.h>
 #include <clickhouse/columns/factory.h>
+#include <ut/utils.h>
 
 #include <gtest/gtest.h>
 

@@ -35,8 +35,7 @@ ColumnRef ColumnArray::Slice(size_t begin, size_t size) const {
     auto result = std::make_shared<ColumnArray>(GetAsColumn(begin));
     result->OffsetsIncrease(1);
 
-    for (size_t i = 1; i < size; i++)
-    {
+    for (size_t i = 1; i < size; i++) {
         result->Append(std::make_shared<ColumnArray>(GetAsColumn(begin + i)));
     }
 

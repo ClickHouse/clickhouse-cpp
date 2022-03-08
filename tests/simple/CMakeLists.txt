@@ -1,10 +1,10 @@
 ADD_EXECUTABLE (simple-test
     ../../ut/utils.cpp
-	main.cpp
+    main.cpp
 )
 
 TARGET_LINK_LIBRARIES (simple-test
-	clickhouse-cpp-lib-static
+    clickhouse-cpp-lib-static
 )
 
 IF (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
