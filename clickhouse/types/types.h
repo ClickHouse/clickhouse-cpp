@@ -75,6 +75,7 @@ public:
 
     /// Is given type same as current one.
     bool IsEqual(const Type& other) const {
+        // Types are equal only if both code_ and type_unique_id_ are equal.
         return this == &other
                 // GetTypeUniqueId() is relatively heavy, so avoid calling it when comparing obviously different types.
                 || (this->GetCode() == other.GetCode() && this->GetTypeUniqueId() == other.GetTypeUniqueId());
