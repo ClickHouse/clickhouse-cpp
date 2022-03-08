@@ -8,6 +8,7 @@
 #include <ratio>
 #include <system_error>
 #include <vector>
+#include <type_traits>
 
 #include <time.h>
 
@@ -71,22 +72,19 @@ inline ostream & operator<<(ostream & ostr, const chrono::duration<R, P> & d) {
 }
 }
 
-#ifdef _win_
-#define _SILENCE_CXX17_RESULT_OF_DEPRECATION_WARNING 1
-#endif
-// Since result_of is deprecated in C++20, and invoke_result_of is unavailable until C++20...
+// Since result_of is deprecated in C++17, and invoke_result_of is unavailable until C++20...
 template <class F, class... ArgTypes>
 using my_result_of_t =
-#if __cplusplus >= 202002L
-    std::invoke_result_of_t<F, ArgTypes...>;
+#if __cplusplus >= 201703L
+    std::invoke_result_t<F, ArgTypes...>;
 #else
-    std::result_of_t<F>;
+    std::result_of_t<F()>;
 #endif
 
 template <typename MeasureFunc>
 class MeasuresCollector {
 public:
-    using Result = my_result_of_t<MeasureFunc()>;
+    using Result = my_result_of_t<MeasureFunc>;
 
     explicit MeasuresCollector(MeasureFunc && measurment_func, const size_t preallocate_results = 10)
         : measurment_func_(std::move(measurment_func))
