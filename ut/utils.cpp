@@ -13,6 +13,7 @@
 #include <clickhouse/base/socket.h> // for ipv4-ipv6 platform-specific stuff
 
 #include <iomanip>
+#include <sstream>
 
 namespace {
 using namespace clickhouse;
@@ -46,9 +47,9 @@ bool doPrintValue(const ColumnRef & c, const size_t row, std::ostream & ostr) {
     return false;
 }
 
-template <>
-bool doPrintValue<ColumnEnum8>(const ColumnRef & c, const size_t row, std::ostream & ostr) {
-    if (const auto & casted_c = c->As<ColumnEnum8>()) {
+template <typename ColumnEnumType>
+bool doPrintEnumValue(const ColumnRef & c, const size_t row, std::ostream & ostr) {
+    if (const auto & casted_c = c->As<ColumnEnumType>()) {
         // via temporary stream to preserve fill and alignment of the ostr
         std::stringstream sstr;
         sstr << casted_c->NameAt(row) << " (" << static_cast<int64_t>(casted_c->At(row)) << ")";
@@ -59,14 +60,13 @@ bool doPrintValue<ColumnEnum8>(const ColumnRef & c, const size_t row, std::ostre
 }
 
 template <>
+bool doPrintValue<ColumnEnum8>(const ColumnRef & c, const size_t row, std::ostream & ostr) {
+    return doPrintEnumValue<ColumnEnum8>(c, row, ostr);
+}
+
+template <>
 bool doPrintValue<ColumnEnum16>(const ColumnRef & c, const size_t row, std::ostream & ostr) {
-    if (const auto & casted_c = c->As<ColumnEnum16>()) {
-        std::stringstream sstr;
-        sstr << casted_c->NameAt(row) << " (" << static_cast<int64_t>(casted_c->At(row)) << ")";
-        ostr << sstr.str();
-        return true;
-    }
-    return false;
+    return doPrintEnumValue<ColumnEnum16>(c, row, ostr);
 }
 
 std::ostream & printColumnValue(const ColumnRef& c, const size_t row, std::ostream & ostr) {
@@ -152,7 +152,7 @@ std::ostream& operator<<(std::ostream & ostr, const PrettyPrintBlock & pretty_pr
         sstr << cross << std::setw(width + 2) << std::setfill(vertical_bar) << vertical_bar;
     }
     sstr << cross;
-    const auto split_line = sstr.str();
+    const std::string split_line(sstr.str());
 
     ostr << split_line << std::endl;
     // column name

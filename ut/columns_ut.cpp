@@ -12,13 +12,14 @@
 #include <clickhouse/columns/ip6.h>
 #include <clickhouse/base/input.h>
 #include <clickhouse/base/output.h>
+#include <clickhouse/base/socket.h> // for ipv4-ipv6 platform-specific stuff
 
 #include <gtest/gtest.h>
 #include "utils.h"
 
 #include <string_view>
+#include <sstream>
 
-#include <clickhouse/base/socket.h> // for ipv4-ipv6 platform-specific stuff
 
 // only compare PODs of equal size this way
 template <typename L, typename R, typename
