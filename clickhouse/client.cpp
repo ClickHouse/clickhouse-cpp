@@ -116,7 +116,7 @@ public:
 
     void SendCancel();
 
-    void Insert(const std::string& table_name, const Block& block);
+    void Insert(const std::string& table_name, const std::string& query_id, const Block& block);
 
     void Ping();
 
@@ -129,7 +129,7 @@ private:
 
     bool ReceivePacket(uint64_t* server_packet = nullptr);
 
-    void SendQuery(const std::string& query);
+    void SendQuery(const std::string& query, const std::string& query_id);
 
     void SendData(const Block& block);
 
@@ -232,7 +232,7 @@ void Client::Impl::ExecuteQuery(Query query) {
         RetryGuard([this]() { Ping(); });
     }
 
-    SendQuery(query.GetText());
+    SendQuery(query.GetText(), query.GetQueryID());
 
     while (ReceivePacket()) {
         ;
@@ -258,13 +258,13 @@ std::string NameToQueryString(const std::string &input)
     return output;
 }
 
-void Client::Impl::Insert(const std::string& table_name, const Block& block) {
+void Client::Impl::Insert(const std::string& table_name, const std::string& query_id, const Block& block) {
     if (options_.ping_before_query) {
         RetryGuard([this]() { Ping(); });
     }
 
     std::stringstream fields_section;
-		const auto num_columns = block.GetColumnCount();
+        const auto num_columns = block.GetColumnCount();
 
     for (unsigned int i = 0; i < num_columns; ++i) {
         if (i == num_columns - 1) {
@@ -274,7 +274,7 @@ void Client::Impl::Insert(const std::string& table_name, const Block& block) {
         }
     }
 
-    SendQuery("INSERT INTO " + table_name + " ( " + fields_section.str() + " ) VALUES");
+    SendQuery("INSERT INTO " + table_name + " ( " + fields_section.str() + " ) VALUES", query_id);
 
     uint64_t server_packet;
     // Receive data packet.
@@ -371,22 +371,22 @@ bool Client::Impl::ReceivePacket(uint64_t* server_packet) {
     case ServerCodes::ProfileInfo: {
         Profile profile;
 
-        if (!WireFormat::ReadUInt64(*input_,  &profile.rows)) {
+        if (!WireFormat::ReadUInt64(*input_, &profile.rows)) {
             return false;
         }
-        if (!WireFormat::ReadUInt64(*input_,  &profile.blocks)) {
+        if (!WireFormat::ReadUInt64(*input_, &profile.blocks)) {
             return false;
         }
-        if (!WireFormat::ReadUInt64(*input_,  &profile.bytes)) {
+        if (!WireFormat::ReadUInt64(*input_, &profile.bytes)) {
             return false;
         }
-        if (!WireFormat::ReadFixed(*input_,  &profile.applied_limit)) {
+        if (!WireFormat::ReadFixed(*input_, &profile.applied_limit)) {
             return false;
         }
-        if (!WireFormat::ReadUInt64(*input_,  &profile.rows_before_limit)) {
+        if (!WireFormat::ReadUInt64(*input_, &profile.rows_before_limit)) {
             return false;
         }
-        if (!WireFormat::ReadFixed(*input_,  &profile.calculated_rows_before_limit)) {
+        if (!WireFormat::ReadFixed(*input_, &profile.calculated_rows_before_limit)) {
             return false;
         }
 
@@ -400,14 +400,14 @@ bool Client::Impl::ReceivePacket(uint64_t* server_packet) {
     case ServerCodes::Progress: {
         Progress info;
 
-        if (!WireFormat::ReadUInt64(*input_,  &info.rows)) {
+        if (!WireFormat::ReadUInt64(*input_, &info.rows)) {
             return false;
         }
-        if (!WireFormat::ReadUInt64(*input_,  &info.bytes)) {
+        if (!WireFormat::ReadUInt64(*input_, &info.bytes)) {
             return false;
         }
         if (REVISION >= DBMS_MIN_REVISION_WITH_TOTAL_ROWS_IN_PROGRESS) {
-            if (!WireFormat::ReadUInt64(*input_,  &info.total_rows)) {
+            if (!WireFormat::ReadUInt64(*input_, &info.total_rows)) {
                 return false;
             }
         }
@@ -489,7 +489,7 @@ bool Client::Impl::ReadBlock(InputStream& input, Block* block) {
 
         if (ColumnRef col = CreateColumnByType(type, create_column_settings)) {
             if (num_rows && !col->Load(&input, num_rows)) {
-                throw std::runtime_error("can't load");
+                throw std::runtime_error("can't load column '" + name + "' of type " + type);
             }
 
             block->AppendColumn(name, col);
@@ -539,23 +539,23 @@ bool Client::Impl::ReceiveException(bool rethrow) {
     do {
         bool has_nested = false;
 
-        if (!WireFormat::ReadFixed(*input_,  &current->code)) {
+        if (!WireFormat::ReadFixed(*input_, &current->code)) {
            exception_received = false;
            break;
         }
-        if (!WireFormat::ReadString(*input_,  &current->name)) {
+        if (!WireFormat::ReadString(*input_, &current->name)) {
             exception_received = false;
             break;
         }
-        if (!WireFormat::ReadString(*input_,  &current->display_text)) {
+        if (!WireFormat::ReadString(*input_, &current->display_text)) {
             exception_received = false;
             break;
         }
-        if (!WireFormat::ReadString(*input_,  &current->stack_trace)) {
+        if (!WireFormat::ReadString(*input_, &current->stack_trace)) {
             exception_received = false;
             break;
         }
-        if (!WireFormat::ReadFixed(*input_,  &has_nested)) {
+        if (!WireFormat::ReadFixed(*input_, &has_nested)) {
             exception_received = false;
             break;
         }
@@ -580,13 +580,13 @@ bool Client::Impl::ReceiveException(bool rethrow) {
 }
 
 void Client::Impl::SendCancel() {
-    WireFormat::WriteUInt64(*output_,  ClientCodes::Cancel);
+    WireFormat::WriteUInt64(*output_, ClientCodes::Cancel);
     output_->Flush();
 }
 
-void Client::Impl::SendQuery(const std::string& query) {
-    WireFormat::WriteUInt64(*output_,  ClientCodes::Query);
-    WireFormat::WriteString(*output_,  std::string());
+void Client::Impl::SendQuery(const std::string& query, const std::string& query_id) {
+    WireFormat::WriteUInt64(*output_, ClientCodes::Query);
+    WireFormat::WriteString(*output_, query_id);
 
     /// Client info.
     if (server_info_.revision >= DBMS_MIN_REVISION_WITH_CLIENT_INFO) {
@@ -599,23 +599,23 @@ void Client::Impl::SendQuery(const std::string& query) {
         info.client_revision = REVISION;
 
 
-        WireFormat::WriteFixed(*output_,  info.query_kind);
-        WireFormat::WriteString(*output_,  info.initial_user);
-        WireFormat::WriteString(*output_,  info.initial_query_id);
-        WireFormat::WriteString(*output_,  info.initial_address);
-        WireFormat::WriteFixed(*output_,  info.iface_type);
+        WireFormat::WriteFixed(*output_, info.query_kind);
+        WireFormat::WriteString(*output_, info.initial_user);
+        WireFormat::WriteString(*output_, info.initial_query_id);
+        WireFormat::WriteString(*output_, info.initial_address);
+        WireFormat::WriteFixed(*output_, info.iface_type);
 
-        WireFormat::WriteString(*output_,  info.os_user);
-        WireFormat::WriteString(*output_,  info.client_hostname);
-        WireFormat::WriteString(*output_,  info.client_name);
-        WireFormat::WriteUInt64(*output_,  info.client_version_major);
-        WireFormat::WriteUInt64(*output_,  info.client_version_minor);
-        WireFormat::WriteUInt64(*output_,  info.client_revision);
+        WireFormat::WriteString(*output_, info.os_user);
+        WireFormat::WriteString(*output_, info.client_hostname);
+        WireFormat::WriteString(*output_, info.client_name);
+        WireFormat::WriteUInt64(*output_, info.client_version_major);
+        WireFormat::WriteUInt64(*output_, info.client_version_minor);
+        WireFormat::WriteUInt64(*output_, info.client_revision);
 
         if (server_info_.revision >= DBMS_MIN_REVISION_WITH_QUOTA_KEY_IN_CLIENT_INFO)
-            WireFormat::WriteString(*output_,  info.quota_key);
+            WireFormat::WriteString(*output_, info.quota_key);
         if (server_info_.revision >= DBMS_MIN_REVISION_WITH_VERSION_PATCH) {
-            WireFormat::WriteUInt64(*output_,  info.client_version_patch);
+            WireFormat::WriteUInt64(*output_, info.client_version_patch);
         }
     }
 
@@ -623,11 +623,11 @@ void Client::Impl::SendQuery(const std::string& query) {
     //if (settings)
     //    settings->serialize(*out);
     //else
-    WireFormat::WriteString(*output_,  std::string());
+    WireFormat::WriteString(*output_, std::string());
 
-    WireFormat::WriteUInt64(*output_,  Stages::Complete);
-    WireFormat::WriteUInt64(*output_,  compression_);
-    WireFormat::WriteString(*output_,  query);
+    WireFormat::WriteUInt64(*output_, Stages::Complete);
+    WireFormat::WriteUInt64(*output_, compression_);
+    WireFormat::WriteString(*output_, query);
     // Send empty block as marker of
     // end of data
     SendData(Block());
@@ -659,10 +659,10 @@ void Client::Impl::WriteBlock(const Block& block, OutputStream& output) {
 }
 
 void Client::Impl::SendData(const Block& block) {
-    WireFormat::WriteUInt64(*output_,  ClientCodes::Data);
+    WireFormat::WriteUInt64(*output_, ClientCodes::Data);
 
     if (server_info_.revision >= DBMS_MIN_REVISION_WITH_TEMPORARY_TABLES) {
-        WireFormat::WriteString(*output_,  std::string());
+        WireFormat::WriteString(*output_, std::string());
     }
 
     if (compression_ == CompressionState::Enable) {
@@ -689,14 +689,14 @@ void Client::Impl::InitializeStreams(std::unique_ptr<SocketBase>&& socket) {
 }
 
 bool Client::Impl::SendHello() {
-    WireFormat::WriteUInt64(*output_,  ClientCodes::Hello);
-    WireFormat::WriteString(*output_,  std::string(DBMS_NAME) + " client");
-    WireFormat::WriteUInt64(*output_,  DBMS_VERSION_MAJOR);
-    WireFormat::WriteUInt64(*output_,  DBMS_VERSION_MINOR);
-    WireFormat::WriteUInt64(*output_,  REVISION);
-    WireFormat::WriteString(*output_,  options_.default_database);
-    WireFormat::WriteString(*output_,  options_.user);
-    WireFormat::WriteString(*output_,  options_.password);
+    WireFormat::WriteUInt64(*output_, ClientCodes::Hello);
+    WireFormat::WriteString(*output_, std::string(DBMS_NAME) + " client");
+    WireFormat::WriteUInt64(*output_, DBMS_VERSION_MAJOR);
+    WireFormat::WriteUInt64(*output_, DBMS_VERSION_MINOR);
+    WireFormat::WriteUInt64(*output_, REVISION);
+    WireFormat::WriteString(*output_, options_.default_database);
+    WireFormat::WriteString(*output_, options_.user);
+    WireFormat::WriteString(*output_, options_.password);
 
     output_->Flush();
 
@@ -706,38 +706,38 @@ bool Client::Impl::SendHello() {
 bool Client::Impl::ReceiveHello() {
     uint64_t packet_type = 0;
 
-    if (!WireFormat::ReadVarint64(*input_,  &packet_type)) {
+    if (!WireFormat::ReadVarint64(*input_, &packet_type)) {
         return false;
     }
 
     if (packet_type == ServerCodes::Hello) {
-        if (!WireFormat::ReadString(*input_,  &server_info_.name)) {
+        if (!WireFormat::ReadString(*input_, &server_info_.name)) {
             return false;
         }
-        if (!WireFormat::ReadUInt64(*input_,  &server_info_.version_major)) {
+        if (!WireFormat::ReadUInt64(*input_, &server_info_.version_major)) {
             return false;
         }
-        if (!WireFormat::ReadUInt64(*input_,  &server_info_.version_minor)) {
+        if (!WireFormat::ReadUInt64(*input_, &server_info_.version_minor)) {
             return false;
         }
-        if (!WireFormat::ReadUInt64(*input_,  &server_info_.revision)) {
+        if (!WireFormat::ReadUInt64(*input_, &server_info_.revision)) {
             return false;
         }
 
         if (server_info_.revision >= DBMS_MIN_REVISION_WITH_SERVER_TIMEZONE) {
-            if (!WireFormat::ReadString(*input_,  &server_info_.timezone)) {
+            if (!WireFormat::ReadString(*input_, &server_info_.timezone)) {
                 return false;
             }
         }
 
         if (server_info_.revision >= DBMS_MIN_REVISION_WITH_SERVER_DISPLAY_NAME) {
-            if (!WireFormat::ReadString(*input_,  &server_info_.display_name)) {
+            if (!WireFormat::ReadString(*input_, &server_info_.display_name)) {
                 return false;
             }
         }
 
         if (server_info_.revision >= DBMS_MIN_REVISION_WITH_VERSION_PATCH) {
-            if (!WireFormat::ReadUInt64(*input_,  &server_info_.version_patch)) {
+            if (!WireFormat::ReadUInt64(*input_, &server_info_.version_patch)) {
                 return false;
             }
         }
@@ -797,8 +797,16 @@ void Client::Select(const std::string& query, SelectCallback cb) {
     Execute(Query(query).OnData(cb));
 }
 
+void Client::Select(const std::string& query, const std::string& query_id, SelectCallback cb) {
+    Execute(Query(query, query_id).OnData(cb));
+}
+
 void Client::SelectCancelable(const std::string& query, SelectCancelableCallback cb) {
     Execute(Query(query).OnDataCancelable(cb));
+}
+
+void Client::SelectCancelable(const std::string& query, const std::string& query_id, SelectCancelableCallback cb) {
+    Execute(Query(query, query_id).OnDataCancelable(cb));
 }
 
 void Client::Select(const Query& query) {
@@ -806,7 +814,11 @@ void Client::Select(const Query& query) {
 }
 
 void Client::Insert(const std::string& table_name, const Block& block) {
-    impl_->Insert(table_name, block);
+    impl_->Insert(table_name, Query::default_query_id, block);
+}
+
+void Client::Insert(const std::string& table_name, const std::string& query_id, const Block& block) {
+    impl_->Insert(table_name, query_id, block);
 }
 
 void Client::Ping() {

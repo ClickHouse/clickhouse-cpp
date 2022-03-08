@@ -1,6 +1,7 @@
 SET ( clickhouse-cpp-ut-src
     main.cpp
 
+    block_ut.cpp
     client_ut.cpp
     columns_ut.cpp
     itemview_ut.cpp

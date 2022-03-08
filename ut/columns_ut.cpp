@@ -952,6 +952,19 @@ TEST(ColumnsCase, LowCardinalityAsWrappedColumn) {
     ASSERT_EQ(Type::FixedString, CreateColumnByType("LowCardinality(FixedString(10000))", create_column_settings)->As<ColumnFixedString>()->GetType().GetCode());
 }
 
+TEST(ColumnsCase, ArrayOfDecimal) {
+    auto column = std::make_shared<clickhouse::ColumnDecimal>(18, 10);
+    auto array = std::make_shared<clickhouse::ColumnArray>(column->Slice(0, 0));
+
+    column->Append("1");
+    column->Append("2");
+    EXPECT_EQ(2u, column->Size());
+
+    array->AppendAsColumn(column);
+    ASSERT_EQ(1u, array->Size());
+    EXPECT_EQ(2u, array->GetAsColumn(0)->Size());
+}
+
 
 class ColumnsCaseWithName : public ::testing::TestWithParam<const char* /*Column Type String*/>
 {};

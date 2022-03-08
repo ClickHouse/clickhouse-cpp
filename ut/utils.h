@@ -110,7 +110,13 @@ MeasuresCollector<MeasureFunc> collect(MeasureFunc && f) {
 
 struct in_addr;
 struct in6_addr;
+// Helper for pretty-printing of the Block
+struct PrettyPrintBlock {
+    const clickhouse::Block & block;
+};
+
 std::ostream& operator<<(std::ostream & ostr, const clickhouse::Block & block);
+std::ostream& operator<<(std::ostream & ostr, const PrettyPrintBlock & block);
 std::ostream& operator<<(std::ostream& ostr, const in_addr& addr);
 std::ostream& operator<<(std::ostream& ostr, const in6_addr& addr);
 
@@ -118,6 +124,9 @@ std::ostream& operator<<(std::ostream& ostr, const in6_addr& addr);
 template <typename ResultType = std::string>
 auto getEnvOrDefault(const std::string& env, const char * default_val) {
     const char* v = std::getenv(env.c_str());
+    if (!v && !default_val)
+        throw std::runtime_error("Environment var '" + env + "' is not set.");
+
     const std::string value = v ? v : default_val;
 
     if constexpr (std::is_same_v<ResultType, std::string>) {
