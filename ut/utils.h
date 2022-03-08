@@ -1,5 +1,7 @@
 #pragma once
 
+#include <clickhouse/base/platform.h>
+
 #include <chrono>
 #include <cstring>
 #include <ostream>
@@ -69,6 +71,9 @@ inline ostream & operator<<(ostream & ostr, const chrono::duration<R, P> & d) {
 }
 }
 
+#ifdef _win_
+#define _SILENCE_CXX17_RESULT_OF_DEPRECATION_WARNING
+#endif
 // Since result_of is deprecated in C++20, and invoke_result_of is unavailable until C++20...
 template <class F, class... ArgTypes>
 using my_result_of_t =
