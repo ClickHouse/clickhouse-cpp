@@ -13,7 +13,7 @@ ColumnArray::ColumnArray(ColumnRef data)
 
 void ColumnArray::AppendAsColumn(ColumnRef array) {
     if (!data_->Type()->IsEqual(array->Type())) {
-        throw std::runtime_error(
+        throw ValidationError(
             "can't append column of type " + array->Type()->GetName() + " "
             "to column type " + data_->Type()->GetName());
     }

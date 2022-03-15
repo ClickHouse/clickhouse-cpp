@@ -49,7 +49,7 @@ void ItemView::ValidateData(Type::Code type, DataType data) {
         case Type::Code::Nullable:
         case Type::Code::Tuple:
         case Type::Code::LowCardinality:
-            throw std::runtime_error("Unsupported type in ItemView: " + std::to_string(static_cast<int>(type)));
+            throw UnimplementedError("Unsupported type in ItemView: " + std::to_string(static_cast<int>(type)));
 
         case Type::Code::UUID:
         case Type::Code::Int128:
@@ -59,11 +59,11 @@ void ItemView::ValidateData(Type::Code type, DataType data) {
             break;
 
         default:
-            throw std::runtime_error("Unknon type code:" + std::to_string(static_cast<int>(type)));
+            throw UnimplementedError("Unknon type code:" + std::to_string(static_cast<int>(type)));
     }
 
     if (expected_size != static_cast<int>(data.size())) {
-        throw std::runtime_error("Value size mismatch for type "
+        throw AssertionError("Value size mismatch for type "
                 + std::to_string(static_cast<int>(type)) + " expected: "
                 + std::to_string(expected_size) + ", got: " + std::to_string(data.size()));
     }

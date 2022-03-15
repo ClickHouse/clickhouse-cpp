@@ -1,5 +1,6 @@
 #include "uuid.h"
 #include "utils.h"
+#include "../exceptions.h"
 
 #include <stdexcept>
 
@@ -16,7 +17,7 @@ ColumnUUID::ColumnUUID(ColumnRef data)
     , data_(data->As<ColumnUInt64>())
 {
     if (data_->Size() % 2 != 0) {
-        throw std::runtime_error("number of entries must be even (two 64-bit numbers for each UUID)");
+        throw ValidationError("number of entries must be even (two 64-bit numbers for each UUID)");
     }
 }
 

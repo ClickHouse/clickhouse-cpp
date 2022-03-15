@@ -3,6 +3,8 @@
 #include "input.h"
 #include "output.h"
 
+#include "../exceptions.h"
+
 #include <stdexcept>
 
 namespace {
@@ -38,7 +40,7 @@ void WireFormat::WriteAll(OutputStream& output, const void* buf, size_t len) {
     }
 
     if (len) {
-        throw std::runtime_error("Failed to write " + std::to_string(original_len)
+        throw IdkError("Failed to write " + std::to_string(original_len)
                 + " bytes, only written " + std::to_string(original_len - len));
     }
 }

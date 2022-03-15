@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../types/types.h"
+#include "../exceptions.h"
 
 #include <string_view>
 #include <stdexcept>
@@ -59,7 +60,7 @@ public:
             if (sizeof(T) == data.size()) {
                 return *reinterpret_cast<const T*>(data.data());
             } else {
-                throw std::runtime_error("Incompatitable value type and size.");
+                throw AssertionError("Incompatitable value type and size.");
             }
         }
     }

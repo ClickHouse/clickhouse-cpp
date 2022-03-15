@@ -11,7 +11,7 @@ ColumnNullable::ColumnNullable(ColumnRef nested, ColumnRef nulls)
     , nulls_(nulls->As<ColumnUInt8>())
 {
     if (nested_->Size() != nulls->Size()) {
-        throw std::runtime_error("count of elements in nested and nulls should be the same");
+        throw ValidationError("count of elements in nested and nulls should be the same");
     }
 }
 
@@ -77,7 +77,7 @@ ColumnRef ColumnNullable::Slice(size_t begin, size_t len) const {
 void ColumnNullable::Swap(Column& other) {
     auto & col = dynamic_cast<ColumnNullable &>(other);
     if (!nested_->Type()->IsEqual(col.nested_->Type()))
-        throw std::runtime_error("Can't swap() Nullable columns of different types.");
+        throw ValidationError("Can't swap() Nullable columns of different types.");
 
     nested_.swap(col.nested_);
     nulls_.swap(col.nulls_);

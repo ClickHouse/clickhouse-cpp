@@ -1,5 +1,7 @@
 #include "block.h"
 
+#include "exceptions.h"
+
 #include <stdexcept>
 
 namespace clickhouse {
@@ -54,7 +56,7 @@ void Block::AppendColumn(const std::string& name, const ColumnRef& col) {
     if (columns_.empty()) {
         rows_ = col->Size();
     } else if (col->Size() != rows_) {
-        throw std::runtime_error("all columns in block must have same count of rows. Name: ["+name+"], rows: ["+std::to_string(rows_)+"], columns: [" + std::to_string(col->Size())+"]");
+        throw ValidationError("all columns in block must have same count of rows. Name: ["+name+"], rows: ["+std::to_string(rows_)+"], columns: [" + std::to_string(col->Size())+"]");
     }
 
     columns_.push_back(ColumnItem{name, col});
@@ -86,7 +88,7 @@ size_t Block::RefreshRowCount()
        if (idx == 0UL)
            rows = col->Size();
        else if (rows != col->Size())
-           throw std::runtime_error("all columns in block must have same count of rows. Name: ["+name+"], rows: ["+std::to_string(rows)+"], columns: [" + std::to_string(col->Size())+"]");
+           throw ValidationError("all columns in block must have same count of rows. Name: ["+name+"], rows: ["+std::to_string(rows)+"], columns: [" + std::to_string(col->Size())+"]");
     }
 
     rows_ = rows;

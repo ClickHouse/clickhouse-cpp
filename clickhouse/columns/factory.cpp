@@ -17,6 +17,8 @@
 
 #include "../types/type_parser.h"
 
+#include "../exceptions.h"
+
 #include <stdexcept>
 
 namespace clickhouse {
@@ -162,7 +164,7 @@ static ColumnRef CreateColumnFromAst(const TypeAst& ast, CreateColumnByTypeSetti
                     case Type::FixedString:
                         return std::make_shared<LowCardinalitySerializationAdaptor<ColumnFixedString>>(nested.elements.front().value);
                     default:
-                        throw std::runtime_error("LowCardinality(" + nested.name + ") is not supported");
+                        throw UnimplementedError("LowCardinality(" + nested.name + ") is not supported");
                 }
             }
             else {
@@ -173,7 +175,7 @@ static ColumnRef CreateColumnFromAst(const TypeAst& ast, CreateColumnByTypeSetti
                     case Type::FixedString:
                         return std::make_shared<ColumnLowCardinalityT<ColumnFixedString>>(nested.elements.front().value);
                     default:
-                        throw std::runtime_error("LowCardinality(" + nested.name + ") is not supported");
+                        throw UnimplementedError("LowCardinality(" + nested.name + ") is not supported");
                 }
             }
         }
