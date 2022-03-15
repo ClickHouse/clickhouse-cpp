@@ -197,7 +197,7 @@ auto Load(ColumnRef new_dictionary_column, InputStream& input, size_t rows) {
     // (see corresponding serializeBinaryBulkStateSuffix, serializeBinaryBulkStatePrefix, and serializeBinaryBulkWithMultipleStreams),
     // but with certain simplifications: no shared dictionaries, no on-the-fly dictionary updates.
     //
-    // As for now those fetures not used in client-server protocol and minimal implimintation suffice,
+    // As for now those features are not used in client-server protocol and minimal implementation suffices,
     // however some day they may.
 
     // prefix
@@ -225,7 +225,7 @@ auto Load(ColumnRef new_dictionary_column, InputStream& input, size_t rows) {
         throw ProtocolError("Failed to read number of rows in dictionary column.");
 
     if (!new_dictionary_column->Load(&input, number_of_keys))
-        throw IdkError("Failed to read values of dictionary column.");
+        throw Error("Failed to read values of dictionary column.");
 
     uint64_t number_of_rows;
     if (!WireFormat::ReadFixed(input, &number_of_rows))

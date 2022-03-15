@@ -40,7 +40,7 @@ void WireFormat::WriteAll(OutputStream& output, const void* buf, size_t len) {
     }
 
     if (len) {
-        throw IdkError("Failed to write " + std::to_string(original_len)
+        throw Error("Failed to write " + std::to_string(original_len)
                 + " bytes, only written " + std::to_string(original_len - len));
     }
 }

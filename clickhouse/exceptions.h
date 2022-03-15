@@ -34,10 +34,6 @@ class LZ4Error : public Error {
     using Error::Error;
 };
 
-class IdkError : public Error {
-    using Error::Error;
-};
-
 class ServerException : public Error {
 public:
     ServerException(std::unique_ptr<Exception> e)
