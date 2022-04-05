@@ -41,9 +41,9 @@ ENDIF ()
 ADD_LIBRARY (clickhouse-cpp-lib ${clickhouse-cpp-lib-src})
 SET_TARGET_PROPERTIES (clickhouse-cpp-lib PROPERTIES LINKER_LANGUAGE CXX)
 TARGET_LINK_LIBRARIES (clickhouse-cpp-lib
-    absl-lib
-    cityhash-lib
-    lz4-lib
+    absl::int128
+    cityhash::cityhash
+    lz4::lz4
 )
 TARGET_INCLUDE_DIRECTORIES (clickhouse-cpp-lib
     PUBLIC ${PROJECT_SOURCE_DIR}
@@ -52,6 +52,15 @@ TARGET_INCLUDE_DIRECTORIES (clickhouse-cpp-lib
 IF (NOT BUILD_SHARED_LIBS)
     ADD_LIBRARY (clickhouse-cpp-lib-static ALIAS clickhouse-cpp-lib)
 ENDIF()
+ADD_LIBRARY (clickhouse-cpp-lib-static STATIC ${clickhouse-cpp-lib-src})
+TARGET_LINK_LIBRARIES (clickhouse-cpp-lib-static
+    absl::int128
+    cityhash::cityhash
+    lz4::lz4
+)
+TARGET_INCLUDE_DIRECTORIES (clickhouse-cpp-lib-static
+    PUBLIC ${PROJECT_SOURCE_DIR}
+)
 
 
 IF (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")

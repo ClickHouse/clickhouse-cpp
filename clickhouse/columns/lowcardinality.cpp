@@ -4,7 +4,7 @@
 #include "nullable.h"
 #include "../base/wire_format.h"
 
-#include <cityhash/city.h>
+#include <city.h>
 
 #include <functional>
 #include <string_view>
