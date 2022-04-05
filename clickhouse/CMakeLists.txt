@@ -51,18 +51,25 @@ TARGET_LINK_LIBRARIES (clickhouse-cpp-lib-static
 )
 
 IF (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    # there is a problem with __builtin_mul_overflow call at link time
-    # the error looks like: ... undefined reference to `__muloti4' ...
-    # caused by clang bug https://bugs.llvm.org/show_bug.cgi?id=16404
-    # explicit linking to compiler-rt allows to workaround the problem
-    set (CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} --rtlib=compiler-rt")
+    INCLUDE (CheckCXXSourceCompiles)
 
-    # some workaround for linking issues on linux:
-    # /usr/bin/ld: CMakeFiles/simple-test.dir/main.cpp.o: undefined reference to symbol '_Unwind_Resume@@GCC_3.0'
-    # /usr/bin/ld: /lib/x86_64-linux-gnu/libgcc_s.so.1: error adding symbols: DSO missing from command line
-    # FIXME: that workaround breaks clang build on mingw
-    TARGET_LINK_LIBRARIES (clickhouse-cpp-lib gcc_s)
-    TARGET_LINK_LIBRARIES (clickhouse-cpp-lib-static gcc_s)
+    CHECK_CXX_SOURCE_COMPILES("#include <bits/c++config.h>\nint main() { return __GLIBCXX__ != 0; }"
+                              BUILDING_WITH_LIB_STDCXX)
+
+    IF (BUILDING_WITH_LIB_STDCXX)
+        # there is a problem with __builtin_mul_overflow call at link time
+        # the error looks like: ... undefined reference to `__muloti4' ...
+        # caused by clang bug https://bugs.llvm.org/show_bug.cgi?id=16404
+        # explicit linking to compiler-rt allows to workaround the problem
+        SET (CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} --rtlib=compiler-rt")
+
+        # some workaround for linking issues on linux:
+        # /usr/bin/ld: CMakeFiles/simple-test.dir/main.cpp.o: undefined reference to symbol '_Unwind_Resume@@GCC_3.0'
+        # /usr/bin/ld: /lib/x86_64-linux-gnu/libgcc_s.so.1: error adding symbols: DSO missing from command line
+        # FIXME: that workaround breaks clang build on mingw
+        TARGET_LINK_LIBRARIES (clickhouse-cpp-lib gcc_s)
+        TARGET_LINK_LIBRARIES (clickhouse-cpp-lib-static gcc_s)
+    ENDIF ()
 ENDIF ()
 
 INSTALL (TARGETS clickhouse-cpp-lib clickhouse-cpp-lib-static
