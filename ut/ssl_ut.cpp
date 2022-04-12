@@ -55,7 +55,7 @@ INSTANTIATE_TEST_SUITE_P(
 
 
 const auto ClickHouseExplorerConfig = ClientOptions()
-        .SetHost(           getEnvOrDefault("CLICKHOUSE_SECURE2_HOST",     "gh-api.clickhouse.tech"))
+        .SetHost(           getEnvOrDefault("CLICKHOUSE_SECURE2_HOST",     "play.clickhouse.com"))
         .SetPort(   getEnvOrDefault<size_t>("CLICKHOUSE_SECURE2_PORT",     "9440"))
         .SetUser(           getEnvOrDefault("CLICKHOUSE_SECURE2_USER",     "explorer"))
         .SetPassword(       getEnvOrDefault("CLICKHOUSE_SECURE2_PASSWORD", ""))
