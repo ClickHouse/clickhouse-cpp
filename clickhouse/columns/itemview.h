@@ -44,7 +44,7 @@ public:
     }
 
     explicit ItemView()
-        : ItemView(Type::Void, {nullptr, 0})
+        : ItemView(Type::Void, {})
     {}
 
     template <typename T>
