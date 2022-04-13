@@ -485,7 +485,7 @@ bool Client::Impl::ReadBlock(InputStream& input, Block* block) {
 
         if (ColumnRef col = CreateColumnByType(type, create_column_settings)) {
             if (num_rows && !col->Load(&input, num_rows)) {
-                throw Error("can't load column '" + name + "' of type " + type);
+                throw ProtocolError("can't load column '" + name + "' of type " + type);
             }
 
             block->AppendColumn(name, col);
