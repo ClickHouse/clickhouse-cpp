@@ -225,7 +225,7 @@ auto Load(ColumnRef new_dictionary_column, InputStream& input, size_t rows) {
         throw ProtocolError("Failed to read number of rows in dictionary column.");
 
     if (!new_dictionary_column->Load(&input, number_of_keys))
-        throw Error("Failed to read values of dictionary column.");
+        throw ProtocolError("Failed to read values of dictionary column.");
 
     uint64_t number_of_rows;
     if (!WireFormat::ReadFixed(input, &number_of_rows))
