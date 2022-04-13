@@ -35,6 +35,16 @@ public:
         return std::dynamic_pointer_cast<const T>(shared_from_this());
     }
 
+    /// Downcast pointer to the specific column's subtype.
+    template <typename T>
+    inline std::shared_ptr<T> AsStrict() {
+        auto result = std::dynamic_pointer_cast<T>(shared_from_this());
+        if (!result) {
+            throw std::runtime_error("Can't cast from " + type_->GetName());
+        }
+        return result;
+    }
+
     /// Get type object of the column.
     inline TypeRef Type() const { return type_; }
     inline const class Type& GetType() const { return *type_; }

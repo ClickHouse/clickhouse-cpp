@@ -11,6 +11,13 @@ ColumnArray::ColumnArray(ColumnRef data)
 {
 }
 
+ColumnArray::ColumnArray(ColumnArray && array)
+    : Column(array.Type())
+    , data_(std::move(array.data_))
+    , offsets_(std::move(array.offsets_))
+{
+}
+
 void ColumnArray::AppendAsColumn(ColumnRef array) {
     if (!data_->Type()->IsEqual(array->Type())) {
         throw ValidationError(
@@ -110,6 +117,15 @@ size_t ColumnArray::GetOffset(size_t n) const {
 
 size_t ColumnArray::GetSize(size_t n) const {
     return (n == 0) ? (*offsets_)[n] : ((*offsets_)[n] - (*offsets_)[n - 1]);
+}
+
+ColumnRef ColumnArray::GetData() {
+    return data_;
+}
+
+void ColumnArray::Reset() {
+    data_.reset();
+    offsets_.reset();
 }
 
 }
