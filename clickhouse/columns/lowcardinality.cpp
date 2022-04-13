@@ -49,7 +49,7 @@ ColumnRef createIndexColumn(IndexType type) {
             return std::make_shared<ColumnUInt64>();
     }
 
-    throw std::runtime_error("Invalid LowCardinality index type value: " + std::to_string(static_cast<uint64_t>(type)));
+    throw ValidationError("Invalid LowCardinality index type value: " + std::to_string(static_cast<uint64_t>(type)));
 }
 
 IndexType indexTypeFromIndexColumn(const Column & index_column) {
@@ -63,7 +63,7 @@ IndexType indexTypeFromIndexColumn(const Column & index_column) {
         case Type::UInt64:
             return IndexType::UInt64;
         default:
-            throw std::runtime_error("Invalid index column type for LowCardinality column:" + index_column.Type()->GetName());
+            throw ValidationError("Invalid index column type for LowCardinality column:" + index_column.Type()->GetName());
     }
 }
 
@@ -90,7 +90,7 @@ inline auto VisitIndexColumn(Vizitor && vizitor, ColumnType && col) {
         case Type::UInt64:
             return vizitor(column_down_cast<ColumnUInt64>(col));
         default:
-            throw std::runtime_error("Invalid index column type " + col.GetType().GetName());
+            throw ValidationError("Invalid index column type " + col.GetType().GetName());
     }
 }
 
@@ -103,7 +103,7 @@ inline void AppendToDictionary(Column& dictionary, const ItemView & item) {
             column_down_cast<ColumnString>(dictionary).Append(item.get<std::string_view>());
             return;
         default:
-            throw std::runtime_error("Unexpected dictionary column type: " + dictionary.GetType().GetName());
+            throw ValidationError("Unexpected dictionary column type: " + dictionary.GetType().GetName());
     }
 }
 
@@ -197,42 +197,42 @@ auto Load(ColumnRef new_dictionary_column, InputStream& input, size_t rows) {
     // (see corresponding serializeBinaryBulkStateSuffix, serializeBinaryBulkStatePrefix, and serializeBinaryBulkWithMultipleStreams),
     // but with certain simplifications: no shared dictionaries, no on-the-fly dictionary updates.
     //
-    // As for now those fetures not used in client-server protocol and minimal implimintation suffice,
+    // As for now those features are not used in client-server protocol and minimal implementation suffices,
     // however some day they may.
 
     // prefix
     uint64_t key_version;
     if (!WireFormat::ReadFixed(input, &key_version))
-        throw std::runtime_error("Failed to read key serialization version.");
+        throw ProtocolError("Failed to read key serialization version.");
 
     if (key_version != KeySerializationVersion::SharedDictionariesWithAdditionalKeys)
-        throw std::runtime_error("Invalid key serialization version value.");
+        throw ProtocolError("Invalid key serialization version value.");
 
     // body
     uint64_t index_serialization_type;
     if (!WireFormat::ReadFixed(input, &index_serialization_type))
-        throw std::runtime_error("Failed to read index serializaton type.");
+        throw ProtocolError("Failed to read index serializaton type.");
 
     auto new_index_column = createIndexColumn(static_cast<IndexType>(index_serialization_type & IndexTypeMask));
     if (index_serialization_type & IndexFlag::NeedGlobalDictionaryBit)
-        throw std::runtime_error("Global dictionary is not supported.");
+        throw UnimplementedError("Global dictionary is not supported.");
 
     if ((index_serialization_type & IndexFlag::HasAdditionalKeysBit) == 0)
-        throw std::runtime_error("HasAdditionalKeysBit is missing.");
+        throw ValidationError("HasAdditionalKeysBit is missing.");
 
     uint64_t number_of_keys;
     if (!WireFormat::ReadFixed(input, &number_of_keys))
-        throw std::runtime_error("Failed to read number of rows in dictionary column.");
+        throw ProtocolError("Failed to read number of rows in dictionary column.");
 
     if (!new_dictionary_column->Load(&input, number_of_keys))
-        throw std::runtime_error("Failed to read values of dictionary column.");
+        throw ProtocolError("Failed to read values of dictionary column.");
 
     uint64_t number_of_rows;
     if (!WireFormat::ReadFixed(input, &number_of_rows))
-        throw std::runtime_error("Failed to read number of rows in index column.");
+        throw ProtocolError("Failed to read number of rows in index column.");
 
     if (number_of_rows != rows)
-        throw std::runtime_error("LowCardinality column must be read in full.");
+        throw AssertionError("LowCardinality column must be read in full.");
 
     new_index_column->Load(&input, number_of_rows);
 
@@ -312,7 +312,7 @@ ColumnRef ColumnLowCardinality::Slice(size_t begin, size_t len) const {
 void ColumnLowCardinality::Swap(Column& other) {
     auto & col = dynamic_cast<ColumnLowCardinality &>(other);
     if (!dictionary_column_->Type()->IsEqual(col.dictionary_column_->Type()))
-        throw std::runtime_error("Can't swap() LowCardinality columns of different types.");
+        throw ValidationError("Can't swap() LowCardinality columns of different types.");
 
     // It is important here not to swap pointers to dictionary object,
     // but swap contents of dictionaries, so the object inside shared_ptr stays the same

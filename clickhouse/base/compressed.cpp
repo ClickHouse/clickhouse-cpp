@@ -1,6 +1,7 @@
 #include "compressed.h"
 #include "wire_format.h"
 #include "output.h"
+#include "../exceptions.h"
 
 #include <cityhash/city.h>
 #include <lz4/lz4.h>
@@ -30,7 +31,7 @@ CompressedInput::~CompressedInput() {
 #else
         if (!std::uncaught_exceptions()) {
 #endif
-            throw std::runtime_error("some data was not read");
+            throw LZ4Error("some data was not read");
         }
     }
 }
@@ -59,7 +60,7 @@ bool CompressedInput::Decompress() {
     }
 
     if (method != COMPRESSION_METHOD) {
-        throw std::runtime_error("unsupported compression method " + std::to_string(int(method)));
+        throw LZ4Error("unsupported compression method " + std::to_string(int(method)));
     } else {
         if (!WireFormat::ReadFixed(*input_, &compressed)) {
             return false;
@@ -69,7 +70,7 @@ bool CompressedInput::Decompress() {
         }
 
         if (compressed > DBMS_MAX_COMPRESSED_SIZE) {
-            throw std::runtime_error("compressed data too big");
+            throw LZ4Error("compressed data too big");
         }
 
         Buffer tmp(compressed);
@@ -87,14 +88,14 @@ bool CompressedInput::Decompress() {
             return false;
         } else {
             if (hash != CityHash128((const char*)tmp.data(), compressed)) {
-                throw std::runtime_error("data was corrupted");
+                throw LZ4Error("data was corrupted");
             }
         }
 
         data_ = Buffer(original);
 
         if (LZ4_decompress_safe((const char*)tmp.data() + HEADER_SIZE, (char*)data_.data(), compressed - HEADER_SIZE, original) < 0) {
-            throw std::runtime_error("can't decompress data");
+            throw LZ4Error("can't decompress data");
         } else {
             mem_.Reset(data_.data(), original);
         }
@@ -143,7 +144,7 @@ void CompressedOutput::Compress(const void * data, size_t len) {
             len,
             static_cast<int>(compressed_buffer_.size() - HEADER_SIZE));
     if (compressed_size <= 0)
-        throw std::runtime_error("Failed to compress chunk of " + std::to_string(len) + " bytes, "
+        throw LZ4Error("Failed to compress chunk of " + std::to_string(len) + " bytes, "
                 "LZ4 error: " + std::to_string(compressed_size));
 
     {
@@ -165,7 +166,7 @@ void CompressedOutput::Compress(const void * data, size_t len) {
 void CompressedOutput::PreallocateCompressBuffer(size_t input_size) {
     const auto estimated_compressed_buffer_size = LZ4_compressBound(static_cast<int>(input_size));
     if (estimated_compressed_buffer_size <= 0)
-        throw std::runtime_error("Failed to estimate compressed buffer size, LZ4 error: " + std::to_string(estimated_compressed_buffer_size));
+        throw LZ4Error("Failed to estimate compressed buffer size, LZ4 error: " + std::to_string(estimated_compressed_buffer_size));
 
     compressed_buffer_.resize(estimated_compressed_buffer_size + HEADER_SIZE + EXTRA_COMPRESS_BUFFER_SIZE);
 }

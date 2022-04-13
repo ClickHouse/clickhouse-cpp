@@ -184,7 +184,7 @@ ItemView ColumnDateTime64::GetItem(size_t index) const {
 void ColumnDateTime64::Swap(Column& other) {
     auto& col = dynamic_cast<ColumnDateTime64&>(other);
     if (col.GetPrecision() != GetPrecision()) {
-        throw std::runtime_error("Can't swap DateTime64 columns when precisions are not the same: "
+        throw ValidationError("Can't swap DateTime64 columns when precisions are not the same: "
                 + std::to_string(GetPrecision()) + "(this) != " + std::to_string(col.GetPrecision()) + "(that)");
     }
 

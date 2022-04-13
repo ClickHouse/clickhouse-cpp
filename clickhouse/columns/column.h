@@ -2,6 +2,7 @@
 
 #include "../types/types.h"
 #include "../columns/itemview.h"
+#include "../exceptions.h"
 
 #include <memory>
 #include <stdexcept>
@@ -61,7 +62,7 @@ public:
     /// Get a view on raw item data if it is supported by column, will throw an exception if index is out of range.
     /// Please note that view is invalidated once column items are added or deleted, column is loaded from strean or destroyed.
     virtual ItemView GetItem(size_t) const {
-        throw std::runtime_error("GetItem() is not supported for column of " + type_->GetName());
+        throw UnimplementedError("GetItem() is not supported for column of " + type_->GetName());
     }
 
     friend void swap(Column& left, Column& right) {

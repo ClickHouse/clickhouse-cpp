@@ -16,13 +16,13 @@ ColumnIPv4::ColumnIPv4(ColumnRef data)
     , data_(data ? data->As<ColumnUInt32>() : nullptr)
 {
     if (!data_)
-        throw std::runtime_error("Expecting ColumnUInt32, got " + (data ? data->GetType().GetName() : "null"));
+        throw ValidationError("Expecting ColumnUInt32, got " + (data ? data->GetType().GetName() : "null"));
 }
 
 void ColumnIPv4::Append(const std::string& str) {
     uint32_t address;
     if (inet_pton(AF_INET, str.c_str(), &address) != 1)
-        throw std::runtime_error("invalid IPv4 format, ip: " + str);
+        throw ValidationError("invalid IPv4 format, ip: " + str);
     data_->Append(htonl(address));
 }
 

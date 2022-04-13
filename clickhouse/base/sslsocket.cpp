@@ -1,5 +1,6 @@
 #include "sslsocket.h"
 #include "../client.h"
+#include "../exceptions.h"
 
 #include <stdexcept>
 
@@ -45,7 +46,7 @@ void throwSSLError(SSL * ssl, int error, const char * /*location*/, const char *
 //              << "\n\t last err: " << ERR_peek_last_error()
 //              << std::endl;
 
-    throw std::runtime_error(prefix + std::to_string(error) + " : " + reason_str);
+    throw clickhouse::OpenSSLError(prefix + std::to_string(error) + " : " + reason_str);
 }
 
 void configureSSL(const clickhouse::SSLParams::ConfigurationType & configuration, SSL * ssl, SSL_CTX * context = nullptr) {
@@ -75,13 +76,13 @@ void configureSSL(const clickhouse::SSLParams::ConfigurationType & configuration
         else if (err == 0)
             throwSSLError(ssl, SSL_ERROR_NONE, nullptr, nullptr, "Failed to configure OpenSSL with command '" + kv.first + "' ");
         else if (err == 1 && value_present)
-            throw std::runtime_error("Failed to configure OpenSSL: command '" + kv.first + "' needs no value");
+            throw clickhouse::OpenSSLError("Failed to configure OpenSSL: command '" + kv.first + "' needs no value");
         else if (err == -2)
-            throw std::runtime_error("Failed to cofigure OpenSSL: unknown command '" + kv.first + "'");
+            throw clickhouse::OpenSSLError("Failed to cofigure OpenSSL: unknown command '" + kv.first + "'");
         else if (err == -3)
-            throw std::runtime_error("Failed to cofigure OpenSSL: command '" + kv.first + "' requires a value");
+            throw clickhouse::OpenSSLError("Failed to cofigure OpenSSL: command '" + kv.first + "' requires a value");
         else
-            throw std::runtime_error("Failed to cofigure OpenSSL: command '" + kv.first + "' unknown error: " + std::to_string(err));
+            throw clickhouse::OpenSSLError("Failed to cofigure OpenSSL: command '" + kv.first + "' unknown error: " + std::to_string(err));
     }
 }
 
@@ -104,7 +105,7 @@ SSL_CTX * prepareSSLContext(const clickhouse::SSLParams & context_params) {
     std::unique_ptr<SSL_CTX, decltype(&SSL_CTX_free)> ctx(SSL_CTX_new(method), &SSL_CTX_free);
 
     if (!ctx)
-        throw std::runtime_error("Failed to initialize SSL context");
+        throw clickhouse::OpenSSLError("Failed to initialize SSL context");
 
 #define HANDLE_SSL_CTX_ERROR(statement) do { \
     if (const auto ret_code = (statement); !ret_code) \
@@ -204,7 +205,7 @@ SSLSocket::SSLSocket(const NetworkAddress& addr, const SSLParams & ssl_params,
 {
     auto ssl = ssl_.get();
     if (!ssl)
-        throw std::runtime_error("Failed to create SSL instance");
+        throw clickhouse::OpenSSLError("Failed to create SSL instance");
 
     std::unique_ptr<ASN1_OCTET_STRING, decltype(&ASN1_OCTET_STRING_free)> ip_addr(a2i_IPADDRESS(addr.Host().c_str()), &ASN1_OCTET_STRING_free);
 
@@ -228,7 +229,7 @@ SSLSocket::SSLSocket(const NetworkAddress& addr, const SSLParams & ssl_params,
 
     if (const auto verify_result = SSL_get_verify_result(ssl); !ssl_params.skip_verification && verify_result != X509_V_OK) {
         auto error_message = X509_verify_cert_error_string(verify_result);
-        throw std::runtime_error("Failed to verify SSL connection, X509_v error: "
+        throw clickhouse::OpenSSLError("Failed to verify SSL connection, X509_v error: "
                 + std::to_string(verify_result)
                 + " " + error_message
                 + "\nServer certificate: " + getCertificateInfo(SSL_get_peer_certificate(ssl)));

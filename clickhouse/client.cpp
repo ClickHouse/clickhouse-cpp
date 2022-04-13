@@ -87,7 +87,7 @@ ClientOptions& ClientOptions::SetSSLOptions(ClientOptions::SSLOptions options)
     return *this;
 #else
     (void)options;
-    throw std::runtime_error("Library was built with no SSL support");
+    throw OpenSSLError("Library was built with no SSL support");
 #endif
 }
 
@@ -152,7 +152,7 @@ private:
 private:
     /// In case of network errors tries to reconnect to server and
     /// call fuc several times.
-    void RetryGuard(std::function<void()> fuc);
+    void RetryGuard(std::function<void()> func);
 
 private:
     class EnsureNull {
@@ -186,10 +186,6 @@ private:
     std::unique_ptr<InputStream> input_;
     std::unique_ptr<OutputStream> output_;
     std::unique_ptr<SocketBase> socket_;
-
-#if defined(WITH_OPENSSL)
-    std::unique_ptr<SSLContext> ssl_context_;
-#endif
 
     ServerInfo server_info_;
 };
@@ -282,7 +278,7 @@ void Client::Impl::Insert(const std::string& table_name, const std::string& quer
         bool ret = ReceivePacket(&server_packet);
 
         if (!ret) {
-            throw std::runtime_error("fail to receive data packet");
+            throw ProtocolError("fail to receive data packet");
         }
         if (server_packet == ServerCodes::Data) {
             break;
@@ -306,7 +302,7 @@ void Client::Impl::Insert(const std::string& table_name, const std::string& quer
 
     if (eos_packet != ServerCodes::EndOfStream && eos_packet != ServerCodes::Exception
         && eos_packet != ServerCodes::Log && options_.rethrow_exceptions) {
-        throw std::runtime_error(std::string{"unexpected packet from server while receiving end of query, expected (expected Exception, EndOfStream or Log, got: "}
+        throw ProtocolError(std::string{"unexpected packet from server while receiving end of query, expected (expected Exception, EndOfStream or Log, got: "}
                             + (eos_packet ? std::to_string(eos_packet) : "nothing") + ")");
     }
 }
@@ -319,7 +315,7 @@ void Client::Impl::Ping() {
     const bool ret = ReceivePacket(&server_packet);
 
     if (!ret || server_packet != ServerCodes::Pong) {
-        throw std::runtime_error("fail to ping server");
+        throw ProtocolError("fail to ping server");
     }
 }
 
@@ -327,7 +323,7 @@ void Client::Impl::ResetConnection() {
     InitializeStreams(socket_factory_->connect(options_));
 
     if (!Handshake()) {
-        throw std::runtime_error("fail to connect to " + options_.host);
+        throw ProtocolError("fail to connect to " + options_.host);
     }
 }
 
@@ -358,7 +354,7 @@ bool Client::Impl::ReceivePacket(uint64_t* server_packet) {
     switch (packet_type) {
     case ServerCodes::Data: {
         if (!ReceiveData()) {
-            throw std::runtime_error("can't read data packet from input stream");
+            throw ProtocolError("can't read data packet from input stream");
         }
         return true;
     }
@@ -431,7 +427,7 @@ bool Client::Impl::ReceivePacket(uint64_t* server_packet) {
     }
 
     default:
-        throw std::runtime_error("unimplemented " + std::to_string((int)packet_type));
+        throw UnimplementedError("unimplemented " + std::to_string((int)packet_type));
         break;
     }
 
@@ -489,12 +485,12 @@ bool Client::Impl::ReadBlock(InputStream& input, Block* block) {
 
         if (ColumnRef col = CreateColumnByType(type, create_column_settings)) {
             if (num_rows && !col->Load(&input, num_rows)) {
-                throw std::runtime_error("can't load column '" + name + "' of type " + type);
+                throw ProtocolError("can't load column '" + name + "' of type " + type);
             }
 
             block->AppendColumn(name, col);
         } else {
-            throw std::runtime_error(std::string("unsupported column type: ") + type);
+            throw UnimplementedError(std::string("unsupported column type: ") + type);
         }
     }
 
@@ -573,7 +569,7 @@ bool Client::Impl::ReceiveException(bool rethrow) {
     }
 
     if (rethrow || options_.rethrow_exceptions) {
-        throw ServerException(std::move(e));
+        throw ServerError(std::move(e));
     }
 
     return exception_received;
@@ -668,8 +664,8 @@ void Client::Impl::SendData(const Block& block) {
     if (compression_ == CompressionState::Enable) {
         assert(options_.compression_method == CompressionMethod::LZ4);
 
-        std::unique_ptr<OutputStream> compressed_ouput = std::make_unique<CompressedOutput>(output_.get(), options_.max_compression_chunk_size);
-        BufferedOutput buffered(std::move(compressed_ouput), options_.max_compression_chunk_size);
+        std::unique_ptr<OutputStream> compressed_output = std::make_unique<CompressedOutput>(output_.get(), options_.max_compression_chunk_size);
+        BufferedOutput buffered(std::move(compressed_output), options_.max_compression_chunk_size);
 
         WriteBlock(block, buffered);
     } else {
@@ -794,19 +790,19 @@ void Client::Execute(const Query& query) {
 }
 
 void Client::Select(const std::string& query, SelectCallback cb) {
-    Execute(Query(query).OnData(cb));
+    Execute(Query(query).OnData(std::move(cb)));
 }
 
 void Client::Select(const std::string& query, const std::string& query_id, SelectCallback cb) {
-    Execute(Query(query, query_id).OnData(cb));
+    Execute(Query(query, query_id).OnData(std::move(cb)));
 }
 
 void Client::SelectCancelable(const std::string& query, SelectCancelableCallback cb) {
-    Execute(Query(query).OnDataCancelable(cb));
+    Execute(Query(query).OnDataCancelable(std::move(cb)));
 }
 
 void Client::SelectCancelable(const std::string& query, const std::string& query_id, SelectCancelableCallback cb) {
-    Execute(Query(query, query_id).OnDataCancelable(cb));
+    Execute(Query(query, query_id).OnDataCancelable(std::move(cb)));
 }
 
 void Client::Select(const Query& query) {

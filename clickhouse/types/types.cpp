@@ -1,5 +1,7 @@
 #include "types.h"
 
+#include "../exceptions.h"
+
 #include <cityhash/city.h>
 
 #include <stdexcept>
@@ -319,7 +321,7 @@ DateTime64Type::DateTime64Type(size_t precision, std::string timezone)
     : Type(DateTime64), details::TypeWithTimeZoneMixin(std::move(timezone)), precision_(precision) {
 
     if (precision_ > 18) {
-        throw std::runtime_error("DateTime64 precision is > 18");
+        throw ValidationError("DateTime64 precision is > 18");
     }
 }
 

@@ -22,7 +22,7 @@ size_t ColumnTuple::TupleSize() const {
 
 void ColumnTuple::Append(ColumnRef column) {
     if (!this->Type()->IsEqual(column->Type())) {
-        throw std::runtime_error(
+        throw ValidationError(
             "can't append column of type " + column->Type()->GetName() + " "
             "to column type " + this->Type()->GetName());
     }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "block.h"
+#include "server_exception.h"
 
 #include <cstdint>
 #include <functional>
@@ -30,16 +31,6 @@ struct QuerySettings {
     // strict_insert_defaults = 0
     // network_compression_method = LZ4
     // priority = 0
-};
-
-
-struct Exception {
-    int code = 0;
-    std::string name;
-    std::string display_text;
-    std::string stack_trace;
-    /// Pointer to nested exception.
-    std::unique_ptr<Exception> nested;
 };
 
 
@@ -90,7 +81,7 @@ public:
      Query();
      Query(const char* query, const char* query_id = nullptr);
      Query(const std::string& query, const std::string& query_id = default_query_id);
-    ~Query();
+    ~Query() override;
 
     ///
     inline const std::string& GetText() const {
@@ -103,25 +94,25 @@ public:
 
     /// Set handler for receiving result data.
     inline Query& OnData(SelectCallback cb) {
-        select_cb_ = cb;
+        select_cb_ = std::move(cb);
         return *this;
     }
 
     inline Query& OnDataCancelable(SelectCancelableCallback cb) {
-        select_cancelable_cb_ = cb;
+        select_cancelable_cb_ = std::move(cb);
         return *this;
     }
 
     /// Set handler for receiving server's exception.
     inline Query& OnException(ExceptionCallback cb) {
-        exception_cb_ = cb;
+        exception_cb_ = std::move(cb);
         return *this;
     }
 
 
     /// Set handler for receiving a progress of query exceution.
     inline Query& OnProgress(ProgressCallback cb) {
-        progress_cb_ = cb;
+        progress_cb_ = std::move(cb);
         return *this;
     }
 

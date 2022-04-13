@@ -1,15 +1,43 @@
 #pragma once
 
-#include "query.h"
+#include "server_exception.h"
 
 #include <stdexcept>
 
 namespace clickhouse {
 
-class ServerException : public std::runtime_error {
+class Error : public std::runtime_error {
+    using std::runtime_error::runtime_error;
+};
+
+class ValidationError : public Error {
+    using Error::Error;
+};
+
+class ProtocolError : public Error {
+    using Error::Error;
+};
+
+class UnimplementedError : public Error {
+    using Error::Error;
+};
+
+class AssertionError : public Error {
+    using Error::Error;
+};
+
+class OpenSSLError : public Error {
+    using Error::Error;
+};
+
+class LZ4Error : public Error {
+    using Error::Error;
+};
+
+class ServerException : public Error {
 public:
     ServerException(std::unique_ptr<Exception> e)
-        : runtime_error(std::string())
+        : Error(std::string())
         , exception_(std::move(e))
     {
     }
@@ -29,5 +57,6 @@ public:
 private:
     std::unique_ptr<Exception> exception_;
 };
+using ServerError = ServerException;
 
 }

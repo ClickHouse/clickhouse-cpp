@@ -32,7 +32,7 @@ ColumnFixedString::ColumnFixedString(size_t n)
 
 void ColumnFixedString::Append(std::string_view str) {
     if (str.size() > string_size_) {
-        throw std::runtime_error("Expected string of length not greater than "
+        throw ValidationError("Expected string of length not greater than "
                                  + std::to_string(string_size_) + " bytes, received "
                                  + std::to_string(str.size()) + " bytes.");
     }
@@ -126,7 +126,7 @@ struct ColumnString::Block
           data_(new CharT[capacity])
     {}
 
-    inline auto GetAvailble() const
+    inline auto GetAvailable() const
     {
         return capacity - size;
     }
@@ -179,7 +179,7 @@ ColumnString::~ColumnString()
 {}
 
 void ColumnString::Append(std::string_view str) {
-    if (blocks_.size() == 0 || blocks_.back().GetAvailble() < str.length())
+    if (blocks_.size() == 0 || blocks_.back().GetAvailable() < str.length())
     {
         blocks_.emplace_back(std::max(DEFAULT_BLOCK_SIZE, str.size()));
     }
@@ -210,7 +210,7 @@ void ColumnString::Append(ColumnRef column) {
         const auto total_size = ComputeTotalSize(col->items_);
 
         // TODO: fill up existing block with some items and then add a new one for the rest of items
-        if (blocks_.size() == 0 || blocks_.back().GetAvailble() < total_size)
+        if (blocks_.size() == 0 || blocks_.back().GetAvailable() < total_size)
             blocks_.emplace_back(std::max(DEFAULT_BLOCK_SIZE, total_size));
         items_.reserve(items_.size() + col->Size());
 
@@ -233,7 +233,7 @@ bool ColumnString::Load(InputStream* input, size_t rows) {
         if (!WireFormat::ReadUInt64(*input, &len))
             return false;
 
-        if (blocks_.size() == 0 || len > block->GetAvailble())
+        if (blocks_.size() == 0 || len > block->GetAvailable())
             block = &blocks_.emplace_back(std::max<size_t>(DEFAULT_BLOCK_SIZE, len));
 
         if (!WireFormat::ReadBytes(*input, block->GetCurrentWritePos(), len))

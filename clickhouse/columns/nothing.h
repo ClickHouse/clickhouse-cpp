@@ -59,7 +59,7 @@ public:
 
     /// Saves column data to output stream.
     void Save(OutputStream*) override {
-        throw std::runtime_error("method Save is not supported for Nothing column");
+        throw UnimplementedError("method Save is not supported for Nothing column");
 	}
 
     /// Clear column data .

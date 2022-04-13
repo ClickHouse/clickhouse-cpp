@@ -156,21 +156,21 @@ void ColumnDecimal::Append(const std::string& value) {
         } else if (*c >= '0' && *c <= '9') {
             if (mulOverflow(int_value, 10, &int_value) ||
                 addOverflow(int_value, *c - '0', &int_value)) {
-                throw std::runtime_error("value is too big for 128-bit integer");
+                throw AssertionError("value is too big for 128-bit integer");
             }
         } else {
-            throw std::runtime_error(std::string("unexpected symbol '") + (*c) + "' in decimal value");
+            throw ValidationError(std::string("unexpected symbol '") + (*c) + "' in decimal value");
         }
         ++c;
     }
 
     if (c != end) {
-        throw std::runtime_error("unexpected symbol '-' in decimal value");
+        throw ValidationError("unexpected symbol '-' in decimal value");
     }
 
     while (zeros) {
         if (mulOverflow(int_value, 10, &int_value)) {
-            throw std::runtime_error("value is too big for 128-bit integer");
+            throw AssertionError("value is too big for 128-bit integer");
         }
         --zeros;
     }
@@ -187,7 +187,7 @@ Int128 ColumnDecimal::At(size_t i) const {
         case Type::Int128:
             return data_->As<ColumnInt128>()->At(i);
         default:
-            throw std::runtime_error("Invalid data_ column type in ColumnDecimal");
+            throw ValidationError("Invalid data_ column type in ColumnDecimal");
     }
 }
 
