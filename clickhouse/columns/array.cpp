@@ -25,12 +25,7 @@ void ColumnArray::AppendAsColumn(ColumnRef array) {
             "to column type " + data_->Type()->GetName());
     }
 
-    if (offsets_->Size() == 0) {
-        offsets_->Append(array->Size());
-    } else {
-        offsets_->Append((*offsets_)[offsets_->Size() - 1] + array->Size());
-    }
-
+    AddOffset(array->Size());
     data_->Append(array);
 }
 
@@ -113,6 +108,14 @@ void ColumnArray::OffsetsIncrease(size_t n) {
 size_t ColumnArray::GetOffset(size_t n) const {
 
     return (n == 0) ? 0 : (*offsets_)[n - 1];
+}
+
+void ColumnArray::AddOffset(size_t n) {
+    if (offsets_->Size() == 0) {
+        offsets_->Append(n);
+    } else {
+        offsets_->Append((*offsets_)[offsets_->Size() - 1] + n);
+    }
 }
 
 size_t ColumnArray::GetSize(size_t n) const {

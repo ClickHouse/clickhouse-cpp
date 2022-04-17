@@ -12,6 +12,8 @@
 
 #include <time.h>
 
+#include <gtest/gtest.h>
+
 namespace clickhouse {
     class Block;
 }
@@ -153,3 +155,104 @@ auto getEnvOrDefault(const std::string& env, const char * default_val) {
         }
     }
 }
+
+
+// based on https://stackoverflow.com/a/31207079
+template <typename T, typename _ = void>
+struct is_container : std::false_type {};
+
+namespace details {
+template <typename... Ts>
+struct is_container_helper {};
+}
+
+// A very loose definition of container, nerfed to fit both C-array and ColumnArrayT<X>::ArrayWrapper
+template <typename T>
+struct is_container<
+        T,
+        std::conditional_t<
+            false,
+            details::is_container_helper<
+                decltype(std::declval<T>().size()),
+                decltype(std::begin(std::declval<T>())),
+                decltype(std::end(std::declval<T>()))
+                >,
+            void
+            >
+        > : public std::true_type {};
+
+template <typename T>
+inline constexpr bool is_container_v = is_container<T>::value;
+
+template <typename Container>
+struct PrintContainer {
+    const Container & container_;
+
+    explicit PrintContainer(const Container& container)
+        : container_(container)
+    {}
+};
+
+template <typename T>
+std::ostream& operator<<(std::ostream & ostr, const PrintContainer<T>& print_container) {
+    ostr << "[";
+
+    const auto & container = print_container.container_;
+    for (auto i = std::begin(container); i != std::end(container); /*intentionally no ++i*/) {
+        const auto & elem = *i;
+
+        if constexpr (is_container_v<std::decay_t<decltype(elem)>>) {
+            ostr << PrintContainer{elem};
+        } else {
+            ostr << elem;
+        }
+
+        if (++i != std::end(container)) {
+            ostr << ", ";
+        }
+    }
+
+    return ostr << "]";
+}
+
+// Compare values to each other, if values are container-ish, then recursively deep compare those containers.
+template <typename Left, typename Right>
+::testing::AssertionResult CompareRecursive(const Left & left, const Right & right);
+
+// Compare containers element-wise, if elements are containers themselves - compare recursevely
+template <typename LeftContainer, typename RightContainer>
+::testing::AssertionResult CompareCotainersRecursive(const LeftContainer& left, const RightContainer& right) {
+    if (left.size() != right.size())
+        return ::testing::AssertionFailure() << "\nContainers size mismatch, expected: " << left.size() << " actual: " << right.size();
+
+    auto l_i = std::begin(left);
+    auto r_i = std::begin(right);
+
+    for (size_t i = 0; i < left.size(); ++i, ++l_i, ++r_i) {
+        auto result = CompareRecursive(*l_i, *r_i);
+        if (!result)
+            return result << "\n\nMismatching items at pos: " << i + 1;
+    }
+
+    return ::testing::AssertionSuccess();
+}
+
+template <typename Left, typename Right>
+::testing::AssertionResult CompareRecursive(const Left & left, const Right & right) {
+    if constexpr (is_container_v<Left> && is_container_v<Right>) {
+        if (auto result = CompareCotainersRecursive(left, right))
+            return result;
+        else {
+            return result << "\nExpected container: " << PrintContainer{left}
+                          << "\nActual container  : " << PrintContainer{right};
+        }
+    } else {
+        if (left != right)
+            return ::testing::AssertionFailure()
+                    << "\nexpected: " << left
+                    << "\nactual  : " << right;
+
+        return ::testing::AssertionSuccess();
+    }
+}
+

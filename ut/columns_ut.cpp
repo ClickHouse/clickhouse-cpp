@@ -20,7 +20,6 @@
 #include <string_view>
 #include <sstream>
 
-
 // only compare PODs of equal size this way
 template <typename L, typename R, typename
         = std::enable_if_t<sizeof(L) == sizeof(R) && std::conjunction_v<std::is_pod<L>, std::is_pod<R>>>>
@@ -966,6 +965,68 @@ TEST(ColumnsCase, ArrayOfDecimal) {
     EXPECT_EQ(2u, array->GetAsColumn(0)->Size());
 }
 
+TEST(ColumnsCase, ArrayTUint64) {
+    auto array = std::make_shared<clickhouse::ColumnArrayT<ColumnUInt64>>();
+
+    auto append_and_test = [&array](const auto& values) {
+//        SCOPED_TRACE(values);
+        const size_t prev_size = array->Size();
+
+        array->Append(values);
+        EXPECT_EQ(prev_size + 1u, array->Size());
+
+        EXPECT_TRUE(CompareRecursive(values, array->At(prev_size)));
+        EXPECT_TRUE(CompareRecursive(values, (*array)[prev_size]));
+
+        // Check that both subscrip and At() work properly.
+        const auto & slice = array->At(prev_size);
+        for (size_t i = 0; i < values.size(); ++i) {
+            EXPECT_EQ(*(values.begin() + i), slice[i])
+                    << " at pos: " << i;
+            EXPECT_EQ(*(values.begin() + i), slice.At(i))
+                    << " at pos: " << i;
+        }
+    };
+
+    append_and_test(std::array{1u, 2u, 3u});
+    append_and_test(std::array{4u, 5u, 6u, 7u});
+    append_and_test(std::array{8u, 9u, 10u, 11u});
+    append_and_test(std::array{0u});
+    append_and_test(std::array<unsigned int, 0>{});
+    append_and_test(std::array{12u, 13u});
+}
+
+TEST(ColumnsCase, ArrayTOfArrayTUint64) {
+    auto array = std::make_shared<clickhouse::ColumnArrayT<ColumnArrayT<ColumnUInt64>>>();
+
+    auto append_and_test = [&array](const auto& values) {
+//        SCOPED_TRACE(values);
+        const size_t prev_size = array->Size();
+
+        array->Append(values);
+        EXPECT_EQ(prev_size + 1u, array->Size());
+
+        EXPECT_TRUE(CompareRecursive(values, array->At(prev_size)));
+        EXPECT_TRUE(CompareRecursive(values, (*array)[prev_size]));
+
+        // Check that both subscrip and At() work properly.
+        const auto & slice = array->At(prev_size);
+        for (size_t i = 0; i < values.size(); ++i) {
+            EXPECT_TRUE(CompareRecursive(*(values.begin() + i), slice[i]))
+                    << " at pos: " << i;
+            EXPECT_TRUE(CompareRecursive(*(values.begin() + i), slice.At(i)))
+                    << " at pos: " << i;
+        }
+    };
+
+    append_and_test(std::array<std::array<unsigned int, 3>, 2>{{{1u, 2u, 3u}, {1u, 2u, 3u}}});
+//    append_and_test(std::array{4u, 5u, 6u, 7u});
+//    append_and_test(std::array{8u, 9u, 10u, 11u});
+//    append_and_test(std::array{0u});
+//    append_and_test(std::array<unsigned int, 0>{});
+//    append_and_test(std::array{12u, 13u});
+}
+
 
 class ColumnsCaseWithName : public ::testing::TestWithParam<const char* /*Column Type String*/>
 {};
@@ -999,3 +1060,32 @@ INSTANTIATE_TEST_SUITE_P(Nested, ColumnsCaseWithName, ::testing::Values(
     "Array(Nullable(LowCardinality(FixedString(10000))))",
     "Array(Enum8('ONE' = 1, 'TWO' = 2))"
 ));
+
+
+
+TEST(TestCompareContainer, ComparePlain) {
+    EXPECT_TRUE(CompareRecursive(std::array{1, 2, 3}, std::array{1, 2, 3}));
+    EXPECT_TRUE(CompareRecursive(std::array<int, 0>{}, std::array<int, 0>{}));
+
+    EXPECT_FALSE(CompareRecursive(std::array{1, 2, 3}, std::array{1, 2, 4}));
+    EXPECT_FALSE(CompareRecursive(std::array{1, 2, 3}, std::array{1, 2}));
+}
+
+TEST(TestCompareContainer, CompareNested) {
+    EXPECT_TRUE(CompareRecursive(
+        std::array<std::array<int, 3>, 2>{{{1, 2, 3}, {4, 5, 6}}},
+        std::array<std::array<int, 3>, 2>{{{1, 2, 3}, {4, 5, 6}}}));
+
+    EXPECT_TRUE(CompareRecursive(
+        std::array<std::array<int, 3>, 3>{{{1, 2, 3}, {4, 5, 6}, {}}},
+        std::array<std::array<int, 3>, 3>{{{1, 2, 3}, {4, 5, 6}, {}}}));
+
+    EXPECT_TRUE(CompareRecursive(
+        std::array<std::array<int, 0>, 1>{{{}}},
+        std::array<std::array<int, 0>, 1>{{{}}}));
+
+    EXPECT_FALSE(CompareRecursive(std::vector<std::vector<int>>{{1, 2, 3}, {4, 5, 6}}, std::vector<std::vector<int>>{{1, 2, 3}, {4, 5, 7}}));
+    EXPECT_FALSE(CompareRecursive(std::vector<std::vector<int>>{{1, 2, 3}, {4, 5, 6}}, std::vector<std::vector<int>>{{1, 2, 3}, {4, 5}}));
+    EXPECT_FALSE(CompareRecursive(std::vector<std::vector<int>>{{1, 2, 3}, {4, 5, 6}}, std::vector<std::vector<int>>{{1, 2, 3}, {}}));
+    EXPECT_FALSE(CompareRecursive(std::vector<std::vector<int>>{{1, 2, 3}, {4, 5, 6}}, std::vector<std::vector<int>>{{}}));
+}

@@ -23,6 +23,9 @@ public:
     /// Type of element of result column same as type of array element.
     ColumnRef GetAsColumn(size_t n) const;
 
+//    template <typename NestedColumnType>
+//     GetAsColumnOf(size_t n) const;
+
 public:
     /// Appends content of given column to the end of current one.
     void Append(ColumnRef column) override;
@@ -56,6 +59,7 @@ protected:
     size_t GetOffset(size_t n) const;
     size_t GetSize(size_t n) const;
     ColumnRef GetData();
+    void AddOffset(size_t n);
     void Reset();
 
 private:
@@ -64,26 +68,30 @@ private:
 };
 
 template <typename NestedColumnType>
-class ColumnArrayWrapper : public ColumnArray {
+class ColumnArrayT : public ColumnArray {
 public:
-    class ArrayElementWrapper {
+    class ArrayWrapper;
+    using ValueType = ArrayWrapper;
+
+    class ArrayWrapper {
         const std::shared_ptr<NestedColumnType> typed_nested_data_;
         const size_t offset_;
         const size_t size_;
+
     public:
         using ValueType = typename NestedColumnType::ValueType;
 
-        ArrayElementWrapper(std::shared_ptr<NestedColumnType> data, size_t offset = 0, size_t size = std::numeric_limits<size_t>::max())
+        ArrayWrapper(std::shared_ptr<NestedColumnType> data, size_t offset = 0, size_t size = std::numeric_limits<size_t>::max())
             : typed_nested_data_(data)
             , offset_(offset)
             , size_(std::min(typed_nested_data_->Size() - offset, size))
         {}
 
-        const ValueType & operator[](size_t index) const {
-            return *typed_nested_data_[offset_ + index];
+        inline const ValueType & operator[](size_t index) const {
+            return (*typed_nested_data_)[offset_ + index];
         }
 
-        const ValueType & At(size_t index) const {
+        inline const ValueType & At(size_t index) const {
             return typed_nested_data_->At(offset_ + index);
         }
 
@@ -102,59 +110,96 @@ public:
 
             using ValueType = typename NestedColumnType::ValueType;
 
-            const ValueType& operator*() const {
+            inline const ValueType& operator*() const {
                 return typed_nested_data_->At(offset_ + index_);
             }
 
-            Iterator& operator++() {
-                ++index_;
+            const ValueType* operator->() const {
+                return &typed_nested_data_->At(offset_ + index_);
             }
 
-            bool operator==(const Iterator& other) const {
+            inline Iterator& operator++() {
+                ++index_;
+                return *this;
+            }
+
+            inline bool operator==(const Iterator& other) const {
                 return this->typed_nested_data_ == other.typed_nested_data_
                         && this->offset_ == other.offset_
                         && this->size_ == other.size_
                         && this->index_ == other.index_;
             }
 
-            bool operator!=(const Iterator& other) const {
+            inline bool operator!=(const Iterator& other) const {
                 return !(*this == other);
             }
         };
 
-        Iterator begin() const {
+        // stl-like interface
+        inline Iterator begin() const {
             return Iterator{typed_nested_data_, offset_, size_, 0};
         }
 
-        Iterator cbegin() const {
+        inline Iterator cbegin() const {
             return Iterator{typed_nested_data_, offset_, size_, 0};
         }
 
-        Iterator end() const {
+        inline Iterator end() const {
             return Iterator{typed_nested_data_, offset_, size_, size_};
         }
 
-        Iterator cend() const {
+        inline Iterator cend() const {
             return Iterator{typed_nested_data_, offset_, size_, size_};
+        }
+
+        inline size_t size() const {
+            return size_;
         }
     };
 
-    ColumnArrayWrapper(std::shared_ptr<NestedColumnType> data)
-        : ColumnArray(data),
+    ColumnArrayT(std::shared_ptr<NestedColumnType> data)
+        : ColumnArray(data)
         , typed_nested_data_(data)
     {}
 
-    ColumnArrayWrapper(ColumnArray && array)
+    ColumnArrayT(ColumnArray && array)
         : ColumnArray(std::move(array))
         , typed_nested_data_(this->getData()->template AsStrict<NestedColumnType>())
     {}
 
-    const ArrayElementWrapper At(size_t index) const {
-        return ArrayElementWrapper{typed_nested_data_, GetOffset(index), GetSize(index)};
+    template <typename ...Args>
+    explicit ColumnArrayT(Args &&... args)
+        : ColumnArrayT(std::make_shared<NestedColumnType>(std::forward<Args>(args)...))
+    {}
+
+    inline const ArrayWrapper At(size_t index) const {
+        return ArrayWrapper{typed_nested_data_, GetOffset(index), GetSize(index)};
     }
 
-    const ArrayElementWrapper operator[](size_t index) const {
-        return ArrayElementWrapper{typed_nested_data_, GetOffset(index), GetSize(index)};
+    inline const ArrayWrapper operator[](size_t index) const {
+        return ArrayWrapper{typed_nested_data_, GetOffset(index), GetSize(index)};
+    }
+
+    using ColumnArray::Append;
+
+    template <typename Container>
+    inline void Append(const Container& container) {
+        Append(std::begin(container), std::end(container));
+    }
+
+    template <typename Begin, typename End>
+    inline void Append(Begin begin, const End & end) {
+        auto & nested_data = *typed_nested_data_;
+        size_t counter = 0;
+
+        while (begin != end) {
+            nested_data.Append(*begin);
+            ++begin;
+            ++counter;
+        }
+
+        // Even if there are 0 items, increase counter, creating empty array item.
+        AddOffset(counter);
     }
 
 private:
