@@ -16,6 +16,7 @@
 
 namespace clickhouse {
     class Block;
+    class Column;
 }
 
 template <typename ChronoDurationType>
@@ -164,6 +165,56 @@ struct is_container : std::false_type {};
 namespace details {
 template <typename... Ts>
 struct is_container_helper {};
+
+// Make a column a RO stl-like container
+template <typename NestedColumnType>
+struct ColumnAsContinerWrapper {
+    const NestedColumnType& nested_col;
+
+    struct Iterator {
+        const NestedColumnType& nested_col;
+        size_t i = 0;
+
+        auto& operator++() {
+            ++i;
+            return *this;
+        }
+
+        auto operator*() const {
+            return nested_col[i];
+        }
+
+        bool operator==(const Iterator & other) const {
+            return &other.nested_col == &this->nested_col && other.i == this->i;
+        }
+
+        bool operator!=(const Iterator & other) const {
+            return !(other == *this);
+        }
+    };
+
+    size_t size() const {
+        return nested_col.Size();
+    }
+
+    auto begin() const {
+        return Iterator{nested_col, 0};
+    }
+
+    auto end() const {
+        return Iterator{nested_col, nested_col.Size()};
+    }
+};
+
+}
+
+template <typename T>
+auto maybeWrapColumnAsContainer(const T & t) {
+    if constexpr (std::is_base_of_v<clickhouse::Column, T>) {
+        return details::ColumnAsContinerWrapper<T>{t};
+    } else {
+        return t;
+    }
 }
 
 // A very loose definition of container, nerfed to fit both C-array and ColumnArrayT<X>::ArrayWrapper
@@ -223,7 +274,7 @@ template <typename Left, typename Right>
 template <typename LeftContainer, typename RightContainer>
 ::testing::AssertionResult CompareCotainersRecursive(const LeftContainer& left, const RightContainer& right) {
     if (left.size() != right.size())
-        return ::testing::AssertionFailure() << "\nContainers size mismatch, expected: " << left.size() << " actual: " << right.size();
+        return ::testing::AssertionFailure() << "\nMismatching containers size, expected: " << left.size() << " actual: " << right.size();
 
     auto l_i = std::begin(left);
     auto r_i = std::begin(right);
@@ -231,7 +282,7 @@ template <typename LeftContainer, typename RightContainer>
     for (size_t i = 0; i < left.size(); ++i, ++l_i, ++r_i) {
         auto result = CompareRecursive(*l_i, *r_i);
         if (!result)
-            return result << "\n\nMismatching items at pos: " << i + 1;
+            return result << "\n\nMismatch at pos: " << i + 1;
     }
 
     return ::testing::AssertionSuccess();
@@ -239,18 +290,22 @@ template <typename LeftContainer, typename RightContainer>
 
 template <typename Left, typename Right>
 ::testing::AssertionResult CompareRecursive(const Left & left, const Right & right) {
-    if constexpr (is_container_v<Left> && is_container_v<Right>) {
-        if (auto result = CompareCotainersRecursive(left, right))
+    if constexpr ((is_container_v<Left> || std::is_base_of_v<clickhouse::Column, std::decay_t<Left>>)
+            && (is_container_v<Right> || std::is_base_of_v<clickhouse::Column, std::decay_t<Right>>) ) {
+
+        const auto & l = maybeWrapColumnAsContainer(left);
+        const auto & r = maybeWrapColumnAsContainer(right);
+
+        if (auto result = CompareCotainersRecursive(l, r))
             return result;
-        else {
-            return result << "\nExpected container: " << PrintContainer{left}
-                          << "\nActual container  : " << PrintContainer{right};
-        }
+        else
+            return result << "\nExpected container: " << PrintContainer{l}
+                          << "\nActual container  : " << PrintContainer{r};
     } else {
         if (left != right)
             return ::testing::AssertionFailure()
-                    << "\nexpected: " << left
-                    << "\nactual  : " << right;
+                    << "\nExpected value: " << left
+                    << "\nActual value  : " << right;
 
         return ::testing::AssertionSuccess();
     }

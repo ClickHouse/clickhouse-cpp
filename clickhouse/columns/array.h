@@ -73,6 +73,26 @@ public:
     class ArrayWrapper;
     using ValueType = ArrayWrapper;
 
+    ColumnArrayT(std::shared_ptr<NestedColumnType> data)
+        : ColumnArray(data)
+        , typed_nested_data_(data)
+    {}
+
+    ColumnArrayT(ColumnArray && array)
+        : ColumnArray(std::move(array))
+        , typed_nested_data_(this->getData()->template AsStrict<NestedColumnType>())
+    {}
+
+    template <typename ...Args>
+    explicit ColumnArrayT(Args &&... args)
+        : ColumnArrayT(std::make_shared<NestedColumnType>(std::forward<Args>(args)...))
+    {}
+
+    static std::shared_ptr<ColumnArrayT<NestedColumnType>> Wrap(ColumnRef col) {
+        auto col_array = col->AsStrict<ColumnArray>();
+        return std::make_shared<ColumnArrayT<NestedColumnType>>(std::move(*col_array));
+    }
+
     class ArrayWrapper {
         const std::shared_ptr<NestedColumnType> typed_nested_data_;
         const size_t offset_;
@@ -87,11 +107,16 @@ public:
             , size_(std::min(typed_nested_data_->Size() - offset, size))
         {}
 
-        inline const ValueType & operator[](size_t index) const {
+        // return by-value instead of by-const-reference to allow nested arrays: Array(Array(X)),
+        // since then ValueType is just a temporary instance of ArrayWrapper.
+        inline auto operator[](size_t index) const {
             return (*typed_nested_data_)[offset_ + index];
         }
 
-        inline const ValueType & At(size_t index) const {
+        inline auto At(size_t index) const {
+            if (index >= size_)
+                throw ValidationError("Out of bounds for array access: "
+                        + std::to_string(index) + " of " + std::to_string(size_));
             return typed_nested_data_->At(offset_ + index);
         }
 
@@ -110,7 +135,7 @@ public:
 
             using ValueType = typename NestedColumnType::ValueType;
 
-            inline const ValueType& operator*() const {
+            inline ValueType operator*() const {
                 return typed_nested_data_->At(offset_ + index_);
             }
 
@@ -157,26 +182,11 @@ public:
         }
     };
 
-    ColumnArrayT(std::shared_ptr<NestedColumnType> data)
-        : ColumnArray(data)
-        , typed_nested_data_(data)
-    {}
-
-    ColumnArrayT(ColumnArray && array)
-        : ColumnArray(std::move(array))
-        , typed_nested_data_(this->getData()->template AsStrict<NestedColumnType>())
-    {}
-
-    template <typename ...Args>
-    explicit ColumnArrayT(Args &&... args)
-        : ColumnArrayT(std::make_shared<NestedColumnType>(std::forward<Args>(args)...))
-    {}
-
-    inline const ArrayWrapper At(size_t index) const {
+    inline auto At(size_t index) const {
         return ArrayWrapper{typed_nested_data_, GetOffset(index), GetSize(index)};
     }
 
-    inline const ArrayWrapper operator[](size_t index) const {
+    inline auto operator[](size_t index) const {
         return ArrayWrapper{typed_nested_data_, GetOffset(index), GetSize(index)};
     }
 

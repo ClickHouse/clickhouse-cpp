@@ -965,66 +965,108 @@ TEST(ColumnsCase, ArrayOfDecimal) {
     EXPECT_EQ(2u, array->GetAsColumn(0)->Size());
 }
 
+template <typename ArrayTSpecialization, typename RowValuesContainer>
+auto AppendRowAndTest(ArrayTSpecialization& array, const RowValuesContainer& values) {
+    SCOPED_TRACE(PrintContainer{values});
+    const size_t prev_size = array.Size();
+
+    array.Append(values);
+    EXPECT_EQ(prev_size + 1u, array.Size());
+
+    EXPECT_TRUE(CompareRecursive(values, array.At(prev_size)));
+    EXPECT_TRUE(CompareRecursive(values, array[prev_size]));
+
+    // Check that both subscrip and At() work properly.
+    const auto & new_row = array.At(prev_size);
+    for (size_t i = 0; i < values.size(); ++i) {
+        EXPECT_TRUE(CompareRecursive(*(values.begin() + i), new_row[i]))
+                << " at pos: " << i;
+        EXPECT_TRUE(CompareRecursive(*(values.begin() + i), new_row.At(i)))
+                << " at pos: " << i;
+    }
+};
+
+template <typename NestedColumnType, typename AllValuesContainer>
+auto CreateAndTestColumnArrayT(const AllValuesContainer& all_values) {
+    auto array = std::make_shared<clickhouse::ColumnArrayT<NestedColumnType>>();
+
+    for (const auto & row : all_values) {
+        EXPECT_NO_FATAL_FAILURE(AppendRowAndTest(*array, row));
+    }
+    EXPECT_TRUE(CompareRecursive(all_values, *array));
+
+    return array;
+}
+
 TEST(ColumnsCase, ArrayTUint64) {
-    auto array = std::make_shared<clickhouse::ColumnArrayT<ColumnUInt64>>();
-
-    auto append_and_test = [&array](const auto& values) {
-//        SCOPED_TRACE(values);
-        const size_t prev_size = array->Size();
-
-        array->Append(values);
-        EXPECT_EQ(prev_size + 1u, array->Size());
-
-        EXPECT_TRUE(CompareRecursive(values, array->At(prev_size)));
-        EXPECT_TRUE(CompareRecursive(values, (*array)[prev_size]));
-
-        // Check that both subscrip and At() work properly.
-        const auto & slice = array->At(prev_size);
-        for (size_t i = 0; i < values.size(); ++i) {
-            EXPECT_EQ(*(values.begin() + i), slice[i])
-                    << " at pos: " << i;
-            EXPECT_EQ(*(values.begin() + i), slice.At(i))
-                    << " at pos: " << i;
-        }
+//    auto array = std::make_shared<clickhouse::ColumnArrayT<ColumnUInt64>>();
+    const std::vector<std::vector<unsigned int>> values = {
+        {1u, 2u, 3u},
+        {4u, 5u, 6u, 7u, 8u, 9u},
+        {0u},
+        {},
+        {13, 14}
     };
+    auto array_ptr = CreateAndTestColumnArrayT<ColumnUInt64>(values);
+    const auto & array = *array_ptr;
 
-    append_and_test(std::array{1u, 2u, 3u});
-    append_and_test(std::array{4u, 5u, 6u, 7u});
-    append_and_test(std::array{8u, 9u, 10u, 11u});
-    append_and_test(std::array{0u});
-    append_and_test(std::array<unsigned int, 0>{});
-    append_and_test(std::array{12u, 13u});
+    {
+        const auto row = array[0];
+        EXPECT_EQ(1u, row[0]);
+        EXPECT_EQ(2u, row[1]);
+        EXPECT_EQ(3u, row[2]);
+
+        // out of band access
+        EXPECT_THROW(row.At(3), ValidationError);
+    }
 }
 
 TEST(ColumnsCase, ArrayTOfArrayTUint64) {
-    auto array = std::make_shared<clickhouse::ColumnArrayT<ColumnArrayT<ColumnUInt64>>>();
-
-    auto append_and_test = [&array](const auto& values) {
-//        SCOPED_TRACE(values);
-        const size_t prev_size = array->Size();
-
-        array->Append(values);
-        EXPECT_EQ(prev_size + 1u, array->Size());
-
-        EXPECT_TRUE(CompareRecursive(values, array->At(prev_size)));
-        EXPECT_TRUE(CompareRecursive(values, (*array)[prev_size]));
-
-        // Check that both subscrip and At() work properly.
-        const auto & slice = array->At(prev_size);
-        for (size_t i = 0; i < values.size(); ++i) {
-            EXPECT_TRUE(CompareRecursive(*(values.begin() + i), slice[i]))
-                    << " at pos: " << i;
-            EXPECT_TRUE(CompareRecursive(*(values.begin() + i), slice.At(i)))
-                    << " at pos: " << i;
-        }
+    const std::vector<std::vector<std::vector<unsigned int>>> values = {
+        // row 0
+        {{1u, 2u, 3u}, {4u, 5u, 6u}},
+        // row 1
+        {{4u, 5u, 6u}, {7u, 8u, 9u}, {10u, 11u}},
+        // etc
+        {{}, {}},
+        {},
+        {{13, 14}, {}}
     };
+    auto array_ptr = CreateAndTestColumnArrayT<ColumnArrayT<ColumnUInt64>>(values);
+    const auto & array = *array_ptr;
 
-    append_and_test(std::array<std::array<unsigned int, 3>, 2>{{{1u, 2u, 3u}, {1u, 2u, 3u}}});
-//    append_and_test(std::array{4u, 5u, 6u, 7u});
-//    append_and_test(std::array{8u, 9u, 10u, 11u});
-//    append_and_test(std::array{0u});
-//    append_and_test(std::array<unsigned int, 0>{});
-//    append_and_test(std::array{12u, 13u});
+    {
+        const auto row = array[0];
+        EXPECT_EQ(1u, row[0][0]);
+        EXPECT_EQ(2u, row[0][1]);
+        EXPECT_EQ(6u, row[1][2]);
+    }
+
+    {
+        EXPECT_EQ(8u,  array[1][1][1]);
+        EXPECT_EQ(11u, array[1][2][1]);
+    }
+
+    {
+        EXPECT_EQ(2u, array[2].size());
+        EXPECT_EQ(0u, array[2][0].size());
+        EXPECT_EQ(0u, array[2][1].size());
+    }
+
+    {
+        EXPECT_EQ(0u, array[3].size());
+        const auto row = array[3];
+        const auto elem0 = row[0];
+        const auto elem1 = row[1];
+
+        EXPECT_EQ(0u, elem0.size());
+        EXPECT_EQ(0u, elem1.size());
+    }
+
+    {
+        EXPECT_EQ(14u, array[4][0][1]);
+        EXPECT_EQ(0u, array[4][1].size());
+    }
 }
 
 
@@ -1069,7 +1111,11 @@ TEST(TestCompareContainer, ComparePlain) {
 
     EXPECT_FALSE(CompareRecursive(std::array{1, 2, 3}, std::array{1, 2, 4}));
     EXPECT_FALSE(CompareRecursive(std::array{1, 2, 3}, std::array{1, 2}));
+
+    // That would cause compile-time error:
+    // EXPECT_FALSE(CompareRecursive(std::array{1, 2, 3}, 1));
 }
+
 
 TEST(TestCompareContainer, CompareNested) {
     EXPECT_TRUE(CompareRecursive(
