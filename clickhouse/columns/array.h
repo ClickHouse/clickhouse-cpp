@@ -12,8 +12,8 @@ namespace clickhouse {
  */
 class ColumnArray : public Column {
 public:
+    // Create an array of given type.
     ColumnArray(ColumnRef data);
-    ColumnArray(ColumnArray && array);
 
     /// Converts input column to array and appends
     /// as one row to the current column.
@@ -22,9 +22,6 @@ public:
     /// Convets array at pos n to column.
     /// Type of element of result column same as type of array element.
     ColumnRef GetAsColumn(size_t n) const;
-
-//    template <typename NestedColumnType>
-//     GetAsColumnOf(size_t n) const;
 
 public:
     /// Appends content of given column to the end of current one.
@@ -56,6 +53,8 @@ public:
     void OffsetsIncrease(size_t);
 
 protected:
+    ColumnArray(ColumnArray&& array);
+
     size_t GetOffset(size_t n) const;
     size_t GetSize(size_t n) const;
     ColumnRef GetData();
@@ -73,14 +72,9 @@ public:
     class ArrayWrapper;
     using ValueType = ArrayWrapper;
 
-    ColumnArrayT(std::shared_ptr<NestedColumnType> data)
+    explicit ColumnArrayT(std::shared_ptr<NestedColumnType> data)
         : ColumnArray(data)
         , typed_nested_data_(data)
-    {}
-
-    ColumnArrayT(ColumnArray && array)
-        : ColumnArray(std::move(array))
-        , typed_nested_data_(this->getData()->template AsStrict<NestedColumnType>())
     {}
 
     template <typename ...Args>
@@ -88,9 +82,24 @@ public:
         : ColumnArrayT(std::make_shared<NestedColumnType>(std::forward<Args>(args)...))
     {}
 
-    static std::shared_ptr<ColumnArrayT<NestedColumnType>> Wrap(ColumnRef col) {
-        auto col_array = col->AsStrict<ColumnArray>();
-        return std::make_shared<ColumnArrayT<NestedColumnType>>(std::move(*col_array));
+    // Helper to allow wrapping a "typeless" ColumnArray
+    explicit ColumnArrayT(ColumnArray&& array)
+        : ColumnArray(std::move(array))
+        , typed_nested_data_(this->GetData()->template AsStrict<NestedColumnType>())
+    {}
+
+    /** Create a ColumnArrayT from a ColumnArray, without copying data and offsets.
+     *  Ownership of column internals is transferred to returned object, original (argument) object
+     *  MUST NOT BE USED IN ANY WAY, it is only safe to dispose it.
+     *
+     *  Throws an exception of `col` is of wrong type, it is safe to use original col in this case.
+     *  This is a static method to make such conversion verbose.
+     */
+    static auto Wrap(Column&& col) {
+        return Wrap(std::move(dynamic_cast<ColumnArray&&>(col)));
+    }
+    static auto Wrap(ColumnArray&& col) {
+        return std::make_shared<ColumnArrayT<NestedColumnType>>(std::move(col));
     }
 
     class ArrayWrapper {
@@ -107,16 +116,14 @@ public:
             , size_(std::min(typed_nested_data_->Size() - offset, size))
         {}
 
-        // return by-value instead of by-const-reference to allow nested arrays: Array(Array(X)),
-        // since then ValueType is just a temporary instance of ArrayWrapper.
         inline auto operator[](size_t index) const {
             return (*typed_nested_data_)[offset_ + index];
         }
 
         inline auto At(size_t index) const {
             if (index >= size_)
-                throw ValidationError("Out of bounds for array access: "
-                        + std::to_string(index) + " of " + std::to_string(size_));
+                throw ValidationError("ColumnArray value index out of bounds: "
+                        + std::to_string(index) + ", max is " + std::to_string(size_));
             return typed_nested_data_->At(offset_ + index);
         }
 
@@ -135,11 +142,12 @@ public:
 
             using ValueType = typename NestedColumnType::ValueType;
 
-            inline ValueType operator*() const {
+            inline auto operator*() const {
                 return typed_nested_data_->At(offset_ + index_);
             }
 
-            const ValueType* operator->() const {
+            // TODO: check that this doesn't cause any issues with nested arrays.
+            const auto* operator->() const {
                 return &typed_nested_data_->At(offset_ + index_);
             }
 
@@ -160,7 +168,7 @@ public:
             }
         };
 
-        // stl-like interface
+        // minimalistic stl-like container interface, hence the lowercase
         inline Iterator begin() const {
             return Iterator{typed_nested_data_, offset_, size_, 0};
         }
@@ -180,9 +188,18 @@ public:
         inline size_t size() const {
             return size_;
         }
+
+        // It is ugly to have both size() and Size(), but it is for compatitability with both STL and rest of the clickhouse-cpp.
+        inline size_t Size() const {
+            return size_;
+        }
     };
 
     inline auto At(size_t index) const {
+        if (index >= Size())
+            throw ValidationError("ColumnArray row index out of bounds: "
+                    + std::to_string(index) + ", max is " + std::to_string(Size()));
+
         return ArrayWrapper{typed_nested_data_, GetOffset(index), GetSize(index)};
     }
 

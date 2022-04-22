@@ -994,12 +994,14 @@ auto CreateAndTestColumnArrayT(const AllValuesContainer& all_values) {
         EXPECT_NO_FATAL_FAILURE(AppendRowAndTest(*array, row));
     }
     EXPECT_TRUE(CompareRecursive(all_values, *array));
+    EXPECT_THROW(array->At(array->Size() + 1), clickhouse::ValidationError);
 
     return array;
 }
 
 TEST(ColumnsCase, ArrayTUint64) {
-//    auto array = std::make_shared<clickhouse::ColumnArrayT<ColumnUInt64>>();
+    // Check inserting\reading back data from clickhouse::ColumnArrayT<ColumnUInt64>
+
     const std::vector<std::vector<unsigned int>> values = {
         {1u, 2u, 3u},
         {4u, 5u, 6u, 7u, 8u, 9u},
@@ -1010,28 +1012,35 @@ TEST(ColumnsCase, ArrayTUint64) {
     auto array_ptr = CreateAndTestColumnArrayT<ColumnUInt64>(values);
     const auto & array = *array_ptr;
 
-    {
-        const auto row = array[0];
-        EXPECT_EQ(1u, row[0]);
-        EXPECT_EQ(2u, row[1]);
-        EXPECT_EQ(3u, row[2]);
+    // Make sure that chaining of brackets works.
+    EXPECT_EQ(1u, array[0][0]);
+    EXPECT_EQ(2u, array[0][1]);
+    EXPECT_EQ(3u, array[0][2]);
 
-        // out of band access
-        EXPECT_THROW(row.At(3), ValidationError);
-    }
+    // empty row
+    EXPECT_EQ(0u, array[3].size());
+
+    EXPECT_EQ(2u, array[4].size());
+    EXPECT_EQ(13u, array[4][0]);
+    EXPECT_EQ(14u, array[4][1]);
+
+    // Make sure that At() throws an exception on nested items
+    EXPECT_THROW(array.At(5), clickhouse::ValidationError);
+    EXPECT_THROW(array[3].At(0), clickhouse::ValidationError);
+    EXPECT_THROW(array[4].At(3), clickhouse::ValidationError);
 }
 
 TEST(ColumnsCase, ArrayTOfArrayTUint64) {
+    // Check inserting\reading back data from 2D array: clickhouse::ColumnArrayT<ColumnArrayT<ColumnUInt64>>
+
     const std::vector<std::vector<std::vector<unsigned int>>> values = {
-        // row 0
         {{1u, 2u, 3u}, {4u, 5u, 6u}},
-        // row 1
         {{4u, 5u, 6u}, {7u, 8u, 9u}, {10u, 11u}},
-        // etc
         {{}, {}},
         {},
         {{13, 14}, {}}
     };
+
     auto array_ptr = CreateAndTestColumnArrayT<ColumnArrayT<ColumnUInt64>>(values);
     const auto & array = *array_ptr;
 
@@ -1055,12 +1064,15 @@ TEST(ColumnsCase, ArrayTOfArrayTUint64) {
 
     {
         EXPECT_EQ(0u, array[3].size());
-        const auto row = array[3];
-        const auto elem0 = row[0];
-        const auto elem1 = row[1];
 
-        EXPECT_EQ(0u, elem0.size());
-        EXPECT_EQ(0u, elem1.size());
+        // [] doesn't check bounds.
+        // On empty rows attempt to access out-of-bound elements
+        // would actually cause access to the elements of the next row.
+        // hence non-0 value of `array[3][0].size()`,
+        // it is effectively the same as `array[3 + 1][0].size()`
+        EXPECT_EQ(2u, array[3][0].size());
+        EXPECT_EQ(14u, array[3][0][1]);
+        EXPECT_EQ(0u, array[3][1].size());
     }
 
     {
@@ -1068,6 +1080,35 @@ TEST(ColumnsCase, ArrayTOfArrayTUint64) {
         EXPECT_EQ(0u, array[4][1].size());
     }
 }
+
+TEST(ColumnsCase, ArrayTWrap) {
+    // Check that ColumnArrayT can wrap a pre-existing ColumnArray,
+    // pre-existing data is kept intact and new rows can be inserted.
+
+    const std::vector<std::vector<uint64_t>> values = {
+        {1u, 2u, 3u},
+        {4u, 5u, 6u, 7u, 8u, 9u},
+        {0u},
+        {},
+        {13, 14}
+    };
+
+    std::shared_ptr<ColumnArray> untyped_array = std::make_shared<ColumnArray>(std::make_shared<ColumnUInt64>());
+    for (size_t i = 0; i < values.size(); ++i) {
+        untyped_array->AppendAsColumn(std::make_shared<ColumnUInt64>(values[i]));
+//        const auto row = untyped_array->GetAsColumn(i)->AsStrict<ColumnUInt64>();
+//        EXPECT_TRUE(CompareRecursive(values[i], *row));
+    }
+
+    auto wrapped_array = ColumnArrayT<ColumnUInt64>::Wrap(std::move(*untyped_array));
+    // Upon wrapping, internals of columns are "stolen" and the column shouldn't be used anymore.
+//    EXPECT_EQ(0u, untyped_array->Size());
+
+    const auto & array = *wrapped_array;
+
+    EXPECT_TRUE(CompareRecursive(values, array));
+}
+
 
 
 class ColumnsCaseWithName : public ::testing::TestWithParam<const char* /*Column Type String*/>
