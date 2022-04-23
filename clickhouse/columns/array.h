@@ -214,6 +214,11 @@ public:
         Append(std::begin(container), std::end(container));
     }
 
+    template <typename ValueType>
+    inline void Append(const std::initializer_list<ValueType>& container) {
+        Append(std::begin(container), std::end(container));
+    }
+
     template <typename Begin, typename End>
     inline void Append(Begin begin, const End & end) {
         auto & nested_data = *typed_nested_data_;

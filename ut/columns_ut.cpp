@@ -967,7 +967,7 @@ TEST(ColumnsCase, ArrayOfDecimal) {
 
 template <typename ArrayTSpecialization, typename RowValuesContainer>
 auto AppendRowAndTest(ArrayTSpecialization& array, const RowValuesContainer& values) {
-    SCOPED_TRACE(PrintContainer{values});
+//    SCOPED_TRACE(PrintContainer{values});
     const size_t prev_size = array.Size();
 
     array.Append(values);
@@ -1147,11 +1147,11 @@ INSTANTIATE_TEST_SUITE_P(Nested, ColumnsCaseWithName, ::testing::Values(
 
 
 TEST(TestCompareContainer, ComparePlain) {
-    EXPECT_TRUE(CompareRecursive(std::array{1, 2, 3}, std::array{1, 2, 3}));
-    EXPECT_TRUE(CompareRecursive(std::array<int, 0>{}, std::array<int, 0>{}));
+    EXPECT_TRUE(CompareRecursive(std::vector<int>{1, 2, 3}, std::vector<int>{1, 2, 3}));
+    EXPECT_TRUE(CompareRecursive(std::vector<int>{}, std::vector<int>{}));
 
-    EXPECT_FALSE(CompareRecursive(std::array{1, 2, 3}, std::array{1, 2, 4}));
-    EXPECT_FALSE(CompareRecursive(std::array{1, 2, 3}, std::array{1, 2}));
+    EXPECT_FALSE(CompareRecursive(std::vector<int>{1, 2, 3}, std::vector<int>{1, 2, 4}));
+    EXPECT_FALSE(CompareRecursive(std::vector<int>{1, 2, 3}, std::vector<int>{1, 2}));
 
     // That would cause compile-time error:
     // EXPECT_FALSE(CompareRecursive(std::array{1, 2, 3}, 1));
@@ -1160,16 +1160,16 @@ TEST(TestCompareContainer, ComparePlain) {
 
 TEST(TestCompareContainer, CompareNested) {
     EXPECT_TRUE(CompareRecursive(
-        std::array<std::array<int, 3>, 2>{{{1, 2, 3}, {4, 5, 6}}},
-        std::array<std::array<int, 3>, 2>{{{1, 2, 3}, {4, 5, 6}}}));
+        std::vector<std::vector<int>>{{{1, 2, 3}, {4, 5, 6}}},
+        std::vector<std::vector<int>>{{{1, 2, 3}, {4, 5, 6}}}));
 
     EXPECT_TRUE(CompareRecursive(
-        std::array<std::array<int, 3>, 3>{{{1, 2, 3}, {4, 5, 6}, {}}},
-        std::array<std::array<int, 3>, 3>{{{1, 2, 3}, {4, 5, 6}, {}}}));
+        std::vector<std::vector<int>>{{{1, 2, 3}, {4, 5, 6}, {}}},
+        std::vector<std::vector<int>>{{{1, 2, 3}, {4, 5, 6}, {}}}));
 
     EXPECT_TRUE(CompareRecursive(
-        std::array<std::array<int, 0>, 1>{{{}}},
-        std::array<std::array<int, 0>, 1>{{{}}}));
+        std::vector<std::vector<int>>{{{}}},
+        std::vector<std::vector<int>>{{{}}}));
 
     EXPECT_FALSE(CompareRecursive(std::vector<std::vector<int>>{{1, 2, 3}, {4, 5, 6}}, std::vector<std::vector<int>>{{1, 2, 3}, {4, 5, 7}}));
     EXPECT_FALSE(CompareRecursive(std::vector<std::vector<int>>{{1, 2, 3}, {4, 5, 6}}, std::vector<std::vector<int>>{{1, 2, 3}, {4, 5}}));

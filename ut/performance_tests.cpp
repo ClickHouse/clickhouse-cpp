@@ -84,9 +84,9 @@ TYPED_TEST_SUITE_P(ColumnPerformanceTest);
 
 // Turns out this is the easiest way to skip test with current version of gtest
 #ifndef NDEBUG
-#  define SKIP_IN_DEBUG_BUILDS() do { std::cerr << "Test skipped...\n"; return; } while(0)
-#else
 #  define SKIP_IN_DEBUG_BUILDS() (void)(0)
+#else
+#  define SKIP_IN_DEBUG_BUILDS() GTEST_SKIP_("Test skipped for DEBUG build...")
 #endif
 
 TYPED_TEST_P(ColumnPerformanceTest, SaveAndLoad) {
