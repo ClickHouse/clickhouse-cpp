@@ -211,7 +211,7 @@ struct ColumnAsContinerWrapper {
 template <typename T>
 auto maybeWrapColumnAsContainer(const T & t) {
     if constexpr (std::is_base_of_v<clickhouse::Column, T>) {
-        return details::ColumnAsContinerWrapper<T>{t};
+        return ::details::ColumnAsContinerWrapper<T>{t};
     } else {
         return t;
     }
@@ -223,7 +223,7 @@ struct is_container<
         T,
         std::conditional_t<
             false,
-            details::is_container_helper<
+            ::details::is_container_helper<
                 decltype(std::declval<T>().size()),
                 decltype(std::begin(std::declval<T>())),
                 decltype(std::end(std::declval<T>()))
