@@ -7,13 +7,18 @@
 
 namespace clickhouse {
 
+template <typename NestedColumnType>
+class ColumnArrayT;
+
 /**
  * Represents column of Array(T).
  */
 class ColumnArray : public Column {
 public:
+    using ValueType = ColumnRef;
+
     // Create an array of given type.
-    ColumnArray(ColumnRef data);
+    explicit ColumnArray(ColumnRef data);
 
     /// Converts input column to array and appends
     /// as one row to the current column.
@@ -53,6 +58,8 @@ public:
     void OffsetsIncrease(size_t);
 
 protected:
+    template<typename T> friend class ColumnArrayT;
+
     ColumnArray(ColumnArray&& array);
 
     size_t GetOffset(size_t n) const;
@@ -98,8 +105,24 @@ public:
     static auto Wrap(Column&& col) {
         return Wrap(std::move(dynamic_cast<ColumnArray&&>(col)));
     }
+
     static auto Wrap(ColumnArray&& col) {
-        return std::make_shared<ColumnArrayT<NestedColumnType>>(std::move(col));
+        // if NestedColumnType is ArrayT specialization
+        if constexpr (std::is_base_of_v<ColumnArray, NestedColumnType> && !std::is_same_v<ColumnArray, NestedColumnType>) {
+//            auto tmp_col = NestedColumnType::Wrap()
+            auto result = std::make_shared<ColumnArrayT<NestedColumnType>>(NestedColumnType::Wrap(col.GetData()));
+            for (size_t i = 0; i < col.Size(); ++i)
+                result->AddOffset(col.GetSize(i));
+
+            return result;
+        } else {
+            return std::make_shared<ColumnArrayT<NestedColumnType>>(std::move(col));
+        }
+    }
+
+    // Helper to simplify integration with other APIs
+    static auto Wrap(ColumnRef&& col) {
+        return Wrap(std::move(*col->AsStrict<ColumnArray>()));
     }
 
     class ArrayWrapper {

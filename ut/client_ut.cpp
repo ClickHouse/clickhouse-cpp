@@ -913,6 +913,128 @@ TEST_P(ClientCase, Query_ID) {
     EXPECT_EQ(5u, total_count);
 }
 
+TEST_P(ClientCase, ArrayArrayUInt64) {
+    // FIXME!!!! : this is a user-reported bug, nested values shoud be adequate
+    client_->Execute(Query(R"sql(CREATE TEMPORARY TABLE IF NOT EXISTS multiarray
+    (
+        `arr` Array(Array(UInt64))
+    )
+    ENGINE = Memory;
+)sql"));
+
+    client_->Execute(Query(R"sql(INSERT INTO multiarray VALUES ([[0,1,2,3,4,5], [100, 200], [10,20, 50, 70]]))sql"));
+
+    client_->Select("SELECT arr FROM multiarray", [](const Block& block) {
+        if (block.GetRowCount() == 0)
+            return;
+
+        std::cout << PrettyPrintBlock{block};
+//        for (size_t c = 0; c < block.GetRowCount(); ++c) {
+//            auto row = block[0]->As<ColumnArray>()->GetAsColumn(c);
+//            std::cout << row->Size() << std::endl;
+//            std::cout << "[";
+//            for (size_t i = 0; i < row->Size(); ++i) {
+//                auto nested_array = row->As<ColumnArray>()->GetAsColumn(i);
+//                for (size_t j = 0; j < nested_array->Size(); ++j) {
+//                std::cout << (int)(*nested_array->As<ColumnUInt64>())[j];
+//                if (j + 1 != nested_array->Size())
+//                    std::cout << " ";
+//                }
+//            }
+//            std::cout << "]" << std::endl;
+//        }
+    });
+}
+
+clickhouse::ColumnRef RoundtripColumnValues(clickhouse::Client& client, clickhouse::ColumnRef expected) {
+    // Create a temporary table with a single column
+    // insert values from `expected`
+    // select and aggregate all values from `expected` into `result` column
+    // return `result`
+
+    auto result = expected->CloneEmpty();
+
+    const std::string type_name = result->GetType().GetName();
+    std::cerr << type_name << std::endl;
+    client.Execute("DROP TEMPORARY TABLE IF EXISTS temporary_roundtrip_table;");
+    client.Execute("CREATE TEMPORARY TABLE IF NOT EXISTS temporary_roundtrip_table (col " + type_name + ");");
+    {
+        Block block;
+        block.AppendColumn("col", expected);
+        block.RefreshRowCount();
+        client.Insert("temporary_roundtrip_table", block);
+    }
+
+    client.Select("SELECT col FROM temporary_roundtrip_table", [&result](const Block& b) {
+        if (b.GetRowCount() == 0)
+            return;
+
+        ASSERT_EQ(1u, b.GetColumnCount());
+        result->Append(b[0]);
+    });
+
+    EXPECT_EQ(expected->Type(), result->Type());
+    EXPECT_EQ(expected->Size(), result->Size());
+    return result;
+}
+
+// TODO(vnemkov): test roundtrip Array(String), Array(Array(UInt64)), Array(Array(Array(UInt64))), with both ColumnArray and ColumnArrayT
+TEST_P(ClientCase, ArrayTUint64) {
+    auto array = std::make_shared<clickhouse::ColumnArrayT<ColumnUInt64>>();
+    array->Append({0, 1, 2});
+
+    auto result = RoundtripColumnValues(*client_, array)->AsStrict<ColumnArray>();
+    auto row = result->GetAsColumn(0)->As<ColumnUInt64>();
+
+    EXPECT_EQ(0u, row->At(0));
+    EXPECT_EQ(1u, (*row)[1]);
+    EXPECT_EQ(2u, (*row)[2]);
+}
+
+TEST_P(ClientCase, ArrayTArrayTUint64) {
+    const std::vector<std::vector<uint64_t>> values = {
+        {1, 2, 3},
+        {4, 5, 6},
+        {7, 8, 9, 10}
+    };
+
+    auto array = std::make_shared<ColumnArrayT<ColumnArrayT<ColumnUInt64>>>();
+    EXPECT_EQ("Array(Array(UInt64))", array->GetType().GetName());
+    array->Append(values);
+    EXPECT_EQ("Array(Array(UInt64))", array->GetType().GetName());
+
+    auto result = RoundtripColumnValues(*client_, array);
+    auto result_typed = ColumnArrayT<ColumnArrayT<ColumnUInt64>>::Wrap(std::move(*result));
+    EXPECT_TRUE(CompareRecursive(*array, *result_typed));
+}
+
+
+
+//TEST_P(ClientCase, ArrayTSimpleFixedString) {
+//    using namespace std::literals;
+//    auto array = std::make_shared<clickhouse::ColumnArrayT<ColumnFixedString>>(6);
+//    array->Append({"hello", "world"});
+
+//    // Additional \0 since strings are padded from right with zeros in FixedString(6).
+//    EXPECT_EQ("hello\0"sv, array->At(0).At(0));
+
+//    auto row = array->At(0);
+//    EXPECT_EQ("hello\0"sv, row.At(0));
+//    EXPECT_EQ(6u, row[0].length());
+//    EXPECT_EQ("hello", row[0].substr(0, 5));
+
+//    EXPECT_EQ("world\0"sv, (*array)[0][1]);
+//}
+
+//TEST_P(ClientCase, ArrayTSimpleArrayOfUint64) {
+//    // Nested 2D-arrays are supported too:
+//    auto array = std::make_shared<clickhouse::ColumnArrayT<clickhouse::ColumnArrayT<ColumnUInt64>>>();
+//    array->Append(std::vector<std::vector<unsigned int>>{{0}, {1, 1}, {2, 2, 2}});
+
+//    EXPECT_EQ(0u, array->At(0).At(0).At(0)); // 0
+//    EXPECT_EQ(1u, (*array)[0][1][1]);        // 1
+//}
+
 const auto LocalHostEndpoint = ClientOptions()
         .SetHost(           getEnvOrDefault("CLICKHOUSE_HOST",     "localhost"))
         .SetPort(   getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "9000"))

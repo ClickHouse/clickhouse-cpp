@@ -1110,7 +1110,38 @@ TEST(ColumnsCase, ArrayTWrap) {
     EXPECT_TRUE(CompareRecursive(values, array));
 }
 
+TEST(ColumnsCase, ArrayTSimpleUint64) {
+    auto array = std::make_shared<clickhouse::ColumnArrayT<ColumnUInt64>>();
+    array->Append({0, 1, 2});
 
+    EXPECT_EQ(0u, array->At(0).At(0)); // 0
+    EXPECT_EQ(1u, (*array)[0][1]);     // 1
+}
+
+TEST(ColumnsCase, ArrayTSimpleFixedString) {
+    using namespace std::literals;
+    auto array = std::make_shared<clickhouse::ColumnArrayT<ColumnFixedString>>(6);
+    array->Append({"hello", "world"});
+
+    // Additional \0 since strings are padded from right with zeros in FixedString(6).
+    EXPECT_EQ("hello\0"sv, array->At(0).At(0));
+
+    auto row = array->At(0);
+    EXPECT_EQ("hello\0"sv, row.At(0));
+    EXPECT_EQ(6u, row[0].length());
+    EXPECT_EQ("hello", row[0].substr(0, 5));
+
+    EXPECT_EQ("world\0"sv, (*array)[0][1]);
+}
+
+TEST(ColumnsCase, ArrayTSimpleArrayOfUint64) {
+    // Nested 2D-arrays are supported too:
+    auto array = std::make_shared<clickhouse::ColumnArrayT<clickhouse::ColumnArrayT<ColumnUInt64>>>();
+    array->Append(std::vector<std::vector<unsigned int>>{{0}, {1, 1}, {2, 2, 2}});
+
+    EXPECT_EQ(0u, array->At(0).At(0).At(0)); // 0
+    EXPECT_EQ(1u, (*array)[0][1][1]);        // 1
+}
 
 class ColumnsCaseWithName : public ::testing::TestWithParam<const char* /*Column Type String*/>
 {};
