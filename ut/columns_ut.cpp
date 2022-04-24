@@ -984,6 +984,7 @@ auto AppendRowAndTest(ArrayTSpecialization& array, const RowValuesContainer& val
         EXPECT_TRUE(CompareRecursive(*(values.begin() + i), new_row.At(i)))
                 << " at pos: " << i;
     }
+    EXPECT_THROW(new_row.At(new_row.size() + 1), clickhouse::ValidationError);
 };
 
 template <typename NestedColumnType, typename AllValuesContainer>

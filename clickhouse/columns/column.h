@@ -40,7 +40,7 @@ public:
     inline std::shared_ptr<T> AsStrict() {
         auto result = std::dynamic_pointer_cast<T>(shared_from_this());
         if (!result) {
-            throw std::runtime_error("Can't cast from " + type_->GetName());
+            throw ValidationError("Can't cast from " + type_->GetName());
         }
         return result;
     }

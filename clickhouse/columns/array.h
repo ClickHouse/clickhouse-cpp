@@ -146,11 +146,6 @@ public:
                 return typed_nested_data_->At(offset_ + index_);
             }
 
-            // TODO: check that this doesn't cause any issues with nested arrays.
-            const auto* operator->() const {
-                return &typed_nested_data_->At(offset_ + index_);
-            }
-
             inline Iterator& operator++() {
                 ++index_;
                 return *this;
