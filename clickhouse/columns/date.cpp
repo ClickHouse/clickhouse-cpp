@@ -48,6 +48,10 @@ ColumnRef ColumnDate::Slice(size_t begin, size_t len) const {
     return result;
 }
 
+ColumnRef ColumnDate::CloneEmpty() const {
+    return std::make_shared<ColumnDate>();
+}
+
 void ColumnDate::Swap(Column& other) {
     auto & col = dynamic_cast<ColumnDate &>(other);
     data_.swap(col.data_);
@@ -112,6 +116,10 @@ ColumnRef ColumnDateTime::Slice(size_t begin, size_t len) const {
     result->data_->Append(col);
 
     return result;
+}
+
+ColumnRef ColumnDateTime::CloneEmpty() const {
+    return std::make_shared<ColumnDate>();
 }
 
 void ColumnDateTime::Swap(Column& other) {
@@ -195,6 +203,10 @@ ColumnRef ColumnDateTime64::Slice(size_t begin, size_t len) const {
     auto sliced_data = data_->Slice(begin, len)->As<ColumnDecimal>();
 
     return ColumnRef{new ColumnDateTime64(type_, sliced_data)};
+}
+
+ColumnRef ColumnDateTime64::CloneEmpty() const {
+    return ColumnRef{new ColumnDateTime64(type_, data_->CloneEmpty()->As<ColumnDecimal>())};
 }
 
 size_t ColumnDateTime64::GetPrecision() const {

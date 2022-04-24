@@ -106,6 +106,10 @@ ColumnRef ColumnFixedString::Slice(size_t begin, size_t len) const {
     return result;
 }
 
+ColumnRef ColumnFixedString::CloneEmpty() const {
+    return std::make_shared<ColumnFixedString>(string_size_);
+}
+
 void ColumnFixedString::Swap(Column& other) {
     auto & col = dynamic_cast<ColumnFixedString &>(other);
     std::swap(string_size_, col.string_size_);
@@ -269,6 +273,10 @@ ColumnRef ColumnString::Slice(size_t begin, size_t len) const {
     }
 
     return result;
+}
+
+ColumnRef ColumnString::CloneEmpty() const {
+    return std::make_shared<ColumnString>();
 }
 
 void ColumnString::Swap(Column& other) {

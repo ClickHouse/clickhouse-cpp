@@ -83,6 +83,8 @@ public:
     /// Makes slice of the current column.
     virtual ColumnRef Slice(size_t begin, size_t len) const = 0;
 
+    virtual ColumnRef CloneEmpty() const = 0;
+
     virtual void Swap(Column&) = 0;
 
     /// Get a view on raw item data if it is supported by column, will throw an exception if index is out of range.

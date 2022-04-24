@@ -378,7 +378,7 @@ TEST(ColumnsCase, DateTime64_Slice) {
 
     {
         // Empty slice on empty column
-        auto slice = column->Slice(0, 0)->As<ColumnDateTime64>();
+        auto slice = column->CloneEmpty()->As<ColumnDateTime64>();
         ASSERT_EQ(0u, slice->Size());
         ASSERT_EQ(column->GetPrecision(), slice->GetPrecision());
     }
@@ -393,7 +393,7 @@ TEST(ColumnsCase, DateTime64_Slice) {
 
     {
         // Empty slice on non-empty column
-        auto slice = column->Slice(0, 0)->As<ColumnDateTime64>();
+        auto slice = column->CloneEmpty()->As<ColumnDateTime64>();
         ASSERT_EQ(0u, slice->Size());
         ASSERT_EQ(column->GetPrecision(), slice->GetPrecision());
     }
@@ -954,7 +954,7 @@ TEST(ColumnsCase, LowCardinalityAsWrappedColumn) {
 
 TEST(ColumnsCase, ArrayOfDecimal) {
     auto column = std::make_shared<clickhouse::ColumnDecimal>(18, 10);
-    auto array = std::make_shared<clickhouse::ColumnArray>(column->Slice(0, 0));
+    auto array = std::make_shared<clickhouse::ColumnArray>(column->CloneEmpty());
 
     column->Append("1");
     column->Append("2");

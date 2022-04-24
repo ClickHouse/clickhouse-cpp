@@ -82,6 +82,10 @@ ColumnRef ColumnNullable::Slice(size_t begin, size_t len) const {
     return std::make_shared<ColumnNullable>(nested_->Slice(begin, len), nulls_->Slice(begin, len));
 }
 
+ColumnRef ColumnNullable::CloneEmpty() const {
+    return std::make_shared<ColumnNullable>(nested_->CloneEmpty(), nulls_->CloneEmpty());
+}
+
 void ColumnNullable::Swap(Column& other) {
     auto & col = dynamic_cast<ColumnNullable &>(other);
     if (!nested_->Type()->IsEqual(col.nested_->Type()))

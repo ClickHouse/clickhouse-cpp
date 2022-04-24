@@ -47,7 +47,7 @@ public:
 
     /// Makes slice of the current column.
     ColumnRef Slice(size_t, size_t) const override;
-
+    ColumnRef CloneEmpty() const override;
     void Swap(Column&) override;
 
     void OffsetsIncrease(size_t);
