@@ -953,7 +953,6 @@ ColumnRef RoundtripColumnValues(Client& client, ColumnRef expected) {
     auto result = expected->CloneEmpty();
 
     const std::string type_name = result->GetType().GetName();
-    std::cerr << type_name << std::endl;
     client.Execute("DROP TEMPORARY TABLE IF EXISTS temporary_roundtrip_table;");
     client.Execute("CREATE TEMPORARY TABLE IF NOT EXISTS temporary_roundtrip_table (col " + type_name + ");");
     {
@@ -989,18 +988,35 @@ TEST_P(ClientCase, RoundtripArrayTUint64) {
 }
 
 TEST_P(ClientCase, RoundtripArrayTArrayTUint64) {
-    const std::vector<std::vector<uint64_t>> values = {
+    const std::vector<std::vector<uint64_t>> row_values = {
         {1, 2, 3},
         {4, 5, 6},
         {7, 8, 9, 10}
     };
 
     auto array = std::make_shared<ColumnArrayT<ColumnArrayT<ColumnUInt64>>>();
-    array->Append(values);
+    array->Append(row_values);
 
     auto result_typed = ColumnArrayT<ColumnArrayT<ColumnUInt64>>::Wrap(RoundtripColumnValues(*client_, array));
     EXPECT_TRUE(CompareRecursive(*array, *result_typed));
 }
+
+TEST_P(ClientCase, RoundtripArrayTArrayTArrayTUint64) {
+    using ColumnType = ColumnArrayT<ColumnArrayT<ColumnArrayT<ColumnUInt64>>>;
+    const std::vector<std::vector<std::vector<uint64_t>>> row_values = {
+        {{1, 2, 3}, {3, 2, 1}},
+        {{4, 5, 6}, {6, 5, 4}},
+        {{7, 8, 9, 10}, {}},
+        {{}, {10, 9, 8, 7}}
+    };
+
+    auto array = std::make_shared<ColumnType>();
+    array->Append(row_values);
+
+    auto result_typed = ColumnType::Wrap(RoundtripColumnValues(*client_, array));
+    EXPECT_TRUE(CompareRecursive(*array, *result_typed));
+}
+
 
 TEST_P(ClientCase, RoundtripArrayTFixedString) {
     auto array = std::make_shared<ColumnArrayT<ColumnFixedString>>(6);
