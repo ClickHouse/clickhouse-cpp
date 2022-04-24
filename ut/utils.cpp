@@ -75,16 +75,21 @@ bool doPrintValue<ColumnEnum16>(const ColumnRef & c, const size_t row, std::ostr
 
 template <>
 bool doPrintValue<ColumnArray, void>(const ColumnRef & c, const size_t row, std::ostream & ostr) {
+    // via temporary stream to preserve fill and alignment of the ostr
+    std::stringstream sstr;
+
     if (const auto & array_col = c->As<ColumnArray>()) {
         const auto & row_values = array_col->GetAsColumn(row);
-        ostr << "[";
+        sstr << "[";
         for (size_t i = 0; i < row_values->Size(); ++i) {
-            printColumnValue(row_values, i, ostr);
+            printColumnValue(row_values, i, sstr);
 
             if (i < row_values->Size() - 1)
-                ostr << ", ";
+                sstr << ", ";
         }
-        ostr << "]";
+        sstr << "]";
+        ostr << sstr.str();
+
         return true;
     }
     return false;
