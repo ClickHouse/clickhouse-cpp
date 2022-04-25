@@ -929,7 +929,8 @@ TEST_P(ClientCase, ArrayArrayUInt64) {
 )sql"));
 
     std::cerr << "INSERTING VALUES" << std::endl;
-    client_->Execute(Query(R"sql(INSERT INTO multiarray VALUES ([[0,1,2,3,4,5], [100, 200], [10,20, 50, 70]]), ([[456, 789], [1011, 1213], [], [14]]), ([[]]))sql"));
+    client_->Execute(Query(R"sql(INSERT INTO multiarray VALUES ([[0,1,2,3,4,5], [100, 200], [10,20, 50, 70]]), ([[456, 789], [1011, 1213], [], [14]]), ([[]]);)sql"));
+    std::cerr << "INSERTED" << std::endl;
 
     auto result = std::make_shared<ColumnArray>(std::make_shared<ColumnArray>(std::make_shared<ColumnUInt64>()));
     ASSERT_EQ(0u, result->Size());
