@@ -58,7 +58,9 @@ protected:
         client_ = std::make_unique<Client>(GetParam());
     }
 
-    void TearDown() override {}
+    void TearDown() override {
+        client_.reset();
+    }
 
     template <typename T>
     std::shared_ptr<T> createTableWithOneColumn(Block & block)
@@ -915,22 +917,34 @@ TEST_P(ClientCase, Query_ID) {
 
 TEST_P(ClientCase, ArrayArrayUInt64) {
     // Based on https://github.com/ClickHouse/clickhouse-cpp/issues/43
+    std::cerr << "Connected to: " << client_->GetServerInfo() << std::endl;
+    std::cerr << "DROPPING TABLE" << std::endl;
+    client_->Execute("DROP TEMPORARY TABLE IF EXISTS multiarray");
+
+    std::cerr << "CREATING TABLE" << std::endl;
     client_->Execute(Query(R"sql(CREATE TEMPORARY TABLE IF NOT EXISTS multiarray
     (
         `arr` Array(Array(UInt64))
     );
 )sql"));
 
+    std::cerr << "INSERTING VALUES" << std::endl;
     client_->Execute(Query(R"sql(INSERT INTO multiarray VALUES ([[0,1,2,3,4,5], [100, 200], [10,20, 50, 70]]), ([[456, 789], [1011, 1213], [], [14]]), ([[]]))sql"));
 
     auto result = std::make_shared<ColumnArray>(std::make_shared<ColumnArray>(std::make_shared<ColumnUInt64>()));
     ASSERT_EQ(0u, result->Size());
+
+    std::cerr << "SELECTING VALUES" << std::endl;
     client_->Select("SELECT arr FROM multiarray", [&result](const Block& block) {
+        std::cerr << "GOT BLOCK: " << block.GetRowCount() << std::endl;
         if (block.GetRowCount() == 0)
             return;
 
         result->Append(block[0]);
     });
+
+    std::cerr << "DONE SELECTING VALUES" << std::endl;
+    client_.reset();
 
     ASSERT_EQ(3u, result->Size());
     {
