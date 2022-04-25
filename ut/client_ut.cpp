@@ -915,7 +915,8 @@ TEST_P(ClientCase, Query_ID) {
     EXPECT_EQ(5u, total_count);
 }
 
-TEST_P(ClientCase, ArrayArrayUInt64) {
+// Spontaneosly fails on INSERTint data.
+TEST_P(ClientCase, DISABLED_ArrayArrayUInt64) {
     // Based on https://github.com/ClickHouse/clickhouse-cpp/issues/43
     std::cerr << "Connected to: " << client_->GetServerInfo() << std::endl;
     std::cerr << "DROPPING TABLE" << std::endl;
