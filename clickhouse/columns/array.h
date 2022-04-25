@@ -28,6 +28,13 @@ public:
     /// Type of element of result column same as type of array element.
     ColumnRef GetAsColumn(size_t n) const;
 
+    /// Shorthand to get a column casted to a proper type.
+    template <typename T>
+    auto GetAsColumnTyped(size_t n) const {
+        auto result = GetAsColumn(n);
+        return result->AsStrict<T>();
+    }
+
 public:
     /// Appends content of given column to the end of current one.
     void Append(ColumnRef column) override;

@@ -914,36 +914,63 @@ TEST_P(ClientCase, Query_ID) {
 }
 
 TEST_P(ClientCase, ArrayArrayUInt64) {
-    // FIXME!!!! : this is a user-reported bug, nested values shoud be adequate
+    // Based on https://github.com/ClickHouse/clickhouse-cpp/issues/43
     client_->Execute(Query(R"sql(CREATE TEMPORARY TABLE IF NOT EXISTS multiarray
     (
         `arr` Array(Array(UInt64))
-    )
-    ENGINE = Memory;
+    );
 )sql"));
 
-    client_->Execute(Query(R"sql(INSERT INTO multiarray VALUES ([[0,1,2,3,4,5], [100, 200], [10,20, 50, 70]]), ([[456, 789], [1011, 1213], [15]]))sql"));
+    client_->Execute(Query(R"sql(INSERT INTO multiarray VALUES ([[0,1,2,3,4,5], [100, 200], [10,20, 50, 70]]), ([[456, 789], [1011, 1213], [], [14]]), ([[]]))sql"));
 
-    client_->Select("SELECT arr FROM multiarray", [](const Block& block) {
+    auto result = std::make_shared<ColumnArray>(std::make_shared<ColumnArray>(std::make_shared<ColumnUInt64>()));
+    ASSERT_EQ(0u, result->Size());
+    client_->Select("SELECT arr FROM multiarray", [&result](const Block& block) {
         if (block.GetRowCount() == 0)
             return;
 
-        std::cout << PrettyPrintBlock{block};
-//        for (size_t c = 0; c < block.GetRowCount(); ++c) {
-//            auto row = block[0]->As<ColumnArray>()->GetAsColumn(c);
-//            std::cout << row->Size() << std::endl;
-//            std::cout << "[";
-//            for (size_t i = 0; i < row->Size(); ++i) {
-//                auto nested_array = row->As<ColumnArray>()->GetAsColumn(i);
-//                for (size_t j = 0; j < nested_array->Size(); ++j) {
-//                std::cout << (int)(*nested_array->As<ColumnUInt64>())[j] << " ";
-//                if (j + 1 != nested_array->Size())
-//                    std::cout << " ";
-//                }
-//            }
-//            std::cout << "]" << std::endl;
-//        }
+        result->Append(block[0]);
     });
+
+    ASSERT_EQ(3u, result->Size());
+    {
+        // ([[0,1,2,3,4,5], [100, 200], [10,20, 50, 70]])
+        const std::vector<std::vector<uint64_t>> expected_vals = {
+            {0, 1, 2, 3, 4, 5},
+            {100, 200},
+            {10, 20, 50, 70}
+        };
+
+        auto row = result->GetAsColumnTyped<ColumnArray>(0);
+        ASSERT_EQ(3u, row->Size());
+        EXPECT_TRUE(CompareRecursive(expected_vals[0], *row->GetAsColumnTyped<ColumnUInt64>(0)));
+        EXPECT_TRUE(CompareRecursive(expected_vals[1], *row->GetAsColumnTyped<ColumnUInt64>(1)));
+        EXPECT_TRUE(CompareRecursive(expected_vals[2], *row->GetAsColumnTyped<ColumnUInt64>(2)));
+    }
+
+    {
+        // ([[456, 789], [1011, 1213], [], [14]])
+        const std::vector<std::vector<uint64_t>> expected_vals = {
+            {456, 789},
+            {1011, 1213},
+            {},
+            {14}
+        };
+
+        auto row = result->GetAsColumnTyped<ColumnArray>(1);
+        ASSERT_EQ(4u, row->Size());
+        EXPECT_TRUE(CompareRecursive(expected_vals[0], *row->GetAsColumnTyped<ColumnUInt64>(0)));
+        EXPECT_TRUE(CompareRecursive(expected_vals[1], *row->GetAsColumnTyped<ColumnUInt64>(1)));
+        EXPECT_TRUE(CompareRecursive(expected_vals[2], *row->GetAsColumnTyped<ColumnUInt64>(2)));
+        EXPECT_TRUE(CompareRecursive(expected_vals[3], *row->GetAsColumnTyped<ColumnUInt64>(3)));
+    }
+
+    {
+        // ([[]])
+        auto row = result->GetAsColumnTyped<ColumnArray>(2);
+        ASSERT_EQ(1u, row->Size());
+        EXPECT_TRUE(CompareRecursive(std::vector<uint64_t>{}, *row->GetAsColumnTyped<ColumnUInt64>(0)));
+    }
 }
 
 ColumnRef RoundtripColumnValues(Client& client, ColumnRef expected) {

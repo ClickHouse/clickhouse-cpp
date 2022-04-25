@@ -31,6 +31,9 @@ void ColumnArray::AppendAsColumn(ColumnRef array) {
 }
 
 ColumnRef ColumnArray::GetAsColumn(size_t n) const {
+    if (n >= Size())
+        throw ValidationError("Index is out ouf bounds: " + std::to_string(n));
+
     return data_->Slice(GetOffset(n), GetSize(n));
 }
 
