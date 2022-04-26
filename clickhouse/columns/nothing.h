@@ -67,11 +67,11 @@ public:
     }
 
     void SaveBody([[maybe_unused]] OutputStream*) override {
-        throw std::runtime_error("method SaveBody is not supported for Nothing column");
+        throw UnimplementedError("method SaveBody is not supported for Nothing column");
     }
 
     void SaveSuffix([[maybe_unused]] OutputStream* output) override {
-        throw std::runtime_error("method SaveSuffix is not supported for Nothing column");
+        throw UnimplementedError("method SaveSuffix is not supported for Nothing column");
     }
 
     /// Clear column data .

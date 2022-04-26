@@ -5,7 +5,7 @@ INCLUDE (cmake/subdirs.cmake)
 INCLUDE (cmake/openssl.cmake)
 
 OPTION (BUILD_BENCHMARK "Build benchmark" OFF)
-OPTION (BUILD_TESTS "Build tests" ON)
+OPTION (BUILD_TESTS "Build tests" OFF)
 OPTION (WITH_OPENSSL "Use OpenSSL for TLS connections" OFF)
 
 PROJECT (CLICKHOUSE-CLIENT)

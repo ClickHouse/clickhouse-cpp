@@ -216,7 +216,7 @@ auto Load(ColumnRef new_dictionary_column, InputStream& input, size_t rows) {
         throw ProtocolError("Failed to read number of rows in dictionary column.");
 
     if (!new_dictionary_column->LoadBody(&input, number_of_keys))
-        throw std::runtime_error("Failed to read values of dictionary column.");
+        throw ProtocolError("Failed to read values of dictionary column.");
 
     uint64_t number_of_rows;
     if (!WireFormat::ReadFixed(input, &number_of_rows))
@@ -245,10 +245,10 @@ bool ColumnLowCardinality::LoadPrefix(InputStream* input, [[maybe_unused]] size_
     uint64_t key_version;
 
     if (!WireFormat::ReadFixed(*input, &key_version))
-        throw std::runtime_error("Failed to read key serialization version.");
+        throw ProtocolError("Failed to read key serialization version.");
 
     if (key_version != KeySerializationVersion::SharedDictionariesWithAdditionalKeys)
-        throw std::runtime_error("Invalid key serialization version value.");
+        throw ProtocolError("Invalid key serialization version value.");
 
 
     // does nothing with key_version, only check it?
