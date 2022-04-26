@@ -6,12 +6,19 @@ namespace clickhouse {
 
 ColumnArray::ColumnArray(ColumnRef data)
     : Column(Type::CreateArray(data->Type()))
-    // FIXME (vnemkov): shared ownershp of a data somewhat error-prone, it is better to clone data column.
+    , data_(data->CloneEmpty())
+    , offsets_(std::make_shared<ColumnUInt64>())
+{
+}
+
+ColumnArray::ColumnArray(ColumnRef data, ShareOwnershipTag)
+    : Column(Type::CreateArray(data->Type()))
     , data_(data)
     , offsets_(std::make_shared<ColumnUInt64>())
 {
 }
 
+// Explicitly sharing `data_` column is required by ColumnArrayT
 ColumnArray::ColumnArray(ColumnArray&& other)
     : Column(other.Type())
     , data_(std::move(other.data_))

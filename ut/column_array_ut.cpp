@@ -190,8 +190,6 @@ TEST(ColumnsCase, ArrayTWrap) {
     std::shared_ptr<ColumnArray> untyped_array = std::make_shared<ColumnArray>(std::make_shared<ColumnUInt64>());
     for (size_t i = 0; i < values.size(); ++i) {
         untyped_array->AppendAsColumn(std::make_shared<ColumnUInt64>(values[i]));
-//        const auto row = untyped_array->GetAsColumn(i)->AsStrict<ColumnUInt64>();
-//        EXPECT_TRUE(CompareRecursive(values[i], *row));
     }
 
     auto wrapped_array = ColumnArrayT<ColumnUInt64>::Wrap(std::move(*untyped_array));

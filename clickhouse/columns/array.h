@@ -68,6 +68,8 @@ protected:
     template<typename T> friend class ColumnArrayT;
 
     ColumnArray(ColumnArray&& array);
+    struct ShareOwnershipTag {};
+    ColumnArray(ColumnRef data, ShareOwnershipTag tag);
 
     size_t GetOffset(size_t n) const;
     size_t GetSize(size_t n) const;
@@ -87,7 +89,7 @@ public:
     using ValueType = ArrayWrapper;
 
     explicit ColumnArrayT(std::shared_ptr<NestedColumnType> data)
-        : ColumnArray(data)
+        : ColumnArray(data, ColumnArray::ShareOwnershipTag{})
         , typed_nested_data_(data)
     {}
 
