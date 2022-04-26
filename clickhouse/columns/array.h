@@ -111,22 +111,21 @@ public:
      *  Throws an exception of `col` is of wrong type, it is safe to use original col in this case.
      *  This is a static method to make such conversion verbose.
      */
-    static auto Wrap(Column&& col) {
-        return Wrap(std::move(dynamic_cast<ColumnArray&&>(col)));
-    }
-
     static auto Wrap(ColumnArray&& col) {
-        // if NestedColumnType is ArrayT specialization
         if constexpr (std::is_base_of_v<ColumnArray, NestedColumnType> && !std::is_same_v<ColumnArray, NestedColumnType>) {
-//            auto tmp_col = NestedColumnType::Wrap()
+            // assuming NestedColumnType is ArrayT specialization
+
             auto result = std::make_shared<ColumnArrayT<NestedColumnType>>(NestedColumnType::Wrap(col.GetData()));
-            for (size_t i = 0; i < col.Size(); ++i)
-                result->AddOffset(col.GetSize(i));
+            result->offsets_ = col.offsets_;
 
             return result;
         } else {
             return std::make_shared<ColumnArrayT<NestedColumnType>>(std::move(col));
         }
+    }
+
+    static auto Wrap(Column&& col) {
+        return Wrap(std::move(dynamic_cast<ColumnArray&&>(col)));
     }
 
     // Helper to simplify integration with other APIs

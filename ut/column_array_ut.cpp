@@ -201,6 +201,37 @@ TEST(ColumnsCase, ArrayTWrap) {
     EXPECT_TRUE(CompareRecursive(values, array));
 }
 
+TEST(ColumnsCase, ArrayTArrayTWrap) {
+    // TODO(nemkov): wrap 2D array
+    // Check that ColumnArrayT can wrap a pre-existing ColumnArray,
+    // pre-existing data is kept intact and new rows can be inserted.
+
+    const std::vector<std::vector<std::vector<uint64_t>>> values = {
+//        {{1u, 2u}, {3u}},
+//        {{4u}, {5u, 6u, 7u}, {8u, 9u}, {}},
+//        {{0u}},
+        {{}},
+//        {{13}, {14, 15}}
+    };
+
+    std::shared_ptr<ColumnArray> untyped_array = std::make_shared<ColumnArray>(std::make_shared<ColumnArray>(std::make_shared<ColumnUInt64>()));
+    for (size_t i = 0; i < values.size(); ++i) {
+        auto array_col = std::make_shared<ColumnArray>(std::make_shared<ColumnUInt64>());
+        for (size_t j = 0; j < values[i].size(); ++j) {
+            const auto & v = values[i][j];
+            SCOPED_TRACE(::testing::Message() << "i: " << i << " j:" << j << " " << PrintContainer{v});
+            array_col->AppendAsColumn(std::make_shared<ColumnUInt64>(v));
+        }
+
+        untyped_array->AppendAsColumn(array_col);
+    }
+
+    auto wrapped_array = ColumnArrayT<ColumnArrayT<ColumnUInt64>>::Wrap(std::move(*untyped_array));
+    const auto & array = *wrapped_array;
+
+    EXPECT_TRUE(CompareRecursive(values, array));
+}
+
 TEST(ColumnsCase, ArrayTSimpleUint64) {
     auto array = std::make_shared<clickhouse::ColumnArrayT<ColumnUInt64>>();
     array->Append({0, 1, 2});
