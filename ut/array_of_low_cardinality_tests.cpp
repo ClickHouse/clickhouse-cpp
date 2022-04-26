@@ -73,7 +73,7 @@ const auto localHostEndpoint = ClientOptions()
                                    .SetDefaultDatabase(getEnvOrDefault("CLICKHOUSE_DB",       "default"));
 
 
-TEST(Something, LowCardinalityString) {
+TEST(ArrayOfLowCardinality, Serialization) {
     const auto inputColumn = buildTestColumn({
         { "aa", "bb" },
         { "cc" }
@@ -98,7 +98,7 @@ TEST(Something, LowCardinalityString) {
     ASSERT_EQ(expectedSerialization, buf);
 }
 
-TEST(Something, LowCardinalityString2) {
+TEST(ArrayOfLowCardinality, InsertAndQuery) {
     Client client(ClientOptions(localHostEndpoint)
                       .SetPingBeforeQuery(true));
 
@@ -128,5 +128,4 @@ TEST(Something, LowCardinalityString2) {
           }
       }
     );
-
 }

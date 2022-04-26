@@ -28,7 +28,7 @@ void ColumnDate::Append(ColumnRef column) {
 }
 
 bool ColumnDate::LoadBody(InputStream* input, size_t rows) {
-    return data_->Load(input, rows);
+    return data_->LoadBody(input, rows);
 }
 
 void ColumnDate::SaveBody(OutputStream* output) {
@@ -90,7 +90,7 @@ void ColumnDateTime::Append(ColumnRef column) {
 }
 
 bool ColumnDateTime::LoadBody(InputStream* input, size_t rows) {
-    return data_->Load(input, rows);
+    return data_->LoadBody(input, rows);
 }
 
 void ColumnDateTime::SaveBody(OutputStream* output) {
@@ -163,7 +163,7 @@ void ColumnDateTime64::Append(ColumnRef column) {
 }
 
 bool ColumnDateTime64::LoadBody(InputStream* input, size_t rows) {
-    return data_->Load(input, rows);
+    return data_->LoadBody(input, rows);
 }
 
 void ColumnDateTime64::SaveBody(OutputStream* output) {

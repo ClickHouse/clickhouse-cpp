@@ -198,7 +198,7 @@ void ColumnDecimal::Append(ColumnRef column) {
 }
 
 bool ColumnDecimal::LoadBody(InputStream * input, size_t rows) {
-    return data_->Load(input, rows);
+    return data_->LoadBody(input, rows);
 }
 
 void ColumnDecimal::SaveBody(OutputStream* output) {

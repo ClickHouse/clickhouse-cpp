@@ -45,7 +45,7 @@ void ColumnUUID::Append(ColumnRef column) {
 }
 
 bool ColumnUUID::LoadBody(InputStream* input, size_t rows) {
-    return data_->Load(input, rows * 2);
+    return data_->LoadBody(input, rows * 2);
 }
 
 void ColumnUUID::SaveBody(OutputStream* output) {

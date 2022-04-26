@@ -72,7 +72,7 @@ void ColumnIPv4::Append(ColumnRef column) {
 }
 
 bool ColumnIPv4::LoadBody(InputStream * input, size_t rows) {
-    return data_->Load(input, rows);
+    return data_->LoadBody(input, rows);
 }
 
 void ColumnIPv4::SaveBody(OutputStream* output) {
