@@ -33,46 +33,6 @@ std::shared_ptr<ColumnArray> buildTestColumn(const std::vector<std::vector<std::
     return arrayColumn;
 }
 
-//std::string gen_random() {
-//    int len = 5;
-//    static const char alphanum[] =
-//        "0123456789"
-//        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-//        "abcdefghijklmnopqrstuvwxyz";
-//    std::string tmp_s;
-//    tmp_s.reserve(len);
-//
-//    for (int i = 0; i < len; ++i) {
-//        tmp_s += alphanum[rand() % (sizeof(alphanum) - 1)];
-//    }
-//
-//    return tmp_s;
-//}
-
-//std::vector<std::string> generateRandomStringVector(int size) {
-//    std::random_device rnd_device;
-//    std::mt19937 mersenne_engine {rnd_device()};
-//    std::uniform_int_distribution<int> dist {1, 100};
-//
-//    auto gen = [&dist, &mersenne_engine](){
-//        return dist(mersenne_engine);
-//    };
-//
-//    std::vector<int> vec(size);
-//
-//    std::generate(vec.begin(), vec.end(), gen);
-//
-//    return vec;
-//}
-
-const auto localHostEndpoint = ClientOptions()
-                                   .SetHost(           getEnvOrDefault("CLICKHOUSE_HOST",     "localhost"))
-                                   .SetPort(   getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "9000"))
-                                   .SetUser(           getEnvOrDefault("CLICKHOUSE_USER",     "default"))
-                                   .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", ""))
-                                   .SetDefaultDatabase(getEnvOrDefault("CLICKHOUSE_DB",       "default"));
-
-
 TEST(ArrayOfLowCardinality, Serialization) {
     const auto inputColumn = buildTestColumn({
         { "aa", "bb" },
@@ -99,6 +59,14 @@ TEST(ArrayOfLowCardinality, Serialization) {
 }
 
 TEST(ArrayOfLowCardinality, InsertAndQuery) {
+
+    const auto localHostEndpoint = ClientOptions()
+                                       .SetHost(           getEnvOrDefault("CLICKHOUSE_HOST",     "localhost"))
+                                       .SetPort(   getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "9000"))
+                                       .SetUser(           getEnvOrDefault("CLICKHOUSE_USER",     "default"))
+                                       .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", ""))
+                                       .SetDefaultDatabase(getEnvOrDefault("CLICKHOUSE_DB",       "default"));
+
     Client client(ClientOptions(localHostEndpoint)
                       .SetPingBeforeQuery(true));
 
