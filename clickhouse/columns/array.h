@@ -24,11 +24,18 @@ public:
     /// Appends content of given column to the end of current one.
     void Append(ColumnRef column) override;
 
+    bool LoadPrefix(InputStream* input, size_t rows) override;
+
     /// Loads column data from input stream.
-    bool Load(InputStream* input, size_t rows) override;
+    bool LoadBody(InputStream* input, size_t rows) override;
+
+    /// Saves column prefix to output stream.
+    void SavePrefix(OutputStream* output) override;
 
     /// Saves column data to output stream.
-    void Save(OutputStream* output) override;
+    void SaveBody(OutputStream* output) override;
+
+    void SaveSuffix(OutputStream* output) override;
 
     /// Clear column data .
     void Clear() override;

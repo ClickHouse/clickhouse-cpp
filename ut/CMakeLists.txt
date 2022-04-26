@@ -15,7 +15,7 @@ SET ( clickhouse-cpp-ut-src
     utils.cpp
     readonly_client_test.cpp
     connection_failed_client_test.cpp
-)
+        array_of_low_cardinality_tests.cpp)
 
 IF (WITH_OPENSSL)
     LIST (APPEND clickhouse-cpp-ut-src ssl_ut.cpp)

@@ -61,14 +61,14 @@ void ColumnVector<T>::Append(ColumnRef column) {
 }
 
 template <typename T>
-bool ColumnVector<T>::Load(InputStream* input, size_t rows) {
+bool ColumnVector<T>::LoadBody(InputStream* input, size_t rows) {
     data_.resize(rows);
 
     return WireFormat::ReadBytes(*input, data_.data(), data_.size() * sizeof(T));
 }
 
 template <typename T>
-void ColumnVector<T>::Save(OutputStream* output) {
+void ColumnVector<T>::SaveBody(OutputStream* output) {
     WireFormat::WriteBytes(*output, data_.data(), data_.size() * sizeof(T));
 }
 

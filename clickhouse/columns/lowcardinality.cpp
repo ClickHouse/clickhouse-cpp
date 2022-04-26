@@ -200,15 +200,6 @@ auto Load(ColumnRef new_dictionary_column, InputStream& input, size_t rows) {
     // As for now those features are not used in client-server protocol and minimal implementation suffices,
     // however some day they may.
 
-    // prefix
-    uint64_t key_version;
-    if (!WireFormat::ReadFixed(input, &key_version))
-        throw ProtocolError("Failed to read key serialization version.");
-
-    if (key_version != KeySerializationVersion::SharedDictionariesWithAdditionalKeys)
-        throw ProtocolError("Invalid key serialization version value.");
-
-    // body
     uint64_t index_serialization_type;
     if (!WireFormat::ReadFixed(input, &index_serialization_type))
         throw ProtocolError("Failed to read index serializaton type.");
@@ -224,8 +215,8 @@ auto Load(ColumnRef new_dictionary_column, InputStream& input, size_t rows) {
     if (!WireFormat::ReadFixed(input, &number_of_keys))
         throw ProtocolError("Failed to read number of rows in dictionary column.");
 
-    if (!new_dictionary_column->Load(&input, number_of_keys))
-        throw ProtocolError("Failed to read values of dictionary column.");
+    if (!new_dictionary_column->LoadBody(&input, number_of_keys))
+        throw std::runtime_error("Failed to read values of dictionary column.");
 
     uint64_t number_of_rows;
     if (!WireFormat::ReadFixed(input, &number_of_rows))
@@ -234,7 +225,7 @@ auto Load(ColumnRef new_dictionary_column, InputStream& input, size_t rows) {
     if (number_of_rows != rows)
         throw AssertionError("LowCardinality column must be read in full.");
 
-    new_index_column->Load(&input, number_of_rows);
+    new_index_column->LoadBody(&input, number_of_rows);
 
     ColumnLowCardinality::UniqueItems new_unique_items_map;
     for (size_t i = 0; i < new_dictionary_column->Size(); ++i) {
@@ -250,7 +241,22 @@ auto Load(ColumnRef new_dictionary_column, InputStream& input, size_t rows) {
 
 }
 
-bool ColumnLowCardinality::Load(InputStream* input, size_t rows) {
+bool ColumnLowCardinality::LoadPrefix(InputStream* input, [[maybe_unused]] size_t rows) {
+    uint64_t key_version;
+
+    if (!WireFormat::ReadFixed(*input, &key_version))
+        throw std::runtime_error("Failed to read key serialization version.");
+
+    if (key_version != KeySerializationVersion::SharedDictionariesWithAdditionalKeys)
+        throw std::runtime_error("Invalid key serialization version value.");
+
+
+    // does nothing with key_version, only check it?
+
+    return true;
+}
+
+bool ColumnLowCardinality::LoadBody(InputStream* input, size_t rows) {
     try {
         auto [new_dictionary, new_index, new_unique_items_map] = ::Load(dictionary_column_->Slice(0, 0), *input, rows);
 
@@ -264,25 +270,22 @@ bool ColumnLowCardinality::Load(InputStream* input, size_t rows) {
     }
 }
 
-void ColumnLowCardinality::Save(OutputStream* output) {
-    // prefix
-    const uint64_t version = static_cast<uint64_t>(KeySerializationVersion::SharedDictionariesWithAdditionalKeys);
+void ColumnLowCardinality::SavePrefix(OutputStream* output) {
+    const auto version = static_cast<uint64_t>(KeySerializationVersion::SharedDictionariesWithAdditionalKeys);
     WireFormat::WriteFixed(*output, version);
+}
 
-    // body
+void ColumnLowCardinality::SaveBody(OutputStream* output) {
     const uint64_t index_serialization_type = indexTypeFromIndexColumn(*index_column_) | IndexFlag::HasAdditionalKeysBit;
     WireFormat::WriteFixed(*output, index_serialization_type);
 
     const uint64_t number_of_keys = dictionary_column_->Size();
     WireFormat::WriteFixed(*output, number_of_keys);
-    dictionary_column_->Save(output);
+    dictionary_column_->SaveBody(output);
 
     const uint64_t number_of_rows = index_column_->Size();
     WireFormat::WriteFixed(*output, number_of_rows);
-    index_column_->Save(output);
-
-    // suffix
-    // NOP
+    index_column_->SaveBody(output);
 }
 
 void ColumnLowCardinality::Clear() {

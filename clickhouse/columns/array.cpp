@@ -54,22 +54,38 @@ void ColumnArray::Append(ColumnRef column) {
     }
 }
 
-bool ColumnArray::Load(InputStream* input, size_t rows) {
+bool ColumnArray::LoadPrefix(InputStream* input, size_t rows) {
     if (!rows) {
         return true;
     }
-    if (!offsets_->Load(input, rows)) {
+
+    return data_->LoadPrefix(input, rows);
+}
+
+bool ColumnArray::LoadBody(InputStream* input, size_t rows) {
+    if (!rows) {
+        return true;
+    }
+    if (!offsets_->LoadBody(input, rows)) {
         return false;
     }
-    if (!data_->Load(input, (*offsets_)[rows - 1])) {
+    if (!data_->LoadBody(input, (*offsets_)[rows - 1])) {
         return false;
     }
     return true;
 }
 
-void ColumnArray::Save(OutputStream* output) {
-    offsets_->Save(output);
-    data_->Save(output);
+void ColumnArray::SavePrefix(OutputStream* output) {
+    data_->SavePrefix(output);
+}
+
+void ColumnArray::SaveBody(OutputStream* output) {
+    offsets_->SaveBody(output);
+    data_->SaveBody(output);
+}
+
+void ColumnArray::SaveSuffix(OutputStream* output) {
+    data_->SaveSuffix(output);
 }
 
 void ColumnArray::Clear() {
@@ -92,6 +108,7 @@ void ColumnArray::OffsetsIncrease(size_t n) {
 }
 
 size_t ColumnArray::GetOffset(size_t n) const {
+
     return (n == 0) ? 0 : (*offsets_)[n - 1];
 }
 

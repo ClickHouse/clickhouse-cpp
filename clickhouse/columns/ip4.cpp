@@ -71,12 +71,12 @@ void ColumnIPv4::Append(ColumnRef column) {
     }
 }
 
-bool ColumnIPv4::Load(InputStream * input, size_t rows) {
+bool ColumnIPv4::LoadBody(InputStream * input, size_t rows) {
     return data_->Load(input, rows);
 }
 
-void ColumnIPv4::Save(OutputStream* output) {
-    data_->Save(output);
+void ColumnIPv4::SaveBody(OutputStream* output) {
+    data_->SaveBody(output);
 }
 
 size_t ColumnIPv4::Size() const {

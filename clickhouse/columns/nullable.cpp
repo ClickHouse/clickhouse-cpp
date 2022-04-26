@@ -50,19 +50,31 @@ void ColumnNullable::Clear() {
     nulls_->Clear();
 }
 
-bool ColumnNullable::Load(InputStream* input, size_t rows) {
-    if (!nulls_->Load(input, rows)) {
+bool ColumnNullable::LoadPrefix(InputStream* input, size_t rows) {
+    return nested_->LoadPrefix(input, rows);
+}
+
+bool ColumnNullable::LoadBody(InputStream* input, size_t rows) {
+    if (!nulls_->LoadBody(input, rows)) {
         return false;
     }
-    if (!nested_->Load(input, rows)) {
+    if (!nested_->LoadBody(input, rows)) {
         return false;
     }
     return true;
 }
 
-void ColumnNullable::Save(OutputStream* output) {
-    nulls_->Save(output);
-    nested_->Save(output);
+void ColumnNullable::SavePrefix(OutputStream* output) {
+    nested_->SavePrefix(output);
+}
+
+void ColumnNullable::SaveBody(OutputStream* output) {
+    nulls_->SaveBody(output);
+    nested_->SaveBody(output);
+}
+
+void ColumnNullable::SaveSuffix(OutputStream* output) {
+    nested_->SaveSuffix(output);
 }
 
 size_t ColumnNullable::Size() const {

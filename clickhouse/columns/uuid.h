@@ -30,10 +30,10 @@ public:
     void Append(ColumnRef column) override;
 
     /// Loads column data from input stream.
-    bool Load(InputStream* input, size_t rows) override;
+    bool LoadBody(InputStream* input, size_t rows) override;
 
     /// Saves column data to output stream.
-    void Save(OutputStream* output) override;
+    void SaveBody(OutputStream* output) override;
     
     /// Clear column data .
     void Clear() override;

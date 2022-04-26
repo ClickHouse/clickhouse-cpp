@@ -43,10 +43,23 @@ public:
     virtual void Append(ColumnRef column) = 0;
 
     /// Loads column data from input stream.
-    virtual bool Load(InputStream* input, size_t rows) = 0;
+    bool Load(InputStream* input, size_t rows);
+
+    virtual bool LoadPrefix(InputStream* input, size_t rows);
+
+    virtual bool LoadBody(InputStream* input, size_t rows);
 
     /// Saves column data to output stream.
-    virtual void Save(OutputStream* output) = 0;
+    virtual void Save(OutputStream* output);
+
+    /// Saves column prefix to output stream. Column types with prefixes must implement it
+    virtual void SavePrefix(OutputStream* output);
+
+    /// Saves column body to output stream.
+    virtual void SaveBody(OutputStream* output);
+
+    /// Saves column suffix to output stream. Column types with suffixes must implement it
+    virtual void SaveSuffix(OutputStream* output);
 
     /// Clear column data .
     virtual void Clear() = 0;
