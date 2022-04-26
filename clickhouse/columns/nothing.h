@@ -66,10 +66,12 @@ public:
         throw UnimplementedError("method Save is not supported for Nothing column");
     }
 
+    /// Saves column data to output stream.
     void SaveBody([[maybe_unused]] OutputStream*) override {
         throw UnimplementedError("method SaveBody is not supported for Nothing column");
     }
 
+    /// Saves column suffix to output stream.
     void SaveSuffix([[maybe_unused]] OutputStream* output) override {
         throw UnimplementedError("method SaveSuffix is not supported for Nothing column");
     }

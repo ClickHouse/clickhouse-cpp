@@ -35,6 +35,7 @@ public:
     /// Saves column data to output stream.
     void SaveBody(OutputStream* output) override;
 
+    /// Saves column suffix to output stream.
     void SaveSuffix(OutputStream* output) override;
 
     /// Clear column data .

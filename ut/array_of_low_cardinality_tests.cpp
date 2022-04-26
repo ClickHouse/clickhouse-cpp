@@ -39,8 +39,8 @@ TEST(ArrayOfLowCardinality, Serialization) {
         { "cc" }
     });
 
-    // The serialization data was extracted from a successful insert. When compared to what Clickhouse/NativeWriter does for the same fields,
-    // the only differences are the index type and indexes.
+    // The serialization data was extracted from a successful insert.
+    // When compared to what Clickhouse/NativeWriter does for the same fields, the only differences are the index type and indexes.
     // Since we are setting a different index type in clickhouse-cpp, it's expected to have different indexes.
     const std::vector<uint8_t> expectedSerialization {
         0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00,

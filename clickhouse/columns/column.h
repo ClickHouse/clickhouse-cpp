@@ -49,9 +49,6 @@ public:
 
     virtual bool LoadBody(InputStream* input, size_t rows);
 
-    /// Saves column data to output stream.
-    virtual void Save(OutputStream* output);
-
     /// Saves column prefix to output stream. Column types with prefixes must implement it
     virtual void SavePrefix(OutputStream* output);
 
@@ -60,6 +57,10 @@ public:
 
     /// Saves column suffix to output stream. Column types with suffixes must implement it
     virtual void SaveSuffix(OutputStream* output);
+
+    /// Template method to save to output stream. It'll call SavePrefix, SaveBody and SaveSuffix respectively
+    /// Should be called only once from the client. Derived classes should not call it.
+    virtual void Save(OutputStream* output);
 
     /// Clear column data .
     virtual void Clear() = 0;

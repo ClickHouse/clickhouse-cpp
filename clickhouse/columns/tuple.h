@@ -29,11 +29,13 @@ public:
     /// Loads column data from input stream.
     bool LoadBody(InputStream* input, size_t rows) override;
 
+    /// Saves column prefix to output stream.
     void SavePrefix(OutputStream* output) override;
 
     /// Saves column data to output stream.
     void SaveBody(OutputStream* output) override;
 
+    /// Saves column suffix to output stream.
     void SaveSuffix(OutputStream* output) override;
 
     /// Clear column data .
