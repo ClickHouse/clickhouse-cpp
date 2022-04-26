@@ -42,20 +42,23 @@ public:
     /// Appends content of given column to the end of current one.
     virtual void Append(ColumnRef column) = 0;
 
-    /// Loads column data from input stream.
+    /// Template method to load column data from input stream. It'll call LoadPrefix and LoadBody.
+    /// Should be called only once from the client. Derived classes should not call it.
     bool Load(InputStream* input, size_t rows);
 
+    /// Loads column prefix from input stream.
     virtual bool LoadPrefix(InputStream* input, size_t rows);
 
+    /// Loads column data from input stream.
     virtual bool LoadBody(InputStream* input, size_t rows);
 
-    /// Saves column prefix to output stream. Column types with prefixes must implement it
+    /// Saves column prefix to output stream. Column types with prefixes must implement it.
     virtual void SavePrefix(OutputStream* output);
 
     /// Saves column body to output stream.
     virtual void SaveBody(OutputStream* output);
 
-    /// Saves column suffix to output stream. Column types with suffixes must implement it
+    /// Saves column suffix to output stream. Column types with suffixes must implement it.
     virtual void SaveSuffix(OutputStream* output);
 
     /// Template method to save to output stream. It'll call SavePrefix, SaveBody and SaveSuffix respectively
