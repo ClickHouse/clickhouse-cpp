@@ -57,6 +57,8 @@ std::string Type::GetName() const {
             return As<DateTime64Type>()->GetName();
         case Date:
             return "Date";
+        case Date32:
+            return "Date32";
         case Array:
             return As<ArrayType>()->GetName();
         case Nullable:
@@ -101,6 +103,7 @@ uint64_t Type::GetTypeUniqueId() const {
         case IPv4:
         case IPv6:
         case Date:
+        case Date32:
             // For simple types, unique ID is the same as Type::Code
             return code_;
 
@@ -141,6 +144,10 @@ TypeRef Type::CreateArray(TypeRef item_type) {
 
 TypeRef Type::CreateDate() {
     return TypeRef(new Type(Type::Date));
+}
+
+TypeRef Type::CreateDate32() {
+    return TypeRef(new Type(Type::Date32));
 }
 
 TypeRef Type::CreateDateTime(std::string timezone) {

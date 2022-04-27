@@ -34,6 +34,7 @@ public:
         FixedString,
         DateTime,
         Date,
+        Date32,
         Array,
         Nullable,
         Tuple,
@@ -87,6 +88,8 @@ public:
     static TypeRef CreateArray(TypeRef item_type);
 
     static TypeRef CreateDate();
+
+    static TypeRef CreateDate32();    
 
     static TypeRef CreateDateTime(std::string timezone = std::string());
 
