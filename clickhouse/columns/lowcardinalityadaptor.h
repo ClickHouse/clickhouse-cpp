@@ -53,8 +53,8 @@ public:
     }
 
     /// Saves column data to output stream.
-    void Save(OutputStream* output) override {
-        ColumnLowCardinalityT<AdaptedColumnType>(this->template As<AdaptedColumnType>()).Save(output);
+    void SaveBody(OutputStream* output) override {
+        ColumnLowCardinalityT<AdaptedColumnType>(this->template As<AdaptedColumnType>()).SaveBody(output);
     }
 };
 

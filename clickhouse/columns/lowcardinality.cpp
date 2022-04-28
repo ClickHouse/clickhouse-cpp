@@ -241,7 +241,7 @@ auto Load(ColumnRef new_dictionary_column, InputStream& input, size_t rows) {
 
 }
 
-bool ColumnLowCardinality::LoadPrefix(InputStream* input, [[maybe_unused]] size_t rows) {
+bool ColumnLowCardinality::LoadPrefix(InputStream* input, size_t) {
     uint64_t key_version;
 
     if (!WireFormat::ReadFixed(*input, &key_version))

@@ -84,10 +84,6 @@ void ColumnArray::SaveBody(OutputStream* output) {
     data_->SaveBody(output);
 }
 
-void ColumnArray::SaveSuffix(OutputStream* output) {
-    data_->SaveSuffix(output);
-}
-
 void ColumnArray::Clear() {
     offsets_->Clear();
     data_->Clear();

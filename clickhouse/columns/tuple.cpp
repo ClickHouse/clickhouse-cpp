@@ -76,12 +76,6 @@ void ColumnTuple::SaveBody(OutputStream* output) {
     }
 }
 
-void ColumnTuple::SaveSuffix(OutputStream* output) {
-    for (auto & column : columns_) {
-        column->SaveSuffix(output);
-    }
-}
-
 void ColumnTuple::Clear() {
     columns_.clear();
 }

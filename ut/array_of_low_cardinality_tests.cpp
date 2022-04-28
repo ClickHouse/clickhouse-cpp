@@ -80,11 +80,11 @@ TEST(ArrayOfLowCardinality, InsertAndQuery) {
     Block block;
     block.AppendColumn("arr", column);
 
-    client.Execute("DROP TABLE test.array_lc");
-    client.Execute("CREATE TABLE IF NOT EXISTS test.array_lc (arr Array(LowCardinality(String))) ENGINE = Memory");
-    client.Insert("test.array_lc", block);
+    client.Execute("DROP TEMPORARY TABLE array_lc");
+    client.Execute("CREATE TEMPORARY TABLE IF NOT EXISTS array_lc (arr Array(LowCardinality(String))) ENGINE = Memory");
+    client.Insert("array_lc", block);
 
-    client.Select("SELECT * FROM test.array_lc", [&](const Block& bl) {
+    client.Select("SELECT * FROM array_lc", [&](const Block& bl) {
           for (size_t c = 0; c < bl.GetRowCount(); ++c) {
               auto col = bl[0]->As<ColumnArray>()->GetAsColumn(c);
               for (size_t i = 0; i < col->Size(); ++i) {

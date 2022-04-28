@@ -57,23 +57,13 @@ public:
 		return true;
 	}
         /// Saves column prefix to output stream.
-    void SavePrefix([[maybe_unused]] OutputStream* output) override {
+    void SavePrefix(OutputStream*) override {
         throw std::runtime_error("method Save is not supported for Nothing column");
     }
 
     /// Saves column data to output stream.
-    void Save(OutputStream*) override {
-        throw UnimplementedError("method Save is not supported for Nothing column");
-    }
-
-    /// Saves column data to output stream.
-    void SaveBody([[maybe_unused]] OutputStream*) override {
+    void SaveBody(OutputStream*) override {
         throw UnimplementedError("method SaveBody is not supported for Nothing column");
-    }
-
-    /// Saves column suffix to output stream.
-    void SaveSuffix([[maybe_unused]] OutputStream* output) override {
-        throw UnimplementedError("method SaveSuffix is not supported for Nothing column");
     }
 
     /// Clear column data .
