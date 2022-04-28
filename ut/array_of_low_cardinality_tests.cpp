@@ -80,7 +80,7 @@ TEST(ArrayOfLowCardinality, InsertAndQuery) {
     Block block;
     block.AppendColumn("arr", column);
 
-    client.Execute("DROP TEMPORARY TABLE array_lc");
+    client.Execute("DROP TEMPORARY TABLE IF EXISTS array_lc");
     client.Execute("CREATE TEMPORARY TABLE IF NOT EXISTS array_lc (arr Array(LowCardinality(String))) ENGINE = Memory");
     client.Insert("array_lc", block);
 
