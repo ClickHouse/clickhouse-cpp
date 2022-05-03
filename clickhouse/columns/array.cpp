@@ -5,16 +5,14 @@
 namespace clickhouse {
 
 ColumnArray::ColumnArray(ColumnRef data)
-    : Column(Type::CreateArray(data->Type()))
-    , data_(data->CloneEmpty())
-    , offsets_(std::make_shared<ColumnUInt64>())
+    : ColumnArray(data, std::make_shared<ColumnUInt64>())
 {
 }
 
-ColumnArray::ColumnArray(ColumnRef data, DoNotCloneDataColumnTag)
+ColumnArray::ColumnArray(ColumnRef data, std::shared_ptr<ColumnUInt64> offsets)
     : Column(Type::CreateArray(data->Type()))
     , data_(data)
-    , offsets_(std::make_shared<ColumnUInt64>())
+    , offsets_(offsets)
 {
 }
 
@@ -48,7 +46,7 @@ ColumnRef ColumnArray::Slice(size_t begin, size_t size) const {
     if (size && begin + size > Size())
         throw ValidationError("Slice indexes are out of bounds");
 
-    auto result = std::make_shared<ColumnArray>(data_->CloneEmpty(), DoNotCloneDataColumnTag{});
+    auto result = std::make_shared<ColumnArray>(data_->CloneEmpty());
     for (size_t i = 0; i < size; i++) {
         result->AppendAsColumn(GetAsColumn(begin + i));
     }
@@ -57,7 +55,7 @@ ColumnRef ColumnArray::Slice(size_t begin, size_t size) const {
 }
 
 ColumnRef ColumnArray::CloneEmpty() const {
-    return std::make_shared<ColumnArray>(data_->CloneEmpty(), DoNotCloneDataColumnTag{});
+    return std::make_shared<ColumnArray>(data_->CloneEmpty());
 }
 
 void ColumnArray::Append(ColumnRef column) {

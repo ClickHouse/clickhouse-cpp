@@ -14,17 +14,23 @@ class ColumnArrayT;
  * Represents column of Array(T).
  */
 class ColumnArray : public Column {
-protected:
-    struct DoNotCloneDataColumnTag {};
-
 public:
     using ValueType = ColumnRef;
 
-    // Create an array of given type, values inside `data` are not taken into account.
+    /** Create an array of given type.
+     *
+     *  `data` is used internaly (and modified) by ColumnArray.
+     *  Users are strongly advised against supplying non-empty columns and/or modifying
+     *  contents of `data` afterwards.
+     */
     explicit ColumnArray(ColumnRef data);
 
-    // Not expected to be used by users, hence protected `DoNotCloneDataColumnTag`
-    ColumnArray(ColumnRef data, DoNotCloneDataColumnTag tag);
+    /** Create an array of given type, with actual values and offsets.
+     *
+     *  Both `data` and `offsets` are used (and modified) internally bye ColumnArray.
+     *  Users are strongly advised against modifying contents of `data` or `offsets` afterwards.
+     */
+    ColumnArray(ColumnRef data, std::shared_ptr<ColumnUInt64> offsets);
 
     /// Converts input column to array and appends
     /// as one row to the current column.
@@ -37,8 +43,7 @@ public:
     /// Shorthand to get a column casted to a proper type.
     template <typename T>
     auto GetAsColumnTyped(size_t n) const {
-        auto result = GetAsColumn(n);
-        return result->AsStrict<T>();
+        return GetAsColumn(n)->AsStrict<T>();
     }
 
 public:
@@ -86,20 +91,26 @@ private:
     std::shared_ptr<ColumnUInt64> offsets_;
 };
 
-template <typename NestedColumnType>
+template <typename ColumnType>
 class ColumnArrayT : public ColumnArray {
 public:
     class ArrayValueView;
     using ValueType = ArrayValueView;
+    using NestedColumnType = ColumnType;
 
     explicit ColumnArrayT(std::shared_ptr<NestedColumnType> data)
         : ColumnArray(data)
-        , typed_nested_data_(this->GetData()->template AsStrict<NestedColumnType>())
+        , typed_nested_data_(data)
+    {}
+
+    ColumnArrayT(std::shared_ptr<NestedColumnType> data, std::shared_ptr<ColumnUInt64> offsets)
+        : ColumnArray(data, offsets)
+        , typed_nested_data_(data)
     {}
 
     template <typename ...Args>
     explicit ColumnArrayT(Args &&... args)
-        : ColumnArrayT(std::make_shared<NestedColumnType>(std::forward<Args>(args)...), ColumnArray::DoNotCloneDataColumnTag{})
+        : ColumnArrayT(std::make_shared<NestedColumnType>(std::forward<Args>(args)...))
     {}
 
     /** Create a ColumnArrayT from a ColumnArray, without copying data and offsets, but by 'stealing' those from `col`.
@@ -113,14 +124,10 @@ public:
     static auto Wrap(ColumnArray&& col) {
         if constexpr (std::is_base_of_v<ColumnArray, NestedColumnType> && !std::is_same_v<ColumnArray, NestedColumnType>) {
             // assuming NestedColumnType is ArrayT specialization
-
-            auto result = std::make_shared<ColumnArrayT<NestedColumnType>>(NestedColumnType::Wrap(col.GetData()), ColumnArray::DoNotCloneDataColumnTag{});
-            result->offsets_ = col.offsets_;
-
-            return result;
+            return std::make_shared<ColumnArrayT<NestedColumnType>>(NestedColumnType::Wrap(col.GetData()), col.offsets_);
         } else {
             auto nested_data = col.GetData()->template AsStrict<NestedColumnType>();
-            return std::shared_ptr<ColumnArrayT<NestedColumnType>>(new ColumnArrayT<NestedColumnType>(std::move(col), std::move(nested_data)));
+            return std::make_shared<ColumnArrayT<NestedColumnType>>(nested_data, col.offsets_);
         }
     }
 
@@ -260,13 +267,6 @@ public:
         // Even if there are 0 items, increase counter, creating empty array item.
         AddOffset(counter);
     }
-
-public:
-    // Helper to allow wrapping 2D-Arrays and also to optimize certain constructors.
-    ColumnArrayT(std::shared_ptr<NestedColumnType> data, ColumnArray::DoNotCloneDataColumnTag tag)
-        : ColumnArray(data, tag)
-        , typed_nested_data_(data)
-    {}
 
 private:
     /// Helper to allow wrapping a "typeless" ColumnArray
