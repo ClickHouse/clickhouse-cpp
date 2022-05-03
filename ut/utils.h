@@ -168,7 +168,7 @@ struct is_container_helper {};
 
 // Make a column a RO stl-like container
 template <typename NestedColumnType>
-struct ColumnAsContinerWrapper {
+struct ColumnAsContainerWrapper {
     const NestedColumnType& nested_col;
 
     struct Iterator {
@@ -211,7 +211,7 @@ struct ColumnAsContinerWrapper {
 template <typename T>
 auto maybeWrapColumnAsContainer(const T & t) {
     if constexpr (std::is_base_of_v<clickhouse::Column, T>) {
-        return ::details::ColumnAsContinerWrapper<T>{t};
+        return ::details::ColumnAsContainerWrapper<T>{t};
     } else {
         return t;
     }

@@ -14,11 +14,17 @@ class ColumnArrayT;
  * Represents column of Array(T).
  */
 class ColumnArray : public Column {
+protected:
+    struct DoNotCloneDataColumnTag {};
+
 public:
     using ValueType = ColumnRef;
 
-    // Create an array of given type.
+    // Create an array of given type, values inside `data` are not taken into account.
     explicit ColumnArray(ColumnRef data);
+
+    // Not expected to be used by users, hence protected `DoNotCloneDataColumnTag`
+    ColumnArray(ColumnRef data, DoNotCloneDataColumnTag tag);
 
     /// Converts input column to array and appends
     /// as one row to the current column.
@@ -68,8 +74,6 @@ protected:
     template<typename T> friend class ColumnArrayT;
 
     ColumnArray(ColumnArray&& array);
-    struct ShareOwnershipTag {};
-    ColumnArray(ColumnRef data, ShareOwnershipTag tag);
 
     size_t GetOffset(size_t n) const;
     size_t GetSize(size_t n) const;
@@ -85,42 +89,38 @@ private:
 template <typename NestedColumnType>
 class ColumnArrayT : public ColumnArray {
 public:
-    class ArrayWrapper;
-    using ValueType = ArrayWrapper;
+    class ArrayValueView;
+    using ValueType = ArrayValueView;
 
     explicit ColumnArrayT(std::shared_ptr<NestedColumnType> data)
-        : ColumnArray(data, ColumnArray::ShareOwnershipTag{})
-        , typed_nested_data_(data)
+        : ColumnArray(data)
+        , typed_nested_data_(this->GetData()->template AsStrict<NestedColumnType>())
     {}
 
     template <typename ...Args>
     explicit ColumnArrayT(Args &&... args)
-        : ColumnArrayT(std::make_shared<NestedColumnType>(std::forward<Args>(args)...))
+        : ColumnArrayT(std::make_shared<NestedColumnType>(std::forward<Args>(args)...), ColumnArray::DoNotCloneDataColumnTag{})
     {}
 
-    // Helper to allow wrapping a "typeless" ColumnArray
-    explicit ColumnArrayT(ColumnArray&& array)
-        : ColumnArray(std::move(array))
-        , typed_nested_data_(this->GetData()->template AsStrict<NestedColumnType>())
-    {}
-
-    /** Create a ColumnArrayT from a ColumnArray, without copying data and offsets.
+    /** Create a ColumnArrayT from a ColumnArray, without copying data and offsets, but by 'stealing' those from `col`.
+     *
      *  Ownership of column internals is transferred to returned object, original (argument) object
      *  MUST NOT BE USED IN ANY WAY, it is only safe to dispose it.
      *
-     *  Throws an exception of `col` is of wrong type, it is safe to use original col in this case.
+     *  Throws an exception if `col` is of wrong type, it is safe to use original col in this case.
      *  This is a static method to make such conversion verbose.
      */
     static auto Wrap(ColumnArray&& col) {
         if constexpr (std::is_base_of_v<ColumnArray, NestedColumnType> && !std::is_same_v<ColumnArray, NestedColumnType>) {
             // assuming NestedColumnType is ArrayT specialization
 
-            auto result = std::make_shared<ColumnArrayT<NestedColumnType>>(NestedColumnType::Wrap(col.GetData()));
+            auto result = std::make_shared<ColumnArrayT<NestedColumnType>>(NestedColumnType::Wrap(col.GetData()), ColumnArray::DoNotCloneDataColumnTag{});
             result->offsets_ = col.offsets_;
 
             return result;
         } else {
-            return std::make_shared<ColumnArrayT<NestedColumnType>>(std::move(col));
+            auto nested_data = col.GetData()->template AsStrict<NestedColumnType>();
+            return std::shared_ptr<ColumnArrayT<NestedColumnType>>(new ColumnArrayT<NestedColumnType>(std::move(col), std::move(nested_data)));
         }
     }
 
@@ -133,7 +133,8 @@ public:
         return Wrap(std::move(*col->AsStrict<ColumnArray>()));
     }
 
-    class ArrayWrapper {
+    /// A single (row) value of the Array-column, i.e. readonly array of items.
+    class ArrayValueView {
         const std::shared_ptr<NestedColumnType> typed_nested_data_;
         const size_t offset_;
         const size_t size_;
@@ -141,7 +142,7 @@ public:
     public:
         using ValueType = typename NestedColumnType::ValueType;
 
-        ArrayWrapper(std::shared_ptr<NestedColumnType> data, size_t offset = 0, size_t size = std::numeric_limits<size_t>::max())
+        ArrayValueView(std::shared_ptr<NestedColumnType> data, size_t offset = 0, size_t size = std::numeric_limits<size_t>::max())
             : typed_nested_data_(data)
             , offset_(offset)
             , size_(std::min(typed_nested_data_->Size() - offset, size))
@@ -226,11 +227,11 @@ public:
             throw ValidationError("ColumnArray row index out of bounds: "
                     + std::to_string(index) + ", max is " + std::to_string(Size()));
 
-        return ArrayWrapper{typed_nested_data_, GetOffset(index), GetSize(index)};
+        return ArrayValueView{typed_nested_data_, GetOffset(index), GetSize(index)};
     }
 
     inline auto operator[](size_t index) const {
-        return ArrayWrapper{typed_nested_data_, GetOffset(index), GetSize(index)};
+        return ArrayValueView{typed_nested_data_, GetOffset(index), GetSize(index)};
     }
 
     using ColumnArray::Append;
@@ -259,6 +260,21 @@ public:
         // Even if there are 0 items, increase counter, creating empty array item.
         AddOffset(counter);
     }
+
+public:
+    // Helper to allow wrapping 2D-Arrays and also to optimize certain constructors.
+    ColumnArrayT(std::shared_ptr<NestedColumnType> data, ColumnArray::DoNotCloneDataColumnTag tag)
+        : ColumnArray(data, tag)
+        , typed_nested_data_(data)
+    {}
+
+private:
+    /// Helper to allow wrapping a "typeless" ColumnArray
+    ColumnArrayT(ColumnArray&& array, std::shared_ptr<NestedColumnType> nested_data)
+        : ColumnArray(std::move(array))
+        , typed_nested_data_(std::move(nested_data))
+    {}
+
 
 private:
     std::shared_ptr<NestedColumnType> typed_nested_data_;

@@ -11,7 +11,7 @@ ColumnArray::ColumnArray(ColumnRef data)
 {
 }
 
-ColumnArray::ColumnArray(ColumnRef data, ShareOwnershipTag)
+ColumnArray::ColumnArray(ColumnRef data, DoNotCloneDataColumnTag)
     : Column(Type::CreateArray(data->Type()))
     , data_(data)
     , offsets_(std::make_shared<ColumnUInt64>())
@@ -45,7 +45,10 @@ ColumnRef ColumnArray::GetAsColumn(size_t n) const {
 }
 
 ColumnRef ColumnArray::Slice(size_t begin, size_t size) const {
-    auto result = std::make_shared<ColumnArray>(data_->CloneEmpty());
+    if (size && size + begin >= Size())
+        throw ValidationError("Slice indexes are out of bounds");
+
+    auto result = std::make_shared<ColumnArray>(data_->CloneEmpty(), DoNotCloneDataColumnTag{});
     for (size_t i = 0; i < size; i++) {
         result->AppendAsColumn(GetAsColumn(begin + i));
     }
@@ -54,7 +57,7 @@ ColumnRef ColumnArray::Slice(size_t begin, size_t size) const {
 }
 
 ColumnRef ColumnArray::CloneEmpty() const {
-    return std::make_shared<ColumnArray>(data_->CloneEmpty());
+    return std::make_shared<ColumnArray>(data_->CloneEmpty(), DoNotCloneDataColumnTag{});
 }
 
 void ColumnArray::Append(ColumnRef column) {

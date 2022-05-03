@@ -22,9 +22,34 @@
 
 namespace {
 using namespace clickhouse;
+
+template <typename NestedColumnType, typename ValuesContainer>
+std::shared_ptr<ColumnArray> Create2DArray(const ValuesContainer& values) {
+    auto result = std::make_shared<ColumnArray>(std::make_shared<ColumnArray>(std::make_shared<NestedColumnType>()));
+    for (size_t i = 0; i < values.size(); ++i) {
+        auto array_col = std::make_shared<ColumnArray>(std::make_shared<NestedColumnType>());
+        for (size_t j = 0; j < values[i].size(); ++j)
+            array_col->AppendAsColumn(std::make_shared<ColumnUInt64>(values[i][j]));
+
+        result->AppendAsColumn(array_col);
+    }
+
+    return result;
 }
 
-TEST(ColumnsCase, ArrayAppend) {
+template <typename NestedColumnType, typename ValuesContainer>
+std::shared_ptr<ColumnArray> CreateArray(const ValuesContainer& values) {
+    auto result = std::make_shared<ColumnArray>(std::make_shared<NestedColumnType>());
+    for (size_t i = 0; i < values.size(); ++i) {
+        result->AppendAsColumn(std::make_shared<NestedColumnType>(values[i]));
+    }
+
+    return result;
+}
+
+}
+
+TEST(ColumnArray, Append) {
     auto arr1 = std::make_shared<ColumnArray>(std::make_shared<ColumnUInt64>());
     auto arr2 = std::make_shared<ColumnArray>(std::make_shared<ColumnUInt64>());
 
@@ -44,7 +69,7 @@ TEST(ColumnsCase, ArrayAppend) {
     ASSERT_EQ(col->As<ColumnUInt64>()->At(1), 3u);
 }
 
-TEST(ColumnsCase, ArrayOfDecimal) {
+TEST(ColumnArray, ArrayOfDecimal) {
     auto column = std::make_shared<clickhouse::ColumnDecimal>(18, 10);
     auto array = std::make_shared<clickhouse::ColumnArray>(column->CloneEmpty());
 
@@ -57,9 +82,81 @@ TEST(ColumnsCase, ArrayOfDecimal) {
     EXPECT_EQ(2u, array->GetAsColumn(0)->Size());
 }
 
+TEST(ColumnArray, GetAsColumn) {
+    // Verify that result of GetAsColumn
+    // - is of proper type
+    // - has expected length
+    // - values match ones predefined ones
+
+    const std::vector<std::vector<uint64_t>> values = {
+        {1u, 2u, 3u},
+        {4u, 5u, 6u, 7u, 8u, 9u},
+        {0u},
+        {},
+        {13, 14}
+    };
+
+    auto array = CreateArray<ColumnUInt64>(values);
+    ASSERT_EQ(values.size(), array->Size());
+
+    for (size_t i = 0; i < values.size(); ++i) {
+        auto row = array->GetAsColumn(i);
+        std::shared_ptr<ColumnUInt64> typed_row;
+
+        EXPECT_NO_THROW(typed_row = row->As<ColumnUInt64>());
+        EXPECT_TRUE(CompareRecursive(values[i], *typed_row));
+    }
+
+    EXPECT_THROW(array->GetAsColumn(array->Size()), ValidationError);
+    EXPECT_THROW(array->GetAsColumn(array->Size() + 1), ValidationError);
+}
+
+TEST(ColumnArray, Slice) {
+    const std::vector<std::vector<uint64_t>> values = {
+        {1u, 2u, 3u},
+        {4u, 5u, 6u, 7u, 8u, 9u},
+        {0u},
+        {},
+        {13, 14, 15}
+    };
+
+    std::shared_ptr<ColumnArray> untyped_array = CreateArray<ColumnUInt64>(values);
+
+    for (size_t i = 0; i < values.size() - 1; ++i) {
+        auto slice = untyped_array->Slice(i, 1)->AsStrict<ColumnArray>();
+        EXPECT_EQ(1u, slice->Size());
+        EXPECT_TRUE(CompareRecursive(values[i], *slice->GetAsColumnTyped<ColumnUInt64>(0)));
+    }
+
+    EXPECT_EQ(0u, untyped_array->Slice(0, 0)->Size());
+    EXPECT_ANY_THROW(untyped_array->Slice(values.size(), 1));
+    EXPECT_ANY_THROW(untyped_array->Slice(0, values.size() + 1));
+}
+
+TEST(ColumnArray, Slice_2D) {
+    const std::vector<std::vector<std::vector<uint64_t>>> values = {
+        {{1u, 2u}, {3u}},
+        {{4u}, {5u, 6u, 7u}, {8u, 9u}, {}},
+        {{0u}},
+        {{}},
+        {{13}, {14, 15}}
+    };
+
+    std::shared_ptr<ColumnArray> untyped_array = Create2DArray<ColumnUInt64>(values);
+
+    for (size_t i = 0; i < values.size() - 1; ++i) {
+        auto slice = untyped_array->Slice(i, 1)->AsStrict<ColumnArray>();
+        EXPECT_EQ(1u, slice->Size());
+
+        for (size_t j = 0; j < values[i].size(); ++j) {
+            EXPECT_TRUE(CompareRecursive(values[i][j], *slice->GetAsColumnTyped<ColumnUInt64>(j)));
+        }
+    }
+}
+
+
 template <typename ArrayTSpecialization, typename RowValuesContainer>
 auto AppendRowAndTest(ArrayTSpecialization& array, const RowValuesContainer& values) {
-//    SCOPED_TRACE(PrintContainer{values});
     const size_t prev_size = array.Size();
 
     array.Append(values);
@@ -68,7 +165,7 @@ auto AppendRowAndTest(ArrayTSpecialization& array, const RowValuesContainer& val
     EXPECT_TRUE(CompareRecursive(values, array.At(prev_size)));
     EXPECT_TRUE(CompareRecursive(values, array[prev_size]));
 
-    // Check that both subscrip and At() work properly.
+    // Check that both subscript and At() work properly.
     const auto & new_row = array.At(prev_size);
     for (size_t i = 0; i < values.size(); ++i) {
         EXPECT_TRUE(CompareRecursive(*(values.begin() + i), new_row[i]))
@@ -92,157 +189,22 @@ auto CreateAndTestColumnArrayT(const AllValuesContainer& all_values) {
     return array;
 }
 
-TEST(ColumnsCase, ArrayTUint64) {
-    // Check inserting\reading back data from clickhouse::ColumnArrayT<ColumnUInt64>
-
-    const std::vector<std::vector<unsigned int>> values = {
-        {1u, 2u, 3u},
-        {4u, 5u, 6u, 7u, 8u, 9u},
-        {0u},
-        {},
-        {13, 14}
-    };
-    auto array_ptr = CreateAndTestColumnArrayT<ColumnUInt64>(values);
-    const auto & array = *array_ptr;
-
-    // Make sure that chaining of brackets works.
-    EXPECT_EQ(1u, array[0][0]);
-    EXPECT_EQ(2u, array[0][1]);
-    EXPECT_EQ(3u, array[0][2]);
-
-    // empty row
-    EXPECT_EQ(0u, array[3].size());
-
-    EXPECT_EQ(2u, array[4].size());
-    EXPECT_EQ(13u, array[4][0]);
-    EXPECT_EQ(14u, array[4][1]);
-
-    // Make sure that At() throws an exception on nested items
-    EXPECT_THROW(array.At(5), clickhouse::ValidationError);
-    EXPECT_THROW(array[3].At(0), clickhouse::ValidationError);
-    EXPECT_THROW(array[4].At(3), clickhouse::ValidationError);
-}
-
-TEST(ColumnsCase, ArrayTOfArrayTUint64) {
-    // Check inserting\reading back data from 2D array: clickhouse::ColumnArrayT<ColumnArrayT<ColumnUInt64>>
-
-    const std::vector<std::vector<std::vector<unsigned int>>> values = {
-        {{1u, 2u, 3u}, {4u, 5u, 6u}},
-        {{4u, 5u, 6u}, {7u, 8u, 9u}, {10u, 11u}},
-        {{}, {}},
-        {},
-        {{13, 14}, {}}
-    };
-
-    auto array_ptr = CreateAndTestColumnArrayT<ColumnArrayT<ColumnUInt64>>(values);
-    const auto & array = *array_ptr;
-
-    {
-        const auto row = array[0];
-        EXPECT_EQ(1u, row[0][0]);
-        EXPECT_EQ(2u, row[0][1]);
-        EXPECT_EQ(6u, row[1][2]);
-    }
-
-    {
-        EXPECT_EQ(8u,  array[1][1][1]);
-        EXPECT_EQ(11u, array[1][2][1]);
-    }
-
-    {
-        EXPECT_EQ(2u, array[2].size());
-        EXPECT_EQ(0u, array[2][0].size());
-        EXPECT_EQ(0u, array[2][1].size());
-    }
-
-    {
-        EXPECT_EQ(0u, array[3].size());
-
-        // [] doesn't check bounds.
-        // On empty rows attempt to access out-of-bound elements
-        // would actually cause access to the elements of the next row.
-        // hence non-0 value of `array[3][0].size()`,
-        // it is effectively the same as `array[3 + 1][0].size()`
-        EXPECT_EQ(2u, array[3][0].size());
-        EXPECT_EQ(14u, array[3][0][1]);
-        EXPECT_EQ(0u, array[3][1].size());
-    }
-
-    {
-        EXPECT_EQ(14u, array[4][0][1]);
-        EXPECT_EQ(0u, array[4][1].size());
-    }
-}
-
-TEST(ColumnsCase, ArrayTWrap) {
-    // TODO(nemkov): wrap 2D array
-    // Check that ColumnArrayT can wrap a pre-existing ColumnArray,
-    // pre-existing data is kept intact and new rows can be inserted.
-
-    const std::vector<std::vector<uint64_t>> values = {
-        {1u, 2u, 3u},
-        {4u, 5u, 6u, 7u, 8u, 9u},
-        {0u},
-        {},
-        {13, 14}
-    };
-
-    std::shared_ptr<ColumnArray> untyped_array = std::make_shared<ColumnArray>(std::make_shared<ColumnUInt64>());
-    for (size_t i = 0; i < values.size(); ++i) {
-        untyped_array->AppendAsColumn(std::make_shared<ColumnUInt64>(values[i]));
-    }
-
-    auto wrapped_array = ColumnArrayT<ColumnUInt64>::Wrap(std::move(*untyped_array));
-    // Upon wrapping, internals of columns are "stolen" and the column shouldn't be used anymore.
-//    EXPECT_EQ(0u, untyped_array->Size());
-
-    const auto & array = *wrapped_array;
-
-    EXPECT_TRUE(CompareRecursive(values, array));
-}
-
-TEST(ColumnsCase, ArrayTArrayTWrap) {
-    // TODO(nemkov): wrap 2D array
-    // Check that ColumnArrayT can wrap a pre-existing ColumnArray,
-    // pre-existing data is kept intact and new rows can be inserted.
-
-    const std::vector<std::vector<std::vector<uint64_t>>> values = {
-//        {{1u, 2u}, {3u}},
-//        {{4u}, {5u, 6u, 7u}, {8u, 9u}, {}},
-//        {{0u}},
-        {{}},
-//        {{13}, {14, 15}}
-    };
-
-    std::shared_ptr<ColumnArray> untyped_array = std::make_shared<ColumnArray>(std::make_shared<ColumnArray>(std::make_shared<ColumnUInt64>()));
-    for (size_t i = 0; i < values.size(); ++i) {
-        auto array_col = std::make_shared<ColumnArray>(std::make_shared<ColumnUInt64>());
-        for (size_t j = 0; j < values[i].size(); ++j) {
-            const auto & v = values[i][j];
-            SCOPED_TRACE(::testing::Message() << "i: " << i << " j:" << j << " " << PrintContainer{v});
-            array_col->AppendAsColumn(std::make_shared<ColumnUInt64>(v));
-        }
-
-        untyped_array->AppendAsColumn(array_col);
-    }
-
-    auto wrapped_array = ColumnArrayT<ColumnArrayT<ColumnUInt64>>::Wrap(std::move(*untyped_array));
-    const auto & array = *wrapped_array;
-
-    EXPECT_TRUE(CompareRecursive(values, array));
-}
-
-TEST(ColumnsCase, ArrayTSimpleUint64) {
+TEST(ColumnArrayT, SimpleUInt64) {
     auto array = std::make_shared<clickhouse::ColumnArrayT<ColumnUInt64>>();
     array->Append({0, 1, 2});
 
-    EXPECT_EQ(0u, array->At(0).At(0)); // 0
-    EXPECT_EQ(1u, (*array)[0][1]);     // 1
+    ASSERT_EQ(1u, array->Size());
+    EXPECT_EQ(0u, array->At(0).At(0));
+    EXPECT_EQ(1u, (*array)[0][1]);
+
+    EXPECT_THROW(array->At(2), ValidationError);
+    EXPECT_THROW(array->At(0).At(3), ValidationError);
+    EXPECT_THROW((*array)[0].At(3), ValidationError);
 }
 
-TEST(ColumnsCase, ArrayTSimpleFixedString) {
+TEST(ColumnArrayT, SimpleFixedString) {
     using namespace std::literals;
-    auto array = std::make_shared<clickhouse::ColumnArrayT<ColumnFixedString>>(6);
+    auto array = std::make_shared<ColumnArrayT<ColumnFixedString>>(6);
     array->Append({"hello", "world"});
 
     // Additional \0 since strings are padded from right with zeros in FixedString(6).
@@ -256,11 +218,89 @@ TEST(ColumnsCase, ArrayTSimpleFixedString) {
     EXPECT_EQ("world\0"sv, (*array)[0][1]);
 }
 
-TEST(ColumnsCase, ArrayTSimpleArrayOfUint64) {
+TEST(ColumnArrayT, SimpleUInt64_2D) {
     // Nested 2D-arrays are supported too:
-    auto array = std::make_shared<clickhouse::ColumnArrayT<clickhouse::ColumnArrayT<ColumnUInt64>>>();
+    auto array = std::make_shared<ColumnArrayT<ColumnArrayT<ColumnUInt64>>>();
     array->Append(std::vector<std::vector<unsigned int>>{{0}, {1, 1}, {2, 2, 2}});
 
-    EXPECT_EQ(0u, array->At(0).At(0).At(0)); // 0
-    EXPECT_EQ(1u, (*array)[0][1][1]);        // 1
+    ASSERT_EQ(1u, array->Size());
+    EXPECT_EQ(0u, array->At(0).At(0).At(0));
+    EXPECT_EQ(1u, (*array)[0][1][1]);
+
+    EXPECT_THROW(array->At(2), ValidationError);
+}
+
+TEST(ColumnArrayT, UInt64) {
+    // Check inserting\reading back data from clickhouse::ColumnArrayT<ColumnUInt64>
+
+    const std::vector<std::vector<unsigned int>> values = {
+        {1u, 2u, 3u},
+        {4u, 5u, 6u, 7u, 8u, 9u},
+        {0u},
+        {},
+        {13, 14}
+    };
+    CreateAndTestColumnArrayT<ColumnUInt64>(values);
+}
+
+TEST(ColumnArrayT, UInt64_2D) {
+    // Check inserting\reading back data from 2D array: ColumnArrayT<ColumnArrayT<ColumnUInt64>>
+
+    const std::vector<std::vector<std::vector<unsigned int>>> values = {
+        {{1u, 2u, 3u}, {4u, 5u, 6u}},
+        {{4u, 5u, 6u}, {7u, 8u, 9u}, {10u, 11u}},
+        {{}, {}},
+        {},
+        {{13, 14}, {}}
+    };
+
+    auto array_ptr = CreateAndTestColumnArrayT<ColumnArrayT<ColumnUInt64>>(values);
+    const auto & array = *array_ptr;
+
+    {
+        EXPECT_EQ(0u, array[3].size());
+
+        // operator[] doesn't check bounds.
+        // On empty rows attempt to access out-of-bound elements
+        // would actually cause access to the elements of the next row.
+        // hence non-0 value of `array[3][0].size()`,
+        // it is effectively the same as `array[3 + 1][0].size()`
+        EXPECT_EQ(2u, array[3][0].size());
+        EXPECT_EQ(14u, array[3][0][1]);
+        EXPECT_EQ(0u, array[3][1].size());
+    }
+}
+
+TEST(ColumnArrayT, Wrap_UInt64) {
+    // Check that ColumnArrayT can wrap a pre-existing ColumnArray.
+
+    const std::vector<std::vector<uint64_t>> values = {
+        {1u, 2u, 3u},
+        {4u, 5u, 6u, 7u, 8u, 9u},
+        {0u},
+        {},
+        {13, 14}
+    };
+
+    auto wrapped_array = ColumnArrayT<ColumnUInt64>::Wrap(CreateArray<ColumnUInt64>(values));
+    const auto & array = *wrapped_array;
+
+    EXPECT_TRUE(CompareRecursive(values, array));
+}
+
+TEST(ColumnArrayT, Wrap_UInt64_2D) {
+    // Check that ColumnArrayT can wrap a pre-existing ColumnArray.
+
+    const std::vector<std::vector<std::vector<uint64_t>>> values = {
+        {{1u, 2u}, {3u}},
+        {{4u}, {5u, 6u, 7u}, {8u, 9u}, {}},
+        {{0u}},
+        {{}},
+        {{13}, {14, 15}}
+    };
+
+    auto wrapped_array = ColumnArrayT<ColumnArrayT<ColumnUInt64>>::Wrap(Create2DArray<ColumnUInt64>(values));
+    const auto & array = *wrapped_array;
+
+    EXPECT_TRUE(CompareRecursive(values, array));
 }
