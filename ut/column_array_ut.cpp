@@ -149,7 +149,7 @@ TEST(ColumnArray, Slice_2D) {
         EXPECT_EQ(1u, slice->Size());
 
         for (size_t j = 0; j < values[i].size(); ++j) {
-            EXPECT_TRUE(CompareRecursive(values[i][j], *slice->GetAsColumnTyped<ColumnUInt64>(j)));
+            EXPECT_TRUE(CompareRecursive(values[i][j], *slice->GetAsColumnTyped<ColumnArray>(0)->GetAsColumnTyped<ColumnUInt64>(j)));
         }
     }
 }
