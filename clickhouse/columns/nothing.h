@@ -51,16 +51,20 @@ public:
 	}
 
     /// Loads column data from input stream.
-    bool Load(InputStream* input, size_t rows) override {
+    bool LoadBody(InputStream* input, size_t rows) override {
 		input->Skip(rows);
 		size_ += rows;
 		return true;
 	}
+        /// Saves column prefix to output stream.
+    void SavePrefix(OutputStream*) override {
+        throw std::runtime_error("method Save is not supported for Nothing column");
+    }
 
     /// Saves column data to output stream.
-    void Save(OutputStream*) override {
-        throw UnimplementedError("method Save is not supported for Nothing column");
-	}
+    void SaveBody(OutputStream*) override {
+        throw UnimplementedError("method SaveBody is not supported for Nothing column");
+    }
 
     /// Clear column data .
     void Clear() override { size_ = 0; }

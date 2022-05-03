@@ -27,12 +27,12 @@ void ColumnDate::Append(ColumnRef column) {
     }
 }
 
-bool ColumnDate::Load(InputStream* input, size_t rows) {
-    return data_->Load(input, rows);
+bool ColumnDate::LoadBody(InputStream* input, size_t rows) {
+    return data_->LoadBody(input, rows);
 }
 
-void ColumnDate::Save(OutputStream* output) {
-    data_->Save(output);
+void ColumnDate::SaveBody(OutputStream* output) {
+    data_->SaveBody(output);
 }
 
 size_t ColumnDate::Size() const {
@@ -89,12 +89,12 @@ void ColumnDateTime::Append(ColumnRef column) {
     }
 }
 
-bool ColumnDateTime::Load(InputStream* input, size_t rows) {
-    return data_->Load(input, rows);
+bool ColumnDateTime::LoadBody(InputStream* input, size_t rows) {
+    return data_->LoadBody(input, rows);
 }
 
-void ColumnDateTime::Save(OutputStream* output) {
-    data_->Save(output);
+void ColumnDateTime::SaveBody(OutputStream* output) {
+    data_->SaveBody(output);
 }
 
 size_t ColumnDateTime::Size() const {
@@ -162,12 +162,12 @@ void ColumnDateTime64::Append(ColumnRef column) {
     }
 }
 
-bool ColumnDateTime64::Load(InputStream* input, size_t rows) {
-    return data_->Load(input, rows);
+bool ColumnDateTime64::LoadBody(InputStream* input, size_t rows) {
+    return data_->LoadBody(input, rows);
 }
 
-void ColumnDateTime64::Save(OutputStream* output) {
-    data_->Save(output);
+void ColumnDateTime64::SaveBody(OutputStream* output) {
+    data_->SaveBody(output);
 }
 
 void ColumnDateTime64::Clear() {

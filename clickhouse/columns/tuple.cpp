@@ -44,9 +44,9 @@ ColumnRef ColumnTuple::Slice(size_t begin, size_t len) const {
     return std::make_shared<ColumnTuple>(sliced_columns);
 }
 
-bool ColumnTuple::Load(InputStream* input, size_t rows) {
+bool ColumnTuple::LoadPrefix(InputStream* input, size_t rows) {
     for (auto ci = columns_.begin(); ci != columns_.end(); ++ci) {
-        if (!(*ci)->Load(input, rows)) {
+        if (!(*ci)->LoadPrefix(input, rows)) {
             return false;
         }
     }
@@ -54,9 +54,25 @@ bool ColumnTuple::Load(InputStream* input, size_t rows) {
     return true;
 }
 
-void ColumnTuple::Save(OutputStream* output) {
+bool ColumnTuple::LoadBody(InputStream* input, size_t rows) {
     for (auto ci = columns_.begin(); ci != columns_.end(); ++ci) {
-        (*ci)->Save(output);
+        if (!(*ci)->LoadBody(input, rows)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+void ColumnTuple::SavePrefix(OutputStream* output) {
+    for (auto & column : columns_) {
+        column->SavePrefix(output);
+    }
+}
+
+void ColumnTuple::SaveBody(OutputStream* output) {
+    for (auto & column : columns_) {
+        column->SaveBody(output);
     }
 }
 

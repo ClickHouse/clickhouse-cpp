@@ -44,12 +44,12 @@ void ColumnUUID::Append(ColumnRef column) {
     }
 }
 
-bool ColumnUUID::Load(InputStream* input, size_t rows) {
-    return data_->Load(input, rows * 2);
+bool ColumnUUID::LoadBody(InputStream* input, size_t rows) {
+    return data_->LoadBody(input, rows * 2);
 }
 
-void ColumnUUID::Save(OutputStream* output) {
-    data_->Save(output);
+void ColumnUUID::SaveBody(OutputStream* output) {
+    data_->SaveBody(output);
 }
 
 size_t ColumnUUID::Size() const {

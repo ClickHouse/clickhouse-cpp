@@ -42,11 +42,27 @@ public:
     /// Appends content of given column to the end of current one.
     virtual void Append(ColumnRef column) = 0;
 
-    /// Loads column data from input stream.
-    virtual bool Load(InputStream* input, size_t rows) = 0;
+    /// Template method to load column data from input stream. It'll call LoadPrefix and LoadBody.
+    /// Should be called only once from the client. Derived classes should not call it.
+    bool Load(InputStream* input, size_t rows);
 
-    /// Saves column data to output stream.
-    virtual void Save(OutputStream* output) = 0;
+    /// Loads column prefix from input stream.
+    virtual bool LoadPrefix(InputStream* input, size_t rows);
+
+    /// Loads column data from input stream.
+    virtual bool LoadBody(InputStream* input, size_t rows) = 0;
+
+    /// Saves column prefix to output stream. Column types with prefixes must implement it.
+    virtual void SavePrefix(OutputStream* output);
+
+    /// Saves column body to output stream.
+    virtual void SaveBody(OutputStream* output) = 0;
+
+    /// Template method to save to output stream. It'll call SavePrefix and SaveBody respectively
+    /// Should be called only once from the client. Derived classes should not call it.
+    /// Save is split in Prefix and Body because some data types require prefixes and specific serialization order.
+    /// For instance, Array(LowCardinality(X)) requires LowCardinality.key_version bytes to come before Array.offsets
+    void Save(OutputStream* output);
 
     /// Clear column data .
     virtual void Clear() = 0;

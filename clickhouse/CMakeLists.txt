@@ -7,6 +7,7 @@ SET ( clickhouse-cpp-lib-src
     base/wire_format.cpp
 
     columns/array.cpp
+    columns/column.cpp
     columns/date.cpp
     columns/decimal.cpp
     columns/enum.cpp
