@@ -45,7 +45,7 @@ ColumnRef ColumnArray::GetAsColumn(size_t n) const {
 }
 
 ColumnRef ColumnArray::Slice(size_t begin, size_t size) const {
-    if (size && size + begin >= Size())
+    if (size && begin + size > Size())
         throw ValidationError("Slice indexes are out of bounds");
 
     auto result = std::make_shared<ColumnArray>(data_->CloneEmpty(), DoNotCloneDataColumnTag{});
