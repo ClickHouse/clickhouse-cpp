@@ -250,9 +250,6 @@ bool ColumnLowCardinality::LoadPrefix(InputStream* input, size_t) {
     if (key_version != KeySerializationVersion::SharedDictionariesWithAdditionalKeys)
         throw ProtocolError("Invalid key serialization version value.");
 
-
-    // does nothing with key_version, only check it?
-
     return true;
 }
 
