@@ -83,6 +83,11 @@ ColumnRef ColumnVector<T>::Slice(size_t begin, size_t len) const {
 }
 
 template <typename T>
+ColumnRef ColumnVector<T>::CloneEmpty() const {
+    return std::make_shared<ColumnVector<T>>();
+}
+
+template <typename T>
 void ColumnVector<T>::Swap(Column& other) {
     auto & col = dynamic_cast<ColumnVector<T> &>(other);
     data_.swap(col.data_);

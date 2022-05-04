@@ -95,6 +95,11 @@ ColumnRef ColumnEnum<T>::Slice(size_t begin, size_t len) const {
 }
 
 template <typename T>
+ColumnRef ColumnEnum<T>::CloneEmpty() const {
+    return std::make_shared<ColumnEnum<T>>(type_);
+}
+
+template <typename T>
 void ColumnEnum<T>::Swap(Column& other) {
     auto & col = dynamic_cast<ColumnEnum<T> &>(other);
     data_.swap(col.data_);

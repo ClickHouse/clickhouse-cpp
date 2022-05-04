@@ -87,6 +87,10 @@ ColumnRef ColumnIPv6::Slice(size_t begin, size_t len) const {
     return std::make_shared<ColumnIPv6>(data_->Slice(begin, len));
 }
 
+ColumnRef ColumnIPv6::CloneEmpty() const {
+    return std::make_shared<ColumnIPv6>(data_->CloneEmpty());
+}
+
 void ColumnIPv6::Swap(Column& other) {
     auto & col = dynamic_cast<ColumnIPv6 &>(other);
     data_.swap(col.data_);

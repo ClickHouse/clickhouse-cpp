@@ -4,11 +4,13 @@ SET ( clickhouse-cpp-ut-src
     block_ut.cpp
     client_ut.cpp
     columns_ut.cpp
+    column_array_ut.cpp
     itemview_ut.cpp
     socket_ut.cpp
     stream_ut.cpp
     type_parser_ut.cpp
     types_ut.cpp
+    utils_ut.cpp
 
     performance_tests.cpp
     tcp_server.cpp

@@ -3,22 +3,47 @@
 #include "column.h"
 #include "numeric.h"
 
+#include <memory>
+
 namespace clickhouse {
+
+template <typename NestedColumnType>
+class ColumnArrayT;
 
 /**
  * Represents column of Array(T).
  */
 class ColumnArray : public Column {
 public:
-    ColumnArray(ColumnRef data);
+    using ValueType = ColumnRef;
 
-    /// Converts input column to array and appends
-    /// as one row to the current column.
+    /** Create an array of given type.
+     *
+     *  `data` is used internaly (and modified) by ColumnArray.
+     *  Users are strongly advised against supplying non-empty columns and/or modifying
+     *  contents of `data` afterwards.
+     */
+    explicit ColumnArray(ColumnRef data);
+
+    /** Create an array of given type, with actual values and offsets.
+     *
+     *  Both `data` and `offsets` are used (and modified) internally bye ColumnArray.
+     *  Users are strongly advised against modifying contents of `data` or `offsets` afterwards.
+     */
+    ColumnArray(ColumnRef data, std::shared_ptr<ColumnUInt64> offsets);
+
+    /// Converts input column to array and appends as one row to the current column.
     void AppendAsColumn(ColumnRef array);
 
     /// Convets array at pos n to column.
     /// Type of element of result column same as type of array element.
     ColumnRef GetAsColumn(size_t n) const;
+
+    /// Shorthand to get a column casted to a proper type.
+    template <typename T>
+    auto GetAsColumnTyped(size_t n) const {
+        return GetAsColumn(n)->AsStrict<T>();
+    }
 
 public:
     /// Appends content of given column to the end of current one.
@@ -44,19 +69,214 @@ public:
 
     /// Makes slice of the current column.
     ColumnRef Slice(size_t, size_t) const override;
-
+    ColumnRef CloneEmpty() const override;
     void Swap(Column&) override;
 
     void OffsetsIncrease(size_t);
 
-private:
-    size_t GetOffset(size_t n) const;
+protected:
+    template<typename T> friend class ColumnArrayT;
 
+    ColumnArray(ColumnArray&& array);
+
+    size_t GetOffset(size_t n) const;
     size_t GetSize(size_t n) const;
+    ColumnRef GetData();
+    void AddOffset(size_t n);
+    void Reset();
 
 private:
     ColumnRef data_;
     std::shared_ptr<ColumnUInt64> offsets_;
+};
+
+template <typename ColumnType>
+class ColumnArrayT : public ColumnArray {
+public:
+    class ArrayValueView;
+    using ValueType = ArrayValueView;
+    using NestedColumnType = ColumnType;
+
+    explicit ColumnArrayT(std::shared_ptr<NestedColumnType> data)
+        : ColumnArray(data)
+        , typed_nested_data_(data)
+    {}
+
+    ColumnArrayT(std::shared_ptr<NestedColumnType> data, std::shared_ptr<ColumnUInt64> offsets)
+        : ColumnArray(data, offsets)
+        , typed_nested_data_(data)
+    {}
+
+    template <typename ...Args>
+    explicit ColumnArrayT(Args &&... args)
+        : ColumnArrayT(std::make_shared<NestedColumnType>(std::forward<Args>(args)...))
+    {}
+
+    /** Create a ColumnArrayT from a ColumnArray, without copying data and offsets, but by 'stealing' those from `col`.
+     *
+     *  Ownership of column internals is transferred to returned object, original (argument) object
+     *  MUST NOT BE USED IN ANY WAY, it is only safe to dispose it.
+     *
+     *  Throws an exception if `col` is of wrong type, it is safe to use original col in this case.
+     *  This is a static method to make such conversion verbose.
+     */
+    static auto Wrap(ColumnArray&& col) {
+        if constexpr (std::is_base_of_v<ColumnArray, NestedColumnType> && !std::is_same_v<ColumnArray, NestedColumnType>) {
+            // assuming NestedColumnType is ArrayT specialization
+            return std::make_shared<ColumnArrayT<NestedColumnType>>(NestedColumnType::Wrap(col.GetData()), col.offsets_);
+        } else {
+            auto nested_data = col.GetData()->template AsStrict<NestedColumnType>();
+            return std::make_shared<ColumnArrayT<NestedColumnType>>(nested_data, col.offsets_);
+        }
+    }
+
+    static auto Wrap(Column&& col) {
+        return Wrap(std::move(dynamic_cast<ColumnArray&&>(col)));
+    }
+
+    // Helper to simplify integration with other APIs
+    static auto Wrap(ColumnRef&& col) {
+        return Wrap(std::move(*col->AsStrict<ColumnArray>()));
+    }
+
+    /// A single (row) value of the Array-column, i.e. readonly array of items.
+    class ArrayValueView {
+        const std::shared_ptr<NestedColumnType> typed_nested_data_;
+        const size_t offset_;
+        const size_t size_;
+
+    public:
+        using ValueType = typename NestedColumnType::ValueType;
+
+        ArrayValueView(std::shared_ptr<NestedColumnType> data, size_t offset = 0, size_t size = std::numeric_limits<size_t>::max())
+            : typed_nested_data_(data)
+            , offset_(offset)
+            , size_(std::min(typed_nested_data_->Size() - offset, size))
+        {}
+
+        inline auto operator[](size_t index) const {
+            return (*typed_nested_data_)[offset_ + index];
+        }
+
+        inline auto At(size_t index) const {
+            if (index >= size_)
+                throw ValidationError("ColumnArray value index out of bounds: "
+                        + std::to_string(index) + ", max is " + std::to_string(size_));
+            return typed_nested_data_->At(offset_ + index);
+        }
+
+        class Iterator {
+            const std::shared_ptr<NestedColumnType> typed_nested_data_;
+            const size_t offset_;
+            const size_t size_;
+            size_t index_;
+        public:
+            Iterator(std::shared_ptr<NestedColumnType> typed_nested_data, size_t offset, size_t size, size_t index)
+                : typed_nested_data_(typed_nested_data)
+                , offset_(offset)
+                , size_(size)
+                , index_(index)
+            {}
+
+            using ValueType = typename NestedColumnType::ValueType;
+
+            inline auto operator*() const {
+                return typed_nested_data_->At(offset_ + index_);
+            }
+
+            inline Iterator& operator++() {
+                ++index_;
+                return *this;
+            }
+
+            inline bool operator==(const Iterator& other) const {
+                return this->typed_nested_data_ == other.typed_nested_data_
+                        && this->offset_ == other.offset_
+                        && this->size_ == other.size_
+                        && this->index_ == other.index_;
+            }
+
+            inline bool operator!=(const Iterator& other) const {
+                return !(*this == other);
+            }
+        };
+
+        // minimalistic stl-like container interface, hence the lowercase
+        inline Iterator begin() const {
+            return Iterator{typed_nested_data_, offset_, size_, 0};
+        }
+
+        inline Iterator cbegin() const {
+            return Iterator{typed_nested_data_, offset_, size_, 0};
+        }
+
+        inline Iterator end() const {
+            return Iterator{typed_nested_data_, offset_, size_, size_};
+        }
+
+        inline Iterator cend() const {
+            return Iterator{typed_nested_data_, offset_, size_, size_};
+        }
+
+        inline size_t size() const {
+            return size_;
+        }
+
+        // It is ugly to have both size() and Size(), but it is for compatitability with both STL and rest of the clickhouse-cpp.
+        inline size_t Size() const {
+            return size_;
+        }
+    };
+
+    inline auto At(size_t index) const {
+        if (index >= Size())
+            throw ValidationError("ColumnArray row index out of bounds: "
+                    + std::to_string(index) + ", max is " + std::to_string(Size()));
+
+        return ArrayValueView{typed_nested_data_, GetOffset(index), GetSize(index)};
+    }
+
+    inline auto operator[](size_t index) const {
+        return ArrayValueView{typed_nested_data_, GetOffset(index), GetSize(index)};
+    }
+
+    using ColumnArray::Append;
+
+    template <typename Container>
+    inline void Append(const Container& container) {
+        Append(std::begin(container), std::end(container));
+    }
+
+    template <typename ValueType>
+    inline void Append(const std::initializer_list<ValueType>& container) {
+        Append(std::begin(container), std::end(container));
+    }
+
+    template <typename Begin, typename End>
+    inline void Append(Begin begin, const End & end) {
+        auto & nested_data = *typed_nested_data_;
+        size_t counter = 0;
+
+        while (begin != end) {
+            nested_data.Append(*begin);
+            ++begin;
+            ++counter;
+        }
+
+        // Even if there are 0 items, increase counter, creating empty array item.
+        AddOffset(counter);
+    }
+
+private:
+    /// Helper to allow wrapping a "typeless" ColumnArray
+    ColumnArrayT(ColumnArray&& array, std::shared_ptr<NestedColumnType> nested_data)
+        : ColumnArray(std::move(array))
+        , typed_nested_data_(std::move(nested_data))
+    {}
+
+
+private:
+    std::shared_ptr<NestedColumnType> typed_nested_data_;
 };
 
 }

@@ -87,6 +87,10 @@ ColumnRef ColumnIPv4::Slice(size_t begin, size_t len) const {
     return std::make_shared<ColumnIPv4>(data_->Slice(begin, len));
 }
 
+ColumnRef ColumnIPv4::CloneEmpty() const {
+    return std::make_shared<ColumnIPv4>(data_->CloneEmpty());
+}
+
 void ColumnIPv4::Swap(Column& other) {
     auto & col = dynamic_cast<ColumnIPv4 &>(other);
     data_.swap(col.data_);

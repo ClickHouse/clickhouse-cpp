@@ -58,7 +58,9 @@ protected:
         client_ = std::make_unique<Client>(GetParam());
     }
 
-    void TearDown() override {}
+    void TearDown() override {
+        client_.reset();
+    }
 
     template <typename T>
     std::shared_ptr<T> createTableWithOneColumn(Block & block)
@@ -911,6 +913,168 @@ TEST_P(ClientCase, Query_ID) {
 
     // We've executed 5 queries with explicit query_id, hence we expect to see 5 entries in logs.
     EXPECT_EQ(5u, total_count);
+}
+
+// Spontaneosly fails on INSERTint data.
+TEST_P(ClientCase, DISABLED_ArrayArrayUInt64) {
+    // Based on https://github.com/ClickHouse/clickhouse-cpp/issues/43
+    std::cerr << "Connected to: " << client_->GetServerInfo() << std::endl;
+    std::cerr << "DROPPING TABLE" << std::endl;
+    client_->Execute("DROP TEMPORARY TABLE IF EXISTS multiarray");
+
+    std::cerr << "CREATING TABLE" << std::endl;
+    client_->Execute(Query(R"sql(CREATE TEMPORARY TABLE IF NOT EXISTS multiarray
+    (
+        `arr` Array(Array(UInt64))
+    );
+)sql"));
+
+    std::cerr << "INSERTING VALUES" << std::endl;
+    client_->Execute(Query(R"sql(INSERT INTO multiarray VALUES ([[0,1,2,3,4,5], [100, 200], [10,20, 50, 70]]), ([[456, 789], [1011, 1213], [], [14]]), ([[]]);)sql"));
+    std::cerr << "INSERTED" << std::endl;
+
+    auto result = std::make_shared<ColumnArray>(std::make_shared<ColumnArray>(std::make_shared<ColumnUInt64>()));
+    ASSERT_EQ(0u, result->Size());
+
+    std::cerr << "SELECTING VALUES" << std::endl;
+    client_->Select("SELECT arr FROM multiarray", [&result](const Block& block) {
+        std::cerr << "GOT BLOCK: " << block.GetRowCount() << std::endl;
+        if (block.GetRowCount() == 0)
+            return;
+
+        result->Append(block[0]);
+    });
+
+    std::cerr << "DONE SELECTING VALUES" << std::endl;
+    client_.reset();
+
+    ASSERT_EQ(3u, result->Size());
+    {
+        // ([[0,1,2,3,4,5], [100, 200], [10,20, 50, 70]])
+        const std::vector<std::vector<uint64_t>> expected_vals = {
+            {0, 1, 2, 3, 4, 5},
+            {100, 200},
+            {10, 20, 50, 70}
+        };
+
+        auto row = result->GetAsColumnTyped<ColumnArray>(0);
+        ASSERT_EQ(3u, row->Size());
+        EXPECT_TRUE(CompareRecursive(expected_vals[0], *row->GetAsColumnTyped<ColumnUInt64>(0)));
+        EXPECT_TRUE(CompareRecursive(expected_vals[1], *row->GetAsColumnTyped<ColumnUInt64>(1)));
+        EXPECT_TRUE(CompareRecursive(expected_vals[2], *row->GetAsColumnTyped<ColumnUInt64>(2)));
+    }
+
+    {
+        // ([[456, 789], [1011, 1213], [], [14]])
+        const std::vector<std::vector<uint64_t>> expected_vals = {
+            {456, 789},
+            {1011, 1213},
+            {},
+            {14}
+        };
+
+        auto row = result->GetAsColumnTyped<ColumnArray>(1);
+        ASSERT_EQ(4u, row->Size());
+        EXPECT_TRUE(CompareRecursive(expected_vals[0], *row->GetAsColumnTyped<ColumnUInt64>(0)));
+        EXPECT_TRUE(CompareRecursive(expected_vals[1], *row->GetAsColumnTyped<ColumnUInt64>(1)));
+        EXPECT_TRUE(CompareRecursive(expected_vals[2], *row->GetAsColumnTyped<ColumnUInt64>(2)));
+        EXPECT_TRUE(CompareRecursive(expected_vals[3], *row->GetAsColumnTyped<ColumnUInt64>(3)));
+    }
+
+    {
+        // ([[]])
+        auto row = result->GetAsColumnTyped<ColumnArray>(2);
+        ASSERT_EQ(1u, row->Size());
+        EXPECT_TRUE(CompareRecursive(std::vector<uint64_t>{}, *row->GetAsColumnTyped<ColumnUInt64>(0)));
+    }
+}
+
+ColumnRef RoundtripColumnValues(Client& client, ColumnRef expected) {
+    // Create a temporary table with a single column
+    // insert values from `expected`
+    // select and aggregate all values from block into `result` column
+    auto result = expected->CloneEmpty();
+
+    const std::string type_name = result->GetType().GetName();
+    client.Execute("DROP TEMPORARY TABLE IF EXISTS temporary_roundtrip_table;");
+    client.Execute("CREATE TEMPORARY TABLE IF NOT EXISTS temporary_roundtrip_table (col " + type_name + ");");
+    {
+        Block block;
+        block.AppendColumn("col", expected);
+        block.RefreshRowCount();
+        client.Insert("temporary_roundtrip_table", block);
+    }
+
+    client.Select("SELECT col FROM temporary_roundtrip_table", [&result](const Block& b) {
+        if (b.GetRowCount() == 0)
+            return;
+
+        ASSERT_EQ(1u, b.GetColumnCount());
+        result->Append(b[0]);
+    });
+
+    EXPECT_EQ(expected->Type(), result->Type());
+    EXPECT_EQ(expected->Size(), result->Size());
+    return result;
+}
+
+TEST_P(ClientCase, RoundtripArrayTUint64) {
+    auto array = std::make_shared<ColumnArrayT<ColumnUInt64>>();
+    array->Append({0, 1, 2});
+
+    auto result = RoundtripColumnValues(*client_, array)->AsStrict<ColumnArray>();
+    auto row = result->GetAsColumn(0)->As<ColumnUInt64>();
+
+    EXPECT_EQ(0u, row->At(0));
+    EXPECT_EQ(1u, (*row)[1]);
+    EXPECT_EQ(2u, (*row)[2]);
+}
+
+TEST_P(ClientCase, RoundtripArrayTArrayTUint64) {
+    const std::vector<std::vector<uint64_t>> row_values = {
+        {1, 2, 3},
+        {4, 5, 6},
+        {7, 8, 9, 10}
+    };
+
+    auto array = std::make_shared<ColumnArrayT<ColumnArrayT<ColumnUInt64>>>();
+    array->Append(row_values);
+
+    auto result_typed = ColumnArrayT<ColumnArrayT<ColumnUInt64>>::Wrap(RoundtripColumnValues(*client_, array));
+    EXPECT_TRUE(CompareRecursive(*array, *result_typed));
+}
+
+TEST_P(ClientCase, RoundtripArrayTArrayTArrayTUint64) {
+    using ColumnType = ColumnArrayT<ColumnArrayT<ColumnArrayT<ColumnUInt64>>>;
+    const std::vector<std::vector<std::vector<uint64_t>>> row_values = {
+        {{1, 2, 3}, {3, 2, 1}},
+        {{4, 5, 6}, {6, 5, 4}},
+        {{7, 8, 9, 10}, {}},
+        {{}, {10, 9, 8, 7}}
+    };
+
+    auto array = std::make_shared<ColumnType>();
+    array->Append(row_values);
+
+    auto result_typed = ColumnType::Wrap(RoundtripColumnValues(*client_, array));
+    EXPECT_TRUE(CompareRecursive(*array, *result_typed));
+}
+
+
+TEST_P(ClientCase, RoundtripArrayTFixedString) {
+    auto array = std::make_shared<ColumnArrayT<ColumnFixedString>>(6);
+    array->Append({"hello", "world"});
+
+    auto result_typed = ColumnArrayT<ColumnFixedString>::Wrap(RoundtripColumnValues(*client_, array));
+    EXPECT_TRUE(CompareRecursive(*array, *result_typed));
+}
+
+TEST_P(ClientCase, RoundtripArrayTString) {
+    auto array = std::make_shared<ColumnArrayT<ColumnString>>();
+    array->Append({"hello", "world"});
+
+    auto result_typed = ColumnArrayT<ColumnString>::Wrap(RoundtripColumnValues(*client_, array));
+    EXPECT_TRUE(CompareRecursive(*array, *result_typed));
 }
 
 const auto LocalHostEndpoint = ClientOptions()

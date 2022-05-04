@@ -14,13 +14,13 @@ namespace clickhouse {
  */
 class ColumnNothing : public Column {
 public:
-	ColumnNothing()
+    ColumnNothing()
         : Column(Type::CreateNothing())
         , size_(0)
     {
     }
 
-	explicit ColumnNothing(size_t n)
+    explicit ColumnNothing(size_t n)
         : Column(Type::CreateNothing())
         , size_(n)
     {
@@ -30,35 +30,35 @@ public:
     void Append(std::unique_ptr<void*>) { ++size_; }
 
     /// Returns element at given row number.
-	std::nullptr_t At(size_t) const { return nullptr; };
+    std::nullptr_t At(size_t) const { return nullptr; };
 
     /// Returns element at given row number.
-	std::nullptr_t operator [] (size_t) const { return nullptr; };
+    std::nullptr_t operator [] (size_t) const { return nullptr; };
 
     /// Makes slice of the current column.
     ColumnRef Slice(size_t, size_t len) const override {
-		return std::make_shared<ColumnNothing>(len);
-	}
+        return std::make_shared<ColumnNothing>(len);
+    }
+
+    ColumnRef CloneEmpty() const override {
+        return std::make_shared<ColumnNothing>();
+    }
 
     ItemView GetItem(size_t /*index*/) const override { return ItemView{}; }
 
 public:
     /// Appends content of given column to the end of current one.
     void Append(ColumnRef column) override {
-		if (auto col = column->As<ColumnNothing>()) {
-			size_ += col->Size();
-		}
-	}
+        if (auto col = column->As<ColumnNothing>()) {
+            size_ += col->Size();
+        }
+    }
 
     /// Loads column data from input stream.
     bool LoadBody(InputStream* input, size_t rows) override {
-		input->Skip(rows);
-		size_ += rows;
-		return true;
-	}
-        /// Saves column prefix to output stream.
-    void SavePrefix(OutputStream*) override {
-        throw std::runtime_error("method Save is not supported for Nothing column");
+        input->Skip(rows);
+        size_ += rows;
+        return true;
     }
 
     /// Saves column data to output stream.
@@ -78,7 +78,7 @@ public:
     }
 
 private:
-	size_t size_;
+    size_t size_;
 };
 
 }

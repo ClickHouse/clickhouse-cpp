@@ -5,9 +5,21 @@
 namespace clickhouse {
 
 ColumnArray::ColumnArray(ColumnRef data)
+    : ColumnArray(data, std::make_shared<ColumnUInt64>())
+{
+}
+
+ColumnArray::ColumnArray(ColumnRef data, std::shared_ptr<ColumnUInt64> offsets)
     : Column(Type::CreateArray(data->Type()))
     , data_(data)
-    , offsets_(std::make_shared<ColumnUInt64>())
+    , offsets_(offsets)
+{
+}
+
+ColumnArray::ColumnArray(ColumnArray&& other)
+    : Column(other.Type())
+    , data_(std::move(other.data_))
+    , offsets_(std::move(other.offsets_))
 {
 }
 
@@ -18,28 +30,31 @@ void ColumnArray::AppendAsColumn(ColumnRef array) {
             "to column type " + data_->Type()->GetName());
     }
 
-    if (offsets_->Size() == 0) {
-        offsets_->Append(array->Size());
-    } else {
-        offsets_->Append((*offsets_)[offsets_->Size() - 1] + array->Size());
-    }
-
+    AddOffset(array->Size());
     data_->Append(array);
 }
 
 ColumnRef ColumnArray::GetAsColumn(size_t n) const {
+    if (n >= Size())
+        throw ValidationError("Index is out ouf bounds: " + std::to_string(n));
+
     return data_->Slice(GetOffset(n), GetSize(n));
 }
 
 ColumnRef ColumnArray::Slice(size_t begin, size_t size) const {
-    auto result = std::make_shared<ColumnArray>(GetAsColumn(begin));
-    result->OffsetsIncrease(1);
+    if (size && begin + size > Size())
+        throw ValidationError("Slice indexes are out of bounds");
 
-    for (size_t i = 1; i < size; i++) {
-        result->Append(std::make_shared<ColumnArray>(GetAsColumn(begin + i)));
+    auto result = std::make_shared<ColumnArray>(data_->CloneEmpty());
+    for (size_t i = 0; i < size; i++) {
+        result->AppendAsColumn(GetAsColumn(begin + i));
     }
 
     return result;
+}
+
+ColumnRef ColumnArray::CloneEmpty() const {
+    return std::make_shared<ColumnArray>(data_->CloneEmpty());
 }
 
 void ColumnArray::Append(ColumnRef column) {
@@ -108,8 +123,25 @@ size_t ColumnArray::GetOffset(size_t n) const {
     return (n == 0) ? 0 : (*offsets_)[n - 1];
 }
 
+void ColumnArray::AddOffset(size_t n) {
+    if (offsets_->Size() == 0) {
+        offsets_->Append(n);
+    } else {
+        offsets_->Append((*offsets_)[offsets_->Size() - 1] + n);
+    }
+}
+
 size_t ColumnArray::GetSize(size_t n) const {
     return (n == 0) ? (*offsets_)[n] : ((*offsets_)[n] - (*offsets_)[n - 1]);
+}
+
+ColumnRef ColumnArray::GetData() {
+    return data_;
+}
+
+void ColumnArray::Reset() {
+    data_.reset();
+    offsets_.reset();
 }
 
 }

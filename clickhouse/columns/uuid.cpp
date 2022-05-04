@@ -60,6 +60,10 @@ ColumnRef ColumnUUID::Slice(size_t begin, size_t len) const {
     return std::make_shared<ColumnUUID>(data_->Slice(begin * 2, len * 2));
 }
 
+ColumnRef ColumnUUID::CloneEmpty() const {
+    return std::make_shared<ColumnUUID>();
+}
+
 void ColumnUUID::Swap(Column& other) {
     auto & col = dynamic_cast<ColumnUUID &>(other);
     data_.swap(col.data_);

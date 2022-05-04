@@ -122,7 +122,7 @@ inline auto GetNullItemForDictionary(const ColumnRef dictionary) {
 namespace clickhouse {
 ColumnLowCardinality::ColumnLowCardinality(ColumnRef dictionary_column)
     : Column(Type::CreateLowCardinality(dictionary_column->Type())),
-      dictionary_column_(dictionary_column->Slice(0, 0)), // safe way to get an column of the same type.
+      dictionary_column_(dictionary_column->CloneEmpty()), // safe way to get an column of the same type.
       index_column_(std::make_shared<ColumnUInt32>())
 {
     AppendNullItemToEmptyColumn();
@@ -255,7 +255,7 @@ bool ColumnLowCardinality::LoadPrefix(InputStream* input, size_t) {
 
 bool ColumnLowCardinality::LoadBody(InputStream* input, size_t rows) {
     try {
-        auto [new_dictionary, new_index, new_unique_items_map] = ::Load(dictionary_column_->Slice(0, 0), *input, rows);
+        auto [new_dictionary, new_index, new_unique_items_map] = ::Load(dictionary_column_->CloneEmpty(), *input, rows);
 
         dictionary_column_->Swap(*new_dictionary);
         index_column_.swap(new_index);
@@ -301,12 +301,16 @@ ColumnRef ColumnLowCardinality::Slice(size_t begin, size_t len) const {
     begin = std::min(begin, Size());
     len = std::min(len, Size() - begin);
 
-    auto result = std::make_shared<ColumnLowCardinality>(dictionary_column_->Slice(0, 0));
+    auto result = std::make_shared<ColumnLowCardinality>(dictionary_column_->CloneEmpty());
 
     for (size_t i = begin; i < begin + len; ++i)
         result->AppendUnsafe(this->GetItem(i));
 
     return result;
+}
+
+ColumnRef ColumnLowCardinality::CloneEmpty() const {
+    return std::make_shared<ColumnLowCardinality>(dictionary_column_->CloneEmpty());
 }
 
 void ColumnLowCardinality::Swap(Column& other) {

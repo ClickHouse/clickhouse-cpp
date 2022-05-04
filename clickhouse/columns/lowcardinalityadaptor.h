@@ -36,7 +36,7 @@ public:
 
     /// Loads column data from input stream.
     bool LoadBody(InputStream* input, size_t rows) override {
-        auto new_data_column = this->Slice(0, 0)->template As<AdaptedColumnType>();
+        auto new_data_column = this->CloneEmpty()->template As<AdaptedColumnType>();
 
         ColumnLowCardinalityT<AdaptedColumnType> low_cardinality_col(new_data_column);
         if (!low_cardinality_col.LoadBody(input, rows))

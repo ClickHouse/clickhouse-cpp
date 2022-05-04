@@ -73,7 +73,7 @@ public:
 
     /// Makes slice of current column, with compacted dictionary
     ColumnRef Slice(size_t begin, size_t len) const override;
-
+    ColumnRef CloneEmpty() const override;
     void Swap(Column& other) override;
     ItemView GetItem(size_t index) const override;
 

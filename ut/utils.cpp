@@ -2,13 +2,15 @@
 
 #include <clickhouse/block.h>
 #include <clickhouse/columns/column.h>
+#include <clickhouse/columns/array.h>
 #include <clickhouse/columns/date.h>
 #include <clickhouse/columns/decimal.h>
 #include <clickhouse/columns/enum.h>
-#include <clickhouse/columns/numeric.h>
-#include <clickhouse/columns/string.h>
 #include <clickhouse/columns/ip4.h>
 #include <clickhouse/columns/ip6.h>
+#include <clickhouse/columns/numeric.h>
+#include <clickhouse/columns/string.h>
+#include <clickhouse/columns/tuple.h>
 
 #include <clickhouse/base/socket.h> // for ipv4-ipv6 platform-specific stuff
 
@@ -17,6 +19,8 @@
 
 namespace {
 using namespace clickhouse;
+std::ostream & printColumnValue(const ColumnRef& c, const size_t row, std::ostream & ostr);
+
 struct DateTimeValue {
     explicit DateTimeValue(const time_t & v)
         : value(v)
@@ -69,6 +73,45 @@ bool doPrintValue<ColumnEnum16>(const ColumnRef & c, const size_t row, std::ostr
     return doPrintEnumValue<ColumnEnum16>(c, row, ostr);
 }
 
+template <>
+bool doPrintValue<ColumnArray, void>(const ColumnRef & c, const size_t row, std::ostream & ostr) {
+    // via temporary stream to preserve fill and alignment of the ostr
+    std::stringstream sstr;
+
+    if (const auto & array_col = c->As<ColumnArray>()) {
+        const auto & row_values = array_col->GetAsColumn(row);
+        sstr << "[";
+        for (size_t i = 0; i < row_values->Size(); ++i) {
+            printColumnValue(row_values, i, sstr);
+
+            if (i < row_values->Size() - 1)
+                sstr << ", ";
+        }
+        sstr << "]";
+        ostr << sstr.str();
+
+        return true;
+    }
+    return false;
+}
+
+template <>
+bool doPrintValue<ColumnTuple, void>(const ColumnRef & c, const size_t row, std::ostream & ostr) {
+    if (const auto & tupple_col = c->As<ColumnTuple>()) {
+        ostr << "(";
+        for (size_t i = 0; i < tupple_col->TupleSize(); ++i) {
+            const auto & nested_col = (*tupple_col)[i];
+            printColumnValue(nested_col, row, ostr);
+
+            if (i < tupple_col->TupleSize() - 1)
+                ostr << ", ";
+        }
+        ostr << ")";
+        return true;
+    }
+    return false;
+}
+
 std::ostream & printColumnValue(const ColumnRef& c, const size_t row, std::ostream & ostr) {
 
     const auto r = false
@@ -91,7 +134,9 @@ std::ostream & printColumnValue(const ColumnRef& c, const size_t row, std::ostre
         || doPrintValue<ColumnDateTime64, DateTimeValue>(c, row, ostr)
         || doPrintValue<ColumnDecimal>(c, row, ostr)
         || doPrintValue<ColumnIPv4>(c, row, ostr)
-        || doPrintValue<ColumnIPv6>(c, row, ostr);
+        || doPrintValue<ColumnIPv6>(c, row, ostr)
+        || doPrintValue<ColumnArray, void>(c, row, ostr)
+        || doPrintValue<ColumnTuple, void>(c, row, ostr);
     if (!r)
         ostr << "Unable to print value of type " << c->GetType().GetName();
 

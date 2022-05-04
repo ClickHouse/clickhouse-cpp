@@ -218,6 +218,11 @@ ColumnRef ColumnDecimal::Slice(size_t begin, size_t len) const {
     return ColumnRef{new ColumnDecimal(type_, data_->Slice(begin, len))};
 }
 
+ColumnRef ColumnDecimal::CloneEmpty() const {
+    // coundn't use std::make_shared since this c-tor is private
+    return ColumnRef{new ColumnDecimal(type_, data_->CloneEmpty())};
+}
+
 void ColumnDecimal::Swap(Column& other) {
     auto & col = dynamic_cast<ColumnDecimal &>(other);
     data_.swap(col.data_);
