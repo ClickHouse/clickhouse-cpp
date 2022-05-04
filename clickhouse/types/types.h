@@ -34,7 +34,6 @@ public:
         FixedString,
         DateTime,
         Date,
-        Date32,
         Array,
         Nullable,
         Tuple,
@@ -50,6 +49,7 @@ public:
         Decimal128,
         LowCardinality,
         DateTime64,
+        Date32,
     };
 
     using EnumItem = std::pair<std::string /* name */, int16_t /* value */>;
