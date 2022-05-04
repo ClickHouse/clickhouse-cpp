@@ -32,8 +32,7 @@ public:
      */
     ColumnArray(ColumnRef data, std::shared_ptr<ColumnUInt64> offsets);
 
-    /// Converts input column to array and appends
-    /// as one row to the current column.
+    /// Converts input column to array and appends as one row to the current column.
     void AppendAsColumn(ColumnRef array);
 
     /// Convets array at pos n to column.

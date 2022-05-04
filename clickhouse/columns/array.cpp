@@ -16,7 +16,6 @@ ColumnArray::ColumnArray(ColumnRef data, std::shared_ptr<ColumnUInt64> offsets)
 {
 }
 
-// Explicitly sharing `data_` column is required by ColumnArrayT
 ColumnArray::ColumnArray(ColumnArray&& other)
     : Column(other.Type())
     , data_(std::move(other.data_))
