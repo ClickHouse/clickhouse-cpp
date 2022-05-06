@@ -92,7 +92,7 @@ bool ColumnDate32::LoadBody(InputStream* input, size_t rows) {
     return data_->LoadBody(input, rows);
 }
 
-void ColumnDate32::SaveBody(clickhouse/columns/date.cppOutputStream* output) {
+void ColumnDate32::SaveBody(OutputStream* output) {
     data_->SaveBody(output);
 }
 
