@@ -143,13 +143,15 @@ TEST(ColumnArray, Slice_2D) {
     };
 
     std::shared_ptr<ColumnArray> untyped_array = Create2DArray<ColumnUInt64>(values);
-
     for (size_t i = 0; i < values.size() - 1; ++i) {
         auto slice = untyped_array->Slice(i, 1)->AsStrict<ColumnArray>();
         EXPECT_EQ(1u, slice->Size());
 
+        auto val = slice->GetAsColumnTyped<ColumnArray>(0);
+        ASSERT_EQ(values[i].size(), val->Size());
+
         for (size_t j = 0; j < values[i].size(); ++j) {
-            EXPECT_TRUE(CompareRecursive(values[i][j], *slice->GetAsColumnTyped<ColumnArray>(0)->GetAsColumnTyped<ColumnUInt64>(j)));
+            ASSERT_TRUE(CompareRecursive(values[i][j], *val->GetAsColumnTyped<ColumnUInt64>(j)));
         }
     }
 }
