@@ -88,12 +88,12 @@ void ColumnDate32::Append(ColumnRef column) {
     }
 }
 
-bool ColumnDate32::Load(InputStream* input, size_t rows) {
-    return data_->Load(input, rows);
+bool ColumnDate32::LoadBody(InputStream* input, size_t rows) {
+    return data_->LoadBody(input, rows);
 }
 
-void ColumnDate32::Save(OutputStream* output) {
-    data_->Save(output);
+void ColumnDate32::SaveBody(clickhouse/columns/date.cppOutputStream* output) {
+    data_->SaveBody(output);
 }
 
 size_t ColumnDate32::Size() const {
@@ -101,12 +101,16 @@ size_t ColumnDate32::Size() const {
 }
 
 ColumnRef ColumnDate32::Slice(size_t begin, size_t len) const {
-    auto col = data_->Slice(begin, len)->As<ColumnUInt16>();
+    auto col = data_->Slice(begin, len)->As<ColumnUInt32>();
     auto result = std::make_shared<ColumnDate32>();
 
     result->data_->Append(col);
 
     return result;
+}
+
+ColumnRef ColumnDate32::CloneEmpty() const {
+    return std::make_shared<ColumnDate32>();
 }
 
 void ColumnDate32::Swap(Column& other) {
@@ -117,7 +121,6 @@ void ColumnDate32::Swap(Column& other) {
 ItemView ColumnDate32::GetItem(size_t index) const {
     return data_->GetItem(index);
 }
-
 
 
 ColumnDateTime::ColumnDateTime()
