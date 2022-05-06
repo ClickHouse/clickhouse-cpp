@@ -19,7 +19,7 @@
 
 #include <string_view>
 #include <sstream>
-
+#include <vector>
 
 // only compare PODs of equal size this way
 template <typename L, typename R, typename
@@ -237,26 +237,6 @@ TEST(ColumnsCase, StringInit) {
 }
 
 
-TEST(ColumnsCase, ArrayAppend) {
-    auto arr1 = std::make_shared<ColumnArray>(std::make_shared<ColumnUInt64>());
-    auto arr2 = std::make_shared<ColumnArray>(std::make_shared<ColumnUInt64>());
-
-    auto id = std::make_shared<ColumnUInt64>();
-    id->Append(1);
-    arr1->AppendAsColumn(id);
-
-    id->Append(3);
-    arr2->AppendAsColumn(id);
-
-    arr1->Append(arr2);
-
-    auto col = arr1->GetAsColumn(1);
-
-    ASSERT_EQ(arr1->Size(), 2u);
-    ASSERT_EQ(col->As<ColumnUInt64>()->At(0), 1u);
-    ASSERT_EQ(col->As<ColumnUInt64>()->At(1), 3u);
-}
-
 TEST(ColumnsCase, TupleAppend){
     auto tuple1 = std::make_shared<ColumnTuple>(std::vector<ColumnRef>({
                                 std::make_shared<ColumnUInt64>(),
@@ -379,7 +359,7 @@ TEST(ColumnsCase, DateTime64_Slice) {
 
     {
         // Empty slice on empty column
-        auto slice = column->Slice(0, 0)->As<ColumnDateTime64>();
+        auto slice = column->CloneEmpty()->As<ColumnDateTime64>();
         ASSERT_EQ(0u, slice->Size());
         ASSERT_EQ(column->GetPrecision(), slice->GetPrecision());
     }
@@ -394,7 +374,7 @@ TEST(ColumnsCase, DateTime64_Slice) {
 
     {
         // Empty slice on non-empty column
-        auto slice = column->Slice(0, 0)->As<ColumnDateTime64>();
+        auto slice = column->CloneEmpty()->As<ColumnDateTime64>();
         ASSERT_EQ(0u, slice->Size());
         ASSERT_EQ(column->GetPrecision(), slice->GetPrecision());
     }
@@ -952,20 +932,6 @@ TEST(ColumnsCase, LowCardinalityAsWrappedColumn) {
     ASSERT_EQ(Type::FixedString, CreateColumnByType("LowCardinality(FixedString(10000))", create_column_settings)->GetType().GetCode());
     ASSERT_EQ(Type::FixedString, CreateColumnByType("LowCardinality(FixedString(10000))", create_column_settings)->As<ColumnFixedString>()->GetType().GetCode());
 }
-
-TEST(ColumnsCase, ArrayOfDecimal) {
-    auto column = std::make_shared<clickhouse::ColumnDecimal>(18, 10);
-    auto array = std::make_shared<clickhouse::ColumnArray>(column->Slice(0, 0));
-
-    column->Append("1");
-    column->Append("2");
-    EXPECT_EQ(2u, column->Size());
-
-    array->AppendAsColumn(column);
-    ASSERT_EQ(1u, array->Size());
-    EXPECT_EQ(2u, array->GetAsColumn(0)->Size());
-}
-
 
 class ColumnsCaseWithName : public ::testing::TestWithParam<const char* /*Column Type String*/>
 {};

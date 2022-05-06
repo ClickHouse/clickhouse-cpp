@@ -419,6 +419,10 @@ bool Client::Impl::ReceivePacket(uint64_t* server_packet) {
         return true;
     }
 
+    case ServerCodes::Hello: {
+        return true;
+    }
+
     case ServerCodes::EndOfStream: {
         if (events_) {
             events_->OnFinish();

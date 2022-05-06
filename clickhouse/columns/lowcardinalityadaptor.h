@@ -27,12 +27,19 @@ class LowCardinalitySerializationAdaptor : public AdaptedColumnType
 public:
     using AdaptedColumnType::AdaptedColumnType;
 
-    /// Loads column data from input stream.
-    bool Load(InputStream* input, size_t rows) override {
+    bool LoadPrefix(InputStream* input, size_t rows) override {
         auto new_data_column = this->Slice(0, 0)->template As<AdaptedColumnType>();
+        ColumnLowCardinalityT<AdaptedColumnType> low_cardinality_col(new_data_column);
+
+        return low_cardinality_col.LoadPrefix(input, rows);
+    }
+
+    /// Loads column data from input stream.
+    bool LoadBody(InputStream* input, size_t rows) override {
+        auto new_data_column = this->CloneEmpty()->template As<AdaptedColumnType>();
 
         ColumnLowCardinalityT<AdaptedColumnType> low_cardinality_col(new_data_column);
-        if (!low_cardinality_col.Load(input, rows))
+        if (!low_cardinality_col.LoadBody(input, rows))
             return false;
 
         // It safe to reuse `flat_data_column` later since ColumnLowCardinalityT makes a deep copy, but still check just in case.
@@ -46,8 +53,8 @@ public:
     }
 
     /// Saves column data to output stream.
-    void Save(OutputStream* output) override {
-        ColumnLowCardinalityT<AdaptedColumnType>(this->template As<AdaptedColumnType>()).Save(output);
+    void SaveBody(OutputStream* output) override {
+        ColumnLowCardinalityT<AdaptedColumnType>(this->template As<AdaptedColumnType>()).SaveBody(output);
     }
 };
 

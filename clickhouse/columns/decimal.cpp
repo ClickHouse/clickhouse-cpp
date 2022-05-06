@@ -197,12 +197,12 @@ void ColumnDecimal::Append(ColumnRef column) {
     }
 }
 
-bool ColumnDecimal::Load(InputStream * input, size_t rows) {
-    return data_->Load(input, rows);
+bool ColumnDecimal::LoadBody(InputStream * input, size_t rows) {
+    return data_->LoadBody(input, rows);
 }
 
-void ColumnDecimal::Save(OutputStream* output) {
-    data_->Save(output);
+void ColumnDecimal::SaveBody(OutputStream* output) {
+    data_->SaveBody(output);
 }
 
 void ColumnDecimal::Clear() {
@@ -216,6 +216,11 @@ size_t ColumnDecimal::Size() const {
 ColumnRef ColumnDecimal::Slice(size_t begin, size_t len) const {
     // coundn't use std::make_shared since this c-tor is private
     return ColumnRef{new ColumnDecimal(type_, data_->Slice(begin, len))};
+}
+
+ColumnRef ColumnDecimal::CloneEmpty() const {
+    // coundn't use std::make_shared since this c-tor is private
+    return ColumnRef{new ColumnDecimal(type_, data_->CloneEmpty())};
 }
 
 void ColumnDecimal::Swap(Column& other) {

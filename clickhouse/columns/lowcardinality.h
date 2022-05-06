@@ -54,11 +54,16 @@ public:
     /// Appends another LowCardinality column to the end of this one, updating dictionary.
     void Append(ColumnRef /*column*/) override;
 
+    bool LoadPrefix(InputStream* input, size_t rows) override;
+
     /// Loads column data from input stream.
-    bool Load(InputStream* input, size_t rows) override;
+    bool LoadBody(InputStream* input, size_t rows) override;
+
+    /// Saves column prefix to output stream.
+    void SavePrefix(OutputStream* output) override;
 
     /// Saves column data to output stream.
-    void Save(OutputStream* output) override;
+    void SaveBody(OutputStream* output) override;
 
     /// Clear column data.
     void Clear() override;
@@ -68,7 +73,7 @@ public:
 
     /// Makes slice of current column, with compacted dictionary
     ColumnRef Slice(size_t begin, size_t len) const override;
-
+    ColumnRef CloneEmpty() const override;
     void Swap(Column& other) override;
     ItemView GetItem(size_t index) const override;
 

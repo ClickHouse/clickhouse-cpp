@@ -12,8 +12,11 @@
 
 #include <time.h>
 
+#include <gtest/gtest.h>
+
 namespace clickhouse {
     class Block;
+    class Column;
 }
 
 template <typename ChronoDurationType>
@@ -153,3 +156,158 @@ auto getEnvOrDefault(const std::string& env, const char * default_val) {
         }
     }
 }
+
+
+// based on https://stackoverflow.com/a/31207079
+template <typename T, typename _ = void>
+struct is_container : std::false_type {};
+
+namespace details {
+template <typename... Ts>
+struct is_container_helper {};
+
+// Make a column a RO stl-like container
+template <typename NestedColumnType>
+struct ColumnAsContainerWrapper {
+    const NestedColumnType& nested_col;
+
+    struct Iterator {
+        const NestedColumnType& nested_col;
+        size_t i = 0;
+
+        auto& operator++() {
+            ++i;
+            return *this;
+        }
+
+        auto operator*() const {
+            return nested_col[i];
+        }
+
+        bool operator==(const Iterator & other) const {
+            return &other.nested_col == &this->nested_col && other.i == this->i;
+        }
+
+        bool operator!=(const Iterator & other) const {
+            return !(other == *this);
+        }
+    };
+
+    size_t size() const {
+        return nested_col.Size();
+    }
+
+    auto begin() const {
+        return Iterator{nested_col, 0};
+    }
+
+    auto end() const {
+        return Iterator{nested_col, nested_col.Size()};
+    }
+};
+
+}
+
+template <typename T>
+auto maybeWrapColumnAsContainer(const T & t) {
+    if constexpr (std::is_base_of_v<clickhouse::Column, T>) {
+        return ::details::ColumnAsContainerWrapper<T>{t};
+    } else {
+        return t;
+    }
+}
+
+// A very loose definition of container, nerfed to fit both C-array and ColumnArrayT<X>::ArrayWrapper
+template <typename T>
+struct is_container<
+        T,
+        std::conditional_t<
+            false,
+            ::details::is_container_helper<
+                decltype(std::declval<T>().size()),
+                decltype(std::begin(std::declval<T>())),
+                decltype(std::end(std::declval<T>()))
+                >,
+            void
+            >
+        > : public std::true_type {};
+
+template <typename T>
+inline constexpr bool is_container_v = is_container<T>::value;
+
+template <typename Container>
+struct PrintContainer {
+    const Container & container_;
+
+    explicit PrintContainer(const Container& container)
+        : container_(container)
+    {}
+};
+
+template <typename T>
+std::ostream& operator<<(std::ostream & ostr, const PrintContainer<T>& print_container) {
+    ostr << "[";
+
+    const auto & container = print_container.container_;
+    for (auto i = std::begin(container); i != std::end(container); /*intentionally no ++i*/) {
+        const auto & elem = *i;
+
+        if constexpr (is_container_v<std::decay_t<decltype(elem)>>) {
+            ostr << PrintContainer{elem};
+        } else {
+            ostr << elem;
+        }
+
+        if (++i != std::end(container)) {
+            ostr << ", ";
+        }
+    }
+
+    return ostr << "]";
+}
+
+// Compare values to each other, if values are container-ish, then recursively deep compare those containers.
+template <typename Left, typename Right>
+::testing::AssertionResult CompareRecursive(const Left & left, const Right & right);
+
+// Compare containers element-wise, if elements are containers themselves - compare recursevely
+template <typename LeftContainer, typename RightContainer>
+::testing::AssertionResult CompareCotainersRecursive(const LeftContainer& left, const RightContainer& right) {
+    if (left.size() != right.size())
+        return ::testing::AssertionFailure() << "\nMismatching containers size, expected: " << left.size() << " actual: " << right.size();
+
+    auto l_i = std::begin(left);
+    auto r_i = std::begin(right);
+
+    for (size_t i = 0; i < left.size(); ++i, ++l_i, ++r_i) {
+        auto result = CompareRecursive(*l_i, *r_i);
+        if (!result)
+            return result << "\n\nMismatch at pos: " << i + 1;
+    }
+
+    return ::testing::AssertionSuccess();
+}
+
+template <typename Left, typename Right>
+::testing::AssertionResult CompareRecursive(const Left & left, const Right & right) {
+    if constexpr ((is_container_v<Left> || std::is_base_of_v<clickhouse::Column, std::decay_t<Left>>)
+            && (is_container_v<Right> || std::is_base_of_v<clickhouse::Column, std::decay_t<Right>>) ) {
+
+        const auto & l = maybeWrapColumnAsContainer(left);
+        const auto & r = maybeWrapColumnAsContainer(right);
+
+        if (auto result = CompareCotainersRecursive(l, r))
+            return result;
+        else
+            return result << "\nExpected container: " << PrintContainer{l}
+                          << "\nActual container  : " << PrintContainer{r};
+    } else {
+        if (left != right)
+            return ::testing::AssertionFailure()
+                    << "\nExpected value: " << left
+                    << "\nActual value  : " << right;
+
+        return ::testing::AssertionSuccess();
+    }
+}
+

@@ -71,12 +71,12 @@ void ColumnIPv4::Append(ColumnRef column) {
     }
 }
 
-bool ColumnIPv4::Load(InputStream * input, size_t rows) {
-    return data_->Load(input, rows);
+bool ColumnIPv4::LoadBody(InputStream * input, size_t rows) {
+    return data_->LoadBody(input, rows);
 }
 
-void ColumnIPv4::Save(OutputStream* output) {
-    data_->Save(output);
+void ColumnIPv4::SaveBody(OutputStream* output) {
+    data_->SaveBody(output);
 }
 
 size_t ColumnIPv4::Size() const {
@@ -85,6 +85,10 @@ size_t ColumnIPv4::Size() const {
 
 ColumnRef ColumnIPv4::Slice(size_t begin, size_t len) const {
     return std::make_shared<ColumnIPv4>(data_->Slice(begin, len));
+}
+
+ColumnRef ColumnIPv4::CloneEmpty() const {
+    return std::make_shared<ColumnIPv4>(data_->CloneEmpty());
 }
 
 void ColumnIPv4::Swap(Column& other) {

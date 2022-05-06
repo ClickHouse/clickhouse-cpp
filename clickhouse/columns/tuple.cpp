@@ -34,19 +34,31 @@ void ColumnTuple::Append(ColumnRef column) {
 size_t ColumnTuple::Size() const {
     return columns_.empty() ? 0 : columns_[0]->Size();
 }
+
 ColumnRef ColumnTuple::Slice(size_t begin, size_t len) const {
     std::vector<ColumnRef> sliced_columns;
     sliced_columns.reserve(columns_.size());
-    for(const auto &column : columns_){
+    for(const auto &column : columns_) {
         sliced_columns.push_back(column->Slice(begin, len));
     }
 
     return std::make_shared<ColumnTuple>(sliced_columns);
 }
 
-bool ColumnTuple::Load(InputStream* input, size_t rows) {
+ColumnRef ColumnTuple::CloneEmpty() const {
+    std::vector<ColumnRef> result_columns;
+    result_columns.reserve(columns_.size());
+
+    for(const auto &column : columns_) {
+        result_columns.push_back(column->CloneEmpty());
+    }
+
+    return std::make_shared<ColumnTuple>(result_columns);
+}
+
+bool ColumnTuple::LoadPrefix(InputStream* input, size_t rows) {
     for (auto ci = columns_.begin(); ci != columns_.end(); ++ci) {
-        if (!(*ci)->Load(input, rows)) {
+        if (!(*ci)->LoadPrefix(input, rows)) {
             return false;
         }
     }
@@ -54,9 +66,25 @@ bool ColumnTuple::Load(InputStream* input, size_t rows) {
     return true;
 }
 
-void ColumnTuple::Save(OutputStream* output) {
+bool ColumnTuple::LoadBody(InputStream* input, size_t rows) {
     for (auto ci = columns_.begin(); ci != columns_.end(); ++ci) {
-        (*ci)->Save(output);
+        if (!(*ci)->LoadBody(input, rows)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+void ColumnTuple::SavePrefix(OutputStream* output) {
+    for (auto & column : columns_) {
+        column->SavePrefix(output);
+    }
+}
+
+void ColumnTuple::SaveBody(OutputStream* output) {
+    for (auto & column : columns_) {
+        column->SaveBody(output);
     }
 }
 

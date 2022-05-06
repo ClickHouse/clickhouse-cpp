@@ -21,11 +21,12 @@ public:
 
 public:
     void Append(ColumnRef column) override;
-    bool Load(InputStream* input, size_t rows) override;
-    void Save(OutputStream* output) override;
+    bool LoadBody(InputStream* input, size_t rows) override;
+    void SaveBody(OutputStream* output) override;
     void Clear() override;
     size_t Size() const override;
     ColumnRef Slice(size_t begin, size_t len) const override;
+    ColumnRef CloneEmpty() const override;
     void Swap(Column& other) override;
     ItemView GetItem(size_t index) const override;
 

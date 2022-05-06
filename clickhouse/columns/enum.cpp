@@ -74,13 +74,13 @@ void ColumnEnum<T>::Append(ColumnRef column) {
 }
 
 template <typename T>
-bool ColumnEnum<T>::Load(InputStream* input, size_t rows) {
+bool ColumnEnum<T>::LoadBody(InputStream* input, size_t rows) {
     data_.resize(rows);
     return WireFormat::ReadBytes(*input, data_.data(), data_.size() * sizeof(T));
 }
 
 template <typename T>
-void ColumnEnum<T>::Save(OutputStream* output) {
+void ColumnEnum<T>::SaveBody(OutputStream* output) {
     WireFormat::WriteBytes(*output, data_.data(), data_.size() * sizeof(T));
 }
 
@@ -92,6 +92,11 @@ size_t ColumnEnum<T>::Size() const {
 template <typename T>
 ColumnRef ColumnEnum<T>::Slice(size_t begin, size_t len) const {
     return std::make_shared<ColumnEnum<T>>(type_, SliceVector(data_, begin, len));
+}
+
+template <typename T>
+ColumnRef ColumnEnum<T>::CloneEmpty() const {
+    return std::make_shared<ColumnEnum<T>>(type_);
 }
 
 template <typename T>

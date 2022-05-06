@@ -122,7 +122,7 @@ inline auto GetNullItemForDictionary(const ColumnRef dictionary) {
 namespace clickhouse {
 ColumnLowCardinality::ColumnLowCardinality(ColumnRef dictionary_column)
     : Column(Type::CreateLowCardinality(dictionary_column->Type())),
-      dictionary_column_(dictionary_column->Slice(0, 0)), // safe way to get an column of the same type.
+      dictionary_column_(dictionary_column->CloneEmpty()), // safe way to get an column of the same type.
       index_column_(std::make_shared<ColumnUInt32>())
 {
     AppendNullItemToEmptyColumn();
@@ -200,15 +200,6 @@ auto Load(ColumnRef new_dictionary_column, InputStream& input, size_t rows) {
     // As for now those features are not used in client-server protocol and minimal implementation suffices,
     // however some day they may.
 
-    // prefix
-    uint64_t key_version;
-    if (!WireFormat::ReadFixed(input, &key_version))
-        throw ProtocolError("Failed to read key serialization version.");
-
-    if (key_version != KeySerializationVersion::SharedDictionariesWithAdditionalKeys)
-        throw ProtocolError("Invalid key serialization version value.");
-
-    // body
     uint64_t index_serialization_type;
     if (!WireFormat::ReadFixed(input, &index_serialization_type))
         throw ProtocolError("Failed to read index serializaton type.");
@@ -224,7 +215,7 @@ auto Load(ColumnRef new_dictionary_column, InputStream& input, size_t rows) {
     if (!WireFormat::ReadFixed(input, &number_of_keys))
         throw ProtocolError("Failed to read number of rows in dictionary column.");
 
-    if (!new_dictionary_column->Load(&input, number_of_keys))
+    if (!new_dictionary_column->LoadBody(&input, number_of_keys))
         throw ProtocolError("Failed to read values of dictionary column.");
 
     uint64_t number_of_rows;
@@ -234,7 +225,7 @@ auto Load(ColumnRef new_dictionary_column, InputStream& input, size_t rows) {
     if (number_of_rows != rows)
         throw AssertionError("LowCardinality column must be read in full.");
 
-    new_index_column->Load(&input, number_of_rows);
+    new_index_column->LoadBody(&input, number_of_rows);
 
     ColumnLowCardinality::UniqueItems new_unique_items_map;
     for (size_t i = 0; i < new_dictionary_column->Size(); ++i) {
@@ -250,9 +241,21 @@ auto Load(ColumnRef new_dictionary_column, InputStream& input, size_t rows) {
 
 }
 
-bool ColumnLowCardinality::Load(InputStream* input, size_t rows) {
+bool ColumnLowCardinality::LoadPrefix(InputStream* input, size_t) {
+    uint64_t key_version;
+
+    if (!WireFormat::ReadFixed(*input, &key_version))
+        throw ProtocolError("Failed to read key serialization version.");
+
+    if (key_version != KeySerializationVersion::SharedDictionariesWithAdditionalKeys)
+        throw ProtocolError("Invalid key serialization version value.");
+
+    return true;
+}
+
+bool ColumnLowCardinality::LoadBody(InputStream* input, size_t rows) {
     try {
-        auto [new_dictionary, new_index, new_unique_items_map] = ::Load(dictionary_column_->Slice(0, 0), *input, rows);
+        auto [new_dictionary, new_index, new_unique_items_map] = ::Load(dictionary_column_->CloneEmpty(), *input, rows);
 
         dictionary_column_->Swap(*new_dictionary);
         index_column_.swap(new_index);
@@ -264,25 +267,22 @@ bool ColumnLowCardinality::Load(InputStream* input, size_t rows) {
     }
 }
 
-void ColumnLowCardinality::Save(OutputStream* output) {
-    // prefix
-    const uint64_t version = static_cast<uint64_t>(KeySerializationVersion::SharedDictionariesWithAdditionalKeys);
+void ColumnLowCardinality::SavePrefix(OutputStream* output) {
+    const auto version = static_cast<uint64_t>(KeySerializationVersion::SharedDictionariesWithAdditionalKeys);
     WireFormat::WriteFixed(*output, version);
+}
 
-    // body
+void ColumnLowCardinality::SaveBody(OutputStream* output) {
     const uint64_t index_serialization_type = indexTypeFromIndexColumn(*index_column_) | IndexFlag::HasAdditionalKeysBit;
     WireFormat::WriteFixed(*output, index_serialization_type);
 
     const uint64_t number_of_keys = dictionary_column_->Size();
     WireFormat::WriteFixed(*output, number_of_keys);
-    dictionary_column_->Save(output);
+    dictionary_column_->SaveBody(output);
 
     const uint64_t number_of_rows = index_column_->Size();
     WireFormat::WriteFixed(*output, number_of_rows);
-    index_column_->Save(output);
-
-    // suffix
-    // NOP
+    index_column_->SaveBody(output);
 }
 
 void ColumnLowCardinality::Clear() {
@@ -301,12 +301,16 @@ ColumnRef ColumnLowCardinality::Slice(size_t begin, size_t len) const {
     begin = std::min(begin, Size());
     len = std::min(len, Size() - begin);
 
-    auto result = std::make_shared<ColumnLowCardinality>(dictionary_column_->Slice(0, 0));
+    auto result = std::make_shared<ColumnLowCardinality>(dictionary_column_->CloneEmpty());
 
     for (size_t i = begin; i < begin + len; ++i)
         result->AppendUnsafe(this->GetItem(i));
 
     return result;
+}
+
+ColumnRef ColumnLowCardinality::CloneEmpty() const {
+    return std::make_shared<ColumnLowCardinality>(dictionary_column_->CloneEmpty());
 }
 
 void ColumnLowCardinality::Swap(Column& other) {

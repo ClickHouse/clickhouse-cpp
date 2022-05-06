@@ -27,12 +27,12 @@ void ColumnDate::Append(ColumnRef column) {
     }
 }
 
-bool ColumnDate::Load(InputStream* input, size_t rows) {
-    return data_->Load(input, rows);
+bool ColumnDate::LoadBody(InputStream* input, size_t rows) {
+    return data_->LoadBody(input, rows);
 }
 
-void ColumnDate::Save(OutputStream* output) {
-    data_->Save(output);
+void ColumnDate::SaveBody(OutputStream* output) {
+    data_->SaveBody(output);
 }
 
 size_t ColumnDate::Size() const {
@@ -46,6 +46,10 @@ ColumnRef ColumnDate::Slice(size_t begin, size_t len) const {
     result->data_->Append(col);
 
     return result;
+}
+
+ColumnRef ColumnDate::CloneEmpty() const {
+    return std::make_shared<ColumnDate>();
 }
 
 void ColumnDate::Swap(Column& other) {
@@ -146,12 +150,12 @@ void ColumnDateTime::Append(ColumnRef column) {
     }
 }
 
-bool ColumnDateTime::Load(InputStream* input, size_t rows) {
-    return data_->Load(input, rows);
+bool ColumnDateTime::LoadBody(InputStream* input, size_t rows) {
+    return data_->LoadBody(input, rows);
 }
 
-void ColumnDateTime::Save(OutputStream* output) {
-    data_->Save(output);
+void ColumnDateTime::SaveBody(OutputStream* output) {
+    data_->SaveBody(output);
 }
 
 size_t ColumnDateTime::Size() const {
@@ -169,6 +173,10 @@ ColumnRef ColumnDateTime::Slice(size_t begin, size_t len) const {
     result->data_->Append(col);
 
     return result;
+}
+
+ColumnRef ColumnDateTime::CloneEmpty() const {
+    return std::make_shared<ColumnDate>();
 }
 
 void ColumnDateTime::Swap(Column& other) {
@@ -219,12 +227,12 @@ void ColumnDateTime64::Append(ColumnRef column) {
     }
 }
 
-bool ColumnDateTime64::Load(InputStream* input, size_t rows) {
-    return data_->Load(input, rows);
+bool ColumnDateTime64::LoadBody(InputStream* input, size_t rows) {
+    return data_->LoadBody(input, rows);
 }
 
-void ColumnDateTime64::Save(OutputStream* output) {
-    data_->Save(output);
+void ColumnDateTime64::SaveBody(OutputStream* output) {
+    data_->SaveBody(output);
 }
 
 void ColumnDateTime64::Clear() {
@@ -252,6 +260,10 @@ ColumnRef ColumnDateTime64::Slice(size_t begin, size_t len) const {
     auto sliced_data = data_->Slice(begin, len)->As<ColumnDecimal>();
 
     return ColumnRef{new ColumnDateTime64(type_, sliced_data)};
+}
+
+ColumnRef ColumnDateTime64::CloneEmpty() const {
+    return ColumnRef{new ColumnDateTime64(type_, data_->CloneEmpty()->As<ColumnDecimal>())};
 }
 
 size_t ColumnDateTime64::GetPrecision() const {

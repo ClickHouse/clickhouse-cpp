@@ -26,10 +26,10 @@ public:
     void Append(ColumnRef column) override;
 
     /// Loads column data from input stream.
-    bool Load(InputStream* input, size_t rows) override;
+    bool LoadBody(InputStream* input, size_t rows) override;
 
     /// Saves column data to output stream.
-    void Save(OutputStream* output) override;
+    void SaveBody(OutputStream* output) override;
 
     /// Clear column data .
     void Clear() override;
@@ -39,7 +39,7 @@ public:
 
     /// Makes slice of the current column.
     ColumnRef Slice(size_t begin, size_t len) const override;
-
+    ColumnRef CloneEmpty() const override;
     void Swap(Column& other) override;
 
     ItemView GetItem(size_t index) const override;
@@ -113,20 +113,20 @@ public:
     void Append(ColumnRef column) override;
 
     /// Loads column data from input stream.
-    bool Load(InputStream* input, size_t rows) override;
+    bool LoadBody(InputStream* input, size_t rows) override;
 
     /// Clear column data .
     void Clear() override;
 
     /// Saves column data to output stream.
-    void Save(OutputStream* output) override;
+    void SaveBody(OutputStream* output) override;
 
     /// Returns count of rows in the column.
     size_t Size() const override;
 
     /// Makes slice of the current column.
     ColumnRef Slice(size_t begin, size_t len) const override;
-
+    ColumnRef CloneEmpty() const override;
     void Swap(Column& other) override;
 
     ItemView GetItem(size_t index) const override;
@@ -161,20 +161,20 @@ public:
     void Append(ColumnRef column) override;
 
     /// Loads column data from input stream.
-    bool Load(InputStream* input, size_t rows) override;
+    bool LoadBody(InputStream* input, size_t rows) override;
 
     /// Clear column data .
     void Clear() override;
 
     /// Saves column data to output stream.
-    void Save(OutputStream* output) override;
+    void SaveBody(OutputStream* output) override;
 
     /// Returns count of rows in the column.
     size_t Size() const override;
 
     /// Makes slice of the current column.
     ColumnRef Slice(size_t begin, size_t len) const override;
-
+    ColumnRef CloneEmpty() const override;
     void Swap(Column& other) override;
 
     ItemView GetItem(size_t index) const override;

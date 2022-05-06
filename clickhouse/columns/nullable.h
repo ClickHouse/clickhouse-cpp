@@ -28,11 +28,17 @@ public:
     /// Appends content of given column to the end of current one.
     void Append(ColumnRef column) override;
 
+    /// Loads column prefix from input stream.
+    bool LoadPrefix(InputStream* input, size_t rows) override;
+
     /// Loads column data from input stream.
-    bool Load(InputStream* input, size_t rows) override;
+    bool LoadBody(InputStream* input, size_t rows) override;
+
+    /// Saves column prefix to output stream.
+    void SavePrefix(OutputStream* output) override;
 
     /// Saves column data to output stream.
-    void Save(OutputStream* output) override;
+    void SaveBody(OutputStream* output) override;
 
     /// Clear column data .
     void Clear() override;
@@ -42,6 +48,7 @@ public:
 
     /// Makes slice of the current column.
     ColumnRef Slice(size_t begin, size_t len) const override;
+    ColumnRef CloneEmpty() const override;
     void Swap(Column&) override;
 
     ItemView GetItem(size_t) const override;
