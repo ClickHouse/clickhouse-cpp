@@ -1,5 +1,6 @@
 #include "array.h"
 #include "numeric.h"
+
 #include <stdexcept>
 
 namespace clickhouse {
@@ -45,10 +46,9 @@ ColumnRef ColumnArray::Slice(size_t begin, size_t size) const {
     if (size && begin + size > Size())
         throw ValidationError("Slice indexes are out of bounds");
 
-    auto result = std::make_shared<ColumnArray>(data_->CloneEmpty());
-    for (size_t i = 0; i < size; i++) {
-        result->AppendAsColumn(GetAsColumn(begin + i));
-    }
+    auto result = std::make_shared<ColumnArray>(data_->Slice(GetOffset(begin), GetOffset(begin + size) - GetOffset(begin)));
+    for (size_t i = 0; i < size; i++)
+        result->AddOffset(GetSize(begin + i));
 
     return result;
 }

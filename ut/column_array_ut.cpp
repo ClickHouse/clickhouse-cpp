@@ -134,6 +134,8 @@ TEST(ColumnArray, Slice) {
 }
 
 TEST(ColumnArray, Slice_2D) {
+    // Verify that ColumnArray::Slice on 2D Array produces a 2D Array of proper type, size and contents.
+    // Also check that slices can be of any size.
     const std::vector<std::vector<std::vector<uint64_t>>> values = {
         {{1u, 2u}, {3u}},
         {{4u}, {5u, 6u, 7u}, {8u, 9u}, {}},
@@ -143,13 +145,20 @@ TEST(ColumnArray, Slice_2D) {
     };
 
     std::shared_ptr<ColumnArray> untyped_array = Create2DArray<ColumnUInt64>(values);
-
     for (size_t i = 0; i < values.size() - 1; ++i) {
-        auto slice = untyped_array->Slice(i, 1)->AsStrict<ColumnArray>();
-        EXPECT_EQ(1u, slice->Size());
+        for (size_t slice_size = 0; slice_size < values.size() - i; ++slice_size) {
+            auto slice = untyped_array->Slice(i, slice_size)->AsStrict<ColumnArray>();
+            EXPECT_EQ(slice_size, slice->Size());
 
-        for (size_t j = 0; j < values[i].size(); ++j) {
-            EXPECT_TRUE(CompareRecursive(values[i][j], *slice->GetAsColumnTyped<ColumnArray>(0)->GetAsColumnTyped<ColumnUInt64>(j)));
+            for (size_t slice_row = 0; slice_row < slice_size; ++slice_row) {
+                SCOPED_TRACE(::testing::Message() << "i: " << i << " slice_size:" << slice_size << " row:" << slice_row);
+                auto val = slice->GetAsColumnTyped<ColumnArray>(slice_row);
+                ASSERT_EQ(values[i + slice_row].size(), val->Size());
+
+                for (size_t j = 0; j < values[i + slice_row].size(); ++j) {
+                    ASSERT_TRUE(CompareRecursive(values[i + slice_row][j], *val->GetAsColumnTyped<ColumnUInt64>(j)));
+                }
+            }
         }
     }
 }
