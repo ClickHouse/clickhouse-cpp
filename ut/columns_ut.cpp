@@ -16,76 +16,17 @@
 
 #include <gtest/gtest.h>
 #include "utils.h"
+#include "value_generators.h"
 
 #include <string_view>
 #include <sstream>
 #include <vector>
-
-// only compare PODs of equal size this way
-template <typename L, typename R, typename
-        = std::enable_if_t<sizeof(L) == sizeof(R) && std::conjunction_v<std::is_pod<L>, std::is_pod<R>>>>
-bool operator==(const L & left, const R& right) {
-    return memcmp(&left, &right, sizeof(left)) == 0;
-}
-
-bool operator==(const in6_addr & left, const std::string_view & right) {
-    return right.size() == sizeof(left) && memcmp(&left, right.data(), sizeof(left)) == 0;
-}
-
-bool operator==(const std::string_view & left, const in6_addr & right) {
-    return left.size() == sizeof(right) && memcmp(left.data(), &right, sizeof(right)) == 0;
-}
+#include <random>
 
 namespace {
 
 using namespace clickhouse;
 using namespace std::literals::string_view_literals;
-
-in_addr MakeIPv4(uint32_t ip) {
-    static_assert(sizeof(in_addr) == sizeof(ip));
-    in_addr result;
-    memcpy(&result, &ip, sizeof(ip));
-
-    return result;
-}
-
-in6_addr MakeIPv6(uint8_t v0,  uint8_t v1,  uint8_t v2,  uint8_t v3,
-                   uint8_t v4,  uint8_t v5,  uint8_t v6,  uint8_t v7,
-                   uint8_t v8,  uint8_t v9,  uint8_t v10, uint8_t v11,
-                   uint8_t v12, uint8_t v13, uint8_t v14, uint8_t v15) {
-    return in6_addr{{{v0, v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15}}};
-}
-
-in6_addr MakeIPv6(uint8_t v10, uint8_t v11, uint8_t v12, uint8_t v13, uint8_t v14, uint8_t v15) {
-    return in6_addr{{{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, v10, v11, v12, v13, v14, v15}}};
-}
-
-static std::vector<uint32_t> MakeNumbers() {
-    return std::vector<uint32_t>
-        {1, 2, 3, 7, 11, 13, 17, 19, 23, 29, 31};
-}
-
-static std::vector<uint8_t> MakeBools() {
-    return std::vector<uint8_t>
-        {1, 0, 0, 0, 1, 1, 0, 1, 1, 1, 0};
-}
-
-static std::vector<std::string> MakeFixedStrings() {
-    return std::vector<std::string>
-        {"aaa", "bbb", "ccc", "ddd"};
-}
-
-static std::vector<std::string> MakeStrings() {
-    return std::vector<std::string>
-        {"a", "ab", "abc", "abcd"};
-}
-
-static std::vector<uint64_t> MakeUUIDs() {
-    return std::vector<uint64_t>
-        {0xbb6a8c699ab2414cllu, 0x86697b7fd27f0825llu,
-         0x84b9f24bc26b49c6llu, 0xa03b4ab723341951llu,
-         0x3507213c178649f9llu, 0x9faf035d662f60aellu};
-}
 
 static const auto LOWCARDINALITY_STRING_FOOBAR_10_ITEMS_BINARY =
         "\x01\x00\x00\x00\x00\x00\x00\x00\x00\x06\x00\x00\x00\x00\x00\x00"
@@ -93,72 +34,6 @@ static const auto LOWCARDINALITY_STRING_FOOBAR_10_ITEMS_BINARY =
         "\x01\x31\x01\x32\x03\x46\x6f\x6f\x01\x34\x03\x42\x61\x72\x01\x37"
         "\x01\x38\x0a\x00\x00\x00\x00\x00\x00\x00\x01\x02\x03\x04\x05\x06"
         "\x04\x07\x08\x04"sv;
-
-template <typename Generator>
-auto GenerateVector(size_t items, Generator && gen) {
-    std::vector<my_result_of_t<Generator, size_t>> result;
-    result.reserve(items);
-    for (size_t i = 0; i < items; ++i) {
-        result.push_back(std::move(gen(i)));
-    }
-
-    return result;
-}
-
-std::string FooBarSeq(size_t i) {
-    std::string result;
-    if (i % 3 == 0)
-        result += "Foo";
-    if (i % 5 == 0)
-        result += "Bar";
-    if (result.empty())
-        result = std::to_string(i);
-
-    return result;
-}
-
-template <typename T, typename U = T>
-auto SameValueSeq(const U & value) {
-    return [&value](size_t) -> T {
-        return value;
-    };
-}
-
-template <typename ResultType, typename Generator1, typename Generator2>
-auto AlternateGenerators(Generator1 && gen1, Generator2 && gen2) {
-    return [&gen1, &gen2](size_t i) -> ResultType {
-        if (i % 2 == 0)
-            return gen1(i/2);
-        else
-            return gen2(i/2);
-    };
-}
-
-template <typename T>
-std::vector<T> ConcatSequences(std::vector<T> && vec1, std::vector<T> && vec2) {
-    std::vector<T> result(vec1);
-
-    result.reserve(vec1.size() + vec2.size());
-    result.insert(result.end(), vec2.begin(), vec2.end());
-
-    return result;
-}
-
-static std::vector<Int64> MakeDateTime64s() {
-    static const auto seconds_multiplier = 1'000'000;
-    static const auto year = 86400ull * 365 * seconds_multiplier; // ~approx, but this doesn't matter here.
-
-    // Approximatelly +/- 200 years around epoch (and value of epoch itself)
-    // with non zero seconds and sub-seconds.
-    // Please note there are values outside of DateTime (32-bit) range that might
-    // not have correct string representation in CH yet,
-    // but still are supported as Int64 values.
-    return GenerateVector(200,
-        [] (size_t i )-> Int64 {
-            return (i - 100) * year * 2 + (i * 10) * seconds_multiplier + i;
-        });
-}
-
 }
 
 // TODO: add tests for ColumnDecimal.
@@ -304,7 +179,7 @@ TEST(ColumnsCase, DateTime64_6) {
 TEST(ColumnsCase, DateTime64_Append_At) {
     auto column = std::make_shared<ColumnDateTime64>(6ul);
 
-    const auto data = MakeDateTime64s();
+    const auto data = MakeDateTime64s(6ul);
     for (const auto & v : data) {
         column->Append(v);
     }
@@ -322,7 +197,7 @@ TEST(ColumnsCase, DateTime64_Clear) {
     ASSERT_NO_THROW(column->Clear());
     ASSERT_EQ(0u, column->Size());
 
-    const auto data = MakeDateTime64s();
+    const auto data = MakeDateTime64s(6ul);
     for (const auto & v : data) {
         column->Append(v);
     }
@@ -334,7 +209,7 @@ TEST(ColumnsCase, DateTime64_Clear) {
 TEST(ColumnsCase, DateTime64_Swap) {
     auto column = std::make_shared<ColumnDateTime64>(6ul);
 
-    const auto data = MakeDateTime64s();
+    const auto data = MakeDateTime64s(6ul);
     for (const auto & v : data) {
         column->Append(v);
     }
@@ -364,7 +239,7 @@ TEST(ColumnsCase, DateTime64_Slice) {
         ASSERT_EQ(column->GetPrecision(), slice->GetPrecision());
     }
 
-    const auto data = MakeDateTime64s();
+    const auto data = MakeDateTime64s(6ul);
     const size_t size = data.size();
     ASSERT_GT(size, 4u); // so the partial slice below has half of the elements of the column
 
@@ -413,7 +288,7 @@ TEST(ColumnsCase, DateTime64_Slice_OUTOFBAND) {
     // Non-Empty slice on empty column
     EXPECT_EQ(0u, column->Slice(0, 10)->Size());
 
-    const auto data = MakeDateTime64s();
+    const auto data = MakeDateTime64s(6ul);
     for (const auto & v : data) {
         column->Append(v);
     }
@@ -437,14 +312,6 @@ TEST(ColumnsCase, Date2038) {
 
     ASSERT_EQ(col1->Size(), 1u);
     ASSERT_EQ(largeDate, col1->At(0));
-}
-
-TEST(ColumnsCase, DateTime) {
-    ASSERT_NE(nullptr, CreateColumnByType("DateTime"));
-    ASSERT_NE(nullptr, CreateColumnByType("DateTime('Europe/Moscow')"));
-
-    ASSERT_EQ(CreateColumnByType("DateTime('UTC')")->As<ColumnDateTime>()->Timezone(), "UTC");
-    ASSERT_EQ(CreateColumnByType("DateTime64(3, 'UTC')")->As<ColumnDateTime64>()->Timezone(), "UTC");
 }
 
 TEST(ColumnsCase, EnumTest) {
@@ -745,7 +612,7 @@ TEST(ColumnsCase, ColumnDecimal128_from_string_overflow) {
 TEST(ColumnsCase, ColumnLowCardinalityString_Append_and_Read) {
     const size_t items_count = 11;
     ColumnLowCardinalityT<ColumnString> col;
-    for (const auto & item : GenerateVector(items_count, &FooBarSeq)) {
+    for (const auto & item : GenerateVector(items_count, &FooBarGenerator)) {
         col.Append(item);
     }
 
@@ -753,15 +620,15 @@ TEST(ColumnsCase, ColumnLowCardinalityString_Append_and_Read) {
     ASSERT_EQ(col.GetDictionarySize(), 8u + 1); // 8 unique items from sequence + 1 null-item
 
     for (size_t i = 0; i < items_count; ++i) {
-        ASSERT_EQ(col.At(i), FooBarSeq(i)) << " at pos: " << i;
-        ASSERT_EQ(col[i], FooBarSeq(i)) << " at pos: " << i;
+        ASSERT_EQ(col.At(i), FooBarGenerator(i)) << " at pos: " << i;
+        ASSERT_EQ(col[i], FooBarGenerator(i)) << " at pos: " << i;
     }
 }
 
 TEST(ColumnsCase, ColumnLowCardinalityString_Clear_and_Append) {
     const size_t items_count = 11;
     ColumnLowCardinalityT<ColumnString> col;
-    for (const auto & item : GenerateVector(items_count, &FooBarSeq))
+    for (const auto & item : GenerateVector(items_count, &FooBarGenerator))
     {
         col.Append(item);
     }
@@ -770,7 +637,7 @@ TEST(ColumnsCase, ColumnLowCardinalityString_Clear_and_Append) {
     ASSERT_EQ(col.Size(), 0u);
     ASSERT_EQ(col.GetDictionarySize(), 1u); // null-item
 
-    for (const auto & item : GenerateVector(items_count, &FooBarSeq))
+    for (const auto & item : GenerateVector(items_count, &FooBarGenerator))
     {
         col.Append(item);
     }
@@ -789,7 +656,7 @@ TEST(ColumnsCase, ColumnLowCardinalityString_Load) {
     ASSERT_TRUE(col.Load(&buffer, items_count));
 
     for (size_t i = 0; i < items_count; ++i) {
-        EXPECT_EQ(col.At(i), FooBarSeq(i)) << " at pos: " << i;
+        EXPECT_EQ(col.At(i), FooBarGenerator(i)) << " at pos: " << i;
     }
 }
 
@@ -798,7 +665,7 @@ TEST(ColumnsCase, ColumnLowCardinalityString_Load) {
 TEST(ColumnsCase, DISABLED_ColumnLowCardinalityString_Save) {
     const size_t items_count = 10;
     ColumnLowCardinalityT<ColumnString> col;
-    for (const auto & item : GenerateVector(items_count, &FooBarSeq)) {
+    for (const auto & item : GenerateVector(items_count, &FooBarGenerator)) {
         col.Append(item);
     }
 
@@ -835,7 +702,7 @@ TEST(ColumnsCase, ColumnLowCardinalityString_SaveAndLoad) {
     // Verify that we can load binary representation back
     ColumnLowCardinalityT<ColumnString> col;
 
-    const auto items = GenerateVector(10, &FooBarSeq);
+    const auto items = GenerateVector(10, &FooBarGenerator);
     for (const auto & item : items) {
         col.Append(item);
     }
@@ -862,7 +729,7 @@ TEST(ColumnsCase, ColumnLowCardinalityString_SaveAndLoad) {
 TEST(ColumnsCase, ColumnLowCardinalityString_WithEmptyString_1) {
     // Verify that when empty string is added to a LC column it can be retrieved back as empty string.
     ColumnLowCardinalityT<ColumnString> col;
-    const auto values = GenerateVector(10, AlternateGenerators<std::string>(SameValueSeq<std::string>(""), FooBarSeq));
+    const auto values = GenerateVector(10, AlternateGenerators<std::string>(SameValueGenerator<std::string>(""), FooBarGenerator));
     for (const auto & item : values) {
         col.Append(item);
     }
@@ -876,7 +743,7 @@ TEST(ColumnsCase, ColumnLowCardinalityString_WithEmptyString_2) {
     // Verify that when empty string is added to a LC column it can be retrieved back as empty string.
     // (Ver2): Make sure that outcome doesn't depend if empty values are on odd positions
     ColumnLowCardinalityT<ColumnString> col;
-    const auto values = GenerateVector(10, AlternateGenerators<std::string>(FooBarSeq, SameValueSeq<std::string>("")));
+    const auto values = GenerateVector(10, AlternateGenerators<std::string>(FooBarGenerator, SameValueGenerator<std::string>("")));
     for (const auto & item : values) {
         col.Append(item);
     }
@@ -889,7 +756,7 @@ TEST(ColumnsCase, ColumnLowCardinalityString_WithEmptyString_2) {
 TEST(ColumnsCase, ColumnLowCardinalityString_WithEmptyString_3) {
     // When we have many leading empty strings and some non-empty values.
     ColumnLowCardinalityT<ColumnString> col;
-    const auto values = ConcatSequences(GenerateVector(100, SameValueSeq<std::string>("")), GenerateVector(5, FooBarSeq));
+    const auto values = ConcatSequences(GenerateVector(100, SameValueGenerator<std::string>("")), GenerateVector(5, FooBarGenerator));
     for (const auto & item : values) {
         col.Append(item);
     }
@@ -899,69 +766,3 @@ TEST(ColumnsCase, ColumnLowCardinalityString_WithEmptyString_3) {
     }
 }
 
-TEST(ColumnsCase, CreateSimpleAggregateFunction) {
-    auto col = CreateColumnByType("SimpleAggregateFunction(funt, Int32)");
-
-    ASSERT_EQ("Int32", col->Type()->GetName());
-    ASSERT_EQ(Type::Int32, col->Type()->GetCode());
-    ASSERT_NE(nullptr, col->As<ColumnInt32>());
-}
-
-
-TEST(ColumnsCase, UnmatchedBrackets) {
-    // When type string has unmatched brackets, CreateColumnByType must return nullptr.
-    ASSERT_EQ(nullptr, CreateColumnByType("FixedString(10"));
-    ASSERT_EQ(nullptr, CreateColumnByType("Nullable(FixedString(10000"));
-    ASSERT_EQ(nullptr, CreateColumnByType("Nullable(FixedString(10000)"));
-    ASSERT_EQ(nullptr, CreateColumnByType("LowCardinality(Nullable(FixedString(10000"));
-    ASSERT_EQ(nullptr, CreateColumnByType("LowCardinality(Nullable(FixedString(10000)"));
-    ASSERT_EQ(nullptr, CreateColumnByType("LowCardinality(Nullable(FixedString(10000))"));
-    ASSERT_EQ(nullptr, CreateColumnByType("Array(LowCardinality(Nullable(FixedString(10000"));
-    ASSERT_EQ(nullptr, CreateColumnByType("Array(LowCardinality(Nullable(FixedString(10000)"));
-    ASSERT_EQ(nullptr, CreateColumnByType("Array(LowCardinality(Nullable(FixedString(10000))"));
-    ASSERT_EQ(nullptr, CreateColumnByType("Array(LowCardinality(Nullable(FixedString(10000)))"));
-}
-
-TEST(ColumnsCase, LowCardinalityAsWrappedColumn) {
-    CreateColumnByTypeSettings create_column_settings;
-    create_column_settings.low_cardinality_as_wrapped_column = true;
-
-    ASSERT_EQ(Type::String, CreateColumnByType("LowCardinality(String)", create_column_settings)->GetType().GetCode());
-    ASSERT_EQ(Type::String, CreateColumnByType("LowCardinality(String)", create_column_settings)->As<ColumnString>()->GetType().GetCode());
-
-    ASSERT_EQ(Type::FixedString, CreateColumnByType("LowCardinality(FixedString(10000))", create_column_settings)->GetType().GetCode());
-    ASSERT_EQ(Type::FixedString, CreateColumnByType("LowCardinality(FixedString(10000))", create_column_settings)->As<ColumnFixedString>()->GetType().GetCode());
-}
-
-class ColumnsCaseWithName : public ::testing::TestWithParam<const char* /*Column Type String*/>
-{};
-
-TEST_P(ColumnsCaseWithName, CreateColumnByType)
-{
-    const auto col = CreateColumnByType(GetParam());
-    ASSERT_NE(nullptr, col);
-    EXPECT_EQ(col->GetType().GetName(), GetParam());
-}
-
-INSTANTIATE_TEST_SUITE_P(Basic, ColumnsCaseWithName, ::testing::Values(
-    "Int8", "Int16", "Int32", "Int64",
-    "UInt8", "UInt16", "UInt32", "UInt64",
-    "String", "Date", "DateTime",
-    "UUID", "Int128"
-));
-
-INSTANTIATE_TEST_SUITE_P(Parametrized, ColumnsCaseWithName, ::testing::Values(
-    "FixedString(0)", "FixedString(10000)",
-    "DateTime('UTC')", "DateTime64(3, 'UTC')",
-    "Decimal(9,3)", "Decimal(18,3)",
-    "Enum8('ONE' = 1, 'TWO' = 2)",
-    "Enum16('ONE' = 1, 'TWO' = 2, 'THREE' = 3, 'FOUR' = 4)"
-));
-
-
-INSTANTIATE_TEST_SUITE_P(Nested, ColumnsCaseWithName, ::testing::Values(
-    "Nullable(FixedString(10000))",
-    "Nullable(LowCardinality(FixedString(10000)))",
-    "Array(Nullable(LowCardinality(FixedString(10000))))",
-    "Array(Enum8('ONE' = 1, 'TWO' = 2))"
-));

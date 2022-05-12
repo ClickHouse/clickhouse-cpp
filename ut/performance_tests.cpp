@@ -15,6 +15,7 @@
 #include <string>
 
 #include "utils.h"
+#include "utils_performance.h"
 
 using namespace clickhouse;
 

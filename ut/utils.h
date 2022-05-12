@@ -2,132 +2,23 @@
 
 #include <clickhouse/base/platform.h>
 
-#include <chrono>
-#include <cstring>
 #include <ostream>
 #include <ratio>
+#include <string_view>
 #include <system_error>
-#include <vector>
 #include <type_traits>
+#include <vector>
 
 #include <time.h>
 
 #include <gtest/gtest.h>
 
+#include "utils_meta.h"
+#include "utils_comparison.h"
+
 namespace clickhouse {
     class Block;
-    class Column;
 }
-
-template <typename ChronoDurationType>
-struct Timer {
-    using DurationType = ChronoDurationType;
-
-    Timer()
-        : started_at(Now())
-    {}
-
-    void Restart() {
-        started_at = Now();
-    }
-
-    void Start() {
-        Restart();
-    }
-
-    auto Elapsed() const {
-        return std::chrono::duration_cast<ChronoDurationType>(Now() - started_at);
-    }
-
-private:
-    static auto Now() {
-        return std::chrono::high_resolution_clock::now().time_since_epoch();
-    }
-
-private:
-    std::chrono::nanoseconds started_at;
-};
-
-template <typename R>
-inline const char * getPrefix() {
-    const char * prefix = "?";
-    if constexpr (std::ratio_equal_v<R, std::nano>) {
-        prefix = "n";
-    } else if constexpr (std::ratio_equal_v<R, std::micro>) {
-        prefix = "u";
-    } else if constexpr (std::ratio_equal_v<R, std::milli>) {
-        prefix = "m";
-    } else if constexpr (std::ratio_equal_v<R, std::centi>) {
-        prefix = "c";
-    } else if constexpr (std::ratio_equal_v<R, std::deci>) {
-        prefix = "d";
-    } else if constexpr (std::ratio_equal_v<R, std::ratio<1, 1>>) {
-        prefix = "";
-    } else {
-        static_assert("Unsupported ratio");
-    }
-
-    return prefix;
-}
-
-namespace std {
-template <typename R, typename P>
-inline ostream & operator<<(ostream & ostr, const chrono::duration<R, P> & d) {
-    return ostr << d.count() << ::getPrefix<P>() << "s";
-}
-}
-
-// Since result_of is deprecated in C++17, and invoke_result_of is unavailable until C++20...
-template <class F, class... ArgTypes>
-using my_result_of_t =
-#if __cplusplus >= 201703L
-    std::invoke_result_t<F, ArgTypes...>;
-#else
-    std::result_of_t<F(ArgTypes...)>;
-#endif
-
-template <typename MeasureFunc>
-class MeasuresCollector {
-public:
-    using Result = my_result_of_t<MeasureFunc>;
-
-    explicit MeasuresCollector(MeasureFunc && measurment_func, const size_t preallocate_results = 10)
-        : measurment_func_(std::move(measurment_func))
-    {
-        results_.reserve(preallocate_results);
-    }
-
-    template <typename NameType>
-    void Add(NameType && name) {
-        results_.emplace_back(name, measurment_func_());
-    }
-
-    const auto & GetResults() const {
-        return results_;
-    }
-
-private:
-    MeasureFunc measurment_func_;
-    std::vector<std::pair<std::string, Result>> results_;
-};
-
-template <typename MeasureFunc>
-MeasuresCollector<MeasureFunc> collect(MeasureFunc && f) {
-    return MeasuresCollector<MeasureFunc>(std::forward<MeasureFunc>(f));
-}
-
-struct in_addr;
-struct in6_addr;
-// Helper for pretty-printing of the Block
-struct PrettyPrintBlock {
-    const clickhouse::Block & block;
-};
-
-std::ostream& operator<<(std::ostream & ostr, const clickhouse::Block & block);
-std::ostream& operator<<(std::ostream & ostr, const PrettyPrintBlock & block);
-std::ostream& operator<<(std::ostream& ostr, const in_addr& addr);
-std::ostream& operator<<(std::ostream& ostr, const in6_addr& addr);
-
 
 template <typename ResultType = std::string>
 auto getEnvOrDefault(const std::string& env, const char * default_val) {
@@ -158,82 +49,48 @@ auto getEnvOrDefault(const std::string& env, const char * default_val) {
 }
 
 
-// based on https://stackoverflow.com/a/31207079
-template <typename T, typename _ = void>
-struct is_container : std::false_type {};
-
-namespace details {
-template <typename... Ts>
-struct is_container_helper {};
-
-// Make a column a RO stl-like container
-template <typename NestedColumnType>
-struct ColumnAsContainerWrapper {
-    const NestedColumnType& nested_col;
-
-    struct Iterator {
-        const NestedColumnType& nested_col;
-        size_t i = 0;
-
-        auto& operator++() {
-            ++i;
-            return *this;
-        }
-
-        auto operator*() const {
-            return nested_col[i];
-        }
-
-        bool operator==(const Iterator & other) const {
-            return &other.nested_col == &this->nested_col && other.i == this->i;
-        }
-
-        bool operator!=(const Iterator & other) const {
-            return !(other == *this);
-        }
-    };
-
-    size_t size() const {
-        return nested_col.Size();
+template <typename R>
+inline const char * getPrefix() {
+    const char * prefix = "?";
+    if constexpr (std::ratio_equal_v<R, std::nano>) {
+        prefix = "n";
+    } else if constexpr (std::ratio_equal_v<R, std::micro>) {
+        prefix = "u";
+    } else if constexpr (std::ratio_equal_v<R, std::milli>) {
+        prefix = "m";
+    } else if constexpr (std::ratio_equal_v<R, std::centi>) {
+        prefix = "c";
+    } else if constexpr (std::ratio_equal_v<R, std::deci>) {
+        prefix = "d";
+    } else if constexpr (std::ratio_equal_v<R, std::ratio<1, 1>>) {
+        prefix = "";
+    } else {
+        static_assert("Unsupported ratio");
     }
 
-    auto begin() const {
-        return Iterator{nested_col, 0};
-    }
+    return prefix;
+}
 
-    auto end() const {
-        return Iterator{nested_col, nested_col.Size()};
-    }
+namespace std {
+template <typename R, typename P>
+inline ostream & operator<<(ostream & ostr, const chrono::duration<R, P> & d) {
+    return ostr << d.count() << ::getPrefix<P>() << "s";
+}
+}
+
+
+struct in_addr;
+struct in6_addr;
+// Helper for pretty-printing of the Block
+struct PrettyPrintBlock {
+    const clickhouse::Block & block;
 };
 
-}
+std::ostream& operator<<(std::ostream & ostr, const clickhouse::Block & block);
+std::ostream& operator<<(std::ostream & ostr, const PrettyPrintBlock & block);
+std::ostream& operator<<(std::ostream& ostr, const in_addr& addr);
+std::ostream& operator<<(std::ostream& ostr, const in6_addr& addr);
 
-template <typename T>
-auto maybeWrapColumnAsContainer(const T & t) {
-    if constexpr (std::is_base_of_v<clickhouse::Column, T>) {
-        return ::details::ColumnAsContainerWrapper<T>{t};
-    } else {
-        return t;
-    }
-}
-
-// A very loose definition of container, nerfed to fit both C-array and ColumnArrayT<X>::ArrayWrapper
-template <typename T>
-struct is_container<
-        T,
-        std::conditional_t<
-            false,
-            ::details::is_container_helper<
-                decltype(std::declval<T>().size()),
-                decltype(std::begin(std::declval<T>())),
-                decltype(std::end(std::declval<T>()))
-                >,
-            void
-            >
-        > : public std::true_type {};
-
-template <typename T>
-inline constexpr bool is_container_v = is_container<T>::value;
 
 template <typename Container>
 struct PrintContainer {
@@ -266,48 +123,4 @@ std::ostream& operator<<(std::ostream & ostr, const PrintContainer<T>& print_con
     return ostr << "]";
 }
 
-// Compare values to each other, if values are container-ish, then recursively deep compare those containers.
-template <typename Left, typename Right>
-::testing::AssertionResult CompareRecursive(const Left & left, const Right & right);
-
-// Compare containers element-wise, if elements are containers themselves - compare recursevely
-template <typename LeftContainer, typename RightContainer>
-::testing::AssertionResult CompareCotainersRecursive(const LeftContainer& left, const RightContainer& right) {
-    if (left.size() != right.size())
-        return ::testing::AssertionFailure() << "\nMismatching containers size, expected: " << left.size() << " actual: " << right.size();
-
-    auto l_i = std::begin(left);
-    auto r_i = std::begin(right);
-
-    for (size_t i = 0; i < left.size(); ++i, ++l_i, ++r_i) {
-        auto result = CompareRecursive(*l_i, *r_i);
-        if (!result)
-            return result << "\n\nMismatch at pos: " << i + 1;
-    }
-
-    return ::testing::AssertionSuccess();
-}
-
-template <typename Left, typename Right>
-::testing::AssertionResult CompareRecursive(const Left & left, const Right & right) {
-    if constexpr ((is_container_v<Left> || std::is_base_of_v<clickhouse::Column, std::decay_t<Left>>)
-            && (is_container_v<Right> || std::is_base_of_v<clickhouse::Column, std::decay_t<Right>>) ) {
-
-        const auto & l = maybeWrapColumnAsContainer(left);
-        const auto & r = maybeWrapColumnAsContainer(right);
-
-        if (auto result = CompareCotainersRecursive(l, r))
-            return result;
-        else
-            return result << "\nExpected container: " << PrintContainer{l}
-                          << "\nActual container  : " << PrintContainer{r};
-    } else {
-        if (left != right)
-            return ::testing::AssertionFailure()
-                    << "\nExpected value: " << left
-                    << "\nActual value  : " << right;
-
-        return ::testing::AssertionSuccess();
-    }
-}
 
