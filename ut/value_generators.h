@@ -29,7 +29,7 @@ inline in6_addr MakeIPv6(uint8_t v10, uint8_t v11, uint8_t v12, uint8_t v13, uin
 
 std::vector<uint32_t> MakeNumbers();
 std::vector<uint8_t> MakeBools();
-std::vector<std::string> MakeFixedStrings();
+std::vector<std::string> MakeFixedStrings(size_t string_size);
 std::vector<std::string> MakeStrings();
 std::vector<uint64_t> MakeUUIDs();
 std::vector<clickhouse::Int64> MakeDateTime64s(size_t scale, size_t values_size = 200);
@@ -108,7 +108,7 @@ struct FromVectorGenerator {
 
     FromVectorGenerator(std::vector<T> data_)
         : data(std::move(data_)),
-          random_generator(0, 0, data.size())
+          random_generator(0, 0, data.size() - 1)
     {}
 
     auto operator()(size_t pos) {

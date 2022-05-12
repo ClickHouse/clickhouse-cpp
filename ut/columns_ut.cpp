@@ -59,7 +59,7 @@ TEST(ColumnsCase, NumericSlice) {
 
 
 TEST(ColumnsCase, FixedStringInit) {
-    const auto column_data = MakeFixedStrings();
+    const auto column_data = MakeFixedStrings(3);
     auto col = std::make_shared<ColumnFixedString>(3, column_data);
 
     ASSERT_EQ(col->Size(), column_data.size());
@@ -76,7 +76,7 @@ TEST(ColumnsCase, FixedString_Append_SmallStrings) {
     // are padded with zeroes on insertion.
 
     const size_t string_size = 7;
-    const auto column_data = MakeFixedStrings();
+    const auto column_data = MakeFixedStrings(3);
 
     auto col = std::make_shared<ColumnFixedString>(string_size);
     size_t i = 0;

@@ -17,9 +17,15 @@ std::vector<uint8_t> MakeBools() {
         {1, 0, 0, 0, 1, 1, 0, 1, 1, 1, 0};
 }
 
-std::vector<std::string> MakeFixedStrings() {
-    return std::vector<std::string>
+std::vector<std::string> MakeFixedStrings(size_t string_size) {
+    std::vector<std::string> result
         {"aaa", "bbb", "ccc", "ddd"};
+
+    std::for_each(result.begin(), result.end(), [string_size](auto& value) {
+        value.resize(string_size, '\0');
+    });
+
+    return result;
 }
 
 std::vector<std::string> MakeStrings() {

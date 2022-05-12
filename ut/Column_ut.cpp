@@ -40,7 +40,7 @@ public:
     static auto MakeColumn() {
         if constexpr (std::is_same_v<ColumnType, ColumnFixedString>) {
             return std::make_shared<ColumnFixedString>(12);
-        } if constexpr (std::is_same_v<ColumnType, ColumnDateTime64>) {
+        } else if constexpr (std::is_same_v<ColumnType, ColumnDateTime64>) {
                 return std::make_shared<ColumnDateTime64>(3);
         } else {
             return std::make_shared<ColumnType>();
@@ -48,9 +48,10 @@ public:
     }
 
     static auto GenerateValues(size_t values_size) {
-        if constexpr (std::is_same_v<ColumnType, ColumnFixedString>
-                || std::is_same_v<ColumnType, ColumnString>) {
+        if constexpr (std::is_same_v<ColumnType, ColumnString>) {
             return GenerateVector(values_size, FooBarGenerator);
+        } else if constexpr (std::is_same_v<ColumnType, ColumnFixedString>) {
+            return GenerateVector(values_size, FromVectorGenerator{MakeFixedStrings(12)});
         } else if constexpr (std::is_same_v<ColumnType, ColumnDate>) {
             return GenerateVector(values_size, FromVectorGenerator{MakeDates()});
         } else if constexpr (std::is_same_v<ColumnType, ColumnDateTime>) {
