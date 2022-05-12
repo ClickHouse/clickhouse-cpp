@@ -79,7 +79,7 @@ INSTANTIATE_TEST_SUITE_P(
 // Looks like `VerifyCAPath` has no effect, while parsing and setting value works.
 // Also for some reason SetPathToCADirectory() + SSL_CTX_load_verify_locations() works.
 #if !defined(__APPLE__)
-TEST(OpenSSLConfiguration, ValidValues) {
+TEST(OpenSSLConfiguration, DISABLED_ValidValues) {
     // Verify that Client with valid configuration set via SetConfiguration is able to connect.
 
     EXPECT_NO_THROW(
