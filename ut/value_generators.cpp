@@ -84,8 +84,20 @@ std::vector<clickhouse::Int128> MakeInt128s() {
     };
 }
 
-std::vector<clickhouse::Int128> MakeDecimals(size_t /*precision*/, size_t /*scale*/) {
-    return MakeInt128s();
+std::vector<clickhouse::Int128> MakeDecimals(size_t /*precision*/, size_t scale) {
+    const auto scale_multiplier = static_cast<size_t>(std::pow(10, scale));
+    const auto rhs_value = 12345678910;
+
+    const std::vector<long long int> vals {0, 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536 - 1};
+
+    std::vector<clickhouse::Int128> result;
+    result.reserve(vals.size());
+
+    std::transform(vals.begin(), vals.end(), std::back_inserter(result), [scale_multiplier, rhs_value](const auto& value) {
+        return value * scale_multiplier + rhs_value % scale_multiplier;
+    });
+
+    return result;
 }
 
 std::string FooBarGenerator(size_t i) {

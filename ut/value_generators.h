@@ -111,7 +111,10 @@ struct FromVectorGenerator {
     FromVectorGenerator(std::vector<T> data_)
         : data(std::move(data_)),
           random_generator(0, 0, data.size() - 1)
-    {}
+    {
+        if (data.size() == 0)
+            throw std::runtime_error("can't generate values from empty vector");
+    }
 
     auto operator()(size_t pos) {
         return data[random_generator(pos)];

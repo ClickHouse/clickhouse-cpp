@@ -42,6 +42,8 @@ public:
             return std::make_shared<ColumnFixedString>(12);
         } else if constexpr (std::is_same_v<ColumnType, ColumnDateTime64>) {
                 return std::make_shared<ColumnDateTime64>(3);
+        } else if constexpr (std::is_same_v<ColumnType, ColumnDecimal>) {
+                return std::make_shared<ColumnDecimal>(10, 5);
         } else {
             return std::make_shared<ColumnType>();
         }
@@ -99,8 +101,8 @@ using ValueColumns = ::testing::Types<
     , ColumnString, ColumnFixedString
     , ColumnDate, ColumnDateTime, ColumnDateTime64
     , ColumnIPv4, ColumnIPv6
-//    , ColumnInt128
-//    , ColumnDecimal
+    , ColumnInt128
+    , ColumnDecimal
     , ColumnUUID
 >;
 TYPED_TEST_SUITE(GenericColumnTest, ValueColumns);
