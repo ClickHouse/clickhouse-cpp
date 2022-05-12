@@ -1,5 +1,6 @@
 #include "value_generators.h"
 
+#include <algorithm>
 #include <math.h>
 
 namespace {
@@ -49,8 +50,15 @@ std::vector<Int64> MakeDateTime64s(size_t scale, size_t values_size) {
 }
 
 std::vector<clickhouse::Int64> MakeDates() {
-    // in CH Date internally a UInt16
-    return {0, 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536 - 1};
+    // in CH Date internally a UInt16 and stores a day number
+    // ColumnDate expects values to be seconds, which is then
+    // converted to day number internally, hence the `* 86400`.
+    std::vector<clickhouse::Int64> result {0, 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536 - 1};
+    std::for_each(result.begin(), result.end(), [](auto& value) {
+        value *= 86400;
+    });
+
+    return result;
 }
 
 std::vector<clickhouse::Int64> MakeDateTimes() {
