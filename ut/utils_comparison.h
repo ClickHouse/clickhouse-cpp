@@ -62,7 +62,6 @@ inline bool operator!=(const std::string_view & left, const in6_addr & right) {
     return !(left == right);
 }
 
-
 namespace details {
 // Make a column a RO stl-like container
 template <typename NestedColumnType>

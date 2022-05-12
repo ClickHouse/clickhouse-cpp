@@ -351,8 +351,17 @@ TEST(ColumnsCase, NullableSlice) {
     ASSERT_EQ(subData->At(3), 17u);
 }
 
+// internal representation of UUID data in ColumnUUID
+std::vector<uint64_t> MakeUUID_data() {
+    return {
+        0xbb6a8c699ab2414cllu, 0x86697b7fd27f0825llu,
+        0x84b9f24bc26b49c6llu, 0xa03b4ab723341951llu,
+        0x3507213c178649f9llu, 0x9faf035d662f60aellu
+    };
+}
+
 TEST(ColumnsCase, UUIDInit) {
-    auto col = std::make_shared<ColumnUUID>(std::make_shared<ColumnUInt64>(MakeUUIDs()));
+    auto col = std::make_shared<ColumnUUID>(std::make_shared<ColumnUInt64>(MakeUUID_data()));
 
     ASSERT_EQ(col->Size(), 3u);
     ASSERT_EQ(col->At(0), UInt128(0xbb6a8c699ab2414cllu, 0x86697b7fd27f0825llu));
@@ -360,7 +369,7 @@ TEST(ColumnsCase, UUIDInit) {
 }
 
 TEST(ColumnsCase, UUIDSlice) {
-    auto col = std::make_shared<ColumnUUID>(std::make_shared<ColumnUInt64>(MakeUUIDs()));
+    auto col = std::make_shared<ColumnUUID>(std::make_shared<ColumnUInt64>(MakeUUID_data()));
     auto sub = col->Slice(1, 2)->As<ColumnUUID>();
 
     ASSERT_EQ(sub->Size(), 2u);

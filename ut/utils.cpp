@@ -248,3 +248,8 @@ std::ostream& operator<<(std::ostream& ostr, const in6_addr& addr) {
 
     return ostr << ip_str;
 }
+
+std::ostream& operator<<(std::ostream & ostr, const clickhouse::Type & type) {
+    return ostr << type.GetName();
+}
+

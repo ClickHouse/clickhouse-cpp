@@ -62,9 +62,14 @@ public:
             return GenerateVector(values_size, FromVectorGenerator{MakeIPv4s()});
         } else if constexpr (std::is_same_v<ColumnType, ColumnIPv6>) {
             return GenerateVector(values_size, FromVectorGenerator{MakeIPv6s()});
+        } else if constexpr (std::is_same_v<ColumnType, ColumnInt128>) {
+            return GenerateVector(values_size, FromVectorGenerator{MakeInt128s()});
+        } else if constexpr (std::is_same_v<ColumnType, ColumnDecimal>) {
+            return GenerateVector(values_size, FromVectorGenerator{MakeDecimals(3, 10)});
+        } else if constexpr (std::is_same_v<ColumnType, ColumnUUID>) {
+            return GenerateVector(values_size, FromVectorGenerator{MakeUUIDs()});
         } else if constexpr (std::is_integral_v<typename ColumnType::ValueType>
-                || std::is_floating_point_v<typename ColumnType::ValueType>
-                || std::is_same_v<ColumnType, ColumnInt128>) {
+                || std::is_floating_point_v<typename ColumnType::ValueType>) {
             // ColumnUIntX and ColumnIntX
             // OR ColumnFloatX
             return GenerateVector<typename ColumnType::ValueType>(values_size, RandomGenerator<typename ColumnType::ValueType>());
@@ -91,13 +96,12 @@ using ValueColumns = ::testing::Types<
     ColumnUInt8, ColumnUInt16, ColumnUInt32, ColumnUInt64
     , ColumnInt8, ColumnInt16, ColumnInt32, ColumnInt64
     , ColumnFloat32, ColumnFloat64
-    , ColumnString//, //ColumnFixedString
-    , ColumnDate
-    , ColumnDateTime//, ColumnDateTime64
+    , ColumnString, ColumnFixedString
+    , ColumnDate, ColumnDateTime, ColumnDateTime64
     , ColumnIPv4, ColumnIPv6
 //    , ColumnInt128
 //    , ColumnDecimal
-//    , ColumnUUID
+    , ColumnUUID
 >;
 TYPED_TEST_SUITE(GenericColumnTest, ValueColumns);
 
@@ -108,6 +112,9 @@ TYPED_TEST(GenericColumnTest, EmptyColumn) {
 
     // Shouldn't be able to get items on empty column.
     ASSERT_ANY_THROW(column->At(0));
+
+    // TODO: verify that Column methods work as expected on empty column:
+    // some throw exceptions, some return poper values (like CloneEmpty)
 }
 
 TYPED_TEST(GenericColumnTest, Append) {
@@ -126,6 +133,8 @@ TYPED_TEST(GenericColumnTest, Slice) {
 
     auto untyped_slice = column->Slice(0, column->Size());
     auto slice = untyped_slice->template AsStrict<typename TestFixture::ColumnType>();
+    EXPECT_EQ(column->GetType(), slice->GetType());
+
     EXPECT_TRUE(CompareRecursive(values, *slice));
 
     // TODO: slices of different sizes
@@ -138,6 +147,8 @@ TYPED_TEST(GenericColumnTest, CloneEmpty) {
     // Check that type matches
     auto clone = clone_untyped->template AsStrict<typename TestFixture::ColumnType>();
     EXPECT_EQ(0u, clone->Size());
+
+    EXPECT_EQ(column->GetType(), clone->GetType());
 }
 
 TYPED_TEST(GenericColumnTest, Clear) {

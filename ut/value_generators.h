@@ -31,12 +31,14 @@ std::vector<uint32_t> MakeNumbers();
 std::vector<uint8_t> MakeBools();
 std::vector<std::string> MakeFixedStrings(size_t string_size);
 std::vector<std::string> MakeStrings();
-std::vector<uint64_t> MakeUUIDs();
 std::vector<clickhouse::Int64> MakeDateTime64s(size_t scale, size_t values_size = 200);
 std::vector<clickhouse::Int64> MakeDates();
 std::vector<clickhouse::Int64> MakeDateTimes();
 std::vector<in_addr> MakeIPv4s();
 std::vector<in6_addr> MakeIPv6s();
+std::vector<clickhouse::UInt128> MakeUUIDs();
+std::vector<clickhouse::Int128> MakeInt128s();
+std::vector<clickhouse::Int128> MakeDecimals(size_t precision, size_t scale);
 
 std::string FooBarGenerator(size_t i);
 

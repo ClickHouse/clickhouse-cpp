@@ -8,18 +8,15 @@ using namespace clickhouse;
 }
 
 std::vector<uint32_t> MakeNumbers() {
-    return std::vector<uint32_t>
-        {1, 2, 3, 7, 11, 13, 17, 19, 23, 29, 31};
+    return std::vector<uint32_t> {1, 2, 3, 7, 11, 13, 17, 19, 23, 29, 31};
 }
 
 std::vector<uint8_t> MakeBools() {
-    return std::vector<uint8_t>
-        {1, 0, 0, 0, 1, 1, 0, 1, 1, 1, 0};
+    return std::vector<uint8_t> {1, 0, 0, 0, 1, 1, 0, 1, 1, 1, 0};
 }
 
 std::vector<std::string> MakeFixedStrings(size_t string_size) {
-    std::vector<std::string> result
-        {"aaa", "bbb", "ccc", "ddd"};
+    std::vector<std::string> result {"aaa", "bbb", "ccc", "ddd"};
 
     std::for_each(result.begin(), result.end(), [string_size](auto& value) {
         value.resize(string_size, '\0');
@@ -29,15 +26,16 @@ std::vector<std::string> MakeFixedStrings(size_t string_size) {
 }
 
 std::vector<std::string> MakeStrings() {
-    return std::vector<std::string>
-        {"a", "ab", "abc", "abcd"};
+    return {"a", "ab", "abc", "abcd"};
 }
 
-std::vector<uint64_t> MakeUUIDs() {
-    return std::vector<uint64_t>
-        {0xbb6a8c699ab2414cllu, 0x86697b7fd27f0825llu,
-         0x84b9f24bc26b49c6llu, 0xa03b4ab723341951llu,
-         0x3507213c178649f9llu, 0x9faf035d662f60aellu};
+std::vector<UInt128> MakeUUIDs() {
+    return {
+        UInt128(0llu, 0llu),
+        UInt128(0xbb6a8c699ab2414cllu, 0x86697b7fd27f0825llu),
+        UInt128(0x84b9f24bc26b49c6llu, 0xa03b4ab723341951llu),
+        UInt128(0x3507213c178649f9llu, 0x9faf035d662f60aellu)
+    };
 }
 
 std::vector<Int64> MakeDateTime64s(size_t scale, size_t values_size) {
@@ -74,6 +72,20 @@ std::vector<clickhouse::Int64> MakeDateTimes() {
         131072, 262144, 524288, 1048576, 2097152, 4194304, 8388608, 16777216, 33554432, 67108864,
         134217728, 268435456, 536870912, 1073741824, 2147483648, 4294967296 - 1
     };
+}
+
+std::vector<clickhouse::Int128> MakeInt128s() {
+    return {
+        absl::MakeInt128(0xffffffffffffffffll, 0xffffffffffffffffll), // -1
+        absl::MakeInt128(0, 0xffffffffffffffffll),  // 2^64
+        absl::MakeInt128(0xffffffffffffffffll, 0),
+        absl::MakeInt128(0x8000000000000000ll, 0),
+        Int128(0)
+    };
+}
+
+std::vector<clickhouse::Int128> MakeDecimals(size_t /*precision*/, size_t /*scale*/) {
+    return MakeInt128s();
 }
 
 std::string FooBarGenerator(size_t i) {

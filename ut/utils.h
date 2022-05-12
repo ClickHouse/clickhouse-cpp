@@ -1,6 +1,10 @@
 #pragma once
 
 #include <clickhouse/base/platform.h>
+#include <clickhouse/columns/uuid.h>
+
+#include "utils_meta.h"
+#include "utils_comparison.h"
 
 #include <ostream>
 #include <ratio>
@@ -13,11 +17,9 @@
 
 #include <gtest/gtest.h>
 
-#include "utils_meta.h"
-#include "utils_comparison.h"
-
 namespace clickhouse {
     class Block;
+    class Type;
 }
 
 template <typename ResultType = std::string>
@@ -76,6 +78,11 @@ template <typename R, typename P>
 inline ostream & operator<<(ostream & ostr, const chrono::duration<R, P> & d) {
     return ostr << d.count() << ::getPrefix<P>() << "s";
 }
+
+template <typename F, typename S>
+inline ostream & operator<<(ostream & ostr, const pair<F, S> & t) {
+    return ostr << "{ " << t.first << ", " << t.second << " }";
+}
 }
 
 
@@ -88,6 +95,7 @@ struct PrettyPrintBlock {
 
 std::ostream& operator<<(std::ostream & ostr, const clickhouse::Block & block);
 std::ostream& operator<<(std::ostream & ostr, const PrettyPrintBlock & block);
+std::ostream& operator<<(std::ostream & ostr, const clickhouse::Type & type);
 std::ostream& operator<<(std::ostream& ostr, const in_addr& addr);
 std::ostream& operator<<(std::ostream& ostr, const in6_addr& addr);
 
