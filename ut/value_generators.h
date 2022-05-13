@@ -84,8 +84,8 @@ struct RandomGenerator {
     }
 
     template <typename U>
-    U operator()(U) {
-        return static_cast<U>(distribution(random_engine));
+    T operator()(U) {
+        return distribution(random_engine);
     }
 
 private:

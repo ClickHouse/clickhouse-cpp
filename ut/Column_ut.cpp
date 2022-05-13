@@ -70,9 +70,10 @@ public:
             return GenerateVector(values_size, FromVectorGenerator{MakeDecimals(3, 10)});
         } else if constexpr (std::is_same_v<ColumnType, ColumnUUID>) {
             return GenerateVector(values_size, FromVectorGenerator{MakeUUIDs()});
-        } else if constexpr (std::is_integral_v<typename ColumnType::ValueType>
-                || std::is_floating_point_v<typename ColumnType::ValueType>) {
+        } else if constexpr (std::is_integral_v<typename ColumnType::ValueType>) {
             // ColumnUIntX and ColumnIntX
+            return GenerateVector<typename ColumnType::ValueType>(values_size, RandomGenerator<int>());
+        } else if constexpr (std::is_floating_point_v<typename ColumnType::ValueType>) {
             // OR ColumnFloatX
             return GenerateVector<typename ColumnType::ValueType>(values_size, RandomGenerator<typename ColumnType::ValueType>());
         }
@@ -107,16 +108,35 @@ using ValueColumns = ::testing::Types<
 >;
 TYPED_TEST_SUITE(GenericColumnTest, ValueColumns);
 
+TYPED_TEST(GenericColumnTest, Construct) {
+    auto column = this->MakeColumn();
+    ASSERT_EQ(0u, column->Size());
+}
 
 TYPED_TEST(GenericColumnTest, EmptyColumn) {
     auto column = this->MakeColumn();
     ASSERT_EQ(0u, column->Size());
 
+    // verify that Column methods work as expected on empty column:
+    // some throw exceptions, some return poper values (like CloneEmpty)
+
     // Shouldn't be able to get items on empty column.
     ASSERT_ANY_THROW(column->At(0));
 
-    // TODO: verify that Column methods work as expected on empty column:
-    // some throw exceptions, some return poper values (like CloneEmpty)
+    {
+        auto slice = column->Slice(0, 0);
+        ASSERT_NO_THROW(slice->template AsStrict<typename TestFixture::ColumnType>());
+        ASSERT_EQ(0u, slice->Size());
+    }
+
+    {
+        auto clone = column->CloneEmpty();
+        ASSERT_NO_THROW(clone->template AsStrict<typename TestFixture::ColumnType>());
+        ASSERT_EQ(0u, clone->Size());
+    }
+
+    ASSERT_NO_THROW(column->Clear());
+    ASSERT_NO_THROW(column->Swap(*this->MakeColumn()));
 }
 
 TYPED_TEST(GenericColumnTest, Append) {
