@@ -164,6 +164,7 @@ TYPED_TEST(GenericColumnTest, Slice) {
 
 TYPED_TEST(GenericColumnTest, CloneEmpty) {
     auto [column, values] = this->MakeColumnWithValues(100);
+    EXPECT_EQ(values.size(), column->Size());
 
     auto clone_untyped = column->CloneEmpty();
     // Check that type matches
@@ -175,6 +176,7 @@ TYPED_TEST(GenericColumnTest, CloneEmpty) {
 
 TYPED_TEST(GenericColumnTest, Clear) {
     auto [column, values] = this->MakeColumnWithValues(100);
+    EXPECT_EQ(values.size(), column->Size());
 
     column->Clear();
     EXPECT_EQ(0u, column->Size());

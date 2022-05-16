@@ -20,6 +20,7 @@
 namespace clickhouse {
     class Block;
     class Type;
+    struct ServerInfo;
 }
 
 template <typename ResultType = std::string>
@@ -93,9 +94,13 @@ struct PrettyPrintBlock {
     const clickhouse::Block & block;
 };
 
-std::ostream& operator<<(std::ostream & ostr, const clickhouse::Block & block);
+namespace clickhouse {
+std::ostream& operator<<(std::ostream & ostr, const Block & block);
+std::ostream& operator<<(std::ostream & ostr, const Type & type);
+std::ostream & operator<<(std::ostream & ostr, const ServerInfo & server_info);
+}
+
 std::ostream& operator<<(std::ostream & ostr, const PrettyPrintBlock & block);
-std::ostream& operator<<(std::ostream & ostr, const clickhouse::Type & type);
 std::ostream& operator<<(std::ostream& ostr, const in_addr& addr);
 std::ostream& operator<<(std::ostream& ostr, const in6_addr& addr);
 

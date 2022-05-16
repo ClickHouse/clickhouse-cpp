@@ -1,6 +1,7 @@
 #include "utils.h"
 
 #include <clickhouse/block.h>
+#include <clickhouse/client.h>
 #include <clickhouse/columns/column.h>
 #include <clickhouse/columns/array.h>
 #include <clickhouse/columns/date.h>
@@ -154,28 +155,6 @@ std::ostream & operator<<(std::ostream & ostr, const ColumnValue& v) {
 
 }
 
-std::ostream& operator<<(std::ostream & ostr, const Block & block) {
-    if (block.GetRowCount() == 0 || block.GetColumnCount() == 0)
-        return ostr;
-
-    for (size_t col = 0; col < block.GetColumnCount(); ++col) {
-        const auto & c = block[col];
-        ostr << c->GetType().GetName() << " [";
-
-        for (size_t row = 0; row < block.GetRowCount(); ++row) {
-            printColumnValue(c, row, ostr);
-            if (row != block.GetRowCount() - 1)
-                ostr << ", ";
-        }
-        ostr << "]";
-
-        if (col != block.GetColumnCount() - 1)
-            ostr << "\n";
-    }
-
-    return ostr;
-}
-
 std::ostream& operator<<(std::ostream & ostr, const PrettyPrintBlock & pretty_print_block) {
     // Pretty-print block:
     // - names of each column
@@ -249,7 +228,41 @@ std::ostream& operator<<(std::ostream& ostr, const in6_addr& addr) {
     return ostr << ip_str;
 }
 
-std::ostream& operator<<(std::ostream & ostr, const clickhouse::Type & type) {
+namespace clickhouse {
+
+std::ostream& operator<<(std::ostream & ostr, const Block & block) {
+    if (block.GetRowCount() == 0 || block.GetColumnCount() == 0)
+        return ostr;
+
+    for (size_t col = 0; col < block.GetColumnCount(); ++col) {
+        const auto & c = block[col];
+        ostr << c->GetType().GetName() << " [";
+
+        for (size_t row = 0; row < block.GetRowCount(); ++row) {
+            printColumnValue(c, row, ostr);
+            if (row != block.GetRowCount() - 1)
+                ostr << ", ";
+        }
+        ostr << "]";
+
+        if (col != block.GetColumnCount() - 1)
+            ostr << "\n";
+    }
+
+    return ostr;
+}
+
+std::ostream& operator<<(std::ostream & ostr, const Type & type) {
     return ostr << type.GetName();
 }
 
+std::ostream & operator<<(std::ostream & ostr, const ServerInfo & server_info) {
+    return ostr << server_info.name << "/" << server_info.display_name
+                << " ver "
+                << server_info.version_major << "."
+                << server_info.version_minor << "."
+                << server_info.version_patch
+                << " (" << server_info.revision << ")";
+}
+
+}
