@@ -119,7 +119,7 @@ ColumnRef ColumnDateTime::Slice(size_t begin, size_t len) const {
 }
 
 ColumnRef ColumnDateTime::CloneEmpty() const {
-    return std::make_shared<ColumnDate>();
+    return std::make_shared<ColumnDateTime>();
 }
 
 void ColumnDateTime::Swap(Column& other) {
