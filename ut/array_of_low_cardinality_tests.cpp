@@ -72,7 +72,9 @@ TEST(ArrayOfLowCardinality, InsertAndQuery) {
 
     const auto testData = std::vector<std::vector<std::string>> {
         { "aa", "bb" },
-        { "cc" }
+        {},
+        { "cc" },
+        {}
     };
 
     auto column = buildTestColumn(testData);
