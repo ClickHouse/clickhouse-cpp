@@ -97,7 +97,7 @@ void ColumnIPv4::Swap(Column& other) {
 }
 
 ItemView ColumnIPv4::GetItem(size_t index) const {
-    return data_->GetItem(index);
+    return ItemView(Type::IPv4, data_->GetItem(index));
 }
 
 }

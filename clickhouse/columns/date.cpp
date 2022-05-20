@@ -58,7 +58,7 @@ void ColumnDate::Swap(Column& other) {
 }
 
 ItemView ColumnDate::GetItem(size_t index) const {
-    return data_->GetItem(index);
+    return ItemView(Type::Date, data_->GetItem(index));
 }
 
 
@@ -128,7 +128,7 @@ void ColumnDateTime::Swap(Column& other) {
 }
 
 ItemView ColumnDateTime::GetItem(size_t index) const {
-    return data_->GetItem(index);
+    return ItemView(Type::DateTime, data_->GetItem(index));
 }
 
 ColumnDateTime64::ColumnDateTime64(size_t precision)
@@ -186,7 +186,7 @@ size_t ColumnDateTime64::Size() const {
 }
 
 ItemView ColumnDateTime64::GetItem(size_t index) const {
-    return data_->GetItem(index);
+    return ItemView(Type::DateTime64, data_->GetItem(index));
 }
 
 void ColumnDateTime64::Swap(Column& other) {

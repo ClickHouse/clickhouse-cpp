@@ -35,13 +35,13 @@ void ItemView::ValidateData(Type::Code type, DataType data) {
         case Type::Code::UInt64:
         case Type::Code::Float64:
         case Type::Code::DateTime64:
-        case Type::Code::IPv6:
         case Type::Code::Decimal64:
             expected_size = 8;
             break;
 
         case Type::Code::String:
         case Type::Code::FixedString:
+        case Type::Code::Decimal:
             // value can be of any size
             return;
 
@@ -51,9 +51,9 @@ void ItemView::ValidateData(Type::Code type, DataType data) {
         case Type::Code::LowCardinality:
             throw UnimplementedError("Unsupported type in ItemView: " + std::to_string(static_cast<int>(type)));
 
+        case Type::Code::IPv6:
         case Type::Code::UUID:
         case Type::Code::Int128:
-        case Type::Code::Decimal:
         case Type::Code::Decimal128:
             expected_size = 16;
             break;
