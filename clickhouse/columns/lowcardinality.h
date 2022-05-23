@@ -96,7 +96,7 @@ protected:
     void AppendUnsafe(const ItemView &);
 
 private:
-    void setup(ColumnRef dictionary_column);
+    void Setup(ColumnRef dictionary_column);
     void AppendNullItem();
     void AppendDefaultItem();
 

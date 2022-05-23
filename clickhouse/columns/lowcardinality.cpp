@@ -159,7 +159,7 @@ ColumnLowCardinality::ColumnLowCardinality(ColumnRef dictionary_column)
       dictionary_column_(dictionary_column->CloneEmpty()), // safe way to get an column of the same type.
       index_column_(std::make_shared<ColumnUInt32>())
 {
-    setup(dictionary_column);
+    Setup(dictionary_column);
 }
 
 ColumnLowCardinality::ColumnLowCardinality(std::shared_ptr<ColumnNullable> dictionary_column)
@@ -168,13 +168,13 @@ ColumnLowCardinality::ColumnLowCardinality(std::shared_ptr<ColumnNullable> dicti
       index_column_(std::make_shared<ColumnUInt32>())
 {
     AppendNullItem();
-    setup(dictionary_column);
+    Setup(dictionary_column);
 }
 
 ColumnLowCardinality::~ColumnLowCardinality()
 {}
 
-void ColumnLowCardinality::setup(ColumnRef dictionary_column) {
+void ColumnLowCardinality::Setup(ColumnRef dictionary_column) {
     AppendDefaultItem();
 
     if (dictionary_column->Size() != 0) {
