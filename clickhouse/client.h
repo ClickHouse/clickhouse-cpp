@@ -86,6 +86,7 @@ struct ClientOptions {
     // TCP options
     DECLARE_FIELD(tcp_nodelay, bool, TcpNoDelay, true);
 
+    // TODO deprecate setting
     /** It helps to ease migration of the old codebases, which can't afford to switch
     * to using ColumnLowCardinalityT or ColumnLowCardinality directly,
     * but still want to benefit from smaller on-wire LowCardinality bandwidth footprint.
