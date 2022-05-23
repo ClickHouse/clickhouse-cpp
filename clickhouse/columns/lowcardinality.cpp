@@ -355,7 +355,10 @@ void ColumnLowCardinality::Clear() {
     dictionary_column_->Clear();
     unique_items_map_.clear();
 
-    AppendNullItem();
+    if (auto columnNullable = dictionary_column_->As<ColumnNullable>()) {
+        AppendNullItem();
+    }
+    AppendDefaultItem();
 }
 
 size_t ColumnLowCardinality::Size() const {
