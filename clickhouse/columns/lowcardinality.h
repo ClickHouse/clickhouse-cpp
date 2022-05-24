@@ -2,6 +2,7 @@
 
 #include "column.h"
 #include "numeric.h"
+#include "nullable.h"
 
 #include <functional>
 #include <string>
@@ -32,6 +33,11 @@ struct LowCardinalityHashKeyHash {
 
 }
 
+/*
+ * LC column contains an "invisible" default item at the beginning of the collection. [default, ...]
+ * If the nested type is Nullable, it contains a null-item at the beginning and a default item at the second position. [null, default, ...]
+ * Null map is not serialized in LC columns. Instead, nulls are tracked by having an index of 0.
+ * */
 class ColumnLowCardinality : public Column {
 public:
     using UniqueItems = std::unordered_map<details::LowCardinalityHashKey, size_t /*dictionary index*/, details::LowCardinalityHashKeyHash>;
@@ -49,6 +55,7 @@ private:
 public:
     // c-tor makes a deep copy of the dictionary_column.
     explicit ColumnLowCardinality(ColumnRef dictionary_column);
+    explicit ColumnLowCardinality(std::shared_ptr<ColumnNullable> dictionary_column);
     ~ColumnLowCardinality();
 
     /// Appends another LowCardinality column to the end of this one, updating dictionary.
@@ -84,12 +91,14 @@ protected:
     std::uint64_t getDictionaryIndex(std::uint64_t item_index) const;
     void appendIndex(std::uint64_t item_index);
     void removeLastIndex();
-
     ColumnRef GetDictionary();
+
     void AppendUnsafe(const ItemView &);
 
 private:
-    void AppendNullItemToEmptyColumn();
+    void Setup(ColumnRef dictionary_column);
+    void AppendNullItem();
+    void AppendDefaultItem();
 
 public:
     static details::LowCardinalityHashKey computeHashKey(const ItemView &);

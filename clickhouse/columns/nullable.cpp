@@ -74,7 +74,6 @@ void ColumnNullable::SaveBody(OutputStream* output) {
 }
 
 size_t ColumnNullable::Size() const {
-    assert(nested_->Size() == nulls_->Size());
     return nulls_->Size();
 }
 
