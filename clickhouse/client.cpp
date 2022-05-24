@@ -653,6 +653,7 @@ void Client::Impl::WriteBlock(const Block& block, OutputStream& output) {
         WireFormat::WriteString(output, bi.Name());
         WireFormat::WriteString(output, bi.Type()->GetName());
 
+        // Empty columns are not serialized and occupy exactly 0 bytes.
         // ref https://github.com/ClickHouse/ClickHouse/blob/39b37a3240f74f4871c8c1679910e065af6bea19/src/Formats/NativeWriter.cpp#L163
         const bool containsData = block.GetRowCount() > 0;
         if (containsData) {
