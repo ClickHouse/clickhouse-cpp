@@ -97,7 +97,7 @@ void ColumnIPv6::Swap(Column& other) {
 }
 
 ItemView ColumnIPv6::GetItem(size_t index) const {
-    return data_->GetItem(index);
+    return ItemView{Type::IPv6, data_->GetItem(index)};
 }
 
 }

@@ -150,6 +150,45 @@ TYPED_TEST(GenericColumnTest, Append) {
     EXPECT_TRUE(CompareRecursive(values, *column));
 }
 
+// To make some value types compatitable with Column::GetItem()
+template <typename ColumnType, typename ValueType>
+inline auto convertValueForGetItem(const ColumnType& col, ValueType&& t) {
+    using T = std::remove_cv_t<std::decay_t<ValueType>>;
+
+    if constexpr (std::is_same_v<ColumnType, ColumnDecimal>) {
+            // Since ColumnDecimal can hold 32, 64, 128-bit wide data and there is no way telling at run-time.
+            const ItemView item = col.GetItem(0);
+        return std::string_view(reinterpret_cast<const char*>(&t), item.data.size());
+    } else if constexpr (std::is_same_v<T, clickhouse::UInt128>
+            || std::is_same_v<T, clickhouse::Int128>) {
+        return std::string_view{reinterpret_cast<const char*>(&t), sizeof(T)};
+    } else if constexpr (std::is_same_v<T, in_addr>) {
+        return htonl(t.s_addr);
+    } else if constexpr (std::is_same_v<T, in6_addr>) {
+        return std::string_view(reinterpret_cast<const char*>(t.s6_addr), 16);
+    } else if constexpr (std::is_same_v<ColumnType, ColumnDate>) {
+        return static_cast<uint16_t>(t / std::time_t(86400));
+    } else if constexpr (std::is_same_v<ColumnType, ColumnDateTime>) {
+        return static_cast<uint32_t>(t);
+    } else {
+        return t;
+    }
+}
+
+TYPED_TEST(GenericColumnTest, GetItem) {
+    auto [column, values] = this->MakeColumnWithValues(100);
+
+    ASSERT_EQ(values.size(), column->Size());
+    ASSERT_EQ(column->GetItem(0).type, column->GetType().GetCode());
+
+    for (size_t i = 0; i < values.size(); ++i) {
+        const auto v = convertValueForGetItem(*column, values[i]);
+        const ItemView item = column->GetItem(i);
+
+        ASSERT_TRUE(CompareRecursive(item.get<decltype(v)>(), v));
+    }
+}
+
 TYPED_TEST(GenericColumnTest, Slice) {
     auto [column, values] = this->MakeColumnWithValues(100);
 
