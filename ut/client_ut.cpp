@@ -12,17 +12,6 @@
 
 using namespace clickhouse;
 
-namespace clickhouse {
-std::ostream & operator<<(std::ostream & ostr, const ServerInfo & server_info) {
-    return ostr << server_info.name << "/" << server_info.display_name
-                << " ver "
-                << server_info.version_major << "."
-                << server_info.version_minor << "."
-                << server_info.version_patch
-                << " (" << server_info.revision << ")";
-}
-}
-
 namespace {
 
 uint64_t versionNumber(
@@ -1013,7 +1002,7 @@ ColumnRef RoundtripColumnValues(Client& client, ColumnRef expected) {
         result->Append(b[0]);
     });
 
-    EXPECT_EQ(expected->Type(), result->Type());
+    EXPECT_EQ(expected->GetType(), result->GetType());
     EXPECT_EQ(expected->Size(), result->Size());
     return result;
 }

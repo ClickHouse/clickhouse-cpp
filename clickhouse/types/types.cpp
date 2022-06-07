@@ -13,52 +13,71 @@ Type::Type(const Code code)
     , type_unique_id_(0)
 {}
 
+const char* Type::TypeName(Type::Code code) {
+    switch (code) {
+        case Type::Code::Void:           return "Void";
+        case Type::Code::Int8:           return "Int8";
+        case Type::Code::Int16:          return "Int16";
+        case Type::Code::Int32:          return "Int32";
+        case Type::Code::Int64:          return "Int64";
+        case Type::Code::UInt8:          return "UInt8";
+        case Type::Code::UInt16:         return "UInt16";
+        case Type::Code::UInt32:         return "UInt32";
+        case Type::Code::UInt64:         return "UInt64";
+        case Type::Code::Float32:        return "Float32";
+        case Type::Code::Float64:        return "Float64";
+        case Type::Code::String:         return "String";
+        case Type::Code::FixedString:    return "FixedString";
+        case Type::Code::DateTime:       return "DateTime";
+        case Type::Code::Date:           return "Date";
+        case Type::Code::Array:          return "Array";
+        case Type::Code::Nullable:       return "Nullable";
+        case Type::Code::Tuple:          return "Tuple";
+        case Type::Code::Enum8:          return "Enum8";
+        case Type::Code::Enum16:         return "Enum16";
+        case Type::Code::UUID:           return "UUID";
+        case Type::Code::IPv4:           return "IPv4";
+        case Type::Code::IPv6:           return "IPv6";
+        case Type::Code::Int128:         return "Int128";
+        case Type::Code::Decimal:        return "Decimal";
+        case Type::Code::Decimal32:      return "Decimal32";
+        case Type::Code::Decimal64:      return "Decimal64";
+        case Type::Code::Decimal128:     return "Decimal128";
+        case Type::Code::LowCardinality: return "LowCardinality";
+        case Type::Code::DateTime64:     return "DateTime64";
+        case Type::Code::Date32:         return "Date32";
+    }
+
+    return "Unknown type";
+}
+
 std::string Type::GetName() const {
     switch (code_) {
         case Void:
-            return "Void";
         case Int8:
-            return "Int8";
         case Int16:
-            return "Int16";
         case Int32:
-            return "Int32";
         case Int64:
-            return "Int64";
         case Int128:
-            return "Int128";
         case UInt8:
-            return "UInt8";
         case UInt16:
-            return "UInt16";
         case UInt32:
-            return "UInt32";
         case UInt64:
-            return "UInt64";
         case UUID:
-            return "UUID";
         case Float32:
-            return "Float32";
         case Float64:
-            return "Float64";
         case String:
-            return "String";
+        case IPv4:
+        case IPv6:
+        case Date:
+        case Date32:
+            return TypeName(code_);
         case FixedString:
             return As<FixedStringType>()->GetName();
-        case IPv4:
-            return "IPv4";
-        case IPv6:
-            return "IPv6";
         case DateTime:
-        {
             return As<DateTimeType>()->GetName();
-        }
         case DateTime64:
             return As<DateTime64Type>()->GetName();
-        case Date:
-            return "Date";
-        case Date32:
-            return "Date32";
         case Array:
             return As<ArrayType>()->GetName();
         case Nullable:

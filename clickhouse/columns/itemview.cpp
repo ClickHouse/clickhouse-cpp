@@ -1,26 +1,56 @@
 #include "../columns/itemview.h"
 
+#include <algorithm>
+#include <sstream>
+
+namespace {
+
+template <typename Container>
+std::string ContainerToString(Container container, const char * separator = ", ") {
+    std::stringstream sstr;
+    const auto end = std::end(container);
+    for (auto i = std::begin(container); i != end; /*intentionally no ++i*/) {
+        const auto & elem = *i;
+        sstr << elem;
+
+        if (++i != end) {
+            sstr << separator;
+        }
+    }
+
+    return sstr.str();
+}
+
+}
+
 namespace clickhouse {
 
 void ItemView::ValidateData(Type::Code type, DataType data) {
-    int expected_size = 0;
+
+    auto AssertSize = [type, &data](std::initializer_list<int> allowed_sizes) -> void {
+        const auto end = std::end(allowed_sizes);
+        if (std::find(std::begin(allowed_sizes), end, static_cast<int>(data.size())) == end) {
+            throw AssertionError(std::string("ItemView value size mismatch for ")
+                    + Type::TypeName(type)
+                    + " expected: " + ContainerToString(allowed_sizes, " or ")
+                    + ", got: " + std::to_string(data.size()));
+        }
+    };
+
     switch (type) {
         case Type::Code::Void:
-            expected_size = 0;
-            break;
+            return AssertSize({0});
 
         case Type::Code::Int8:
         case Type::Code::UInt8:
         case Type::Code::Enum8:
-            expected_size = 1;
-            break;
+            return AssertSize({1});
 
         case Type::Code::Int16:
         case Type::Code::UInt16:
         case Type::Code::Date:
         case Type::Code::Enum16:
-            expected_size = 2;
-            break;
+            return AssertSize({2});
 
         case Type::Code::Int32:
         case Type::Code::UInt32:
@@ -28,17 +58,14 @@ void ItemView::ValidateData(Type::Code type, DataType data) {
         case Type::Code::DateTime:
         case Type::Code::IPv4:
         case Type::Code::Decimal32:
-            expected_size = 4;
-            break;
+            return AssertSize({4});
 
         case Type::Code::Int64:
         case Type::Code::UInt64:
         case Type::Code::Float64:
         case Type::Code::DateTime64:
-        case Type::Code::IPv6:
         case Type::Code::Decimal64:
-            expected_size = 8;
-            break;
+            return AssertSize({8});
 
         case Type::Code::String:
         case Type::Code::FixedString:
@@ -49,23 +76,20 @@ void ItemView::ValidateData(Type::Code type, DataType data) {
         case Type::Code::Nullable:
         case Type::Code::Tuple:
         case Type::Code::LowCardinality:
-            throw UnimplementedError("Unsupported type in ItemView: " + std::to_string(static_cast<int>(type)));
+            throw AssertionError("Unsupported type in ItemView: " + std::string(Type::TypeName(type)));
 
+        case Type::Code::IPv6:
         case Type::Code::UUID:
         case Type::Code::Int128:
-        case Type::Code::Decimal:
         case Type::Code::Decimal128:
-            expected_size = 16;
-            break;
+            return AssertSize({16});
+
+        case Type::Code::Decimal:
+            // Could be either Decimal32, Decimal64 or Decimal128
+            return AssertSize({4, 8, 16});
 
         default:
             throw UnimplementedError("Unknon type code:" + std::to_string(static_cast<int>(type)));
-    }
-
-    if (expected_size != static_cast<int>(data.size())) {
-        throw AssertionError("Value size mismatch for type "
-                + std::to_string(static_cast<int>(type)) + " expected: "
-                + std::to_string(expected_size) + ", got: " + std::to_string(data.size()));
     }
 }
 

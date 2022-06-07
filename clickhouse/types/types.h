@@ -84,6 +84,9 @@ public:
 
     bool IsEqual(const TypeRef& other) const { return IsEqual(*other); }
 
+    /// Simple name, doesn't depend on parameters and\or nested types, caller MUST NOT free returned value.
+    static const char* TypeName(Code);
+
 public:
     static TypeRef CreateArray(TypeRef item_type);
 

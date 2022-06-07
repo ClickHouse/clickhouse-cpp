@@ -229,7 +229,7 @@ void ColumnDecimal::Swap(Column& other) {
 }
 
 ItemView ColumnDecimal::GetItem(size_t index) const {
-    return data_->GetItem(index);
+    return ItemView{GetType().GetCode(), data_->GetItem(index)};
 }
 
 size_t ColumnDecimal::GetScale() const

@@ -5,6 +5,7 @@
 
 #include <string_view>
 #include <stdexcept>
+#include <type_traits>
 
 namespace clickhouse {
 
@@ -43,8 +44,15 @@ public:
         ValidateData(type, data);
     }
 
+    ItemView(Type::Code type, ItemView other)
+        : type(type),
+          data(other.data)
+    {
+        ValidateData(type, data);
+    }
+
     explicit ItemView()
-        : ItemView(Type::Void, {})
+        : ItemView(Type::Void, std::string_view{})
     {}
 
     template <typename T>
@@ -53,11 +61,12 @@ public:
     {}
 
     template <typename T>
-    T get() const {
-        if constexpr (std::is_same_v<std::string_view, T> || std::is_same_v<std::string, T>) {
+    auto get() const {
+        using ValueType = std::remove_cv_t<std::decay_t<T>>;
+        if constexpr (std::is_same_v<std::string_view, ValueType> || std::is_same_v<std::string, ValueType>) {
             return data;
-        } else if constexpr (std::is_fundamental_v<T> || std::is_same_v<Int128, T>) {
-            if (sizeof(T) == data.size()) {
+        } else if constexpr (std::is_fundamental_v<ValueType> || std::is_same_v<Int128, ValueType>) {
+            if (sizeof(ValueType) == data.size()) {
                 return *reinterpret_cast<const T*>(data.data());
             } else {
                 throw AssertionError("Incompatitable value type and size.");

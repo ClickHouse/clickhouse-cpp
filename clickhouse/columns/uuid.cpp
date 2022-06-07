@@ -70,7 +70,11 @@ void ColumnUUID::Swap(Column& other) {
 }
 
 ItemView ColumnUUID::GetItem(size_t index) const {
-    return data_->GetItem(index);
+    // We know that ColumnUInt64 stores it's data in continius memory region,
+    // and that every 2 values from data represent 1 UUID value.
+    const auto data_item_view = data_->GetItem(index * 2);
+
+    return ItemView{Type::UUID, std::string_view{data_item_view.data.data(), data_item_view.data.size() * 2}};
 }
 
 }
