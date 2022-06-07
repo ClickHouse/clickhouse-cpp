@@ -63,6 +63,66 @@ ItemView ColumnDate::GetItem(size_t index) const {
 
 
 
+ColumnDate32::ColumnDate32()
+    : Column(Type::CreateDate32())
+    , data_(std::make_shared<ColumnUInt32>())
+{
+}
+
+void ColumnDate32::Append(const std::time_t& value) {
+    /// TODO: This code is fundamentally wrong.
+    data_->Append(static_cast<uint16_t>(value / std::time_t(86400)));
+}
+
+void ColumnDate32::Clear() {
+    data_->Clear();
+}
+
+std::time_t ColumnDate32::At(size_t n) const {
+    return static_cast<std::time_t>(data_->At(n)) * 86400;
+}
+
+void ColumnDate32::Append(ColumnRef column) {
+    if (auto col = column->As<ColumnDate32>()) {
+        data_->Append(col->data_);
+    }
+}
+
+bool ColumnDate32::LoadBody(InputStream* input, size_t rows) {
+    return data_->LoadBody(input, rows);
+}
+
+void ColumnDate32::SaveBody(OutputStream* output) {
+    data_->SaveBody(output);
+}
+
+size_t ColumnDate32::Size() const {
+    return data_->Size();
+}
+
+ColumnRef ColumnDate32::Slice(size_t begin, size_t len) const {
+    auto col = data_->Slice(begin, len)->As<ColumnUInt32>();
+    auto result = std::make_shared<ColumnDate32>();
+
+    result->data_->Append(col);
+
+    return result;
+}
+
+ColumnRef ColumnDate32::CloneEmpty() const {
+    return std::make_shared<ColumnDate32>();
+}
+
+void ColumnDate32::Swap(Column& other) {
+    auto & col = dynamic_cast<ColumnDate32 &>(other);
+    data_.swap(col.data_);
+}
+
+ItemView ColumnDate32::GetItem(size_t index) const {
+    return data_->GetItem(index);
+}
+
+
 ColumnDateTime::ColumnDateTime()
     : Column(Type::CreateDateTime())
     , data_(std::make_shared<ColumnUInt32>())

@@ -85,6 +85,8 @@ static ColumnRef CreateTerminalColumn(const TypeAst& ast) {
         }
     case Type::Date:
         return std::make_shared<ColumnDate>();
+    case Type::Date32:
+        return std::make_shared<ColumnDate32>();    
 
     case Type::IPv4:
         return std::make_shared<ColumnIPv4>();

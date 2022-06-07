@@ -45,6 +45,7 @@ const char* Type::TypeName(Type::Code code) {
         case Type::Code::Decimal128:     return "Decimal128";
         case Type::Code::LowCardinality: return "LowCardinality";
         case Type::Code::DateTime64:     return "DateTime64";
+        case Type::Code::Date32:         return "Date32";
     }
 
     return "Unknown type";
@@ -69,6 +70,7 @@ std::string Type::GetName() const {
         case IPv4:
         case IPv6:
         case Date:
+        case Date32:
             return TypeName(code_);
         case FixedString:
             return As<FixedStringType>()->GetName();
@@ -120,6 +122,7 @@ uint64_t Type::GetTypeUniqueId() const {
         case IPv4:
         case IPv6:
         case Date:
+        case Date32:
             // For simple types, unique ID is the same as Type::Code
             return code_;
 
@@ -160,6 +163,10 @@ TypeRef Type::CreateArray(TypeRef item_type) {
 
 TypeRef Type::CreateDate() {
     return TypeRef(new Type(Type::Date));
+}
+
+TypeRef Type::CreateDate32() {
+    return TypeRef(new Type(Type::Date32));
 }
 
 TypeRef Type::CreateDateTime(std::string timezone) {

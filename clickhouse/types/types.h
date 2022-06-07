@@ -49,6 +49,7 @@ public:
         Decimal128,
         LowCardinality,
         DateTime64,
+        Date32,
     };
 
     using EnumItem = std::pair<std::string /* name */, int16_t /* value */>;
@@ -90,6 +91,8 @@ public:
     static TypeRef CreateArray(TypeRef item_type);
 
     static TypeRef CreateDate();
+
+    static TypeRef CreateDate32();    
 
     static TypeRef CreateDateTime(std::string timezone = std::string());
 
