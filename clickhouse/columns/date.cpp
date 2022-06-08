@@ -65,13 +65,13 @@ ItemView ColumnDate::GetItem(size_t index) const {
 
 ColumnDate32::ColumnDate32()
     : Column(Type::CreateDate32())
-    , data_(std::make_shared<ColumnUInt32>())
+    , data_(std::make_shared<ColumnInt32>())
 {
 }
 
 void ColumnDate32::Append(const std::time_t& value) {
     /// TODO: This code is fundamentally wrong.
-    data_->Append(static_cast<uint16_t>(value / std::time_t(86400)));
+    data_->Append(static_cast<int32_t>(value / std::time_t(86400)));
 }
 
 void ColumnDate32::Clear() {
@@ -101,7 +101,7 @@ size_t ColumnDate32::Size() const {
 }
 
 ColumnRef ColumnDate32::Slice(size_t begin, size_t len) const {
-    auto col = data_->Slice(begin, len)->As<ColumnUInt32>();
+    auto col = data_->Slice(begin, len)->As<ColumnInt32>();
     auto result = std::make_shared<ColumnDate32>();
 
     result->data_->Append(col);
@@ -119,7 +119,7 @@ void ColumnDate32::Swap(Column& other) {
 }
 
 ItemView ColumnDate32::GetItem(size_t index) const {
-    return data_->GetItem(index);
+    return ItemView{Type()->GetCode(), data_->GetItem(index)};
 }
 
 
