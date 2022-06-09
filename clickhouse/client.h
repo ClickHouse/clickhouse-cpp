@@ -91,9 +91,13 @@ struct ClientOptions {
     * to using ColumnLowCardinalityT or ColumnLowCardinality directly,
     * but still want to benefit from smaller on-wire LowCardinality bandwidth footprint.
     *
+    * Please note that option is now deprecated and will be removed in next major release.
+    * Since it slows development down and makes code somewhat uglier.
+    * 
     * @see LowCardinalitySerializationAdaptor, CreateColumnByType
+    * @deprecated since 2.1
     */
-    DECLARE_FIELD(backward_compatibility_lowcardinality_as_wrapped_column, bool, SetBakcwardCompatibilityFeatureLowCardinalityAsWrappedColumn, true);
+    DECLARE_FIELD(backward_compatibility_lowcardinality_as_wrapped_column, bool, SetBakcwardCompatibilityFeatureLowCardinalityAsWrappedColumn, false);
 
     /** Set max size data to compress if compression enabled.
      *
