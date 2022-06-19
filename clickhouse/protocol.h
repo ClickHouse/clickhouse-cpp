@@ -2,38 +2,37 @@
 
 namespace clickhouse {
 
-    /// То, что передаёт сервер.
+    /// Types of packets received from server
     namespace ServerCodes {
         enum {
-            Hello                = 0,    /// Имя, версия, ревизия.
-            Data                 = 1,    /// Блок данных со сжатием или без.
-            Exception            = 2,    /// Исключение во время обработки запроса.
-            Progress             = 3,    /// Прогресс выполнения запроса: строк считано, байт считано.
-            Pong                 = 4,    /// Ответ на Ping.
-            EndOfStream          = 5,    /// Все пакеты были переданы.
-            ProfileInfo          = 6,    /// Пакет с профайлинговой информацией.
-            Totals               = 7,    /// Блок данных с тотальными значениями, со сжатием или без.
-            Extremes             = 8,    /// Блок данных с минимумами и максимумами, аналогично.
-            TablesStatusResponse = 9,    /// Ответ на запрос TableStatus.
-            Log                  = 10,   /// Системный лог исполнения запроса.
+            Hello                = 0,    /// Name, version, revision.
+            Data                 = 1,    /// `Block` of data, may be compressed.
+            Exception            = 2,    /// Exception that occured on server side during query execution.
+            Progress             = 3,    /// Query execcution progress: rows and bytes read.
+            Pong                 = 4,    /// response to Ping sent by client.
+            EndOfStream          = 5,    /// All packets were sent.
+            ProfileInfo          = 6,    /// Profiling data
+            Totals               = 7,    /// Block of totals, may be compressed.
+            Extremes             = 8,    /// Block of mins and maxs, may be compressed.
+            TablesStatusResponse = 9,    /// Response to TableStatus.
+            Log                  = 10,   /// Query execution log.
         };
     }
 
     /// То, что передаёт клиент.
     namespace ClientCodes {
         enum {
-            Hello       = 0,    /// Имя, версия, ревизия, БД по-умолчанию.
-            Query       = 1,    /** Идентификатор запроса, настройки на отдельный запрос,
-                                  * информация, до какой стадии исполнять запрос,
-                                  * использовать ли сжатие, текст запроса (без данных для INSERT-а).
+            Hello       = 0,    /// Name, version, default database name.
+            Query       = 1,    /** Query id, query settings, query processing stage, 
+                                  * compression status, and query text (no INSERT data).
                                   */
-            Data        = 2,    /// Блок данных со сжатием или без.
-            Cancel      = 3,    /// Отменить выполнение запроса.
-            Ping        = 4,    /// Проверка живости соединения с сервером.
+            Data        = 2,    /// Data `Block` (e.g. INSERT data), may be compressed.
+            Cancel      = 3,    /// Cancel query.
+            Ping        = 4,    /// Check server connection.
         };
     }
 
-    /// Использовать ли сжатие.
+    /// Should we compress `Block`s of data 
     namespace CompressionState {
         enum {
             Disable     = 0,
