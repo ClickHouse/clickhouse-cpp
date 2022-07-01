@@ -7,38 +7,10 @@
 
 #include <gtest/gtest.h>
 
-#include <cmath>
 #include <thread>
 #include <chrono>
 
 using namespace clickhouse;
-
-namespace {
-
-uint64_t versionNumber(
-        uint64_t version_major,
-        uint64_t version_minor,
-        uint64_t version_patch = 0,
-        uint64_t revision = 0) {
-
-    // in this case version_major can be up to 1000
-    static auto revision_decimal_places = 8;
-    static auto patch_decimal_places = 4;
-    static auto minor_decimal_places = 4;
-
-    auto const result = version_major * static_cast<uint64_t>(std::pow(10, minor_decimal_places + patch_decimal_places + revision_decimal_places))
-            + version_minor * static_cast<uint64_t>(std::pow(10, patch_decimal_places + revision_decimal_places))
-            + version_patch * static_cast<uint64_t>(std::pow(10, revision_decimal_places))
-            + revision;
-
-    return result;
-}
-
-uint64_t versionNumber(const ServerInfo & server_info) {
-    return versionNumber(server_info.version_major, server_info.version_minor, server_info.version_patch, server_info.revision);
-}
-
-}
 
 // Use value-parameterized tests to run same tests with different client
 // options.

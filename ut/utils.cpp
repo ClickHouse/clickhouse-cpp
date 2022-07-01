@@ -267,3 +267,7 @@ std::ostream & operator<<(std::ostream & ostr, const ServerInfo & server_info) {
 }
 
 }
+
+uint64_t versionNumber(const ServerInfo & server_info) {
+    return versionNumber(server_info.version_major, server_info.version_minor, server_info.version_patch, server_info.revision);
+}
