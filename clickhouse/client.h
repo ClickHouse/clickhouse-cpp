@@ -92,7 +92,7 @@ struct ClientOptions {
     * but still want to benefit from smaller on-wire LowCardinality bandwidth footprint.
     *
     * Please note that option is now deprecated and will be removed in next major release.
-    * Since it slows development down and makes code somewhat uglier.
+    * Since it slows development down and makes code uglier.
     * 
     * @see LowCardinalitySerializationAdaptor, CreateColumnByType
     * @deprecated since 2.1
