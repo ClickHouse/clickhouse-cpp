@@ -19,6 +19,7 @@ SET ( clickhouse-cpp-ut-src
     array_of_low_cardinality_tests.cpp
     CreateColumnByType_ut.cpp
     Column_ut.cpp
+    roundtrip_column.cpp
 
     utils.cpp
     value_generators.cpp

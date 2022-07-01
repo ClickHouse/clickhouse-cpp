@@ -18,6 +18,7 @@
 #include <iomanip>
 #include <sstream>
 
+
 namespace {
 using namespace clickhouse;
 std::ostream & printColumnValue(const ColumnRef& c, const size_t row, std::ostream & ostr);
@@ -265,4 +266,8 @@ std::ostream & operator<<(std::ostream & ostr, const ServerInfo & server_info) {
                 << " (" << server_info.revision << ")";
 }
 
+}
+
+uint64_t versionNumber(const ServerInfo & server_info) {
+    return versionNumber(server_info.version_major, server_info.version_minor, server_info.version_patch, server_info.revision);
 }

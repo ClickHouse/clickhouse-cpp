@@ -3,41 +3,14 @@
 #include "readonly_client_test.h"
 #include "connection_failed_client_test.h"
 #include "utils.h"
+#include "roundtrip_column.h"
 
 #include <gtest/gtest.h>
 
-#include <cmath>
 #include <thread>
 #include <chrono>
 
 using namespace clickhouse;
-
-namespace {
-
-uint64_t versionNumber(
-        uint64_t version_major,
-        uint64_t version_minor,
-        uint64_t version_patch = 0,
-        uint64_t revision = 0) {
-
-    // in this case version_major can be up to 1000
-    static auto revision_decimal_places = 8;
-    static auto patch_decimal_places = 4;
-    static auto minor_decimal_places = 4;
-
-    auto const result = version_major * static_cast<uint64_t>(std::pow(10, minor_decimal_places + patch_decimal_places + revision_decimal_places))
-            + version_minor * static_cast<uint64_t>(std::pow(10, patch_decimal_places + revision_decimal_places))
-            + version_patch * static_cast<uint64_t>(std::pow(10, revision_decimal_places))
-            + revision;
-
-    return result;
-}
-
-uint64_t versionNumber(const ServerInfo & server_info) {
-    return versionNumber(server_info.version_major, server_info.version_minor, server_info.version_patch, server_info.revision);
-}
-
-}
 
 // Use value-parameterized tests to run same tests with different client
 // options.
@@ -976,35 +949,6 @@ TEST_P(ClientCase, DISABLED_ArrayArrayUInt64) {
         ASSERT_EQ(1u, row->Size());
         EXPECT_TRUE(CompareRecursive(std::vector<uint64_t>{}, *row->GetAsColumnTyped<ColumnUInt64>(0)));
     }
-}
-
-ColumnRef RoundtripColumnValues(Client& client, ColumnRef expected) {
-    // Create a temporary table with a single column
-    // insert values from `expected`
-    // select and aggregate all values from block into `result` column
-    auto result = expected->CloneEmpty();
-
-    const std::string type_name = result->GetType().GetName();
-    client.Execute("DROP TEMPORARY TABLE IF EXISTS temporary_roundtrip_table;");
-    client.Execute("CREATE TEMPORARY TABLE IF NOT EXISTS temporary_roundtrip_table (col " + type_name + ");");
-    {
-        Block block;
-        block.AppendColumn("col", expected);
-        block.RefreshRowCount();
-        client.Insert("temporary_roundtrip_table", block);
-    }
-
-    client.Select("SELECT col FROM temporary_roundtrip_table", [&result](const Block& b) {
-        if (b.GetRowCount() == 0)
-            return;
-
-        ASSERT_EQ(1u, b.GetColumnCount());
-        result->Append(b[0]);
-    });
-
-    EXPECT_EQ(expected->GetType(), result->GetType());
-    EXPECT_EQ(expected->Size(), result->Size());
-    return result;
 }
 
 TEST_P(ClientCase, RoundtripArrayTUint64) {

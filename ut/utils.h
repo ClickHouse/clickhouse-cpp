@@ -1,7 +1,6 @@
 #pragma once
 
 #include <clickhouse/base/platform.h>
-#include <clickhouse/columns/uuid.h>
 
 #include "utils_meta.h"
 #include "utils_comparison.h"
@@ -12,12 +11,14 @@
 #include <system_error>
 #include <type_traits>
 #include <vector>
+#include <cmath>
 
 #include <time.h>
 
 #include <gtest/gtest.h>
 
 namespace clickhouse {
+    class Client;
     class Block;
     class Type;
     struct ServerInfo;
@@ -136,4 +137,23 @@ std::ostream& operator<<(std::ostream & ostr, const PrintContainer<T>& print_con
     return ostr << "]";
 }
 
+inline uint64_t versionNumber(
+        uint64_t version_major,
+        uint64_t version_minor,
+        uint64_t version_patch = 0,
+        uint64_t revision = 0) {
 
+    // in this case version_major can be up to 1000
+    static auto revision_decimal_places = 8;
+    static auto patch_decimal_places = 4;
+    static auto minor_decimal_places = 4;
+
+    auto const result = version_major * static_cast<uint64_t>(std::pow(10, minor_decimal_places + patch_decimal_places + revision_decimal_places))
+            + version_minor * static_cast<uint64_t>(std::pow(10, patch_decimal_places + revision_decimal_places))
+            + version_patch * static_cast<uint64_t>(std::pow(10, revision_decimal_places))
+            + revision;
+
+    return result;
+}
+
+uint64_t versionNumber(const clickhouse::ServerInfo & server_info);
