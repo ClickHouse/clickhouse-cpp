@@ -212,13 +212,13 @@ public:
     std::string GetName() const;
 
     /// Methods to work with enum types.
-    const std::string& GetEnumName(int16_t value) const;
+    std::string_view GetEnumName(int16_t value) const;
     int16_t GetEnumValue(const std::string& name) const;
     bool HasEnumName(const std::string& name) const;
     bool HasEnumValue(int16_t value) const;
 
 private:
-    using ValueToNameType     = std::map<int16_t, std::string>;
+    using ValueToNameType     = std::map<int16_t, std::string_view>;
     using NameToValueType     = std::map<std::string, int16_t>;
     using ValueToNameIterator = ValueToNameType::const_iterator;
 
