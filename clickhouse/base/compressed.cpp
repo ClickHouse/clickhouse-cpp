@@ -75,7 +75,7 @@ bool CompressedInput::Decompress() {
 
         Buffer tmp(compressed);
 
-        // Заполнить заголовок сжатых данных.
+        // Data header
         {
             BufferOutput out(&tmp);
             out.Write(&method,     sizeof(method));
