@@ -1,7 +1,6 @@
 #pragma once
 
 #include <clickhouse/base/platform.h>
-#include <clickhouse/columns/uuid.h>
 
 #include "utils_meta.h"
 #include "utils_comparison.h"
@@ -18,6 +17,7 @@
 #include <gtest/gtest.h>
 
 namespace clickhouse {
+    class Client;
     class Block;
     class Type;
     struct ServerInfo;
@@ -135,5 +135,3 @@ std::ostream& operator<<(std::ostream & ostr, const PrintContainer<T>& print_con
 
     return ostr << "]";
 }
-
-

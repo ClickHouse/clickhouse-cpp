@@ -18,6 +18,7 @@
 #include <iomanip>
 #include <sstream>
 
+
 namespace {
 using namespace clickhouse;
 std::ostream & printColumnValue(const ColumnRef& c, const size_t row, std::ostream & ostr);

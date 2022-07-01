@@ -2,6 +2,7 @@
 
 #include <clickhouse/base/socket.h> // for ipv4-ipv6 platform-specific stuff
 #include <clickhouse/columns/numeric.h>
+#include <clickhouse/columns/uuid.h>
 
 #include "utils.h"
 
