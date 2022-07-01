@@ -87,15 +87,19 @@ TEST(ArrayOfLowCardinality, InsertAndQuery) {
     client.Insert("array_lc", block);
 
     client.Select("SELECT * FROM array_lc", [&](const Block& bl) {
-          for (size_t c = 0; c < bl.GetRowCount(); ++c) {
-              auto col = bl[0]->As<ColumnArray>()->GetAsColumn(c);
-              for (size_t i = 0; i < col->Size(); ++i) {
-                  auto stringColumn = col->As<ColumnString>();
-                  const auto string = stringColumn->At(i);
-
+        for (size_t c = 0; c < bl.GetRowCount(); ++c) {
+          auto col = bl[0]->As<ColumnArray>()->GetAsColumn(c);
+          for (size_t i = 0; i < col->Size(); ++i) {
+              if (auto string_column = col->As<ColumnString>()) {
+                  const auto string = string_column->At(i);
                   ASSERT_EQ(testData[c][i], string);
+              } else if (auto lc_string_column = col->As<ColumnLowCardinalityT<ColumnString>>()) {
+                  const auto string = lc_string_column->At(i);
+                  ASSERT_EQ(testData[c][i], string);
+              } else {
+                  FAIL() << "Unexpected column type: " << col->Type()->GetName();
               }
           }
-      }
-    );
+        }
+    });
 }
