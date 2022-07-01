@@ -19,7 +19,7 @@ public:
 
     /// Returns element at given row number.
     const T& At(size_t n) const;
-    const std::string NameAt(size_t n) const;
+    std::string_view NameAt(size_t n) const;
 
     /// Returns element at given row number.
     const T& operator[] (size_t n) const;
@@ -38,7 +38,7 @@ public:
     /// Saves column data to output stream.
     void SaveBody(OutputStream* output) override;
 
-    /// Clear column data .
+    /// Clear column data.
     void Clear() override;
 
     /// Returns count of rows in the column.

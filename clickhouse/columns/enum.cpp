@@ -44,7 +44,7 @@ const T& ColumnEnum<T>::At(size_t n) const {
 }
 
 template <typename T>
-const std::string ColumnEnum<T>::NameAt(size_t n) const {
+std::string_view ColumnEnum<T>::NameAt(size_t n) const {
     return type_->As<EnumType>()->GetEnumName(data_.at(n));
 }
 

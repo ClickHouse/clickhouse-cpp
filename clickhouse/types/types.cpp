@@ -259,8 +259,8 @@ std::string DecimalType::GetName() const {
 
 EnumType::EnumType(Type::Code type, const std::vector<EnumItem>& items) : Type(type) {
     for (const auto& item : items) {
-        value_to_name_[item.second] = item.first;
-        name_to_value_[item.first]  = item.second;
+        auto result = name_to_value_.insert(item);
+        value_to_name_[item.second] = result.first->first;
     }
 }
 
@@ -291,7 +291,7 @@ std::string EnumType::GetName() const {
     return result;
 }
 
-const std::string& EnumType::GetEnumName(int16_t value) const {
+std::string_view EnumType::GetEnumName(int16_t value) const {
     return value_to_name_.at(value);
 }
 
