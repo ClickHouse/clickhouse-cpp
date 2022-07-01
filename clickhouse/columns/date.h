@@ -86,7 +86,7 @@ public:
     ItemView GetItem(size_t index) const override;
 
 private:
-    std::shared_ptr<ColumnUInt32> data_;
+    std::shared_ptr<ColumnInt32> data_;
 };
 
 

@@ -33,6 +33,7 @@ std::vector<std::string> MakeFixedStrings(size_t string_size);
 std::vector<std::string> MakeStrings();
 std::vector<clickhouse::Int64> MakeDateTime64s(size_t scale, size_t values_size = 200);
 std::vector<clickhouse::Int64> MakeDates();
+std::vector<clickhouse::Int64> MakeDates32();
 std::vector<clickhouse::Int64> MakeDateTimes();
 std::vector<in_addr> MakeIPv4s();
 std::vector<in6_addr> MakeIPv6s();

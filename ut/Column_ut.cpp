@@ -22,6 +22,14 @@ namespace {
 using namespace clickhouse;
 }
 
+namespace clickhouse{
+
+std::ostream& operator<<(std::ostream& ostr, const Type::Code& type_code) {
+    return ostr << Type::TypeName(type_code) << " (" << static_cast<int>(type_code) << ")";
+}
+
+}
+
 
 // Generic tests for a Column subclass against basic API:
 // 1. Constructor: Create, ensure that it is empty
@@ -60,6 +68,8 @@ public:
             return GenerateVector(values_size, FromVectorGenerator{MakeDateTimes()});
         } else if constexpr (std::is_same_v<ColumnType, ColumnDateTime64>) {
             return MakeDateTime64s(3u, values_size);
+        } else if constexpr (std::is_same_v<ColumnType, ColumnDate32>) {
+            return GenerateVector(values_size, FromVectorGenerator{MakeDates32()});
         } else if constexpr (std::is_same_v<ColumnType, ColumnIPv4>) {
             return GenerateVector(values_size, FromVectorGenerator{MakeIPv4s()});
         } else if constexpr (std::is_same_v<ColumnType, ColumnIPv6>) {
@@ -100,7 +110,7 @@ using ValueColumns = ::testing::Types<
     , ColumnInt8, ColumnInt16, ColumnInt32, ColumnInt64
     , ColumnFloat32, ColumnFloat64
     , ColumnString, ColumnFixedString
-    , ColumnDate, ColumnDateTime, ColumnDateTime64
+    , ColumnDate, ColumnDateTime, ColumnDateTime64, ColumnDate32
     , ColumnIPv4, ColumnIPv6
     , ColumnInt128
     , ColumnDecimal
@@ -168,6 +178,8 @@ inline auto convertValueForGetItem(const ColumnType& col, ValueType&& t) {
         return std::string_view(reinterpret_cast<const char*>(t.s6_addr), 16);
     } else if constexpr (std::is_same_v<ColumnType, ColumnDate>) {
         return static_cast<uint16_t>(t / std::time_t(86400));
+    } else if constexpr (std::is_same_v<ColumnType, ColumnDate32>) {
+        return static_cast<uint32_t>(t / std::time_t(86400));
     } else if constexpr (std::is_same_v<ColumnType, ColumnDateTime>) {
         return static_cast<uint32_t>(t);
     } else {

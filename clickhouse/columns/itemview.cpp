@@ -56,6 +56,7 @@ void ItemView::ValidateData(Type::Code type, DataType data) {
         case Type::Code::UInt32:
         case Type::Code::Float32:
         case Type::Code::DateTime:
+        case Type::Code::Date32:
         case Type::Code::IPv4:
         case Type::Code::Decimal32:
             return AssertSize({4});

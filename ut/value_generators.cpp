@@ -65,6 +65,23 @@ std::vector<clickhouse::Int64> MakeDates() {
     return result;
 }
 
+std::vector<clickhouse::Int64> MakeDates32() {
+    // in CH Date32 internally a UInt32 and stores a day number
+    // ColumnDate expects values to be seconds, which is then
+    // converted to day number internally, hence the `* 86400`.
+    // 114634 * 86400 is 2282-11-10, last integer that fits into DateTime32 range
+    // (max is 2283-11-11)
+    std::vector<clickhouse::Int64> result  = MakeDates();
+
+    // add corresponding negative values, since pre-epoch date are supported too.
+    const auto size = result.size();
+    for (size_t i = 0; i < size; ++i) {
+        result.push_back(result[i] * -1);
+    }
+
+    return result;
+}
+
 std::vector<clickhouse::Int64> MakeDateTimes() {
     // in CH DateTime internally a UInt32
     return {

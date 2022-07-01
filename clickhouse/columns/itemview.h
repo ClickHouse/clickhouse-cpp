@@ -69,7 +69,8 @@ public:
             if (sizeof(ValueType) == data.size()) {
                 return *reinterpret_cast<const T*>(data.data());
             } else {
-                throw AssertionError("Incompatitable value type and size.");
+                throw AssertionError("Incompatitable value type and size. Requested size: "
+                        + std::to_string(sizeof(ValueType)) + " stored size: " + std::to_string(data.size()));
             }
         }
     }
