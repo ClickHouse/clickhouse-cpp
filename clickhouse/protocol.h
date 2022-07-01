@@ -19,7 +19,7 @@ namespace clickhouse {
         };
     }
 
-    /// То, что передаёт клиент.
+    /// Types of packets sent by client.
     namespace ClientCodes {
         enum {
             Hello       = 0,    /// Name, version, default database name.

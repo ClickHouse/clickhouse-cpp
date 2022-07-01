@@ -14,11 +14,11 @@ namespace clickhouse {
  * Settings of individual query.
  */
 struct QuerySettings {
-    /// Максимальное количество потоков выполнения запроса. По-умолчанию - определять автоматически.
+    /// Maximum thread to use on the server-side to process a query. Default - let the server choose.
     int max_threads = 0;
-    /// Считать минимумы и максимумы столбцов результата.
+    /// Compute min and max values of the result.
     bool extremes = false;
-    /// Тихо пропускать недоступные шарды.
+    /// Silently skip unavailable shards.
     bool skip_unavailable_shards = false;
     /// Write statistics about read rows, bytes, time elapsed, etc.
     bool output_format_write_statistics = true;
