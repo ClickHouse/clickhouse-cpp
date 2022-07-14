@@ -84,6 +84,7 @@ INSTALL(FILES block.h DESTINATION include/clickhouse/)
 INSTALL(FILES client.h DESTINATION include/clickhouse/)
 INSTALL(FILES error_codes.h DESTINATION include/clickhouse/)
 INSTALL(FILES exceptions.h DESTINATION include/clickhouse/)
+INSTALL(FILES server_exception.h DESTINATION include/clickhouse/)
 INSTALL(FILES protocol.h DESTINATION include/clickhouse/)
 INSTALL(FILES query.h DESTINATION include/clickhouse/)
 
