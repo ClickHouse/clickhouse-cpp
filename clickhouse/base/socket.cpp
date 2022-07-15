@@ -181,7 +181,9 @@ NetworkAddress::NetworkAddress(const std::string& host, const std::string& port)
 
     hints.ai_family = PF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
-
+    // using AI_ADDRCONFIG on windows will cause getaddrinfo to return WSAHOST_NOT_FOUND
+    // for more information, see https://github.com/ClickHouse/clickhouse-cpp/issues/195
+#if defined(_unix_) 
     if (!Singleton<LocalNames>()->IsLocalName(host)) {
         // https://linux.die.net/man/3/getaddrinfo
         // If hints.ai_flags includes the AI_ADDRCONFIG flag,
@@ -193,6 +195,7 @@ NetworkAddress::NetworkAddress(const std::string& host, const std::string& port)
         // as valid as a configured address.
         hints.ai_flags |= AI_ADDRCONFIG;
     }
+#endif
 
     const int error = getaddrinfo(host.c_str(), port.c_str(), &hints, &info_);
 
