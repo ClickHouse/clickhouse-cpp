@@ -76,3 +76,10 @@ client.Select("SELECT id, name FROM test.numbers", [] (const Block& block)
 client.Execute("DROP TABLE test.numbers");
 ```
 Please note that `Client` instance is NOT thread-safe. I.e. you must create a separate `Client` for each thread or utilize some synchronization techniques.
+
+## Retries
+If you wish to implement some retry logic atop of `clickhouse::Client` there are few simple rules to make you life easier:
+- If previous attempt threw an exception, then make sure to call `clickhouse::Client::ResetConnection()` before the next try. 
+- For `clickhouse::Client::Insert()` you can reuse a block from previous try, no need to rebuild it from scratch.
+
+See https://github.com/ClickHouse/clickhouse-cpp/issues/184 for details.
