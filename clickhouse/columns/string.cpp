@@ -1,26 +1,9 @@
 #include "string.h"
 #include "utils.h"
 
+#include <algorithm>
+
 #include "../base/wire_format.h"
-
-namespace {
-const size_t DEFAULT_BLOCK_SIZE = 4096;
-
-template <typename Container>
-size_t ComputeTotalSize(const Container & strings, size_t begin = 0, size_t len = -1)
-{
-    size_t result = 0;
-    if (begin < strings.size()) {
-        len = std::min(len, strings.size() - begin);
-
-        for (size_t i = begin; i < begin + len; ++i)
-            result += strings[i].size();
-    }
-
-    return result;
-}
-
-}
 
 namespace clickhouse {
 
@@ -164,23 +147,30 @@ struct ColumnString::Block
 
 ColumnString::ColumnString()
     : Column(Type::CreateString())
-{
+{}
+
+ColumnString::ColumnString(const std::vector<std::string>& data)
+    : Column(Type::CreateString()) {
+    ConstructFromVector(data);
 }
 
-ColumnString::ColumnString(const std::vector<std::string> & data)
-    : Column(Type::CreateString())
-{
-    items_.reserve(data.size());
-    blocks_.emplace_back(ComputeTotalSize(data));
+ColumnString::ColumnString(const std::vector<std::string_view>& data)
+    : Column(Type::CreateString()) {
+    ConstructFromVector(data);
+}
 
-    for (const auto & s : data)
-    {
-        AppendUnsafe(s);
-    }
+ColumnString::ColumnString(std::string&& payload, std::vector<std::string_view>&& items)
+    : Column(Type::CreateString()), items_(std::move(items)), blocks_() {
+    blocks_.emplace_back(std::move(payload));
 }
 
 ColumnString::~ColumnString()
 {}
+
+void ColumnString::Reserve(size_t rows) {
+    items_.reserve(rows);
+    blocks_.reserve(rows);
+}
 
 void ColumnString::Append(std::string_view str) {
     if (blocks_.size() == 0 || blocks_.back().GetAvailable() < str.length())

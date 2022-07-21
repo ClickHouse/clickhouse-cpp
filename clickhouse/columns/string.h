@@ -7,6 +7,23 @@
 #include <utility>
 #include <vector>
 
+namespace {
+const size_t DEFAULT_BLOCK_SIZE = 4096;
+
+template <typename Container>
+size_t ComputeTotalSize(const Container& strings, size_t begin = 0, size_t len = -1) {
+    size_t result = 0;
+    if (begin < strings.size()) {
+        len = std::min(len, strings.size() - begin);
+
+        for (size_t i = begin; i < begin + len; ++i) result += strings[i].size();
+    }
+
+    return result;
+}
+
+}  // namespace
+
 namespace clickhouse {
 
 /**
@@ -78,6 +95,8 @@ public:
     ~ColumnString();
 
     explicit ColumnString(const std::vector<std::string> & data);
+    explicit ColumnString(const std::vector<std::string_view>& data);
+    ColumnString(std::string&& payload, std::vector<std::string_view>&& items);
     ColumnString& operator=(const ColumnString&) = delete;
     ColumnString(const ColumnString&) = delete;
 
@@ -91,6 +110,9 @@ public:
     std::string_view operator [] (size_t n) const;
 
 public:
+    /// Reserve column capacity to reduce memory allocation times.
+    void Reserve(size_t rows) override;
+
     /// Appends content of given column to the end of current one.
     void Append(ColumnRef column) override;
 
@@ -113,6 +135,16 @@ public:
     ItemView GetItem(size_t) const override;
 
 private:
+    template <typename StringVec>
+    void ConstructFromVector(const StringVec& data) {
+        items_.reserve(data.size());
+        blocks_.emplace_back(ComputeTotalSize(data));
+
+        for (const auto& s : data) {
+            AppendUnsafe(s);
+        }
+    }
+
     void AppendUnsafe(std::string_view);
 
 private:
