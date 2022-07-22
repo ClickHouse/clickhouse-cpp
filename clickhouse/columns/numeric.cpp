@@ -26,6 +26,11 @@ ColumnVector<T>::ColumnVector(std::vector<T> && data)
 }
 
 template <typename T>
+void ColumnVector<T>::Reserve(size_t rows) {
+    data_.reserve(rows);
+}
+
+template <typename T>
 void ColumnVector<T>::Append(const T& value) {
     data_.push_back(value);
 }

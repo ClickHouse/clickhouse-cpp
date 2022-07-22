@@ -24,6 +24,8 @@ ColumnArray::ColumnArray(ColumnArray&& other)
 {
 }
 
+void ColumnArray::Reserve(size_t rows) { data_->Reserve(rows); }
+
 void ColumnArray::AppendAsColumn(ColumnRef array) {
     if (!data_->Type()->IsEqual(array->Type())) {
         throw ValidationError(

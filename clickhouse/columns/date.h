@@ -14,6 +14,9 @@ public:
 
     ColumnDate();
 
+    /// Reserve column capacity to reduce memory allocation times.
+    void Reserve(size_t rows) override;
+
     /// Appends one element to the end of column.
     /// TODO: The implementation is fundamentally wrong.
     void Append(const std::time_t& value);
@@ -54,6 +57,9 @@ public:
     using ValueType = std::time_t;
 
     ColumnDate32();
+
+    /// Reserve column capacity to reduce memory allocation times.
+    void Reserve(size_t rows);
 
     /// Appends one element to the end of column.
     /// TODO: The implementation is fundamentally wrong.

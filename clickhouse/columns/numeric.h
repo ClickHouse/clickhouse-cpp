@@ -31,6 +31,9 @@ public:
     void Erase(size_t pos, size_t count = 1);
 
 public:
+    /// Reserve column capacity to reduce memory allocation times.
+    void Reserve(size_t rows) override;
+
     /// Appends content of given column to the end of current one.
     void Append(ColumnRef column) override;
 

@@ -8,6 +8,8 @@ ColumnDate::ColumnDate()
 {
 }
 
+void ColumnDate::Reserve(size_t rows) { data_->Reserve(rows); }
+
 void ColumnDate::Append(const std::time_t& value) {
     /// TODO: This code is fundamentally wrong.
     data_->Append(static_cast<uint16_t>(value / std::time_t(86400)));
@@ -68,6 +70,8 @@ ColumnDate32::ColumnDate32()
     , data_(std::make_shared<ColumnInt32>())
 {
 }
+
+void ColumnDateTime::Reserve(size_t rows) { data_->Reserve(rows); }
 
 void ColumnDate32::Append(const std::time_t& value) {
     /// TODO: This code is fundamentally wrong.

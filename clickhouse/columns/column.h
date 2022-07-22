@@ -49,6 +49,9 @@ public:
     inline TypeRef Type() const { return type_; }
     inline const class Type& GetType() const { return *type_; }
 
+    /// Reserve column capacity to reduce memory allocation times.
+    virtual void Reserve(size_t rows) {}
+
     /// Appends content of given column to the end of current one.
     virtual void Append(ColumnRef column) = 0;
 
