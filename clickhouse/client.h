@@ -86,6 +86,9 @@ struct ClientOptions {
     // TCP options
     DECLARE_FIELD(tcp_nodelay, bool, TcpNoDelay, true);
 
+    /// Set the socket recv timeout in seconds.
+    DECLARE_FIELD(socket_timeout_sec, unsigned int, SetSocketTimeoutTime, 0);
+
     // TODO deprecate setting
     /** It helps to ease migration of the old codebases, which can't afford to switch
     * to using ColumnLowCardinalityT or ColumnLowCardinality directly,
