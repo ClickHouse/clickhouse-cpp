@@ -100,6 +100,9 @@ public:
     /// @params nodelay whether to enable TCP_NODELAY
     void SetTcpNoDelay(bool nodelay) noexcept;
 
+    /// @params time the time (in seconds) the socket recv timeout.
+    void SetSocketTimeoutTime(unsigned int time) noexcept;
+
     std::unique_ptr<InputStream> makeInputStream() const override;
     std::unique_ptr<OutputStream> makeOutputStream() const override;
 

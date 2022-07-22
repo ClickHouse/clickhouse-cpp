@@ -183,7 +183,7 @@ NetworkAddress::NetworkAddress(const std::string& host, const std::string& port)
     hints.ai_socktype = SOCK_STREAM;
     // using AI_ADDRCONFIG on windows will cause getaddrinfo to return WSAHOST_NOT_FOUND
     // for more information, see https://github.com/ClickHouse/clickhouse-cpp/issues/195
-#if defined(_unix_) 
+#if defined(_unix_)
     if (!Singleton<LocalNames>()->IsLocalName(host)) {
         // https://linux.die.net/man/3/getaddrinfo
         // If hints.ai_flags includes the AI_ADDRCONFIG flag,
@@ -292,6 +292,17 @@ void Socket::SetTcpNoDelay(bool nodelay) noexcept {
 #endif
 }
 
+void Socket::SetSocketTimeoutTime(unsigned int time) noexcept {
+    struct timeval time_val = {time, 0};
+#if defined(_unix_) && defined(_linux_)
+    setsockopt(handle_, SOL_SOCKET, SO_RCVTIMEO, (const char*)&time_val, sizeof time_val);
+#elif defined(_darwin_)
+    setsockopt(handle_, SOL_SOCKET, SO_RCVTIMEO, (const char*)&time_val, sizeof time_val);
+#elif defined(_unix_)
+    // setsockopt not support SO_RCVTIMEO in BSD.
+#endif
+}
+
 std::unique_ptr<InputStream> Socket::makeInputStream() const {
     return std::make_unique<SocketInput>(handle_);
 }
@@ -324,6 +335,9 @@ void NonSecureSocketFactory::setSocketOptions(Socket &socket, const ClientOption
     }
     if (opts.tcp_nodelay) {
         socket.SetTcpNoDelay(opts.tcp_nodelay);
+    }
+    if (opts.socket_timeout_sec) {
+        socket.SetSocketTimeoutTime(opts_.socket_timeout_sec);
     }
 }
 
