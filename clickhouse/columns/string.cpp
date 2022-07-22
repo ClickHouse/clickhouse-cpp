@@ -110,22 +110,21 @@ struct ColumnString::Block
     explicit Block(size_t starting_capacity)
         : size(0),
           capacity(starting_capacity),
-          data_(new CharT[capacity])
+          data_(starting_capacity, 0)
     {}
+    explicit Block(std::string&& payload)
+        : size(payload.size()), capacity(payload.size()), data_(std::move(payload)) {}
 
     inline auto GetAvailable() const
     {
         return capacity - size;
     }
 
-    std::string_view AppendUnsafe(std::string_view str)
-    {
-        const auto pos = &data_[size];
-
-        memcpy(pos, str.data(), str.size());
+   std::string_view AppendUnsafe(std::string_view str) {
+        std::copy(str.begin(), str.end(), data_.begin() + size);
+        std::string_view sv{data_.data() + size, str.size()};
         size += str.size();
-
-        return std::string_view(pos, str.size());
+        return sv;
     }
 
     auto GetCurrentWritePos()
@@ -142,7 +141,7 @@ struct ColumnString::Block
 
     size_t size;
     const size_t capacity;
-    std::unique_ptr<CharT[]> data_;
+    std::string data_;
 };
 
 ColumnString::ColumnString()
