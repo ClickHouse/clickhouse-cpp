@@ -111,6 +111,18 @@ TEST(ColumnsCase, StringInit) {
     ASSERT_EQ(col->At(3), "abcd");
 }
 
+TEST(ColumnsCase, StringAppend) {
+    auto col = std::make_shared<ColumnString>();
+    std::string data = "ufiudhf3493fyiudferyer3yrifhdflkdjfeuroe";
+    col->Append(data);
+    col->Append(std::move(data));
+    col->Append("11");
+
+    ASSERT_EQ(col->Size(), 3u);
+    ASSERT_EQ(col->At(0), "ufiudhf3493fyiudferyer3yrifhdflkdjfeuroe");
+    ASSERT_EQ(col->At(1), "ufiudhf3493fyiudferyer3yrifhdflkdjfeuroe");
+    ASSERT_EQ(col->At(2), "11");
+}
 
 TEST(ColumnsCase, TupleAppend){
     auto tuple1 = std::make_shared<ColumnTuple>(std::vector<ColumnRef>({
