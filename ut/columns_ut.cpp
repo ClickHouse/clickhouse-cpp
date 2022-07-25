@@ -113,14 +113,15 @@ TEST(ColumnsCase, StringInit) {
 
 TEST(ColumnsCase, StringAppend) {
     auto col = std::make_shared<ColumnString>();
-    std::string data = "ufiudhf3493fyiudferyer3yrifhdflkdjfeuroe";
+    const char* expected = "ufiudhf3493fyiudferyer3yrifhdflkdjfeuroe";
+    std::string data(expected);
     col->Append(data);
     col->Append(std::move(data));
     col->Append("11");
 
     ASSERT_EQ(col->Size(), 3u);
-    ASSERT_EQ(col->At(0), "ufiudhf3493fyiudferyer3yrifhdflkdjfeuroe");
-    ASSERT_EQ(col->At(1), "ufiudhf3493fyiudferyer3yrifhdflkdjfeuroe");
+    ASSERT_EQ(col->At(0), expected);
+    ASSERT_EQ(col->At(1), expected);
     ASSERT_EQ(col->At(2), "11");
 }
 

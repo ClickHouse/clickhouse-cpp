@@ -90,6 +90,16 @@ public:
     ColumnString& operator=(const ColumnString&) = delete;
     ColumnString(const ColumnString&) = delete;
 
+    /// Appends one element to the column.
+    void Append(const std::string_view& str);
+
+    /// Appends one element to the column.
+    void Append(std::string&& steal_value);
+
+    /// Appends one element to the column.
+    /// If str lifetime is managed elsewhere and guaranteed to outlive the Block sent to the server
+    void AppendNoManagedLifetime(std::string_view str);
+
     /// Returns element at given row number.
     std::string_view At(size_t n) const;
 
@@ -122,78 +132,11 @@ private:
     void AppendUnsafe(std::string_view);
 
 private:
-    struct Block {
-        using CharT = typename std::string::value_type;
-
-        explicit Block(size_t starting_capacity)
-            : size(0),
-            capacity(starting_capacity),
-            data_(new CharT[capacity])
-        {}
-
-        inline auto GetAvailable() const
-        {
-            return capacity - size;
-        }
-
-        std::string_view AppendUnsafe(std::string_view str)
-        {
-            const auto pos = &data_[size];
-
-            memcpy(pos, str.data(), str.size());
-            size += str.size();
-
-            return std::string_view(pos, str.size());
-        }
-
-        auto GetCurrentWritePos()
-        {
-            return &data_[size];
-        }
-
-        std::string_view ConsumeTailAsStringViewUnsafe(size_t len)
-        {
-            const auto start = &data_[size];
-            size += len;
-            return std::string_view(start, len);
-        }
-
-        size_t size;
-        const size_t capacity;
-        std::unique_ptr<CharT[]> data_;
-    };
+    struct Block;
 
     std::vector<std::string_view> items_;
     std::vector<Block> blocks_;
     std::deque<std::string> append_data_;
-
-public:
-    /// Appends one element to the column. Copy or move str
-    template<typename StringType>
-    void Append(StringType&& str) {
-        using str_type = decltype(str);
-        if (std::is_same_v<std::string, std::decay_t<str_type>> && std::is_rvalue_reference_v<str_type>) {
-            append_data_.emplace_back(std::move(str));
-            auto& last_data = append_data_.back();
-            items_.emplace_back(std::string_view{ last_data.data(),last_data.length() });
-        }
-        else if constexpr (std::is_convertible_v<std::decay_t<str_type>, std::string_view>) {
-            auto data_view = std::string_view(str);
-            if (blocks_.size() == 0 || blocks_.back().GetAvailable() < data_view.length()) {
-                blocks_.emplace_back(std::max(DEFAULT_BLOCK_SIZE, data_view.size()));
-            }
-            items_.emplace_back(blocks_.back().AppendUnsafe(data_view));
-        }
-        else {
-            static_assert(always_false_v<str_type>, "the StringType is not correct");
-        }
-    }
-
-    /// Appends one element to the column.
-    /// If str lifetime is managed elsewhere and guaranteed to outlive the Block sent to the server
-    void AppendNoManagedLifetime(std::string_view str) {
-        items_.emplace_back(str);
-    }
 };
 
 }

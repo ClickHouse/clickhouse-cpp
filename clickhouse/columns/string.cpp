@@ -119,6 +119,47 @@ ItemView ColumnFixedString::GetItem(size_t index) const {
     return ItemView{Type::FixedString, this->At(index)};
 }
 
+struct ColumnString::Block
+{
+    using CharT = typename std::string::value_type;
+
+    explicit Block(size_t starting_capacity)
+        : size(0),
+        capacity(starting_capacity),
+        data_(new CharT[capacity])
+    {}
+
+    inline auto GetAvailable() const
+    {
+        return capacity - size;
+    }
+
+    std::string_view AppendUnsafe(std::string_view str)
+    {
+        const auto pos = &data_[size];
+
+        memcpy(pos, str.data(), str.size());
+        size += str.size();
+
+        return std::string_view(pos, str.size());
+    }
+
+    auto GetCurrentWritePos()
+    {
+        return &data_[size];
+    }
+
+    std::string_view ConsumeTailAsStringViewUnsafe(size_t len)
+    {
+        const auto start = &data_[size];
+        size += len;
+        return std::string_view(start, len);
+    }
+
+    size_t size;
+    const size_t capacity;
+    std::unique_ptr<CharT[]> data_;
+};
 
 ColumnString::ColumnString()
     : Column(Type::CreateString())
@@ -151,6 +192,27 @@ ColumnString::ColumnString(std::vector<std::string>&& data)
 
 ColumnString::~ColumnString()
 {}
+
+void ColumnString::Append(const std::string_view& str) {
+    if (blocks_.size() == 0 || blocks_.back().GetAvailable() < str.length())
+    {
+        blocks_.emplace_back(std::max(DEFAULT_BLOCK_SIZE, str.size()));
+    }
+
+    items_.emplace_back(blocks_.back().AppendUnsafe(str));
+}
+
+void ColumnString::Append(std::string&& steal_value)
+{
+    append_data_.emplace_back(std::move(steal_value));
+    auto& last_data = append_data_.back();
+    items_.emplace_back(std::string_view{ last_data.data(),last_data.length() });
+}
+
+void ColumnString::AppendNoManagedLifetime(std::string_view str)
+{
+    items_.emplace_back(str);
+}
 
 void ColumnString::AppendUnsafe(std::string_view str)
 {
