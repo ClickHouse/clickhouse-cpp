@@ -166,8 +166,8 @@ ColumnString::ColumnString()
 {
 }
 
-ColumnString::ColumnString(const std::vector<std::string> & data)
-    : Column(Type::CreateString())
+ColumnString::ColumnString(const std::vector<std::string>& data)
+    : ColumnString()
 {
     items_.reserve(data.size());
     blocks_.emplace_back(ComputeTotalSize(data));
@@ -176,10 +176,10 @@ ColumnString::ColumnString(const std::vector<std::string> & data)
     {
         AppendUnsafe(s);
     }
-}
+};
 
 ColumnString::ColumnString(std::vector<std::string>&& data)
-    : Column(Type::CreateString())
+    : ColumnString()
 {
     items_.reserve(data.size());
 

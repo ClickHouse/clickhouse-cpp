@@ -6,8 +6,6 @@
 #include <string_view>
 #include <utility>
 #include <vector>
-#include <algorithm>
-#include <type_traits>
 #include <deque>
 
 namespace clickhouse {
