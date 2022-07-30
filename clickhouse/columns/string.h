@@ -89,10 +89,13 @@ public:
     ColumnString(const ColumnString&) = delete;
 
     /// Appends one element to the column.
-    void Append(const std::string_view& str);
+    void Append(std::string_view str);
 
     /// Appends one element to the column.
     void Append(std::string&& steal_value);
+
+    /// Appends one element to the column.
+    void Append(const char* str);
 
     /// Appends one element to the column.
     /// If str lifetime is managed elsewhere and guaranteed to outlive the Block sent to the server
