@@ -10,11 +10,6 @@
 
 namespace clickhouse {
 
-constexpr size_t DEFAULT_BLOCK_SIZE = 4096;
-
-template <typename>
-inline constexpr bool always_false_v = false;
-
 /**
  * Represents column of fixed-length strings.
  */
