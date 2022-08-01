@@ -5,9 +5,10 @@
 
 namespace {
 
+constexpr size_t DEFAULT_BLOCK_SIZE = 4096;
+
 template <typename Container>
-size_t ComputeTotalSize(const Container & strings, size_t begin = 0, size_t len = -1)
-{
+size_t ComputeTotalSize(const Container & strings, size_t begin = 0, size_t len = -1) {
     size_t result = 0;
     if (begin < strings.size()) {
         len = std::min(len, strings.size() - begin);
@@ -63,8 +64,7 @@ std::string_view ColumnFixedString::operator [](size_t n) const {
     return std::string_view(&data_[pos], string_size_);
 }
 
-size_t ColumnFixedString::FixedSize() const
-{
+size_t ColumnFixedString::FixedSize() const {
        return string_size_;
 }
 
@@ -202,8 +202,7 @@ void ColumnString::Append(std::string_view str) {
     items_.emplace_back(blocks_.back().AppendUnsafe(str));
 }
 
-void ColumnString::Append(std::string&& steal_value)
-{
+void ColumnString::Append(std::string&& steal_value) {
     append_data_.emplace_back(std::move(steal_value));
     auto& last_data = append_data_.back();
     items_.emplace_back(std::string_view{ last_data.data(),last_data.length() });
@@ -211,21 +210,18 @@ void ColumnString::Append(std::string&& steal_value)
 
 void ColumnString::Append(const char* str) {
     auto len = strlen(str);
-    if (blocks_.size() == 0 || blocks_.back().GetAvailable() < len)
-    {
+    if (blocks_.size() == 0 || blocks_.back().GetAvailable() < len) {
         blocks_.emplace_back(std::max(DEFAULT_BLOCK_SIZE, len));
     }
 
     items_.emplace_back(blocks_.back().AppendUnsafe(str));
 }
 
-void ColumnString::AppendNoManagedLifetime(std::string_view str)
-{
+void ColumnString::AppendNoManagedLifetime(std::string_view str) {
     items_.emplace_back(str);
 }
 
-void ColumnString::AppendUnsafe(std::string_view str)
-{
+void ColumnString::AppendUnsafe(std::string_view str) {
     items_.emplace_back(blocks_.back().AppendUnsafe(str));
 }
 
