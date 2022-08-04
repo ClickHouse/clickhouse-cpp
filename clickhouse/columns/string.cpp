@@ -208,15 +208,6 @@ void ColumnString::Append(std::string&& steal_value) {
     items_.emplace_back(std::string_view{ last_data.data(),last_data.length() });
 }
 
-void ColumnString::Append(const char* str) {
-    auto len = strlen(str);
-    if (blocks_.size() == 0 || blocks_.back().GetAvailable() < len) {
-        blocks_.emplace_back(std::max(DEFAULT_BLOCK_SIZE, len));
-    }
-
-    items_.emplace_back(blocks_.back().AppendUnsafe(str));
-}
-
 void ColumnString::AppendNoManagedLifetime(std::string_view str) {
     items_.emplace_back(str);
 }
