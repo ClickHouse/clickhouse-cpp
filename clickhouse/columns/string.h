@@ -90,9 +90,6 @@ public:
     void Append(std::string&& steal_value);
 
     /// Appends one element to the column.
-    void Append(const char* str);
-
-    /// Appends one element to the column.
     /// If str lifetime is managed elsewhere and guaranteed to outlive the Block sent to the server
     void AppendNoManagedLifetime(std::string_view str);
 
