@@ -202,6 +202,15 @@ void ColumnString::Append(std::string_view str) {
     items_.emplace_back(blocks_.back().AppendUnsafe(str));
 }
 
+void ColumnString::Append(const char* str) {
+    auto len = strlen(str);
+    if (blocks_.size() == 0 || blocks_.back().GetAvailable() < len) {
+        blocks_.emplace_back(std::max(DEFAULT_BLOCK_SIZE, len));
+    }
+
+    items_.emplace_back(blocks_.back().AppendUnsafe(str));
+}
+
 void ColumnString::Append(std::string&& steal_value) {
     append_data_.emplace_back(std::move(steal_value));
     auto& last_data = append_data_.back();

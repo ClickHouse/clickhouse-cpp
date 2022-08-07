@@ -87,6 +87,9 @@ public:
     void Append(std::string_view str);
 
     /// Appends one element to the column.
+    void Append(const char* str);
+
+    /// Appends one element to the column.
     void Append(std::string&& steal_value);
 
     /// Appends one element to the column.
