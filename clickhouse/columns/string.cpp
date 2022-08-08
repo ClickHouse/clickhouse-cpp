@@ -4,11 +4,11 @@
 #include "../base/wire_format.h"
 
 namespace {
-const size_t DEFAULT_BLOCK_SIZE = 4096;
+
+constexpr size_t DEFAULT_BLOCK_SIZE = 4096;
 
 template <typename Container>
-size_t ComputeTotalSize(const Container & strings, size_t begin = 0, size_t len = -1)
-{
+size_t ComputeTotalSize(const Container & strings, size_t begin = 0, size_t len = -1) {
     size_t result = 0;
     if (begin < strings.size()) {
         len = std::min(len, strings.size() - begin);
@@ -64,8 +64,7 @@ std::string_view ColumnFixedString::operator [](size_t n) const {
     return std::string_view(&data_[pos], string_size_);
 }
 
-size_t ColumnFixedString::FixedSize() const
-{
+size_t ColumnFixedString::FixedSize() const {
        return string_size_;
 }
 
@@ -126,8 +125,8 @@ struct ColumnString::Block
 
     explicit Block(size_t starting_capacity)
         : size(0),
-          capacity(starting_capacity),
-          data_(new CharT[capacity])
+        capacity(starting_capacity),
+        data_(new CharT[capacity])
     {}
 
     inline auto GetAvailable() const
@@ -167,8 +166,8 @@ ColumnString::ColumnString()
 {
 }
 
-ColumnString::ColumnString(const std::vector<std::string> & data)
-    : Column(Type::CreateString())
+ColumnString::ColumnString(const std::vector<std::string>& data)
+    : ColumnString()
 {
     items_.reserve(data.size());
     blocks_.emplace_back(ComputeTotalSize(data));
@@ -176,6 +175,18 @@ ColumnString::ColumnString(const std::vector<std::string> & data)
     for (const auto & s : data)
     {
         AppendUnsafe(s);
+    }
+};
+
+ColumnString::ColumnString(std::vector<std::string>&& data)
+    : ColumnString()
+{
+    items_.reserve(data.size());
+
+    for (auto&& d : data) {
+        append_data_.emplace_back(std::move(d));
+        auto& last_data = append_data_.back();
+        items_.emplace_back(std::string_view{ last_data.data(),last_data.length() });
     }
 }
 
@@ -191,14 +202,34 @@ void ColumnString::Append(std::string_view str) {
     items_.emplace_back(blocks_.back().AppendUnsafe(str));
 }
 
-void ColumnString::AppendUnsafe(std::string_view str)
-{
+void ColumnString::Append(const char* str) {
+    auto len = strlen(str);
+    if (blocks_.size() == 0 || blocks_.back().GetAvailable() < len) {
+        blocks_.emplace_back(std::max(DEFAULT_BLOCK_SIZE, len));
+    }
+
+    items_.emplace_back(blocks_.back().AppendUnsafe(str));
+}
+
+void ColumnString::Append(std::string&& steal_value) {
+    append_data_.emplace_back(std::move(steal_value));
+    auto& last_data = append_data_.back();
+    items_.emplace_back(std::string_view{ last_data.data(),last_data.length() });
+}
+
+void ColumnString::AppendNoManagedLifetime(std::string_view str) {
+    items_.emplace_back(str);
+}
+
+void ColumnString::AppendUnsafe(std::string_view str) {
     items_.emplace_back(blocks_.back().AppendUnsafe(str));
 }
 
 void ColumnString::Clear() {
     items_.clear();
     blocks_.clear();
+    append_data_.clear();
+    append_data_.shrink_to_fit();
 }
 
 std::string_view ColumnString::At(size_t n) const {
@@ -283,6 +314,7 @@ void ColumnString::Swap(Column& other) {
     auto & col = dynamic_cast<ColumnString &>(other);
     items_.swap(col.items_);
     blocks_.swap(col.blocks_);
+    append_data_.swap(col.append_data_);
 }
 
 ItemView ColumnString::GetItem(size_t index) const {
