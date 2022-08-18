@@ -86,8 +86,6 @@ TEST(TypesCase, IsEqual) {
         "DateTime64(3, 'UTC')",
         "Decimal(9,3)",
         "Decimal(18,3)",
-        "Enum8()",
-        "Enum16()",
         "Enum8('ONE' = 1)",
         "Enum8('ONE' = 1, 'TWO' = 2)",
         "Enum16('ONE' = 1, 'TWO' = 2, 'THREE' = 3, 'FOUR' = 4)",
@@ -125,5 +123,19 @@ TEST(TypesCase, IsEqual) {
             EXPECT_EQ(should_be_equal, type->IsEqual(other_type))
                         << "For types: " << type_name << " and " << other_type_name;
         }
+    }
+}
+
+TEST(TypesCase, ErrorEnumContent) {
+    const std::string type_names[] = {
+        "Enum8()",
+        "Enum8('ONE')",
+        "Enum8('ONE'=1,'TWO')",
+        "Enum16('TWO'=,'TWO')",
+    };
+ 
+    for (const auto& type_name : type_names) {
+        SCOPED_TRACE(type_name);
+        EXPECT_THROW(clickhouse::CreateColumnByType(type_name)->Type(), ValidationError);
     }
 }
