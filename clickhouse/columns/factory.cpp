@@ -137,12 +137,16 @@ static ColumnRef CreateColumnFromAst(const TypeAst& ast, CreateColumnByTypeSetti
 
         case TypeAst::Enum: {
             std::vector<Type::EnumItem> enum_items;
+            //ast.elements.size() minimum is 1.
+            if ((ast.elements.size() % 2) != 0) {
+                throw ValidationError(ast.name + " content is not correct");
+            }
 
             enum_items.reserve(ast.elements.size() / 2);
             for (size_t i = 0; i < ast.elements.size(); i += 2) {
                 enum_items.push_back(
-                    Type::EnumItem{ast.elements[i].value_string,
-                                   (int16_t)ast.elements[i + 1].value});
+                    Type::EnumItem{ ast.elements[i].value_string,
+                                   (int16_t)ast.elements[i + 1].value });
             }
 
             if (ast.code == Type::Enum8) {
