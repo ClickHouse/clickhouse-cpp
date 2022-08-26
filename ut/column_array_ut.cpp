@@ -84,14 +84,14 @@ TEST(ColumnArray, AppendWithMove) {
     id->Append(std::move(str2));
     arr->AppendAsColumnWithMove(id);
 
-    ASSERT_EQ(arr->Size(), 2);
+    ASSERT_EQ(arr->Size(), 2u);
 
     auto col = arr->GetAsColumn(0);
-    ASSERT_EQ(col->Size(), 1);
+    ASSERT_EQ(col->Size(), 1u);
     ASSERT_EQ(col->As<ColumnString>()->At(0), expect1);
 
     col = arr->GetAsColumn(1);
-    ASSERT_EQ(col->Size(), 1);
+    ASSERT_EQ(col->Size(), 1u);
     ASSERT_EQ(col->As<ColumnString>()->At(0), expect2);
 }
 
