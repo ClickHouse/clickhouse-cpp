@@ -63,6 +63,50 @@ inline void ArrayExample(Client& client) {
     client.Execute("DROP TEMPORARY TABLE test_array");
 }
 
+inline void StringArrayExample(Client& client) {
+    {
+        Block b;
+
+        /// Create a table.
+        client.Execute("CREATE TEMPORARY TABLE IF NOT EXISTS test_string_array (arr Array(String))");
+
+        auto arr = std::make_shared<ColumnArray>(std::make_shared<ColumnString>());
+
+        auto id = std::make_shared<ColumnString>();
+        std::string long_time = "1234567890qwertyui";
+        id->AppendNoManagedLifetime(long_time);
+        id->Append("hellohellohellohellohello");
+        arr->AppendAsColumnWithMove(id);
+
+        id->Append("worldworldworldworldworldworld");
+        arr->AppendAsColumnWithMove(id);
+
+        id->Append("heiheiheiheiheiheiheiheiheihei");
+        arr->AppendAsColumnWithMove(id);
+
+        id->Append("hahahahahahahahahahahahahahahaha");
+        arr->AppendAsColumnWithMove(id);
+
+        b.AppendColumn("arr", arr);
+        client.Insert("test_string_array", b);
+
+        client.Select("SELECT arr FROM test_string_array", [](const Block& block)
+        {
+            for (size_t c = 0; c < block.GetRowCount(); ++c) {
+                auto col = block[0]->As<ColumnArray>()->GetAsColumn(c);
+                for (size_t i = 0; i < col->Size(); ++i) {
+                    std::cerr << (*col->As<ColumnString>())[i] << " ";
+                }
+                std::cerr << std::endl;
+            }
+        }
+        );
+
+        /// Delete table.
+        client.Execute("DROP TABLE test_string_array");
+    }
+}
+
 inline void MultiArrayExample(Client& client) {
     Block b;
 
@@ -477,6 +521,7 @@ inline void IPExample(Client &client) {
 }
 
 static void RunTests(Client& client) {
+    StringArrayExample(client);
     ArrayExample(client);
     CancelableExample(client);
     DateExample(client);
@@ -496,7 +541,7 @@ static void RunTests(Client& client) {
 int main() {
     try {
         const auto localHostEndpoint = ClientOptions()
-                .SetHost(           getEnvOrDefault("CLICKHOUSE_HOST",     "localhost"))
+                .SetHost(           getEnvOrDefault("CLICKHOUSE_HOST",     "192.168.3.163"))
                 .SetPort(   getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "9000"))
                 .SetUser(           getEnvOrDefault("CLICKHOUSE_USER",     "default"))
                 .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", ""))

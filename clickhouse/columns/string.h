@@ -106,6 +106,10 @@ public:
     /// Appends content of given column to the end of current one.
     void Append(ColumnRef column) override;
 
+    /// Appends content of given column to the end of current one.
+    /// Move the column data if possible, without memory copy.
+    void AppendWithMove(ColumnRef column) override;
+
     /// Loads column data from input stream.
     bool LoadBody(InputStream* input, size_t rows) override;
 

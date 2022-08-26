@@ -35,6 +35,10 @@ public:
     /// Converts input column to array and appends as one row to the current column.
     void AppendAsColumn(ColumnRef array);
 
+    /// Converts input column to array and appends as one row to the current column.
+    /// Move the column data if possible, without memory copy.
+    void AppendAsColumnWithMove(ColumnRef array);
+
     /// Convets array at pos n to column.
     /// Type of element of result column same as type of array element.
     ColumnRef GetAsColumn(size_t n) const;
