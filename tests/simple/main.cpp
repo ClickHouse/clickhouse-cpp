@@ -541,7 +541,7 @@ static void RunTests(Client& client) {
 int main() {
     try {
         const auto localHostEndpoint = ClientOptions()
-                .SetHost(           getEnvOrDefault("CLICKHOUSE_HOST",     "192.168.3.163"))
+                .SetHost(           getEnvOrDefault("CLICKHOUSE_HOST",     "localhost"))
                 .SetPort(   getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "9000"))
                 .SetUser(           getEnvOrDefault("CLICKHOUSE_USER",     "default"))
                 .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", ""))
