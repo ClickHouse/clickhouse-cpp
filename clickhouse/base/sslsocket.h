@@ -48,9 +48,7 @@ private:
 
 class SSLSocket : public Socket {
 public:
-    explicit SSLSocket(const NetworkAddress& addr, const SocketTimeoutParams& timeout_params,
-                       const SSLParams& ssl_params, SSLContext& context);
-
+    explicit SSLSocket(const NetworkAddress& addr, const SSLParams & ssl_params, SSLContext& context);
     SSLSocket(SSLSocket &&) = default;
     ~SSLSocket() override = default;
 
@@ -71,7 +69,7 @@ public:
     ~SSLSocketFactory() override;
 
 protected:
-    std::unique_ptr<Socket> doConnect(const NetworkAddress& address, const ClientOptions& opts) override;
+    std::unique_ptr<Socket> doConnect(const NetworkAddress& address) override;
 
 private:
     const SSLParams ssl_params_;

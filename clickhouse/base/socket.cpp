@@ -112,16 +112,6 @@ void SetNonBlock(SOCKET fd, bool value) {
 #endif
 }
 
-void SetTimeout(SOCKET fd, const SocketTimeoutParams& timeout_params) {
-#if defined(_unix_)
-    timeval recv_timeout { .tv_sec = timeout_params.recv_timeout.count(), .tv_usec = 0 };
-    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &recv_timeout, sizeof(recv_timeout));
-
-    timeval send_timeout { .tv_sec = timeout_params.send_timeout.count(), .tv_usec = 0 };
-    setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &send_timeout, sizeof(send_timeout));
-#endif
-};
-
 ssize_t Poll(struct pollfd* fds, int nfds, int timeout) noexcept {
 #if defined(_win_)
     return WSAPoll(fds, nfds, timeout);
@@ -130,7 +120,7 @@ ssize_t Poll(struct pollfd* fds, int nfds, int timeout) noexcept {
 #endif
 }
 
-SOCKET SocketConnect(const NetworkAddress& addr, const SocketTimeoutParams& timeout_params) {
+SOCKET SocketConnect(const NetworkAddress& addr) {
     int last_err = 0;
     for (auto res = addr.Info(); res != nullptr; res = res->ai_next) {
         SOCKET s(socket(res->ai_family, res->ai_socktype, res->ai_protocol));
@@ -140,7 +130,6 @@ SOCKET SocketConnect(const NetworkAddress& addr, const SocketTimeoutParams& time
         }
 
         SetNonBlock(s, true);
-        SetTimeout(s, timeout_params);
 
         if (connect(s, res->ai_addr, (int)res->ai_addrlen) != 0) {
             int err = getSocketErrorCode();
@@ -224,14 +213,12 @@ NetworkAddress::~NetworkAddress() {
 const struct addrinfo* NetworkAddress::Info() const {
     return info_;
 }
-
 const std::string & NetworkAddress::Host() const {
     return host_;
 }
 
 
 SocketBase::~SocketBase() = default;
-
 
 SocketFactory::~SocketFactory() = default;
 
@@ -240,8 +227,8 @@ void SocketFactory::sleepFor(const std::chrono::milliseconds& duration) {
 }
 
 
-Socket::Socket(const NetworkAddress& addr, const SocketTimeoutParams& timeout_params)
-    : handle_(SocketConnect(addr, timeout_params))
+Socket::Socket(const NetworkAddress& addr)
+    : handle_(SocketConnect(addr))
 {}
 
 Socket::Socket(Socket&& other) noexcept
@@ -313,21 +300,19 @@ std::unique_ptr<OutputStream> Socket::makeOutputStream() const {
     return std::make_unique<SocketOutput>(handle_);
 }
 
-
 NonSecureSocketFactory::~NonSecureSocketFactory()  {}
 
 std::unique_ptr<SocketBase> NonSecureSocketFactory::connect(const ClientOptions &opts) {
     const auto address = NetworkAddress(opts.host, std::to_string(opts.port));
 
-    auto socket = doConnect(address, opts);
+    auto socket = doConnect(address);
     setSocketOptions(*socket, opts);
 
     return socket;
 }
 
-std::unique_ptr<Socket> NonSecureSocketFactory::doConnect(const NetworkAddress& address, const ClientOptions& opts) {
-    SocketTimeoutParams timeout_params { opts.connection_recv_timeout, opts.connection_send_timeout };
-    return std::make_unique<Socket>(address, timeout_params);
+std::unique_ptr<Socket> NonSecureSocketFactory::doConnect(const NetworkAddress& address) {
+    return std::make_unique<Socket>(address);
 }
 
 void NonSecureSocketFactory::setSocketOptions(Socket &socket, const ClientOptions &opts) {
@@ -341,7 +326,6 @@ void NonSecureSocketFactory::setSocketOptions(Socket &socket, const ClientOption
         socket.SetTcpNoDelay(opts.tcp_nodelay);
     }
 }
-
 
 SocketInput::SocketInput(SOCKET s)
     : s_(s)

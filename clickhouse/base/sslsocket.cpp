@@ -198,9 +198,9 @@ SSL_CTX * SSLContext::getContext() {
     << "\n\t handshake state: " << SSL_get_state(ssl_) \
     << std::endl
 */
-SSLSocket::SSLSocket(const NetworkAddress& addr, const SocketTimeoutParams& timeout_params,
-                     const SSLParams & ssl_params, SSLContext& context)
-    : Socket(addr, timeout_params)
+SSLSocket::SSLSocket(const NetworkAddress& addr, const SSLParams & ssl_params,
+                     SSLContext& context)
+    : Socket(addr)
     , ssl_(SSL_new(context.getContext()), &SSL_free)
 {
     auto ssl = ssl_.get();
@@ -267,9 +267,8 @@ SSLSocketFactory::SSLSocketFactory(const ClientOptions& opts)
 
 SSLSocketFactory::~SSLSocketFactory() = default;
 
-std::unique_ptr<Socket> SSLSocketFactory::doConnect(const NetworkAddress& address, const ClientOptions& opts) {
-    SocketTimeoutParams timeout_params { opts.connection_recv_timeout, opts.connection_send_timeout };
-    return std::make_unique<SSLSocket>(address, timeout_params, ssl_params_, *ssl_context_);
+std::unique_ptr<Socket> SSLSocketFactory::doConnect(const NetworkAddress& address) {
+    return std::make_unique<SSLSocket>(address, ssl_params_, *ssl_context_);
 }
 
 std::unique_ptr<InputStream> SSLSocket::makeInputStream() const {

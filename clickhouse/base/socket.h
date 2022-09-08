@@ -82,14 +82,9 @@ public:
 };
 
 
-struct SocketTimeoutParams {
-    const std::chrono::seconds recv_timeout {0};
-    const std::chrono::seconds send_timeout {0};
-};
-
 class Socket : public SocketBase {
 public:
-    Socket(const NetworkAddress& addr, const SocketTimeoutParams& timeout_params);
+    Socket(const NetworkAddress& addr);
     Socket(Socket&& other) noexcept;
     Socket& operator=(Socket&& other) noexcept;
 
@@ -124,7 +119,7 @@ public:
     std::unique_ptr<SocketBase> connect(const ClientOptions& opts) override;
 
 protected:
-    virtual std::unique_ptr<Socket> doConnect(const NetworkAddress& address, const ClientOptions& opts);
+    virtual std::unique_ptr<Socket> doConnect(const NetworkAddress& address);
 
     void setSocketOptions(Socket& socket, const ClientOptions& opts);
 };

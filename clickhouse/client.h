@@ -86,10 +86,6 @@ struct ClientOptions {
     // TCP options
     DECLARE_FIELD(tcp_nodelay, bool, TcpNoDelay, true);
 
-    /// Connection socket timeout. If the timeout is set to zero then the operation will never timeout.
-    DECLARE_FIELD(connection_recv_timeout, std::chrono::seconds, SetConnectionRecvTimeout, std::chrono::seconds(0));
-    DECLARE_FIELD(connection_send_timeout, std::chrono::seconds, SetConnectionSendTimeout, std::chrono::seconds(0));
-
     // TODO deprecate setting
     /** It helps to ease migration of the old codebases, which can't afford to switch
     * to using ColumnLowCardinalityT or ColumnLowCardinality directly,
