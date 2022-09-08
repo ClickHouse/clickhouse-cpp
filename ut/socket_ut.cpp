@@ -18,7 +18,7 @@ TEST(Socketcase, connecterror) {
 
     std::this_thread::sleep_for(std::chrono::seconds(1));
     try {
-        Socket socket(addr);
+        Socket socket(addr, SocketTimeoutParams {});
     } catch (const std::system_error& e) {
         FAIL();
     }
@@ -26,11 +26,35 @@ TEST(Socketcase, connecterror) {
     std::this_thread::sleep_for(std::chrono::seconds(1));
     server.stop();
     try {
-        Socket socket(addr);
+        Socket socket(addr, SocketTimeoutParams {});
         FAIL();
     } catch (const std::system_error& e) {
         ASSERT_NE(EINPROGRESS,e.code().value());
     }
+}
+
+TEST(Socketcase, timeoutrecv) {
+    using Seconds = std::chrono::seconds;
+
+    int port = 19979;
+    NetworkAddress addr("localhost", std::to_string(port));
+    LocalTcpServer server(port);
+    server.start();
+
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+    try {
+        Socket socket(addr, SocketTimeoutParams { .recv_timeout = Seconds(5), .send_timeout = Seconds(5) });
+
+        std::unique_ptr<InputStream> ptr_input_stream = socket.makeInputStream();
+        char buf[1024];
+        ptr_input_stream->Read(buf, sizeof(buf));
+
+    } catch (const std::system_error& e) {
+        ASSERT_EQ(EAGAIN, e.code().value());
+    }
+
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+    server.stop();
 }
 
 // Test to verify that reading from empty socket doesn't hangs.
