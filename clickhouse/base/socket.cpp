@@ -114,11 +114,27 @@ void SetNonBlock(SOCKET fd, bool value) {
 
 void SetTimeout(SOCKET fd, const SocketTimeoutParams& timeout_params) {
 #if defined(_unix_)
-    timeval recv_timeout { .tv_sec = timeout_params.recv_timeout.count(), .tv_usec = 0 };
-    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &recv_timeout, sizeof(recv_timeout));
+    timeval recv_timeout { timeout_params.recv_timeout_s.count(), timeout_params.recv_timeout_us.count() };
+    auto recv_ret = setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &recv_timeout, sizeof(recv_timeout));
 
-    timeval send_timeout { .tv_sec = timeout_params.send_timeout.count(), .tv_usec = 0 };
-    setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &send_timeout, sizeof(send_timeout));
+    timeval send_timeout { timeout_params.send_timeout_s.count(), timeout_params.send_timeout_us.count() };
+    auto send_ret = setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &send_timeout, sizeof(send_timeout));
+
+    if (recv_ret == -1 || send_ret == -1) {
+        throw std::system_error(getSocketErrorCode(), getErrorCategory(), "fail to set socket timeout");
+    }
+#else
+    const struct timeval recv_tv { timeout_params.recv_timeout_s.count(), timeout_params.recv_timeout_us.count()};
+    DWORD recv_timeout = recv_tv.tv_sec * 1000 + recv_tv.tv_usec / 1000;
+    auto recv_ret = setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&recv_timeout, sizeof(DWORD));
+
+    const struct timeval send_tv { timeout_params.send_timeout_s.count(), timeout_params.send_timeout_us.count()};
+    DWORD send_timeout = send_tv.tv_sec * 1000 + send_tv.tv_usec / 1000;
+    auto send_ret = setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, (const char*)&send_timeout, sizeof(DWORD));
+    
+    if (recv_ret == SOCKET_ERROR || send_ret == SOCKET_ERROR) {
+        throw std::system_error(getSocketErrorCode(), getErrorCategory(), "fail to set socket timeout");
+    }
 #endif
 };
 
@@ -242,6 +258,10 @@ void SocketFactory::sleepFor(const std::chrono::milliseconds& duration) {
 
 Socket::Socket(const NetworkAddress& addr, const SocketTimeoutParams& timeout_params)
     : handle_(SocketConnect(addr, timeout_params))
+{}
+
+Socket::Socket(const NetworkAddress & addr)
+    : handle_(SocketConnect(addr, SocketTimeoutParams{}))
 {}
 
 Socket::Socket(Socket&& other) noexcept
