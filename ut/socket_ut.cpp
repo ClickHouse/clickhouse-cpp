@@ -43,7 +43,7 @@ TEST(Socketcase, timeoutrecv) {
 
     std::this_thread::sleep_for(std::chrono::seconds(1));
     try {
-        Socket socket(addr, SocketTimeoutParams { .recv_timeout = Seconds(5), .send_timeout = Seconds(5) });
+        Socket socket(addr, SocketTimeoutParams { Seconds(5), Seconds(5) });
 
         std::unique_ptr<InputStream> ptr_input_stream = socket.makeInputStream();
         char buf[1024];
