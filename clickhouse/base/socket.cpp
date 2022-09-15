@@ -114,10 +114,10 @@ void SetNonBlock(SOCKET fd, bool value) {
 
 void SetTimeout(SOCKET fd, const SocketTimeoutParams& timeout_params) {
 #if defined(_unix_)
-    timeval recv_timeout { timeout_params.recv_timeout_s.count(), timeout_params.recv_timeout_us.count() };
+    timeval recv_timeout { timeout_params.recv_timeout_s.count(), static_cast<int>(timeout_params.recv_timeout_us.count()) };
     auto recv_ret = setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &recv_timeout, sizeof(recv_timeout));
 
-    timeval send_timeout { timeout_params.send_timeout_s.count(), timeout_params.send_timeout_us.count() };
+    timeval send_timeout { timeout_params.send_timeout_s.count(), static_cast<int>(timeout_params.send_timeout_us.count()) };
     auto send_ret = setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &send_timeout, sizeof(send_timeout));
 
     if (recv_ret == -1 || send_ret == -1) {
