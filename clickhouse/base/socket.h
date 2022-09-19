@@ -83,10 +83,8 @@ public:
 
 
 struct SocketTimeoutParams {
-    const std::chrono::seconds recv_timeout_s {0};
-    const std::chrono::seconds send_timeout_s {0};
-    const std::chrono::microseconds recv_timeout_us{ 0 };
-    const std::chrono::microseconds send_timeout_us{ 0 };
+    std::chrono::milliseconds recv_timeout{ 0 };
+    std::chrono::milliseconds send_timeout{ 0 };
 };
 
 class Socket : public SocketBase {
