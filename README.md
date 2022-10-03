@@ -75,7 +75,9 @@ client.Select("SELECT id, name FROM test.numbers", [] (const Block& block)
 /// Delete table.
 client.Execute("DROP TABLE test.numbers");
 ```
-Please note that `Client` instance is NOT thread-safe. I.e. you must create a separate `Client` for each thread or utilize some synchronization techniques.
+
+## Thread-safety
+⚠ Please note that `Client` instance is NOT thread-safe. I.e. you must create a separate `Client` for each thread or utilize some synchronization techniques. ⚠
 
 ## Retries
 If you wish to implement some retry logic atop of `clickhouse::Client` there are few simple rules to make you life easier:
