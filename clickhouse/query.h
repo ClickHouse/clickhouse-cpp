@@ -94,7 +94,6 @@ public:
         return query_id_;
     }
 
-
     /// Set handler for receiving result data.
     inline Query& OnData(SelectCallback cb) {
         select_cb_ = std::move(cb);
