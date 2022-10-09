@@ -430,6 +430,22 @@ bool Client::Impl::ReceivePacket(uint64_t* server_packet) {
         return false;
     }
 
+    case ServerCodes::TableColumns: {
+        // external table name
+        if (!WireFormat::SkipString(*input_)) {
+            return false;
+        }
+
+        std::string columns_metadata;
+        if (!WireFormat::ReadString(*input_, &columns_metadata)) {
+            return false;
+        }
+        if (events_) {
+            events_->OnColumnsMetadata(columns_metadata);
+        }
+        return true;
+    }
+
     default:
         throw UnimplementedError("unimplemented " + std::to_string((int)packet_type));
         break;

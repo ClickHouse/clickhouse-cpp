@@ -16,6 +16,7 @@ namespace clickhouse {
             Extremes             = 8,    /// Block of mins and maxs, may be compressed.
             TablesStatusResponse = 9,    /// Response to TableStatus.
             Log                  = 10,   /// Query execution log.
+            TableColumns         = 11,   /// Columns' description for default values calculation
         };
     }
 
@@ -23,7 +24,7 @@ namespace clickhouse {
     namespace ClientCodes {
         enum {
             Hello       = 0,    /// Name, version, default database name.
-            Query       = 1,    /** Query id, query settings, query processing stage, 
+            Query       = 1,    /** Query id, query settings, query processing stage,
                                   * compression status, and query text (no INSERT data).
                                   */
             Data        = 2,    /// Data `Block` (e.g. INSERT data), may be compressed.
@@ -32,7 +33,7 @@ namespace clickhouse {
         };
     }
 
-    /// Should we compress `Block`s of data 
+    /// Should we compress `Block`s of data
     namespace CompressionState {
         enum {
             Disable     = 0,
