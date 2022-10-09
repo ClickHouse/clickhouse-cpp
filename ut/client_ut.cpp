@@ -1039,6 +1039,64 @@ TEST_P(ClientCase, OnProgress) {
     EXPECT_LE(received_progress->written_bytes, 10000u);
 }
 
+TEST_P(ClientCase, QuerySettings) {
+    client_->Execute("DROP TEMPORARY TABLE IF EXISTS test_clickhouse_query_settings_table_1;");
+    client_->Execute("CREATE TEMPORARY TABLE IF NOT EXISTS test_clickhouse_query_settings_table_1 ( id  Int64 )");
+
+    client_->Execute("DROP TEMPORARY TABLE IF EXISTS test_clickhouse_query_settings_table_2;");
+    client_->Execute("CREATE TEMPORARY TABLE IF NOT EXISTS test_clickhouse_query_settings_table_2 ( id  Int64, value Int64 )");
+
+    client_->Execute("INSERT INTO test_clickhouse_query_settings_table_1 (*) VALUES (1)");
+
+    Query query("SELECT value "
+                "FROM test_clickhouse_query_settings_table_1 "
+                "LEFT OUTER JOIN test_clickhouse_query_settings_table_2 "
+                "ON test_clickhouse_query_settings_table_1.id = test_clickhouse_query_settings_table_2.id");
+
+
+    bool checked = false;
+
+    query.SetSetting("join_use_nulls", {"1"});
+
+    query.OnData(
+        [&](const Block& block) {
+            if (block.GetRowCount() == 0)
+                return;
+            ASSERT_EQ(1U, block.GetColumnCount());
+            ASSERT_EQ(1U, block.GetRowCount());
+            ASSERT_TRUE(block[0]->GetType().IsEqual(Type::CreateNullable(Type::CreateSimple<int64_t>())));
+            auto cl = block[0]->As<ColumnNullable>();
+            EXPECT_TRUE(cl->IsNull(0));
+            checked = true;
+        });
+    client_->Execute(query);
+
+    EXPECT_TRUE(checked);
+
+    query.SetSetting("join_use_nulls", {"0"});
+
+    query.OnData(
+        [&](const Block& block) {
+            if (block.GetRowCount() == 0)
+                return;
+            ASSERT_EQ(1U, block.GetColumnCount());
+            ASSERT_EQ(1U, block.GetRowCount());
+            ASSERT_TRUE(block[0]->GetType().IsEqual(Type::CreateSimple<int64_t>()));
+            auto cl = block[0]->As<ColumnInt64>();
+            EXPECT_EQ(cl->At(0), 0);
+            checked = true;
+        }
+    );
+    checked = false;
+    client_->Execute(query);
+
+    EXPECT_TRUE(checked);
+
+    query.SetSetting("wrong_setting_name", {"0", QuerySettingsField::IMPORTANT});
+
+    EXPECT_THROW(client_->Execute(query), ServerException);
+}
+
 const auto LocalHostEndpoint = ClientOptions()
         .SetHost(           getEnvOrDefault("CLICKHOUSE_HOST",     "localhost"))
         .SetPort(   getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "9000"))

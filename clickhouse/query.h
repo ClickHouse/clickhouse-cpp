@@ -7,32 +7,21 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <unordered_map>
 
 namespace clickhouse {
 
-/**
- * Settings of individual query.
- */
-struct QuerySettings {
-    /// Maximum thread to use on the server-side to process a query. Default - let the server choose.
-    int max_threads = 0;
-    /// Compute min and max values of the result.
-    bool extremes = false;
-    /// Silently skip unavailable shards.
-    bool skip_unavailable_shards = false;
-    /// Write statistics about read rows, bytes, time elapsed, etc.
-    bool output_format_write_statistics = true;
-    /// Use client timezone for interpreting DateTime string values, instead of adopting server timezone.
-    bool use_client_time_zone = false;
-
-    // connect_timeout
-    // max_block_size
-    // distributed_group_by_no_merge = false
-    // strict_insert_defaults = 0
-    // network_compression_method = LZ4
-    // priority = 0
+struct QuerySettingsField {
+    enum Flags : uint64_t
+    {
+        IMPORTANT = 0x01,
+        CUSTOM = 0x02,
+    };
+    std::string value;
+    uint64_t flags{0};
 };
 
+using QuerySettings = std::unordered_map<std::string, QuerySettingsField>;
 
 struct Profile {
     uint64_t rows = 0;
@@ -94,6 +83,22 @@ public:
         return query_id_;
     }
 
+    inline const QuerySettings& GetQuerySettings() const {
+        return query_settings_;
+    }
+
+    /// Set per query settings
+    inline Query& SetQuerySettings(QuerySettings query_settings) {
+        query_settings_ = std::move(query_settings);
+        return *this;
+    }
+
+    /// Set per query setting
+    inline Query& SetSetting(const std::string& key, const QuerySettingsField& value) {
+        query_settings_[key] = value;
+        return *this;
+    }
+
     /// Set handler for receiving result data.
     inline Query& OnData(SelectCallback cb) {
         select_cb_ = std::move(cb);
@@ -110,7 +115,6 @@ public:
         exception_cb_ = std::move(cb);
         return *this;
     }
-
 
     /// Set handler for receiving a progress of query exceution.
     inline Query& OnProgress(ProgressCallback cb) {
@@ -157,6 +161,7 @@ private:
 private:
     const std::string query_;
     const std::string query_id_;
+    QuerySettings query_settings_;
     ExceptionCallback exception_cb_;
     ProgressCallback progress_cb_;
     SelectCallback select_cb_;
