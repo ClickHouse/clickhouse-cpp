@@ -35,8 +35,9 @@
 #define DBMS_MIN_REVISION_WITH_VERSION_PATCH            54401
 #define DBMS_MIN_REVISION_WITH_LOW_CARDINALITY_TYPE     54405
 #define DBMS_MIN_REVISION_WITH_COLUMN_DEFAULTS_METADATA 54410
+#define DBMS_MIN_REVISION_WITH_CLIENT_WRITE_INFO        54420
 
-#define REVISION  DBMS_MIN_REVISION_WITH_COLUMN_DEFAULTS_METADATA
+#define REVISION DBMS_MIN_REVISION_WITH_CLIENT_WRITE_INFO
 
 namespace clickhouse {
 
@@ -405,6 +406,15 @@ bool Client::Impl::ReceivePacket(uint64_t* server_packet) {
         }
         if (REVISION >= DBMS_MIN_REVISION_WITH_TOTAL_ROWS_IN_PROGRESS) {
             if (!WireFormat::ReadUInt64(*input_, &info.total_rows)) {
+                return false;
+            }
+        }
+        if (REVISION >= DBMS_MIN_REVISION_WITH_CLIENT_WRITE_INFO)
+        {
+            if (!WireFormat::ReadUInt64(*input_, &info.written_rows)) {
+                return false;
+            }
+            if (!WireFormat::ReadUInt64(*input_, &info.written_bytes)) {
                 return false;
             }
         }
