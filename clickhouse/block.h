@@ -73,6 +73,8 @@ public:
 
     const BlockInfo& Info() const;
 
+    void setInfo(BlockInfo&& info);
+
     /// Count of rows in the block.
     size_t GetRowCount() const;
 
