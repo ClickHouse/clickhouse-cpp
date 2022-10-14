@@ -436,12 +436,9 @@ bool Client::Impl::ReceivePacket(uint64_t* server_packet) {
             return false;
         }
 
-        std::string columns_metadata;
-        if (!WireFormat::ReadString(*input_, &columns_metadata)) {
+        //  columns metadata
+        if (!WireFormat::SkipString(*input_)) {
             return false;
-        }
-        if (events_) {
-            events_->OnColumnsMetadata(columns_metadata);
         }
         return true;
     }

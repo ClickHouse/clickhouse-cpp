@@ -66,8 +66,6 @@ public:
 
     virtual void OnProgress(const Progress& progress) = 0;
 
-    virtual void OnColumnsMetadata(const std::string& columns_metadata) = 0;
-
     virtual void OnFinish() = 0;
 };
 
@@ -76,7 +74,6 @@ using ExceptionCallback        = std::function<void(const Exception& e)>;
 using ProgressCallback         = std::function<void(const Progress& progress)>;
 using SelectCallback           = std::function<void(const Block& block)>;
 using SelectCancelableCallback = std::function<bool(const Block& block)>;
-using ColumnsMetadataCallback  = std::function<bool(const std::string& columns_metadata)>;
 
 
 class Query : public QueryEvents {
@@ -119,12 +116,6 @@ public:
         return *this;
     }
 
-    /// Set handler for receiving a metedata of column of query.
-    inline Query& OnColumnsMetadata(ColumnsMetadataCallback cb) {
-        columns_metadata_cb_ = std::move(cb);
-        return *this;
-    }
-
     static const std::string default_query_id;
 
 private:
@@ -158,12 +149,6 @@ private:
         }
     }
 
-    void OnColumnsMetadata(const std::string& columns_metadata) override {
-        if (columns_metadata_cb_) {
-            columns_metadata_cb_(columns_metadata);
-        }
-    }
-
     void OnFinish() override {
     }
 
@@ -174,7 +159,6 @@ private:
     ProgressCallback progress_cb_;
     SelectCallback select_cb_;
     SelectCancelableCallback select_cancelable_cb_;
-    ColumnsMetadataCallback columns_metadata_cb_;
 };
 
 }
