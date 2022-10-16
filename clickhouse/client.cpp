@@ -37,8 +37,10 @@
 #define DBMS_MIN_REVISION_WITH_COLUMN_DEFAULTS_METADATA 54410
 #define DBMS_MIN_REVISION_WITH_CLIENT_WRITE_INFO        54420
 #define DBMS_MIN_REVISION_WITH_SETTINGS_SERIALIZED_AS_STRINGS 54429
+#define DBMS_MIN_REVISION_WITH_INTERSERVER_SECRET       54441
+#define DBMS_MIN_REVISION_WITH_OPENTELEMETRY            54442
 
-#define REVISION  DBMS_MIN_REVISION_WITH_SETTINGS_SERIALIZED_AS_STRINGS
+#define REVISION  DBMS_MIN_REVISION_WITH_OPENTELEMETRY
 
 namespace clickhouse {
 
@@ -661,6 +663,27 @@ void Client::Impl::SendQuery(const Query& query) {
         if (server_info_.revision >= DBMS_MIN_REVISION_WITH_VERSION_PATCH) {
             WireFormat::WriteUInt64(*output_, info.client_version_patch);
         }
+
+        if (server_info_.revision >= DBMS_MIN_REVISION_WITH_OPENTELEMETRY) {
+            if (const auto& tracing_context = query.GetTracingContext()) {
+                // Have OpenTelemetry header.
+                WireFormat::WriteFixed(*output_, uint8_t(1));
+                // No point writing these numbers with variable length, because they
+                // are random and will probably require the full length anyway.
+                WireFormat::WriteFixed(*output_, tracing_context->trace_id);
+                WireFormat::WriteFixed(*output_, tracing_context->span_id);
+                WireFormat::WriteString(*output_, tracing_context->tracestate);
+                WireFormat::WriteFixed(*output_, tracing_context->trace_flags);
+            } else {
+                // Don't have OpenTelemetry header.
+                WireFormat::WriteFixed(*output_, uint8_t(0));
+            }
+        } else {
+            if (query.GetTracingContext()) {
+                // Current implementation works only for server version >= v20.11.2.1-stable
+                throw UnimplementedError(std::string("Can't send open telemetry tracing context to a server, server version is too old"));
+            }
+        }
     }
 
     /// Per query settings
@@ -677,6 +700,10 @@ void Client::Impl::SendQuery(const Query& query) {
     }
     // Empty string signals end of serialized settings
     WireFormat::WriteString(*output_, std::string());
+
+    if (server_info_.revision >= DBMS_MIN_REVISION_WITH_INTERSERVER_SECRET) {
+        WireFormat::WriteString(*output_, "");
+    }
 
     WireFormat::WriteUInt64(*output_, Stages::Complete);
     WireFormat::WriteUInt64(*output_, compression_);

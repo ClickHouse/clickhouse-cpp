@@ -29,12 +29,12 @@ std::vector<std::string> MakeStrings() {
     return {"a", "ab", "abc", "abcd"};
 }
 
-std::vector<UInt128> MakeUUIDs() {
+std::vector<UUID> MakeUUIDs() {
     return {
-        UInt128(0llu, 0llu),
-        UInt128(0xbb6a8c699ab2414cllu, 0x86697b7fd27f0825llu),
-        UInt128(0x84b9f24bc26b49c6llu, 0xa03b4ab723341951llu),
-        UInt128(0x3507213c178649f9llu, 0x9faf035d662f60aellu)
+        UUID(0llu, 0llu),
+        UUID(0xbb6a8c699ab2414cllu, 0x86697b7fd27f0825llu),
+        UUID(0x84b9f24bc26b49c6llu, 0xa03b4ab723341951llu),
+        UUID(0x3507213c178649f9llu, 0x9faf035d662f60aellu)
     };
 }
 

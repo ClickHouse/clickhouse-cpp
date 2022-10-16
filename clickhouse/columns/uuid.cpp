@@ -21,7 +21,7 @@ ColumnUUID::ColumnUUID(ColumnRef data)
     }
 }
 
-void ColumnUUID::Append(const UInt128& value) {
+void ColumnUUID::Append(const UUID& value) {
     data_->Append(value.first);
     data_->Append(value.second);
 }
@@ -30,12 +30,12 @@ void ColumnUUID::Clear() {
     data_->Clear();
 }
 
-const UInt128 ColumnUUID::At(size_t n) const {
-    return UInt128(data_->At(n * 2), data_->At(n * 2 + 1));
+const UUID ColumnUUID::At(size_t n) const {
+    return UUID(data_->At(n * 2), data_->At(n * 2 + 1));
 }
 
-const UInt128 ColumnUUID::operator [] (size_t n) const {
-    return UInt128((*data_)[n * 2], (*data_)[n * 2 + 1]);
+const UUID ColumnUUID::operator [] (size_t n) const {
+    return UUID((*data_)[n * 2], (*data_)[n * 2 + 1]);
 }
 
 void ColumnUUID::Append(ColumnRef column) {
@@ -78,4 +78,3 @@ ItemView ColumnUUID::GetItem(size_t index) const {
 }
 
 }
-

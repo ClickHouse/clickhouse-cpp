@@ -38,7 +38,7 @@ std::vector<clickhouse::Int64> MakeDates32();
 std::vector<clickhouse::Int64> MakeDateTimes();
 std::vector<in_addr> MakeIPv4s();
 std::vector<in6_addr> MakeIPv6s();
-std::vector<clickhouse::UInt128> MakeUUIDs();
+std::vector<clickhouse::UUID> MakeUUIDs();
 std::vector<clickhouse::Int128> MakeInt128s();
 std::vector<clickhouse::Int128> MakeDecimals(size_t precision, size_t scale);
 

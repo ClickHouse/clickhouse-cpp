@@ -12,9 +12,11 @@
 #include <clickhouse/columns/numeric.h>
 #include <clickhouse/columns/string.h>
 #include <clickhouse/columns/tuple.h>
+#include <clickhouse/columns/uuid.h>
 
 #include <clickhouse/base/socket.h> // for ipv4-ipv6 platform-specific stuff
 
+#include <cinttypes>
 #include <iomanip>
 #include <sstream>
 
@@ -114,6 +116,15 @@ bool doPrintValue<ColumnTuple, void>(const ColumnRef & c, const size_t row, std:
     return false;
 }
 
+template <>
+bool doPrintValue<ColumnUUID, void>(const ColumnRef & c, const size_t row, std::ostream & ostr) {
+    if (const auto & uuid_col = c->As<ColumnUUID>()) {
+        ostr << ToString(uuid_col->At(row));
+        return true;
+    }
+    return false;
+}
+
 std::ostream & printColumnValue(const ColumnRef& c, const size_t row, std::ostream & ostr) {
 
     const auto r = false
@@ -138,7 +149,8 @@ std::ostream & printColumnValue(const ColumnRef& c, const size_t row, std::ostre
         || doPrintValue<ColumnIPv4>(c, row, ostr)
         || doPrintValue<ColumnIPv6>(c, row, ostr)
         || doPrintValue<ColumnArray, void>(c, row, ostr)
-        || doPrintValue<ColumnTuple, void>(c, row, ostr);
+        || doPrintValue<ColumnTuple, void>(c, row, ostr)
+        || doPrintValue<ColumnUUID, void>(c, row, ostr);
     if (!r)
         ostr << "Unable to print value of type " << c->GetType().GetName();
 
@@ -270,4 +282,15 @@ std::ostream & operator<<(std::ostream & ostr, const ServerInfo & server_info) {
 
 uint64_t versionNumber(const ServerInfo & server_info) {
     return versionNumber(server_info.version_major, server_info.version_minor, server_info.version_patch, server_info.revision);
+}
+
+std::string ToString(const clickhouse::UUID& v) {
+    std::string result(36, 0);
+    // ffff ff ff ss ssssss
+    const int count = std::snprintf(result.data(), result.size() + 1, "%.8" PRIx64 "-%.4" PRIx64 "-%.4" PRIx64 "-%.4" PRIx64 "-%.12" PRIx64,
+                                    v.first >> 32, (v.first >> 16) & 0xffff, v.first & 0xffff, v.second >> 48, v.second & 0xffffffffffff);
+    if (count != 36) {
+        throw std::runtime_error("Error while converting UUID to string");
+    }
+    return result;
 }

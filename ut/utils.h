@@ -1,6 +1,7 @@
 #pragma once
 
 #include <clickhouse/base/platform.h>
+#include <clickhouse/base/uuid.h>
 
 #include "utils_meta.h"
 #include "utils_comparison.h"
@@ -157,3 +158,5 @@ inline uint64_t versionNumber(
 }
 
 uint64_t versionNumber(const clickhouse::ServerInfo & server_info);
+
+std::string ToString(const clickhouse::UUID& v);

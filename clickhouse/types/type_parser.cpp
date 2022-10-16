@@ -1,5 +1,4 @@
 #include "type_parser.h"
-#include "../base/string_utils.h"
 
 #include <algorithm>
 #include <map>
