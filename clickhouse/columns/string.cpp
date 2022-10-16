@@ -30,6 +30,20 @@ ColumnFixedString::ColumnFixedString(size_t n)
 {
 }
 
+ColumnFixedString::ColumnFixedString(size_t n, const std::vector<std::string_view>& data)
+    : ColumnFixedString(n)
+{
+    for (const auto& v : data)
+        Append(v);
+}
+
+ColumnFixedString::ColumnFixedString(size_t n, const std::vector<std::string>& data)
+    : ColumnFixedString(n)
+{
+    for (const auto& v : data)
+        Append(v);
+}
+
 void ColumnFixedString::Append(std::string_view str) {
     if (str.size() > string_size_) {
         throw ValidationError("Expected string of length not greater than "
