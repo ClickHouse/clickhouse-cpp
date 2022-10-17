@@ -34,8 +34,9 @@
 #define DBMS_MIN_REVISION_WITH_SERVER_DISPLAY_NAME      54372
 #define DBMS_MIN_REVISION_WITH_VERSION_PATCH            54401
 #define DBMS_MIN_REVISION_WITH_LOW_CARDINALITY_TYPE     54405
+#define DBMS_MIN_REVISION_WITH_COLUMN_DEFAULTS_METADATA 54410
 
-#define REVISION  DBMS_MIN_REVISION_WITH_LOW_CARDINALITY_TYPE
+#define REVISION  DBMS_MIN_REVISION_WITH_COLUMN_DEFAULTS_METADATA
 
 namespace clickhouse {
 
@@ -428,6 +429,19 @@ bool Client::Impl::ReceivePacket(uint64_t* server_packet) {
             events_->OnFinish();
         }
         return false;
+    }
+
+    case ServerCodes::TableColumns: {
+        // external table name
+        if (!WireFormat::SkipString(*input_)) {
+            return false;
+        }
+
+        //  columns metadata
+        if (!WireFormat::SkipString(*input_)) {
+            return false;
+        }
+        return true;
     }
 
     default:
