@@ -71,6 +71,11 @@ const BlockInfo& Block::Info() const {
     return info_;
 }
 
+/// Set block info
+void Block::SetInfo(BlockInfo info) {
+    info_ = std::move(info);
+}
+
 /// Count of rows in the block.
 size_t Block::GetRowCount() const {
     return rows_;

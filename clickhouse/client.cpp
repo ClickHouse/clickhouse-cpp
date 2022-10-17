@@ -485,7 +485,7 @@ bool Client::Impl::ReadBlock(InputStream& input, Block* block) {
             return false;
         }
 
-        // TODO use data
+        block->SetInfo(std::move(info));
     }
 
     uint64_t num_columns = 0;
