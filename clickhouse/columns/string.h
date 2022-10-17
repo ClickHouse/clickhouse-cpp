@@ -18,6 +18,7 @@ public:
     using ValueType = std::string_view;
 
     explicit ColumnFixedString(size_t n);
+    ~ColumnFixedString() override;
 
     template <typename Values>
     ColumnFixedString(size_t n, const Values & values)
@@ -76,7 +77,7 @@ public:
     using ValueType = std::string_view;
 
     ColumnString();
-    ~ColumnString();
+    ~ColumnString() override;
 
     explicit ColumnString(const std::vector<std::string> & data);
     explicit ColumnString(std::vector<std::string>&& data);

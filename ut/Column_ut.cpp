@@ -243,6 +243,15 @@ TYPED_TEST(GenericColumnTest, Swap) {
     column_A->Swap(*column_B);
 
     EXPECT_EQ(0u, column_A->Size());
+
+    {
+        // If there are any dandling pointers/references from column_B into column_A after Swap(),
+        // then filling column_A with new values would most likely overwrite/invalidate those
+        // and CompareRecursive below would fail.
+        this->AppendValues(column_A, this->GenerateValues(1));
+        column_A.reset();
+    }
+
     EXPECT_TRUE(CompareRecursive(values, *column_B));
 }
 

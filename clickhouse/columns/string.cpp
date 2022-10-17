@@ -30,6 +30,9 @@ ColumnFixedString::ColumnFixedString(size_t n)
 {
 }
 
+ColumnFixedString::~ColumnFixedString()
+{}
+
 void ColumnFixedString::Append(std::string_view str) {
     if (str.size() > string_size_) {
         throw ValidationError("Expected string of length not greater than "

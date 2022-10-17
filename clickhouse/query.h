@@ -10,30 +10,6 @@
 
 namespace clickhouse {
 
-/**
- * Settings of individual query.
- */
-struct QuerySettings {
-    /// Maximum thread to use on the server-side to process a query. Default - let the server choose.
-    int max_threads = 0;
-    /// Compute min and max values of the result.
-    bool extremes = false;
-    /// Silently skip unavailable shards.
-    bool skip_unavailable_shards = false;
-    /// Write statistics about read rows, bytes, time elapsed, etc.
-    bool output_format_write_statistics = true;
-    /// Use client timezone for interpreting DateTime string values, instead of adopting server timezone.
-    bool use_client_time_zone = false;
-
-    // connect_timeout
-    // max_block_size
-    // distributed_group_by_no_merge = false
-    // strict_insert_defaults = 0
-    // network_compression_method = LZ4
-    // priority = 0
-};
-
-
 struct Profile {
     uint64_t rows = 0;
     uint64_t blocks = 0;

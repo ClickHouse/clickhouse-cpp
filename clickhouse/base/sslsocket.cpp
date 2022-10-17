@@ -61,6 +61,9 @@ void configureSSL(const clickhouse::SSLParams::ConfigurationType & configuration
         SSL_CONF_CTX_set_ssl(conf_ctx, ssl);
     else if (context)
         SSL_CONF_CTX_set_ssl_ctx(conf_ctx, context);
+    else {
+        throw clickhouse::AssertionError("Either SSL or SSL_CTX should be provided");
+    }
 
     for (const auto & kv : configuration) {
         const int err = SSL_CONF_cmd(conf_ctx, kv.first.c_str(), (kv.second ? kv.second->c_str() : nullptr));
