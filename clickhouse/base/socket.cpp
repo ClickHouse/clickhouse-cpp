@@ -144,7 +144,9 @@ ssize_t Poll(struct pollfd* fds, int nfds, int timeout) noexcept {
 #endif
 }
 
+#ifndef INVALID_SOCKET
 const SOCKET INVALID_SOCKET = -1;
+#endif
 
 void CloseSocket(SOCKET socket) {
     if (socket == INVALID_SOCKET)
