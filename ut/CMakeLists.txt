@@ -1,3 +1,5 @@
+SET(TESTS_LINK_LIBRARY "clickhouse-cpp-lib-static" CACHE STRING "Whenever to link unit-test binaries against static or shared library")
+
 SET ( clickhouse-cpp-ut-src
     main.cpp
 
@@ -35,9 +37,10 @@ ADD_EXECUTABLE (clickhouse-cpp-ut
 )
 
 TARGET_LINK_LIBRARIES (clickhouse-cpp-ut
-    clickhouse-cpp-lib-static
+    ${TESTS_LINK_LIBRARY}
     gtest-lib
 )
+
 IF (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --rtlib=compiler-rt")
 ENDIF ()
