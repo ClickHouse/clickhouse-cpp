@@ -116,7 +116,7 @@ public:
         return *this;
     }
 
-    inline static const std::string default_query_id{};
+    static constexpr char default_query_id[] = "";
 
 private:
     void OnData(const Block& block) override {
