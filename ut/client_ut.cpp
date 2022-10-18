@@ -1021,7 +1021,7 @@ TEST_P(ClientCase, OnProgress) {
         });
     client_->Execute(query);
 
-    EXPECT_TRUE(received_progress.has_value());
+    ASSERT_TRUE(received_progress.has_value());
 
     EXPECT_GE(received_progress->rows, 0u);
     EXPECT_LE(received_progress->rows, 2u);
