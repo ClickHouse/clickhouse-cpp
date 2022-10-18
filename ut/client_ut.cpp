@@ -1022,8 +1022,21 @@ TEST_P(ClientCase, OnProgress) {
     client_->Execute(query);
 
     EXPECT_TRUE(received_progress.has_value());
-    // Unfortunately server has different behavior in different version.
-    // So checking value of rows, bytes, etc is absolutely useless
+
+    EXPECT_GE(received_progress->rows, 0u);
+    EXPECT_LE(received_progress->rows, 2u);
+
+    EXPECT_GE(received_progress->bytes, 0u);
+    EXPECT_LE(received_progress->bytes, 10000u);
+
+    EXPECT_GE(received_progress->total_rows, 0u);
+    EXPECT_LE(received_progress->total_rows, 2u);
+
+    EXPECT_GE(received_progress->written_rows, 0u);
+    EXPECT_LE(received_progress->written_rows, 2u);
+
+    EXPECT_GE(received_progress->written_bytes, 0u);
+    EXPECT_LE(received_progress->written_bytes, 10000u);
 }
 
 const auto LocalHostEndpoint = ClientOptions()
