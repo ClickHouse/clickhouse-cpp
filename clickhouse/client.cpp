@@ -35,8 +35,9 @@
 #define DBMS_MIN_REVISION_WITH_VERSION_PATCH            54401
 #define DBMS_MIN_REVISION_WITH_LOW_CARDINALITY_TYPE     54405
 #define DBMS_MIN_REVISION_WITH_COLUMN_DEFAULTS_METADATA 54410
+#define DBMS_MIN_REVISION_WITH_CLIENT_WRITE_INFO        54420
 
-#define REVISION  DBMS_MIN_REVISION_WITH_COLUMN_DEFAULTS_METADATA
+#define REVISION DBMS_MIN_REVISION_WITH_CLIENT_WRITE_INFO
 
 namespace clickhouse {
 
@@ -408,6 +409,15 @@ bool Client::Impl::ReceivePacket(uint64_t* server_packet) {
                 return false;
             }
         }
+        if (REVISION >= DBMS_MIN_REVISION_WITH_CLIENT_WRITE_INFO)
+        {
+            if (!WireFormat::ReadUInt64(*input_, &info.written_rows)) {
+                return false;
+            }
+            if (!WireFormat::ReadUInt64(*input_, &info.written_bytes)) {
+                return false;
+            }
+        }
 
         if (events_) {
             events_->OnProgress(info);
@@ -475,7 +485,7 @@ bool Client::Impl::ReadBlock(InputStream& input, Block* block) {
             return false;
         }
 
-        // TODO use data
+        block->SetInfo(std::move(info));
     }
 
     uint64_t num_columns = 0;

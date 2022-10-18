@@ -48,6 +48,8 @@ struct Progress {
     uint64_t rows = 0;
     uint64_t bytes = 0;
     uint64_t total_rows = 0;
+    uint64_t written_rows = 0;
+    uint64_t written_bytes = 0;
 };
 
 
