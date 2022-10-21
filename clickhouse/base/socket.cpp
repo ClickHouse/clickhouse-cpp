@@ -27,7 +27,7 @@ char const* windowsErrorCategory::name() const noexcept {
 
 std::string windowsErrorCategory::message(int c) const {
     char error[UINT8_MAX];
-    auto len = FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, nullptr, static_cast<DWORD>(c), 0, error, sizeof(error), nullptr);
+    auto len = FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, nullptr, static_cast<DWORD>(c), 0, error, sizeof(error), nullptr);
     if (len == 0) {
         return "unknown";
     }
