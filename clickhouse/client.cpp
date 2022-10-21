@@ -36,8 +36,9 @@
 #define DBMS_MIN_REVISION_WITH_LOW_CARDINALITY_TYPE     54405
 #define DBMS_MIN_REVISION_WITH_COLUMN_DEFAULTS_METADATA 54410
 #define DBMS_MIN_REVISION_WITH_CLIENT_WRITE_INFO        54420
+#define DBMS_MIN_REVISION_WITH_SETTINGS_SERIALIZED_AS_STRINGS 54429
 
-#define REVISION DBMS_MIN_REVISION_WITH_CLIENT_WRITE_INFO
+#define REVISION  DBMS_MIN_REVISION_WITH_SETTINGS_SERIALIZED_AS_STRINGS
 
 namespace clickhouse {
 
@@ -131,7 +132,7 @@ private:
 
     bool ReceivePacket(uint64_t* server_packet = nullptr);
 
-    void SendQuery(const std::string& query, const std::string& query_id);
+    void SendQuery(const Query& query);
 
     void SendData(const Block& block);
 
@@ -230,7 +231,7 @@ void Client::Impl::ExecuteQuery(Query query) {
         RetryGuard([this]() { Ping(); });
     }
 
-    SendQuery(query.GetText(), query.GetQueryID());
+    SendQuery(query);
 
     while (ReceivePacket()) {
         ;
@@ -272,7 +273,8 @@ void Client::Impl::Insert(const std::string& table_name, const std::string& quer
         }
     }
 
-    SendQuery("INSERT INTO " + table_name + " ( " + fields_section.str() + " ) VALUES", query_id);
+    Query query("INSERT INTO " + table_name + " ( " + fields_section.str() + " ) VALUES", query_id);
+    SendQuery(query);
 
     uint64_t server_packet;
     // Receive data packet.
@@ -608,9 +610,9 @@ void Client::Impl::SendCancel() {
     output_->Flush();
 }
 
-void Client::Impl::SendQuery(const std::string& query, const std::string& query_id) {
+void Client::Impl::SendQuery(const Query& query) {
     WireFormat::WriteUInt64(*output_, ClientCodes::Query);
-    WireFormat::WriteString(*output_, query_id);
+    WireFormat::WriteString(*output_, query.GetQueryID());
 
     /// Client info.
     if (server_info_.revision >= DBMS_MIN_REVISION_WITH_CLIENT_INFO) {
@@ -643,15 +645,24 @@ void Client::Impl::SendQuery(const std::string& query, const std::string& query_
         }
     }
 
-    /// Per query settings.
-    //if (settings)
-    //    settings->serialize(*out);
-    //else
+    /// Per query settings
+    if (server_info_.revision >= DBMS_MIN_REVISION_WITH_SETTINGS_SERIALIZED_AS_STRINGS) {
+        for(const auto& [name, field] : query.GetQuerySettings()) {
+            WireFormat::WriteString(*output_, name);
+            WireFormat::WriteVarint64(*output_, field.flags);
+            WireFormat::WriteString(*output_, field.value);
+        }
+    }
+    else if (query.GetQuerySettings().size() > 0) {
+        // Current implementation works only for server version >= v20.1.2.4-stable, since we do not implement binary settings serialization.
+        throw UnimplementedError(std::string("Can't send query settings to a server, server version is too old"));
+    }
+    // Empty string signals end of serialized settings
     WireFormat::WriteString(*output_, std::string());
 
     WireFormat::WriteUInt64(*output_, Stages::Complete);
     WireFormat::WriteUInt64(*output_, compression_);
-    WireFormat::WriteString(*output_, query);
+    WireFormat::WriteString(*output_, query.GetText());
     // Send empty block as marker of
     // end of data
     SendData(Block());
