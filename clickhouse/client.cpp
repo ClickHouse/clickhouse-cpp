@@ -645,12 +645,17 @@ void Client::Impl::SendQuery(const Query& query) {
         }
     }
 
-    /// Per query settings.
-    assert(server_info_.revision >=  DBMS_MIN_REVISION_WITH_SETTINGS_SERIALIZED_AS_STRINGS);
-    for(const auto& [name, field] : query.GetQuerySettings()) {
-        WireFormat::WriteString(*output_, name);
-        WireFormat::WriteVarint64(*output_, field.flags);
-        WireFormat::WriteString(*output_, field.value);
+    /// Per query settings
+    if (server_info_.revision >= DBMS_MIN_REVISION_WITH_SETTINGS_SERIALIZED_AS_STRINGS) {
+        for(const auto& [name, field] : query.GetQuerySettings()) {
+            WireFormat::WriteString(*output_, name);
+            WireFormat::WriteVarint64(*output_, field.flags);
+            WireFormat::WriteString(*output_, field.value);
+        }
+    }
+    else if (query.GetQuerySettings().size() > 0) {
+        // Current implementation works only for server version >= v20.1.2.4-stable, since we do not implement binary settings serialization.
+        throw UnimplementedError(std::string("Can't send query settings to a server, server version is too old"));
     }
     // Empty string signals end of serialized settings
     WireFormat::WriteString(*output_, std::string());
