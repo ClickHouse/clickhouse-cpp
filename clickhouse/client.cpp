@@ -458,7 +458,6 @@ bool Client::Impl::ReceivePacket(uint64_t* server_packet) {
         if (events_) {
             events_->OnServerLog(block);
         }
-
         return true;
     }
 
@@ -472,6 +471,7 @@ bool Client::Impl::ReceivePacket(uint64_t* server_packet) {
         if (!WireFormat::SkipString(*input_)) {
             return false;
         }
+        return true;
     }
 
     default:
