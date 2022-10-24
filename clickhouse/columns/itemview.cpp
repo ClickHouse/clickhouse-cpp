@@ -90,7 +90,7 @@ void ItemView::ValidateData(Type::Code type, DataType data) {
             return AssertSize({4, 8, 16});
 
         default:
-            throw UnimplementedError("Unknon type code:" + std::to_string(static_cast<int>(type)));
+            throw UnimplementedError("Unknown type code:" + std::to_string(static_cast<int>(type)));
     }
 }
 

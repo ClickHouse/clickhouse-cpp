@@ -7,7 +7,7 @@ namespace clickhouse {
         enum {
             Hello                = 0,    /// Name, version, revision.
             Data                 = 1,    /// `Block` of data, may be compressed.
-            Exception            = 2,    /// Exception that occured on server side during query execution.
+            Exception            = 2,    /// Exception that occurred on server side during query execution.
             Progress             = 3,    /// Query execcution progress: rows and bytes read.
             Pong                 = 4,    /// response to Ping sent by client.
             EndOfStream          = 5,    /// All packets were sent.

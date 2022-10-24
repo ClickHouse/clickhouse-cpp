@@ -116,7 +116,7 @@ public:
         return *this;
     }
 
-    /// Set handler for receiving a progress of query exceution.
+    /// Set handler for receiving a progress of query execution.
     inline Query& OnProgress(ProgressCallback cb) {
         progress_cb_ = std::move(cb);
         return *this;

@@ -78,11 +78,11 @@ void configureSSL(const clickhouse::SSLParams::ConfigurationType & configuration
         else if (err == 1 && value_present)
             throw clickhouse::OpenSSLError("Failed to configure OpenSSL: command '" + kv.first + "' needs no value");
         else if (err == -2)
-            throw clickhouse::OpenSSLError("Failed to cofigure OpenSSL: unknown command '" + kv.first + "'");
+            throw clickhouse::OpenSSLError("Failed to configure OpenSSL: unknown command '" + kv.first + "'");
         else if (err == -3)
-            throw clickhouse::OpenSSLError("Failed to cofigure OpenSSL: command '" + kv.first + "' requires a value");
+            throw clickhouse::OpenSSLError("Failed to configure OpenSSL: command '" + kv.first + "' requires a value");
         else
-            throw clickhouse::OpenSSLError("Failed to cofigure OpenSSL: command '" + kv.first + "' unknown error: " + std::to_string(err));
+            throw clickhouse::OpenSSLError("Failed to configure OpenSSL: command '" + kv.first + "' unknown error: " + std::to_string(err));
     }
 }
 

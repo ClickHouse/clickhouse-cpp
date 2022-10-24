@@ -75,7 +75,7 @@ INSTANTIATE_TEST_SUITE_P(
     }
 ));
 
-// For some reasons doen't work on MacOS.
+// For some reasons doesn't work on MacOS.
 // Looks like `VerifyCAPath` has no effect, while parsing and setting value works.
 // Also for some reason SetPathToCADirectory() + SSL_CTX_load_verify_locations() works.
 #if !defined(__APPLE__)
@@ -141,7 +141,7 @@ INSTANTIATE_TEST_SUITE_P(
         ClientOptions(ClickHouseExplorerConfig)
             .SetSSLOptions(ClientOptions::SSLOptions()
                      .SetUseDefaultCALocations(false)
-                     .SetSkipVerification(true)), // No CA loaded, but verfication is skipped
+                     .SetSkipVerification(true)), // No CA loaded, but verification is skipped
         {"SELECT 1;"}
     }
 ));
