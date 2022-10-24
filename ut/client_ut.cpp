@@ -1097,6 +1097,24 @@ TEST_P(ClientCase, QuerySettings) {
     EXPECT_THROW(client_->Execute(query), ServerException);
 }
 
+TEST_P(ClientCase, ServerLogs) {
+
+    Block block;
+    createTableWithOneColumn<ColumnString>(block);
+
+    size_t received_row_count = 0;
+    Query query("INSERT INTO " + table_name + " (*) VALUES (\'Foo\'), (\'Bar\')" );
+    query.SetSetting("send_logs_level", {"trace"});
+    query.OnServerLog([&](const Block& block) {
+        received_row_count += block.GetRowCount();
+        return true;
+    });
+    client_->Execute(query);
+
+    EXPECT_GT(received_row_count, 0U);
+}
+
+
 const auto LocalHostEndpoint = ClientOptions()
         .SetHost(           getEnvOrDefault("CLICKHOUSE_HOST",     "localhost"))
         .SetPort(   getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "9000"))

@@ -57,6 +57,12 @@ public:
 
     virtual void OnProgress(const Progress& progress) = 0;
 
+    /** Handle query execution logs provided by server.
+     *  Amount of logs regulated by `send_logs_level` setting.
+     *  By-default only `fatal` log events are sent to the client side.
+     */
+    virtual void OnServerLog(const Block& block) = 0;
+
     virtual void OnFinish() = 0;
 };
 
@@ -65,6 +71,7 @@ using ExceptionCallback        = std::function<void(const Exception& e)>;
 using ProgressCallback         = std::function<void(const Progress& progress)>;
 using SelectCallback           = std::function<void(const Block& block)>;
 using SelectCancelableCallback = std::function<bool(const Block& block)>;
+using SelectServerLogCallback  = std::function<bool(const Block& block)>;
 
 
 class Query : public QueryEvents {
@@ -122,6 +129,12 @@ public:
         return *this;
     }
 
+    /// Set handler for receiving a server log of query exceution.
+    inline Query& OnServerLog(SelectServerLogCallback cb) {
+        select_server_log_cb_ = std::move(cb);
+        return *this;
+    }
+
     static const std::string default_query_id;
 
 private:
@@ -155,6 +168,12 @@ private:
         }
     }
 
+    void OnServerLog(const Block& block) override {
+        if (select_server_log_cb_) {
+            select_server_log_cb_(block);
+        }
+    }
+
     void OnFinish() override {
     }
 
@@ -166,6 +185,7 @@ private:
     ProgressCallback progress_cb_;
     SelectCallback select_cb_;
     SelectCancelableCallback select_cancelable_cb_;
+    SelectServerLogCallback select_server_log_cb_;
 };
 
 }

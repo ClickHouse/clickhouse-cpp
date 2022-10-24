@@ -443,6 +443,24 @@ bool Client::Impl::ReceivePacket(uint64_t* server_packet) {
         return false;
     }
 
+    case ServerCodes::Log: {
+        // log tag
+        if (!WireFormat::SkipString(*input_)) {
+            return false;
+        }
+        Block block;
+
+        // Use uncompressed stream since log blocks usually contain only one row
+        if (!ReadBlock(*input_, &block)) {
+            return false;
+        }
+
+        if (events_) {
+            events_->OnServerLog(block);
+        }
+        return true;
+    }
+
     case ServerCodes::TableColumns: {
         // external table name
         if (!WireFormat::SkipString(*input_)) {
