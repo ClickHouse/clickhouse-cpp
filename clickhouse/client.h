@@ -90,22 +90,20 @@ struct ClientOptions {
     DECLARE_FIELD(connection_recv_timeout, std::chrono::seconds, SetConnectionRecvTimeout, std::chrono::seconds(0));
     DECLARE_FIELD(connection_send_timeout, std::chrono::seconds, SetConnectionSendTimeout, std::chrono::seconds(0));
 
-    // TODO deprecate setting
     /** It helps to ease migration of the old codebases, which can't afford to switch
     * to using ColumnLowCardinalityT or ColumnLowCardinality directly,
     * but still want to benefit from smaller on-wire LowCardinality bandwidth footprint.
     *
     * @see LowCardinalitySerializationAdaptor, CreateColumnByType
     */
+    [[deprecated("Makes implementation of LC(X) harder and code uglier. Will be removed in next major release (3.0) ")]]
     DECLARE_FIELD(backward_compatibility_lowcardinality_as_wrapped_column, bool, SetBakcwardCompatibilityFeatureLowCardinalityAsWrappedColumn, true);
 
     /** Set max size data to compress if compression enabled.
      *
-     *  Allows choosing tradeoff betwen RAM\CPU:
+     *  Allows choosing tradeoff between RAM\CPU:
      *  - Lower value reduces RAM usage, but slightly increases CPU usage.
      *  - Higher value increases RAM usage but slightly decreases CPU usage.
-     *
-     *  Default is 0, use natural implementation-defined chunk size.
      */
     DECLARE_FIELD(max_compression_chunk_size, unsigned int, SetMaxCompressionChunkSize, 65535);
 
@@ -133,7 +131,7 @@ struct ClientOptions {
          *  If no CAs are configured, the server's identity can't be validated, and the Client would err.
          *  See https://www.openssl.org/docs/man1.1.1/man3/SSL_CTX_set_default_verify_paths.html
         */
-        /// Load deafult CA certificates from deafult locations.
+        /// Load default CA certificates from default locations.
         DECLARE_FIELD(use_default_ca_locations, bool, SetUseDefaultCALocations, true);
         /// Path to the CA files to verify server certificate, may be empty.
         DECLARE_FIELD(path_to_ca_files, std::vector<std::string>, SetPathToCAFiles, {});

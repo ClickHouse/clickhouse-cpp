@@ -428,7 +428,7 @@ TEST_P(ClientCase, Cancellable) {
             "CREATE TEMPORARY TABLE IF NOT EXISTS test_clickhouse_cpp_cancel (x UInt64) ");
 
     /// Insert a few blocks. In order to make cancel have effect, we have to
-    /// insert a relative larget amount of data.
+    /// insert a relative larger amount of data.
     const int kBlock = 10;
     const int kRowEachBlock = 1000000;
     for (unsigned j = 0; j < kBlock; j++) {
@@ -856,7 +856,7 @@ TEST_P(ClientCase, Query_ID) {
         // DB::Exception: clickhouse_cpp_cicd: Not enough privileges. To execute this query it's necessary to have grant SYSTEM FLUSH LOGS ON
         if (std::string(e.what()).find("To execute this query it's necessary to have grant SYSTEM FLUSH LOGS ON") != std::string::npos) {
             // Insufficient privileges, the only safe way is to wait long enough for system
-            // to flush the logs automaticaly. Usualy it takes 7.5 seconds, so just in case,
+            // to flush the logs automatically. Usually it takes 7.5 seconds, so just in case,
             // wait 3 times that to ensure that all previously executed queries are in the logs now.
             const auto wait_duration = std::chrono::seconds(23);
             std::cerr << "Got error while flushing logs, now we wait " << wait_duration << "..." << std::endl;

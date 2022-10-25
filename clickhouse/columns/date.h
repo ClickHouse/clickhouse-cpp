@@ -145,8 +145,8 @@ public:
 
     /// Appends one element to the end of column.
     void Append(const Int64& value);
-    // It is a bit controversal: users might expect it to parse string of ISO8601 or some other human-friendly format,
-    // but current implemntation parses it as fractional integer with decimal point, e.g. "123.456".
+    // It is a bit controversial: users might expect it to parse string of ISO8601 or some other human-friendly format,
+    // but current implementation parses it as fractional integer with decimal point, e.g. "123.456".
 //    void Append(const std::string& value);
 
     /// Returns element at given row number.

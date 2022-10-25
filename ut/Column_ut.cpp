@@ -283,14 +283,14 @@ TYPED_TEST(GenericColumnTest, RoundTrip) {
         // Date32 first appeared in v21.9.2.17-stable
         const auto server_info = client.GetServerInfo();
         if (versionNumber(server_info) < versionNumber(21, 9)) {
-            GTEST_SKIP() << "Date32 is availble since v21.9.2.17-stable and can't be tested against server: " << server_info;
+            GTEST_SKIP() << "Date32 is available since v21.9.2.17-stable and can't be tested against server: " << server_info;
         }
     }
 
     if constexpr (std::is_same_v<typename TestFixture::ColumnType, ColumnInt128>) {
         const auto server_info = client.GetServerInfo();
         if (versionNumber(server_info) < versionNumber(21, 7)) {
-            GTEST_SKIP() << "ColumnInt128 is availble since v21.7.2.7-stable and can't be tested against server: " << server_info;
+            GTEST_SKIP() << "ColumnInt128 is available since v21.7.2.7-stable and can't be tested against server: " << server_info;
         }
     }
 

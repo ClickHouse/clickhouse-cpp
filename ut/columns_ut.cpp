@@ -626,7 +626,7 @@ TEST(ColumnsCase, ColumnDecimal128_from_string_overflow) {
     EXPECT_ANY_THROW(col->Append("400000000000000000000000000000000000000"));
 
 #ifndef ABSL_HAVE_INTRINSIC_INT128
-    // unfortunatelly std::numeric_limits<Int128>::min() overflows when there is no __int128 intrinsic type.
+    // unfortunately std::numeric_limits<Int128>::min() overflows when there is no __int128 intrinsic type.
     EXPECT_ANY_THROW(col->Append("-170141183460469231731687303715884105728"));
 #endif
 }
@@ -682,7 +682,7 @@ TEST(ColumnsCase, ColumnLowCardinalityString_Load) {
     }
 }
 
-// This is temporary diabled since we are not 100% compatitable with ClickHouse
+// This is temporary disabled since we are not 100% compatitable with ClickHouse
 // on how we serailize LC columns, but we check interoperability in other tests (see client_ut.cpp)
 TEST(ColumnsCase, DISABLED_ColumnLowCardinalityString_Save) {
     const size_t items_count = 10;
