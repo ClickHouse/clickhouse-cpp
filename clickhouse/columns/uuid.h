@@ -1,11 +1,11 @@
 #pragma once
 
+#include "../base/uuid.h"
 #include "column.h"
 #include "numeric.h"
 
 namespace clickhouse {
 
-using UInt128 = std::pair<uint64_t, uint64_t>;
 
 /**
  * Represents a UUID column.
@@ -17,13 +17,13 @@ public:
     explicit ColumnUUID(ColumnRef data);
 
     /// Appends one element to the end of column.
-    void Append(const UInt128& value);
+    void Append(const UUID& value);
 
     /// Returns element at given row number.
-    const UInt128 At(size_t n) const;
+    const UUID At(size_t n) const;
 
     /// Returns element at given row number.
-    const UInt128 operator [] (size_t n) const;
+    const UUID operator [] (size_t n) const;
 
 public:
     /// Appends content of given column to the end of current one.
@@ -34,7 +34,7 @@ public:
 
     /// Saves column data to output stream.
     void SaveBody(OutputStream* output) override;
-    
+
     /// Clear column data .
     void Clear() override;
 

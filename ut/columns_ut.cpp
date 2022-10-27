@@ -377,8 +377,8 @@ TEST(ColumnsCase, UUIDInit) {
     auto col = std::make_shared<ColumnUUID>(std::make_shared<ColumnUInt64>(MakeUUID_data()));
 
     ASSERT_EQ(col->Size(), 3u);
-    ASSERT_EQ(col->At(0), UInt128(0xbb6a8c699ab2414cllu, 0x86697b7fd27f0825llu));
-    ASSERT_EQ(col->At(2), UInt128(0x3507213c178649f9llu, 0x9faf035d662f60aellu));
+    ASSERT_EQ(col->At(0), UUID(0xbb6a8c699ab2414cllu, 0x86697b7fd27f0825llu));
+    ASSERT_EQ(col->At(2), UUID(0x3507213c178649f9llu, 0x9faf035d662f60aellu));
 }
 
 TEST(ColumnsCase, UUIDSlice) {
@@ -386,8 +386,8 @@ TEST(ColumnsCase, UUIDSlice) {
     auto sub = col->Slice(1, 2)->As<ColumnUUID>();
 
     ASSERT_EQ(sub->Size(), 2u);
-    ASSERT_EQ(sub->At(0), UInt128(0x84b9f24bc26b49c6llu, 0xa03b4ab723341951llu));
-    ASSERT_EQ(sub->At(1), UInt128(0x3507213c178649f9llu, 0x9faf035d662f60aellu));
+    ASSERT_EQ(sub->At(0), UUID(0x84b9f24bc26b49c6llu, 0xa03b4ab723341951llu));
+    ASSERT_EQ(sub->At(1), UUID(0x3507213c178649f9llu, 0x9faf035d662f60aellu));
 }
 
 TEST(ColumnsCase, Int128) {
@@ -787,4 +787,3 @@ TEST(ColumnsCase, ColumnLowCardinalityString_WithEmptyString_3) {
         EXPECT_EQ(values[i], col.At(i)) << " at pos: " << i;
     }
 }
-

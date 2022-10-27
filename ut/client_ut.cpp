@@ -43,6 +43,30 @@ protected:
         return "SELECT " + column_name + " FROM " + table_name;
     }
 
+    void FlushLogs() {
+        try {
+            client_->Execute("SYSTEM FLUSH LOGS");
+        } catch (const std::exception & e) {
+            std::cerr << "Got error while flushing logs: " << e.what() << std::endl;
+            const auto wait_for_flush = []() {
+                // Insufficient privileges, the only safe way is to wait long enough for system
+                // to flush the logs automaticaly. Usually it takes 7.5 seconds, so just in case,
+                // wait 3 times that to ensure that all previously executed queries are in the logs now.
+                const auto wait_duration = std::chrono::seconds(23);
+                std::cerr << "Now we wait " << wait_duration << "..." << std::endl;
+                std::this_thread::sleep_for(wait_duration);
+            };
+            // DB::Exception: clickhouse_cpp_cicd: Not enough privileges. To execute this query it's necessary to have grant SYSTEM FLUSH LOGS ON
+            if (std::string(e.what()).find("To execute this query it's necessary to have grant SYSTEM FLUSH LOGS ON") != std::string::npos) {
+                wait_for_flush();
+            }
+            // DB::Exception: clickhouse_cpp_cicd: Cannot execute query in readonly mode
+            if (std::string(e.what()).find("Cannot execute query in readonly mode") != std::string::npos) {
+                wait_for_flush();
+            }
+        }
+    }
+
     std::unique_ptr<Client> client_;
     const std::string table_name = "test_clickhouse_cpp_test_ut_table";
     const std::string column_name = "test_column";
@@ -850,19 +874,7 @@ TEST_P(ClientCase, Query_ID) {
     client_->SelectCancelable("SELECT 'b', count(*) FROM " + table_name, query_id, [](const Block &) { return true; });
     client_->Execute(Query("TRUNCATE TABLE " + table_name, query_id));
 
-    try {
-        client_->Execute("SYSTEM FLUSH LOGS");
-    } catch (const std::exception & e) {
-        // DB::Exception: clickhouse_cpp_cicd: Not enough privileges. To execute this query it's necessary to have grant SYSTEM FLUSH LOGS ON
-        if (std::string(e.what()).find("To execute this query it's necessary to have grant SYSTEM FLUSH LOGS ON") != std::string::npos) {
-            // Insufficient privileges, the only safe way is to wait long enough for system
-            // to flush the logs automatically. Usually it takes 7.5 seconds, so just in case,
-            // wait 3 times that to ensure that all previously executed queries are in the logs now.
-            const auto wait_duration = std::chrono::seconds(23);
-            std::cerr << "Got error while flushing logs, now we wait " << wait_duration << "..." << std::endl;
-            std::this_thread::sleep_for(wait_duration);
-        }
-    }
+    FlushLogs();
 
     size_t total_count = 0;
     client_->Select("SELECT type, query_kind, query_id, query "
@@ -1114,6 +1126,31 @@ TEST_P(ClientCase, ServerLogs) {
     EXPECT_GT(received_row_count, 0U);
 }
 
+
+TEST_P(ClientCase, TracingContext) {
+    Block block;
+    createTableWithOneColumn<ColumnString>(block);
+
+    Query query("INSERT INTO " + table_name + " (*) VALUES (\'Foo\'), (\'Bar\')" );
+    open_telemetry::TracingContext tracing_context;
+    std::srand(std::time(0));
+    tracing_context.trace_id = {std::rand(), std::rand()};
+    query.SetTracingContext(tracing_context);
+    client_->Execute(query);
+
+    FlushLogs();
+
+    size_t received_rows = 0;
+    client_->Select("SELECT trace_id, toString(trace_id), operation_name "
+                   "FROM system.opentelemetry_span_log "
+                   "WHERE trace_id = toUUID(\'" + ToString(tracing_context.trace_id) + "\');",
+        [&](const Block& block) {
+            // std::cerr << PrettyPrintBlock{block} << std::endl;
+            received_rows += block.GetRowCount();
+    });
+
+    EXPECT_GT(received_rows, 0u);
+}
 
 const auto LocalHostEndpoint = ClientOptions()
         .SetHost(           getEnvOrDefault("CLICKHOUSE_HOST",     "localhost"))

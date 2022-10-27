@@ -3,9 +3,12 @@
 #include "block.h"
 #include "server_exception.h"
 
+#include "base/open_telemetry.h"
+
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 
@@ -106,6 +109,16 @@ public:
         return *this;
     }
 
+    inline const std::optional<open_telemetry::TracingContext>& GetTracingContext() const {
+        return tracing_context_;
+    }
+
+    /// Set tracing context for open telemetry signals
+    inline Query& SetTracingContext(open_telemetry::TracingContext tracing_context) {
+        tracing_context_ = std::move(tracing_context);
+        return *this;
+    }
+
     /// Set handler for receiving result data.
     inline Query& OnData(SelectCallback cb) {
         select_cb_ = std::move(cb);
@@ -180,6 +193,7 @@ private:
 private:
     const std::string query_;
     const std::string query_id_;
+    std::optional<open_telemetry::TracingContext> tracing_context_;
     QuerySettings query_settings_;
     ExceptionCallback exception_cb_;
     ProgressCallback progress_cb_;
