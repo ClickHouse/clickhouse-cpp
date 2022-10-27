@@ -39,8 +39,11 @@
 #define DBMS_MIN_REVISION_WITH_SETTINGS_SERIALIZED_AS_STRINGS 54429
 #define DBMS_MIN_REVISION_WITH_INTERSERVER_SECRET       54441
 #define DBMS_MIN_REVISION_WITH_OPENTELEMETRY            54442
+#define DBMS_MIN_REVISION_WITH_DISTRIBUTED_DEPTH        54448
+#define DBMS_MIN_REVISION_WITH_INITIAL_QUERY_START_TIME 54449
+#define DBMS_MIN_REVISION_WITH_INCREMENTAL_PROFILE_EVENTS 54451
 
-#define REVISION  DBMS_MIN_REVISION_WITH_OPENTELEMETRY
+#define REVISION  DBMS_MIN_REVISION_WITH_INCREMENTAL_PROFILE_EVENTS
 
 namespace clickhouse {
 
@@ -476,6 +479,22 @@ bool Client::Impl::ReceivePacket(uint64_t* server_packet) {
         return true;
     }
 
+    case ServerCodes::ProfileEvents: {
+        if (!WireFormat::SkipString(*input_)) {
+            return false;
+        }
+
+        Block block;
+        if (!ReadBlock(*input_, &block)) {
+            return false;
+        }
+
+        if (events_) {
+            events_->OnProfileEvents(block);
+        }
+        return true;
+    }
+
     default:
         throw UnimplementedError("unimplemented " + std::to_string((int)packet_type));
         break;
@@ -649,6 +668,9 @@ void Client::Impl::SendQuery(const Query& query) {
         WireFormat::WriteString(*output_, info.initial_user);
         WireFormat::WriteString(*output_, info.initial_query_id);
         WireFormat::WriteString(*output_, info.initial_address);
+        if (server_info_.revision >= DBMS_MIN_REVISION_WITH_INITIAL_QUERY_START_TIME) {
+            WireFormat::WriteFixed<int64_t>(*output_, 0);
+        }
         WireFormat::WriteFixed(*output_, info.iface_type);
 
         WireFormat::WriteString(*output_, info.os_user);
@@ -660,6 +682,8 @@ void Client::Impl::SendQuery(const Query& query) {
 
         if (server_info_.revision >= DBMS_MIN_REVISION_WITH_QUOTA_KEY_IN_CLIENT_INFO)
             WireFormat::WriteString(*output_, info.quota_key);
+        if (server_info_.revision >= DBMS_MIN_REVISION_WITH_DISTRIBUTED_DEPTH)
+            WireFormat::WriteUInt64(*output_, 0u);
         if (server_info_.revision >= DBMS_MIN_REVISION_WITH_VERSION_PATCH) {
             WireFormat::WriteUInt64(*output_, info.client_version_patch);
         }
