@@ -21,6 +21,18 @@ void ColumnNullable::Append(bool isnull)
 }
 
 
+void ColumnNullable::AppendWithMove(ColumnRef column)
+{
+    if (auto col = column->As<ColumnNullable>()) {
+        if (!col->nested_->Type()->IsEqual(nested_->Type())) {
+            return;
+        }
+
+        nested_->AppendWithMove(col->nested_);
+        nulls_->AppendWithMove(col->nulls_);
+    }
+}
+
 bool ColumnNullable::IsNull(size_t n) const {
     return nulls_->At(n) != 0;
 }

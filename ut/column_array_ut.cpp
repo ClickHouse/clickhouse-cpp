@@ -69,6 +69,32 @@ TEST(ColumnArray, Append) {
     ASSERT_EQ(col->As<ColumnUInt64>()->At(1), 3u);
 }
 
+TEST(ColumnArray, AppendWithMove) {
+    auto arr = std::make_shared<ColumnArray>(std::make_shared<ColumnString>());
+
+    std::string str1 = "hello clickhouse-server";
+    std::string str2 = "hello clickhouse-client";
+
+    auto id = std::make_shared<ColumnString>();
+    std::string expect1 = str1;
+    id->Append(std::move(str1));
+    arr->AppendAsColumnWithMove(id);
+
+    std::string expect2 = str2;
+    id->Append(std::move(str2));
+    arr->AppendAsColumnWithMove(id);
+
+    ASSERT_EQ(arr->Size(), 2u);
+
+    auto col = arr->GetAsColumn(0);
+    ASSERT_EQ(col->Size(), 1u);
+    ASSERT_EQ(col->As<ColumnString>()->At(0), expect1);
+
+    col = arr->GetAsColumn(1);
+    ASSERT_EQ(col->Size(), 1u);
+    ASSERT_EQ(col->As<ColumnString>()->At(0), expect2);
+}
+
 TEST(ColumnArray, ArrayOfDecimal) {
     auto column = std::make_shared<clickhouse::ColumnDecimal>(18, 10);
     auto array = std::make_shared<clickhouse::ColumnArray>(column->CloneEmpty());

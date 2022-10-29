@@ -255,6 +255,30 @@ void ColumnString::Append(ColumnRef column) {
     }
 }
 
+void ColumnString::AppendWithMove(ColumnRef column)
+{
+    if (auto col = column->As<ColumnString>()) {
+        for (auto&& block : col->blocks_) {
+            blocks_.emplace_back(std::move(block));
+        }
+        col->blocks_.clear();
+        col->blocks_.shrink_to_fit();
+
+        for (auto&& ad : col->append_data_) {
+            append_data_.emplace_back(std::move(ad));
+        }
+        col->append_data_.clear();
+        col->append_data_.shrink_to_fit();
+
+        items_.reserve(items_.size() + col->Size());
+        for (auto&& item : col->items_) {
+            items_.emplace_back(std::move(item));
+        }
+        col->items_.clear();
+        col->items_.shrink_to_fit();
+    }
+}
+
 bool ColumnString::LoadBody(InputStream* input, size_t rows) {
     items_.clear();
     blocks_.clear();

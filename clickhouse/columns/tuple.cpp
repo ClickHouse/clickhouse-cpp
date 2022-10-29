@@ -31,6 +31,20 @@ void ColumnTuple::Append(ColumnRef column) {
         columns_[ci]->Append((*source_tuple_column)[ci]);
     }
 }
+
+void ColumnTuple::AppendWithMove(ColumnRef column)
+{
+    if (!this->Type()->IsEqual(column->Type())) {
+        throw ValidationError(
+            "can't append column of type " + column->Type()->GetName() + " "
+            "to column type " + this->Type()->GetName());
+    }
+    auto source_tuple_column = column->As<ColumnTuple>();
+    for (size_t ci = 0; ci < columns_.size(); ++ci) {
+        columns_[ci]->AppendWithMove((*source_tuple_column)[ci]);
+    }
+}
+
 size_t ColumnTuple::Size() const {
     return columns_.empty() ? 0 : columns_[0]->Size();
 }

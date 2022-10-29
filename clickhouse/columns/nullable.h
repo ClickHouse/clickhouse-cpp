@@ -15,6 +15,10 @@ public:
     /// Appends one null flag to the end of the column
     void Append(bool isnull);
 
+    /// Appends content of given column to the end of current one.
+    /// Move the column data if possible
+    void AppendWithMove(ColumnRef column) override;
+
     /// Returns null flag at given row number.
     bool IsNull(size_t n) const;
 

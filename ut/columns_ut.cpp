@@ -125,6 +125,28 @@ TEST(ColumnsCase, StringAppend) {
     ASSERT_EQ(col->At(2), "11");
 }
 
+TEST(ColumnsCase, StringColumnAppend) {
+    auto col = std::make_shared<ColumnString>();
+    std::string data = "this is first message";
+    col->Append(data);
+    ASSERT_EQ(col->Size(), 1u);
+
+    auto col1 = std::make_shared<ColumnString>();
+    col1->AppendWithMove(col);
+    ASSERT_EQ(col->Size(), 0u);
+
+    std::string data1 = "this is 2th message";
+    col->Append(data1);
+    ASSERT_EQ(col->Size(), 1u);
+
+    col1->AppendWithMove(col);
+    ASSERT_EQ(col->Size(), 0u);
+
+    ASSERT_EQ(col1->Size(), 2u);
+    ASSERT_EQ(col1->At(0), data);
+    ASSERT_EQ(col1->At(1), data1);
+}
+
 TEST(ColumnsCase, TupleAppend){
     auto tuple1 = std::make_shared<ColumnTuple>(std::vector<ColumnRef>({
                                 std::make_shared<ColumnUInt64>(),
@@ -140,6 +162,30 @@ TEST(ColumnsCase, TupleAppend){
 
     ASSERT_EQ((*tuple2)[0]->As<ColumnUInt64>()->At(0), 2u);
     ASSERT_EQ((*tuple2)[1]->As<ColumnString>()->At(0), "2");
+}
+
+TEST(ColumnsCase, TupleAppendWithMove) {
+    auto tuple1 = std::make_shared<ColumnTuple>(std::vector<ColumnRef>({
+                                std::make_shared<ColumnString>(),
+                                std::make_shared<ColumnString>()
+        }));
+    auto tuple2 = std::make_shared<ColumnTuple>(std::vector<ColumnRef>({
+                                std::make_shared<ColumnString>(),
+                                std::make_shared<ColumnString>()
+        }));
+
+    std::string str1 = "hi, 1th TupleAppendWithMove";
+    (*tuple1)[0]->As<ColumnString>()->Append(str1);
+
+    std::string str2 = "hi, 2th TupleAppendWithMove";
+    (*tuple1)[1]->As<ColumnString>()->Append(str2);
+    tuple2->AppendWithMove(tuple1);
+
+    ASSERT_EQ((*tuple1)[0]->As<ColumnString>()->Size(), 0u);
+    ASSERT_EQ((*tuple1)[1]->As<ColumnString>()->Size(), 0u);
+
+    ASSERT_EQ((*tuple2)[0]->As<ColumnString>()->At(0), str1);
+    ASSERT_EQ((*tuple2)[1]->As<ColumnString>()->At(0), str2);
 }
 
 TEST(ColumnsCase, TupleSlice){
@@ -362,6 +408,23 @@ TEST(ColumnsCase, NullableSlice) {
     ASSERT_TRUE(sub->IsNull(1));
     ASSERT_FALSE(sub->IsNull(3));
     ASSERT_EQ(subData->At(3), 17u);
+}
+
+TEST(ColumnsCase, NullableAppendWithMove) {
+    std::vector<std::string> data{ {"this is first data"},{"this is second data"} };
+    auto data_col = std::make_shared<ColumnString>(data);
+    auto nulls_col = std::make_shared<ColumnUInt8>(std::vector<uint8_t>{1, 0});
+    auto col = std::make_shared<ColumnNullable>(data_col, nulls_col);
+
+    auto new_col = std::make_shared<ColumnNullable>(
+        std::make_shared<ColumnString>(), std::make_shared<ColumnUInt8>());
+    new_col->AppendWithMove(col);
+
+    ASSERT_EQ(new_col->Size(), 2u);
+    ASSERT_TRUE(new_col->IsNull(0));
+    ASSERT_EQ(new_col->Nested()->As<ColumnString>()->At(1), data[1]);
+
+    ASSERT_EQ(col->Nested()->As<ColumnString>()->Size(), 0u);
 }
 
 // internal representation of UUID data in ColumnUUID

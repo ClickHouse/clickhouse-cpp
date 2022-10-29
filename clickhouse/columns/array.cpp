@@ -35,6 +35,18 @@ void ColumnArray::AppendAsColumn(ColumnRef array) {
     data_->Append(array);
 }
 
+void ColumnArray::AppendAsColumnWithMove(ColumnRef array)
+{
+    if (!data_->Type()->IsEqual(array->Type())) {
+        throw ValidationError(
+            "can't append column of type " + array->Type()->GetName() + " "
+            "to column type " + data_->Type()->GetName());
+    }
+
+    AddOffset(array->Size());
+    data_->AppendWithMove(array);
+}
+
 ColumnRef ColumnArray::GetAsColumn(size_t n) const {
     if (n >= Size())
         throw ValidationError("Index is out ouf bounds: " + std::to_string(n));
