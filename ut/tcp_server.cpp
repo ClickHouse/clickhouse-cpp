@@ -17,9 +17,13 @@
 
 namespace clickhouse {
 
+#ifndef INVALID_SOCKET
+#define INVALID_SOCKET = -1;
+#endif
+
 LocalTcpServer::LocalTcpServer(int port)
     : port_(port)
-    , serverSd_(-1)
+    , serverSd_(INVALID_SOCKET)
 {}
 
 LocalTcpServer::~LocalTcpServer() {
@@ -34,7 +38,7 @@ void LocalTcpServer::start() {
     servAddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
     servAddr.sin_port = htons(port_);
     serverSd_ = socket(AF_INET, SOCK_STREAM, 0);
-    if (serverSd_ < 0) {
+    if (serverSd_ == INVALID_SOCKET) {
         std::cerr << "Error establishing server socket" << std::endl;
         throw std::runtime_error("Error establishing server socket");
     }
@@ -62,7 +66,7 @@ void LocalTcpServer::start() {
 }
 
 void LocalTcpServer::stop() {
-    if(serverSd_ > 0) {
+    if (serverSd_ != INVALID_SOCKET) {
 
 #if defined(__WIN32__) || defined(_WIN32) || defined(_WIN64)
         shutdown(serverSd_, SD_BOTH);
@@ -71,7 +75,7 @@ void LocalTcpServer::stop() {
         shutdown(serverSd_, SHUT_RDWR);
         close(serverSd_);
 #endif
-        serverSd_ = -1;
+        serverSd_ = INVALID_SOCKET;
     }
 }
 

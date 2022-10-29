@@ -18,7 +18,11 @@ public:
 private:
 
     int port_;
-    size_t serverSd_;
+#if defined(_WIN32)
+    size_t serverSd_; 
+#else
+    int serverSd_;
+#endif
 };
 
 }

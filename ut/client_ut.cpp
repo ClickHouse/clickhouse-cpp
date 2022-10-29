@@ -479,7 +479,7 @@ TEST_P(ClientCase, Cancellable) {
         );
     );
     /// It's easier to get query cancelled for compress enabled client.
-    EXPECT_LE(row_cnt, kBlock * kRowEachBlock);
+    EXPECT_LE(row_cnt, static_cast<size_t>(kBlock * kRowEachBlock));
 }
 
 TEST_P(ClientCase, Exception) {
@@ -779,7 +779,7 @@ TEST_P(ClientCase, ColEscapeNameTest) {
             EXPECT_EQ(column_names[i], sblock.GetColumnName(i));
         }
 
-        EXPECT_EQ(row, 2);
+        EXPECT_EQ(row, static_cast <size_t>(2));
         EXPECT_EQ(sblock[0]->As<ColumnUInt64>()->At(0), 1u);
         EXPECT_EQ(sblock[0]->As<ColumnUInt64>()->At(1), 2u);
         EXPECT_EQ(sblock[1]->As<ColumnUInt64>()->At(0), 4u);
