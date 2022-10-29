@@ -178,7 +178,7 @@ std::ostream& operator<<(std::ostream & ostr, const PrettyPrintBlock & pretty_pr
     if (block.GetRowCount() == 0 || block.GetColumnCount() == 0)
         return ostr;
 
-    std::vector<int> column_width(block.GetColumnCount());
+    std::vector<size_t> column_width(block.GetColumnCount());
     const auto horizontal_bar = '|';
     const auto cross = '+';
     const auto vertical_bar = '-';

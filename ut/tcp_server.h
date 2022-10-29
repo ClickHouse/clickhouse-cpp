@@ -18,7 +18,7 @@ public:
 private:
 
     int port_;
-    int serverSd_;
+    size_t serverSd_;
 };
 
 }

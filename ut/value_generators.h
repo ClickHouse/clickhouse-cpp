@@ -80,7 +80,7 @@ struct RandomGenerator {
             typename std::conditional_t<std::is_integral_v<T>, std::uniform_int_distribution<T>, void>>;
 
     explicit RandomGenerator(T seed = 0, T value_min = std::numeric_limits<T>::min(), T value_max = std::numeric_limits<T>::max())
-        : random_engine(seed)
+        : random_engine(static_cast<unsigned int>(seed))
         , distribution(value_min, value_max)
     {
     }

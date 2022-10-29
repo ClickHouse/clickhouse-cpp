@@ -19,7 +19,7 @@ TEST(Socketcase, connecterror) {
     std::this_thread::sleep_for(std::chrono::seconds(1));
     try {
         Socket socket(addr);
-    } catch (const std::system_error& e) {
+    } catch (const std::system_error&) {
         FAIL();
     }
 

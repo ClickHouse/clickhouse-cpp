@@ -468,7 +468,7 @@ TEST_P(ClientCase, Cancellable) {
     }
 
     /// Send a query which is canceled after receiving the first blockr.
-    int row_cnt = 0;
+    size_t row_cnt = 0;
     EXPECT_NO_THROW(
         client_->SelectCancelable("SELECT * FROM test_clickhouse_cpp_cancel",
             [&row_cnt](const Block& block)
@@ -772,7 +772,7 @@ TEST_P(ClientCase, ColEscapeNameTest) {
     client_->Insert(R"sql("test_clickhouse_cpp_col_escape_""name_test")sql", block);
     client_->Select(R"sql(SELECT * FROM "test_clickhouse_cpp_col_escape_""name_test")sql", [] (const Block& sblock)
     {
-        int row = sblock.GetRowCount();
+        size_t row = sblock.GetRowCount();
         if (row <= 0) {return;}
         ASSERT_EQ(columns_count, sblock.GetColumnCount());
         for (size_t i = 0; i < columns_count; ++i) {
@@ -855,7 +855,7 @@ TEST_P(ClientCase, DateTime64) {
 TEST_P(ClientCase, Query_ID) {
     const auto server_info = client_->GetServerInfo();
 
-    std::srand(std::time(nullptr) + reinterpret_cast<int64_t>(&server_info));
+    std::srand(static_cast<uint32_t>((std::time(nullptr) + reinterpret_cast<int64_t>(&server_info))));
     const auto * test_info = ::testing::UnitTest::GetInstance()->current_test_info();
     const std::string query_id = std::to_string(std::rand()) + "-" + test_info->test_suite_name() + "/" + test_info->name();
 
@@ -1133,7 +1133,7 @@ TEST_P(ClientCase, TracingContext) {
 
     Query query("INSERT INTO " + table_name + " (*) VALUES (\'Foo\'), (\'Bar\')" );
     open_telemetry::TracingContext tracing_context;
-    std::srand(std::time(0));
+    std::srand(static_cast<uint32_t>(std::time(0)));
     tracing_context.trace_id = {std::rand(), std::rand()};
     query.SetTracingContext(tracing_context);
     client_->Execute(query);
@@ -1154,7 +1154,7 @@ TEST_P(ClientCase, TracingContext) {
 
 const auto LocalHostEndpoint = ClientOptions()
         .SetHost(           getEnvOrDefault("CLICKHOUSE_HOST",     "localhost"))
-        .SetPort(   getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "9000"))
+        .SetPort( getEnvOrDefault<uint32_t>("CLICKHOUSE_PORT",     "9000"))
         .SetUser(           getEnvOrDefault("CLICKHOUSE_USER",     "default"))
         .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", ""))
         .SetDefaultDatabase(getEnvOrDefault("CLICKHOUSE_DB",       "default"));
@@ -1196,7 +1196,7 @@ INSTANTIATE_TEST_SUITE_P(ClientLocalFailed, ConnectionFailedClientTest,
     ::testing::Values(ConnectionFailedClientTest::ParamType{
         ClientOptions()
             .SetHost(           getEnvOrDefault("CLICKHOUSE_HOST",     "localhost"))
-            .SetPort(   getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "9000"))
+            .SetPort( getEnvOrDefault<uint32_t>("CLICKHOUSE_PORT",     "9000"))
             .SetUser("non_existing_user_clickhouse_cpp_test")
             .SetPassword("wrongpwd")
             .SetDefaultDatabase(getEnvOrDefault("CLICKHOUSE_DB",       "default"))

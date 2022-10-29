@@ -62,7 +62,7 @@ TEST(ArrayOfLowCardinality, InsertAndQuery) {
 
     const auto localHostEndpoint = ClientOptions()
                                        .SetHost(           getEnvOrDefault("CLICKHOUSE_HOST",     "localhost"))
-                                       .SetPort(   getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "9000"))
+                                       .SetPort( getEnvOrDefault<uint32_t>("CLICKHOUSE_PORT",     "9000"))
                                        .SetUser(           getEnvOrDefault("CLICKHOUSE_USER",     "default"))
                                        .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", ""))
                                        .SetDefaultDatabase(getEnvOrDefault("CLICKHOUSE_DB",       "default"));
