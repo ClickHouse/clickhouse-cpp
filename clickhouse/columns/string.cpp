@@ -203,12 +203,7 @@ void ColumnString::Append(std::string_view str) {
 }
 
 void ColumnString::Append(const char* str) {
-    auto len = strlen(str);
-    if (blocks_.size() == 0 || blocks_.back().GetAvailable() < len) {
-        blocks_.emplace_back(std::max(DEFAULT_BLOCK_SIZE, len));
-    }
-
-    items_.emplace_back(blocks_.back().AppendUnsafe(str));
+    Append(std::string_view{ str });
 }
 
 void ColumnString::Append(std::string&& steal_value) {
@@ -257,26 +252,29 @@ void ColumnString::Append(ColumnRef column) {
 
 void ColumnString::AppendWithMove(ColumnRef column)
 {
-    if (auto col = column->As<ColumnString>()) {
-        for (auto&& block : col->blocks_) {
-            blocks_.emplace_back(std::move(block));
-        }
-        col->blocks_.clear();
-        col->blocks_.shrink_to_fit();
-
-        for (auto&& ad : col->append_data_) {
-            append_data_.emplace_back(std::move(ad));
-        }
-        col->append_data_.clear();
-        col->append_data_.shrink_to_fit();
-
-        items_.reserve(items_.size() + col->Size());
-        for (auto&& item : col->items_) {
-            items_.emplace_back(std::move(item));
-        }
-        col->items_.clear();
-        col->items_.shrink_to_fit();
+    auto col = column->As<ColumnString>();
+    if (!col) {
+        return;
     }
+
+    for (auto&& block : col->blocks_) {
+        blocks_.emplace_back(std::move(block));
+    }
+    col->blocks_.clear();
+    col->blocks_.shrink_to_fit();
+
+    for (auto&& ad : col->append_data_) {
+        append_data_.emplace_back(std::move(ad));
+    }
+    col->append_data_.clear();
+    col->append_data_.shrink_to_fit();
+
+    items_.reserve(items_.size() + col->Size());
+    for (auto&& item : col->items_) {
+        items_.emplace_back(std::move(item));
+    }
+    col->items_.clear();
+    col->items_.shrink_to_fit();
 }
 
 bool ColumnString::LoadBody(InputStream* input, size_t rows) {
