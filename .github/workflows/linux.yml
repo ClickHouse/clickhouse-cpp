@@ -78,6 +78,8 @@ jobs:
         docker run -d --name clickhouse ${CLICKHOUSE_SERVER_IMAGE}
         docker ps -a
         docker stats -a --no-stream
+        ## Check and wait until CH is ready to accept connections
+        docker exec -it clickhouse bash -c 'for i in {1..10}; do echo checking if clickhouse server is started  attempt \#$i; if ( grep -q "<Information> Application: Ready for connections." /var/log/clickhouse-server/clickhouse-server.log ); then echo seems like it is started; exit 0; fi; sleep 1; done; exit -1'
 
     - name: Test
       working-directory: ${{github.workspace}}/build/ut
