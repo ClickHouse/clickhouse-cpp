@@ -75,7 +75,7 @@ jobs:
     - name: Test - Start ClickHouse server in background
       run: |
         docker pull ${CLICKHOUSE_SERVER_IMAGE}
-        docker run -d --name clickhouse ${CLICKHOUSE_SERVER_IMAGE}
+        docker run -d --name clickhouse -p 9000:9000 ${CLICKHOUSE_SERVER_IMAGE}
         docker ps -a
         docker stats -a --no-stream
         ## Check and wait until CH is ready to accept connections
