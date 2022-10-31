@@ -1,6 +1,7 @@
 #include <benchmark/benchmark.h>
 
 #include <clickhouse/client.h>
+#include <ut/utils.h>
 
 namespace clickhouse {
 
