@@ -8,7 +8,8 @@ on:
 
 env:
   BUILD_TYPE: Release
-  CH_SERVER_VERSION: 21.3.17.2
+  CLICKHOUSE_SERVER_IMAGE: "clickhouse/clickhouse-server:22.3"
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -48,7 +49,16 @@ jobs:
     - uses: actions/checkout@v2
 
     - name: Install dependencies
-      run: sudo apt-get install -y cmake ${{ matrix.INSTALL }} ${{ matrix.INSTALL_SSL }}
+      run: sudo apt-get install -y docker cmake ${{ matrix.INSTALL }} ${{ matrix.INSTALL_SSL }}
+
+    - name: Install dependencies - Docker
+      run: |
+        sudo apt remove -y docker docker-engine docker.io containerd runc
+        sudo apt install -y apt-transport-https ca-certificates curl gnupg lsb-release
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+        echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+        sudo apt update -q
+        sudo apt install docker-ce docker-ce-cli containerd.io
 
     - name: Configure CMake
       run: |
@@ -62,17 +72,14 @@ jobs:
     - name: Build
       run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} --target all
 
-    - name: Start ClickHouse server
+    - name: Test - Start ClickHouse server in background
       run: |
-        sudo apt-get install apt-transport-https ca-certificates dirmngr
-        sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv E0C56BD4
-        echo "deb https://repo.clickhouse.com/deb/stable/ main/" | sudo tee /etc/apt/sources.list.d/clickhouse.list
-        sudo apt-get update
-        sudo apt-get install -y \
-            clickhouse-server=${{env.CH_SERVER_VERSION}} \
-            clickhouse-client=${{env.CH_SERVER_VERSION}} \
-            clickhouse-common-static=${{env.CH_SERVER_VERSION}}
-        sudo service clickhouse-server start
+        docker pull ${CLICKHOUSE_SERVER_IMAGE}
+        docker run -d --name clickhouse -p 9000:9000 ${CLICKHOUSE_SERVER_IMAGE}
+        docker ps -a
+        docker stats -a --no-stream
+        ## Check and wait until CH is ready to accept connections
+        docker exec clickhouse bash -c 'for i in {1..10}; do echo checking if clickhouse server is started  attempt \#$i; if ( grep -q "<Information> Application: Ready for connections." /var/log/clickhouse-server/clickhouse-server.log ); then echo seems like clickhouse server is started; exit 0; fi; sleep 1; done; exit -1'
 
     - name: Test
       working-directory: ${{github.workspace}}/build/ut
