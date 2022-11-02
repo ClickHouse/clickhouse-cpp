@@ -1126,7 +1126,6 @@ TEST_P(ClientCase, ServerLogs) {
     EXPECT_GT(received_row_count, 0U);
 }
 
-
 TEST_P(ClientCase, TracingContext) {
     Block block;
     createTableWithOneColumn<ColumnString>(block);
@@ -1150,6 +1149,26 @@ TEST_P(ClientCase, TracingContext) {
     });
 
     EXPECT_GT(received_rows, 0u);
+}
+
+TEST_P(ClientCase, OnProfileEvents) {
+    Block block;
+    createTableWithOneColumn<ColumnString>(block);
+
+    client_->Execute("INSERT INTO " + table_name + " (*) VALUES (\'Foo\'), (\'Bar\')");
+    size_t received_row_count = 0;
+    Query query("SELECT * FROM " + table_name);
+
+    query.OnProfileEvents([&](const Block& block) {
+        received_row_count += block.GetRowCount();
+        return true;
+    });
+    client_->Execute(query);
+
+    const int DBMS_MIN_REVISION_WITH_INCREMENTAL_PROFILE_EVENTS = 54451;
+    if (client_->GetServerInfo().revision >= DBMS_MIN_REVISION_WITH_INCREMENTAL_PROFILE_EVENTS) {
+        EXPECT_GT(received_row_count, 0U);
+    }
 }
 
 const auto LocalHostEndpoint = ClientOptions()
