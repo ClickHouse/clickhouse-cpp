@@ -75,7 +75,7 @@ IF (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     ENDIF ()
 ENDIF ()
 
-INSTALL (TARGETS clickhouse-cpp-lib EXPORT clickhouse-cpp-libConfig
+INSTALL (TARGETS clickhouse-cpp-lib EXPORT clickhouse-cppConfig
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
@@ -86,16 +86,16 @@ INSTALL (TARGETS clickhouse-cpp-lib-static
 )
 
 # install cmake config
-INSTALL (EXPORT clickhouse-cpp-libConfig DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake)
-EXPORT (TARGETS clickhouse-cpp-lib FILE clickhouse-cpp-libConfig.cmake)
+INSTALL (EXPORT clickhouse-cppConfig DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake)
+EXPORT (TARGETS clickhouse-cpp-lib FILE clickhouse-cppConfig.cmake)
 
 # install pkgconfig
 SET (DEST_DIR "${CMAKE_INSTALL_PREFIX}")
 SET (PRIVATE_LIBS "-lclickhouse-cpp-lib")
 CONFIGURE_FILE (
-  "${CMAKE_CURRENT_SOURCE_DIR}/clickhouse-cpp-lib.pc.in"
-  "${CMAKE_CURRENT_BINARY_DIR}/clickhouse-cpp-lib.pc" @ONLY)
-INSTALL(FILES "${CMAKE_CURRENT_BINARY_DIR}/clickhouse-cpp-lib.pc" DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
+  "${CMAKE_CURRENT_SOURCE_DIR}/clickhouse-cpp.pc.in"
+  "${CMAKE_CURRENT_BINARY_DIR}/clickhouse-cpp.pc" @ONLY)
+INSTALL(FILES "${CMAKE_CURRENT_BINARY_DIR}/clickhouse-cpp.pc" DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
 
 # general
 INSTALL(FILES block.h DESTINATION include/clickhouse/)
