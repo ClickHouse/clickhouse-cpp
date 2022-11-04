@@ -36,6 +36,8 @@ PROJECT (CLICKHOUSE-CLIENT)
     INCLUDE_DIRECTORIES (.)
     INCLUDE_DIRECTORIES (contrib)
 
+    INCLUDE (GNUInstallDirs)
+
     SUBDIRS (
         clickhouse
         contrib/absl
