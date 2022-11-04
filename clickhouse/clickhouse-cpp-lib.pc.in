@@ -1,0 +1,10 @@
+prefix=@DEST_DIR@
+libdir=${prefix}/lib
+includedir=${prefix}/include
+
+Name: clickhouse-cpp-lib
+Description: C++ library for communicating with a ClickHouse.
+Version: @VERSION_MAJOR@.@VERSION_MINOR@.@VERSION_PATCH@
+
+Libs: -L${libdir} -lclickhouse-cpp-lib
+Cflags: -I${includedir}
