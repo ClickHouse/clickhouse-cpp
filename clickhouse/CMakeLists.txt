@@ -90,7 +90,7 @@ INSTALL (EXPORT clickhouse-cpp-libConfig DESTINATION ${CMAKE_INSTALL_LIBDIR}/cma
 EXPORT (TARGETS clickhouse-cpp-lib FILE clickhouse-cpp-libConfig.cmake)
 
 INSTALL (EXPORT clickhouse-cpp-lib-staticConfig DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/clickhouse-cpp-lib-static)
-EXPORT (TARGETS clickhouse-cpp-lib FILE clickhouse-cpp-lib-staticConfig.cmake)
+EXPORT (TARGETS clickhouse-cpp-lib-static absl-lib cityhash-lib lz4-lib FILE clickhouse-cpp-lib-staticConfig.cmake)
 
 # install pkgconfig
 SET (DEST_DIR "${CMAKE_INSTALL_PREFIX}")

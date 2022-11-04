@@ -39,10 +39,10 @@ PROJECT (CLICKHOUSE-CLIENT)
     INCLUDE (GNUInstallDirs)
 
     SUBDIRS (
-        clickhouse
         contrib/absl
         contrib/cityhash
         contrib/lz4
+        clickhouse
     )
 
     IF (BUILD_BENCHMARK)
