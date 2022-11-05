@@ -10,4 +10,5 @@ install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/"
   DESTINATION "include/clickhouse-cpp-deps/absl"
   FILES_MATCHING
   PATTERN "*.h"
+  PATTERN "*.inc"
   )
