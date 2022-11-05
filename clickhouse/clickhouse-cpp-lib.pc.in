@@ -7,4 +7,4 @@ Description: C++ library for communicating with a ClickHouse.
 Version: @VERSION_MAJOR@.@VERSION_MINOR@.@VERSION_PATCH@
 
 Libs: -L${libdir} -lclickhouse-cpp-lib
-Cflags: -I${includedir}
+Cflags: -I${includedir} -I${includedir}/clickhouse-cpp-deps/

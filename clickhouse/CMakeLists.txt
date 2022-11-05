@@ -75,6 +75,14 @@ IF (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     ENDIF ()
 ENDIF ()
 
+target_include_directories(clickhouse-cpp-lib INTERFACE
+  $<INSTALL_INTERFACE:include/clickhouse-cpp-deps/>
+  )
+
+target_include_directories(clickhouse-cpp-lib-static INTERFACE
+  $<INSTALL_INTERFACE:include/clickhouse-cpp-deps/>
+  )
+
 INSTALL (TARGETS clickhouse-cpp-lib EXPORT clickhouse-cpp-libConfig
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
