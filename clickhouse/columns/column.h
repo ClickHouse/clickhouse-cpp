@@ -2,6 +2,7 @@
 
 #include "../types/types.h"
 #include "../columns/itemview.h"
+#include "../columns/serialization.h"
 #include "../exceptions.h"
 
 #include <memory>
@@ -19,7 +20,11 @@ using ColumnRef = std::shared_ptr<class Column>;
  */
 class Column : public std::enable_shared_from_this<Column> {
 public:
-    explicit inline Column(TypeRef type) : type_(type) {}
+    explicit inline Column(TypeRef type, SerializationRef serialization)
+        : type_(std::move(type))
+        , serialization_(std::move(serialization))
+    {
+    }
 
     virtual ~Column() {}
 
@@ -56,18 +61,6 @@ public:
     /// Should be called only once from the client. Derived classes should not call it.
     bool Load(InputStream* input, size_t rows);
 
-    /// Loads column prefix from input stream.
-    virtual bool LoadPrefix(InputStream* input, size_t rows);
-
-    /// Loads column data from input stream.
-    virtual bool LoadBody(InputStream* input, size_t rows) = 0;
-
-    /// Saves column prefix to output stream. Column types with prefixes must implement it.
-    virtual void SavePrefix(OutputStream* output);
-
-    /// Saves column body to output stream.
-    virtual void SaveBody(OutputStream* output) = 0;
-
     /// Template method to save to output stream. It'll call SavePrefix and SaveBody respectively
     /// Should be called only once from the client. Derived classes should not call it.
     /// Save is split in Prefix and Body because some data types require prefixes and specific serialization order.
@@ -93,12 +86,23 @@ public:
         throw UnimplementedError("GetItem() is not supported for column of " + type_->GetName());
     }
 
+    virtual bool LoadSerializationKind(InputStream* input);
+
+    virtual void SaveSerializationKind(OutputStream* output);
+
+    virtual void SetSerializationKind(Serialization::Kind kind) = 0;
+
+    SerializationRef GetSerialization();
+
+    virtual bool HasCustomSerialization() const;
+
     friend void swap(Column& left, Column& right) {
         left.Swap(right);
     }
 
 protected:
     TypeRef type_;
+    SerializationRef serialization_;
 };
 
 }  // namespace clickhouse

@@ -25,12 +25,6 @@ public:
     /// Appends content of given column to the end of current one.
     void Append(ColumnRef column) override;
 
-    /// Loads column data from input stream.
-    bool LoadBody(InputStream* input, size_t rows) override;
-
-    /// Saves column data to output stream.
-    void SaveBody(OutputStream* output) override;
-
     /// Clear column data .
     void Clear() override;
 
@@ -44,7 +38,17 @@ public:
 
     ItemView GetItem(size_t index) const override;
 
+    void SetSerializationKind(Serialization::Kind kind)  override;
+
 private:
+    /// Loads column data from input stream.
+    bool LoadBody(InputStream* input, size_t rows);
+
+    /// Saves column data to output stream.
+    void SaveBody(OutputStream* output);
+
+    friend SerializationDefault<ColumnDate>;
+
     std::shared_ptr<ColumnUInt16> data_;
 };
 
@@ -66,12 +70,6 @@ public:
     /// Appends content of given column to the end of current one.
     void Append(ColumnRef column) override;
 
-    /// Loads column data from input stream.
-    bool LoadBody(InputStream* input, size_t rows) override;
-
-    /// Saves column data to output stream.
-    void SaveBody(OutputStream* output) override;
-
     /// Clear column data .
     void Clear() override;
 
@@ -85,7 +83,17 @@ public:
 
     ItemView GetItem(size_t index) const override;
 
+    void SetSerializationKind(Serialization::Kind kind)  override;
+
 private:
+    /// Loads column data from input stream.
+    bool LoadBody(InputStream* input, size_t rows);
+
+    /// Saves column data to output stream.
+    void SaveBody(OutputStream* output);
+
+    friend SerializationDefault<ColumnDate32>;
+
     std::shared_ptr<ColumnInt32> data_;
 };
 
@@ -111,14 +119,8 @@ public:
     /// Appends content of given column to the end of current one.
     void Append(ColumnRef column) override;
 
-    /// Loads column data from input stream.
-    bool LoadBody(InputStream* input, size_t rows) override;
-
     /// Clear column data .
     void Clear() override;
-
-    /// Saves column data to output stream.
-    void SaveBody(OutputStream* output) override;
 
     /// Returns count of rows in the column.
     size_t Size() const override;
@@ -130,7 +132,17 @@ public:
 
     ItemView GetItem(size_t index) const override;
 
+    void SetSerializationKind(Serialization::Kind kind)  override;
+
 private:
+    /// Loads column data from input stream.
+    bool LoadBody(InputStream* input, size_t rows);
+
+    /// Saves column data to output stream.
+    void SaveBody(OutputStream* output);
+
+    friend SerializationDefault<ColumnDateTime>;
+
     std::shared_ptr<ColumnUInt32> data_;
 };
 
@@ -159,14 +171,8 @@ public:
     /// Appends content of given column to the end of current one.
     void Append(ColumnRef column) override;
 
-    /// Loads column data from input stream.
-    bool LoadBody(InputStream* input, size_t rows) override;
-
     /// Clear column data .
     void Clear() override;
-
-    /// Saves column data to output stream.
-    void SaveBody(OutputStream* output) override;
 
     /// Returns count of rows in the column.
     size_t Size() const override;
@@ -180,10 +186,19 @@ public:
 
     size_t GetPrecision() const;
 
-private:
-    ColumnDateTime64(TypeRef type, std::shared_ptr<ColumnDecimal> data);
+    void SetSerializationKind(Serialization::Kind kind)  override;
 
 private:
+    /// Loads column data from input stream.
+    bool LoadBody(InputStream* input, size_t rows);
+
+    /// Saves column data to output stream.
+    void SaveBody(OutputStream* output);
+
+    friend SerializationDefault<ColumnDateTime64>;
+
+    ColumnDateTime64(TypeRef type, std::shared_ptr<ColumnDecimal> data);
+
     std::shared_ptr<ColumnDecimal> data_;
     const size_t precision_;
 };

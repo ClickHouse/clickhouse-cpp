@@ -29,18 +29,6 @@ public:
     /// Appends content of given column to the end of current one.
     void Append(ColumnRef column) override;
 
-    /// Loads column prefix from input stream.
-    bool LoadPrefix(InputStream* input, size_t rows) override;
-
-    /// Loads column data from input stream.
-    bool LoadBody(InputStream* input, size_t rows) override;
-
-    /// Saves column prefix to output stream.
-    void SavePrefix(OutputStream* output) override;
-
-    /// Saves column data to output stream.
-    void SaveBody(OutputStream* output) override;
-
     /// Clear column data .
     void Clear() override;
 
@@ -52,7 +40,29 @@ public:
     ColumnRef CloneEmpty() const override;
     void Swap(Column& other) override;
 
+    bool LoadSerializationKind(InputStream* input) override;
+
+    void SaveSerializationKind(OutputStream* output) override;
+
+    void SetSerializationKind(Serialization::Kind kind) override;
+
+    bool HasCustomSerialization() const override;
+
 private:
+    /// Loads column prefix from input stream.
+    bool LoadPrefix(InputStream* input, size_t rows);
+
+    /// Loads column data from input stream.
+    bool LoadBody(InputStream* input, size_t rows);
+
+    /// Saves column prefix to output stream.
+    void SavePrefix(OutputStream* output);
+
+    /// Saves column data to output stream.
+    void SaveBody(OutputStream* output);
+
+    friend SerializationDefault<ColumnTuple>;
+
     std::vector<ColumnRef> columns_;
 };
 

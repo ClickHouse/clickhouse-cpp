@@ -4,6 +4,10 @@
 
 struct in_addr;
 
+bool operator==(const in_addr& l, const in_addr& r);
+
+bool operator!=(const in_addr& l, const in_addr& r);
+
 namespace clickhouse {
 
 class ColumnIPv4 : public Column {
@@ -40,12 +44,6 @@ public:
     /// Appends content of given column to the end of current one.
     void Append(ColumnRef column) override;
 
-    /// Loads column data from input stream.
-    bool LoadBody(InputStream* input, size_t rows) override;
-
-    /// Saves column data to output stream.
-    void SaveBody(OutputStream* output) override;
-
     /// Clear column data .
     void Clear() override;
 
@@ -58,8 +56,17 @@ public:
     void Swap(Column& other) override;
 
     ItemView GetItem(size_t index) const override;
+    void SetSerializationKind(Serialization::Kind kind)  override;
 
 private:
+    /// Loads column data from input stream.
+    bool LoadBody(InputStream* input, size_t rows);
+
+    /// Saves column data to output stream.
+    void SaveBody(OutputStream* output);
+
+    friend SerializationDefault<ColumnIPv4>;
+
     std::shared_ptr<ColumnUInt32> data_;
 };
 

@@ -9,13 +9,13 @@ namespace clickhouse {
 
 template <typename T>
 ColumnEnum<T>::ColumnEnum(TypeRef type)
-    : Column(type)
+    : Column(type, Serialization::MakeDefault(this))
 {
 }
 
 template <typename T>
 ColumnEnum<T>::ColumnEnum(TypeRef type, const std::vector<T>& data)
-    : Column(type)
+    : Column(type, Serialization::MakeDefault(this))
     , data_(data)
 {
 }
@@ -108,6 +108,22 @@ void ColumnEnum<T>::Swap(Column& other) {
 template <typename T>
 ItemView ColumnEnum<T>::GetItem(size_t index) const {
     return ItemView{type_->GetCode(), data_[index]};
+}
+
+template <typename T>
+void ColumnEnum<T>::SetSerializationKind(Serialization::Kind kind) {
+    switch (kind)
+    {
+    case Serialization::Kind::DEFAULT:
+        serialization_ = Serialization::MakeDefault(this);
+        break;
+    case Serialization::Kind::SPARSE:
+        serialization_ = Serialization::MakeSparse(this, static_cast<T>(0));
+        break;
+    default:
+        throw UnimplementedError("Serialization kind:" + std::to_string(static_cast<int>(kind))
+            + " is not supported for column of " + type_->GetName());
+    }
 }
 
 template class ColumnEnum<int8_t>;

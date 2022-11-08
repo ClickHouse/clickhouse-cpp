@@ -11,7 +11,7 @@ static std::vector<TypeRef> CollectTypes(const std::vector<ColumnRef>& columns) 
 }
 
 ColumnTuple::ColumnTuple(const std::vector<ColumnRef>& columns)
-    : Column(Type::CreateTuple(CollectTypes(columns)))
+    : Column(Type::CreateTuple(CollectTypes(columns)), Serialization::MakeDefault(this))
     , columns_(columns)
 {
 }
@@ -57,8 +57,8 @@ ColumnRef ColumnTuple::CloneEmpty() const {
 }
 
 bool ColumnTuple::LoadPrefix(InputStream* input, size_t rows) {
-    for (auto ci = columns_.begin(); ci != columns_.end(); ++ci) {
-        if (!(*ci)->LoadPrefix(input, rows)) {
+    for (auto & column : columns_) {
+        if (!(column->GetSerialization()->LoadPrefix(column.get(), input, rows))) {
             return false;
         }
     }
@@ -67,8 +67,8 @@ bool ColumnTuple::LoadPrefix(InputStream* input, size_t rows) {
 }
 
 bool ColumnTuple::LoadBody(InputStream* input, size_t rows) {
-    for (auto ci = columns_.begin(); ci != columns_.end(); ++ci) {
-        if (!(*ci)->LoadBody(input, rows)) {
+    for (auto & column : columns_) {
+        if (!(column->GetSerialization()->LoadBody(column.get(), input, rows))) {
             return false;
         }
     }
@@ -78,13 +78,13 @@ bool ColumnTuple::LoadBody(InputStream* input, size_t rows) {
 
 void ColumnTuple::SavePrefix(OutputStream* output) {
     for (auto & column : columns_) {
-        column->SavePrefix(output);
+        column->GetSerialization()->SavePrefix(column.get(), output);
     }
 }
 
 void ColumnTuple::SaveBody(OutputStream* output) {
     for (auto & column : columns_) {
-        column->SaveBody(output);
+        column->GetSerialization()->SaveBody(column.get(), output);
     }
 }
 
@@ -95,6 +95,46 @@ void ColumnTuple::Clear() {
 void ColumnTuple::Swap(Column& other) {
     auto & col = dynamic_cast<ColumnTuple &>(other);
     columns_.swap(col.columns_);
+}
+
+bool ColumnTuple::LoadSerializationKind(InputStream* input) {
+    if (!Column::LoadSerializationKind(input)) {
+        return false;
+    }
+    for (auto & column : columns_) {
+        if (!(column->LoadSerializationKind(input))) {
+            return false;
+        }
+    }
+    return true;
+}
+
+void ColumnTuple::SaveSerializationKind(OutputStream* output) {
+    Column::SaveSerializationKind(output);
+    for (auto & column : columns_) {
+        column->SaveSerializationKind(output);
+    }
+}
+
+void ColumnTuple::SetSerializationKind(Serialization::Kind kind) {
+    switch (kind)
+    {
+    case Serialization::Kind::DEFAULT:
+        serialization_ = Serialization::MakeDefault(this);
+        break;
+    default:
+        throw UnimplementedError("Serialization kind:" + std::to_string(static_cast<int>(kind))
+            + " is not supported for column of " + type_->GetName());
+    }
+}
+
+bool ColumnTuple::HasCustomSerialization() const {
+    for (auto & column : columns_) {
+        if (column->HasCustomSerialization()) {
+            return true;
+        }
+    }
+    return false;
 }
 
 }

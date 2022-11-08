@@ -25,7 +25,7 @@ size_t ComputeTotalSize(const Container & strings, size_t begin = 0, size_t len 
 namespace clickhouse {
 
 ColumnFixedString::ColumnFixedString(size_t n)
-    : Column(Type::CreateString(n))
+    : Column(Type::CreateString(n), Serialization::MakeDefault(this))
     , string_size_(n)
 {
 }
@@ -118,6 +118,21 @@ ItemView ColumnFixedString::GetItem(size_t index) const {
     return ItemView{Type::FixedString, this->At(index)};
 }
 
+void ColumnFixedString::SetSerializationKind(Serialization::Kind kind) {
+    switch (kind)
+    {
+    case Serialization::Kind::DEFAULT:
+        serialization_ = Serialization::MakeDefault(this);
+        break;
+    case Serialization::Kind::SPARSE:
+        serialization_ = Serialization::MakeSparse(this, std::string(FixedSize(), '\0'));
+        break;
+    default:
+        throw UnimplementedError("Serialization kind:" + std::to_string(static_cast<int>(kind))
+            + " is not supported for column of " + type_->GetName());
+    }
+}
+
 struct ColumnString::Block
 {
     using CharT = typename std::string::value_type;
@@ -157,7 +172,7 @@ struct ColumnString::Block
 };
 
 ColumnString::ColumnString()
-    : Column(Type::CreateString())
+    : Column(Type::CreateString(), Serialization::MakeDefault(this))
 {
 }
 
@@ -315,6 +330,21 @@ void ColumnString::Swap(Column& other) {
 
 ItemView ColumnString::GetItem(size_t index) const {
     return ItemView{Type::String, this->At(index)};
+}
+
+void ColumnString::SetSerializationKind(Serialization::Kind kind) {
+    switch (kind)
+    {
+    case Serialization::Kind::DEFAULT:
+        serialization_ = Serialization::MakeDefault(this);
+        break;
+    case Serialization::Kind::SPARSE:
+        serialization_ = Serialization::MakeSparse(this, std::string());
+        break;
+    default:
+        throw UnimplementedError("Serialization kind:" + std::to_string(static_cast<int>(kind))
+            + " is not supported for column of " + type_->GetName());
+    }
 }
 
 }

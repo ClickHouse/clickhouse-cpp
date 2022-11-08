@@ -21,19 +21,22 @@ public:
 
 public:
     void Append(ColumnRef column) override;
-    bool LoadBody(InputStream* input, size_t rows) override;
-    void SaveBody(OutputStream* output) override;
     void Clear() override;
     size_t Size() const override;
     ColumnRef Slice(size_t begin, size_t len) const override;
     ColumnRef CloneEmpty() const override;
     void Swap(Column& other) override;
     ItemView GetItem(size_t index) const override;
+    void SetSerializationKind(Serialization::Kind kind)  override;
 
     size_t GetScale() const;
     size_t GetPrecision() const;
 
 private:
+    bool LoadBody(InputStream* input, size_t rows);
+    void SaveBody(OutputStream* output);
+    friend SerializationDefault<ColumnDecimal>;
+
     /// Depending on a precision it can be one of:
     ///  - ColumnInt32
     ///  - ColumnInt64

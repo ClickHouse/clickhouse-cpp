@@ -7,20 +7,20 @@ namespace clickhouse {
 
 template <typename T>
 ColumnVector<T>::ColumnVector()
-    : Column(Type::CreateSimple<T>())
+    : Column(Type::CreateSimple<T>(), Serialization::MakeDefault(this))
 {
 }
 
 template <typename T>
 ColumnVector<T>::ColumnVector(const std::vector<T> & data)
-    : Column(Type::CreateSimple<T>())
+    : Column(Type::CreateSimple<T>(), Serialization::MakeDefault(this))
     , data_(data)
 {
 }
 
 template <typename T>
 ColumnVector<T>::ColumnVector(std::vector<T> && data)
-    : Column(Type::CreateSimple<T>())
+    : Column(Type::CreateSimple<T>(), Serialization::MakeDefault(this))
     , data_(std::move(data))
 {
 }
@@ -96,6 +96,22 @@ void ColumnVector<T>::Swap(Column& other) {
 template <typename T>
 ItemView ColumnVector<T>::GetItem(size_t index) const  {
     return ItemView{type_->GetCode(), data_[index]};
+}
+
+template <typename T>
+void ColumnVector<T>::SetSerializationKind(Serialization::Kind kind) {
+    switch (kind)
+    {
+    case Serialization::Kind::DEFAULT:
+        serialization_ = Serialization::MakeDefault(this);
+        break;
+    case Serialization::Kind::SPARSE:
+        serialization_ = Serialization::MakeSparse(this, static_cast<T>(0));
+        break;
+    default:
+        throw UnimplementedError("Serialization kind:" + std::to_string(static_cast<int>(kind))
+            + " is not supported for column of " + type_->GetName());
+    }
 }
 
 template class ColumnVector<int8_t>;

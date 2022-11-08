@@ -3,16 +3,24 @@
 #include "../base/socket.h" // for platform-specific IPv4-related functions
 #include <stdexcept>
 
+bool operator==(const in_addr& l, const in_addr& r) {
+    return l.s_addr == r.s_addr;
+}
+
+bool operator!=(const in_addr& l, const in_addr& r) {
+    return l.s_addr != r.s_addr;
+}
+
 namespace clickhouse {
 
 ColumnIPv4::ColumnIPv4()
-    : Column(Type::CreateIPv4())
+    : Column(Type::CreateIPv4(), Serialization::MakeDefault(this))
     , data_(std::make_shared<ColumnUInt32>())
 {
 }
 
 ColumnIPv4::ColumnIPv4(ColumnRef data)
-    : Column(Type::CreateIPv4())
+    : Column(Type::CreateIPv4(), Serialization::MakeDefault(this))
     , data_(data ? data->As<ColumnUInt32>() : nullptr)
 {
     if (!data_)
@@ -72,11 +80,11 @@ void ColumnIPv4::Append(ColumnRef column) {
 }
 
 bool ColumnIPv4::LoadBody(InputStream * input, size_t rows) {
-    return data_->LoadBody(input, rows);
+    return data_->GetSerialization()->LoadBody(data_.get(), input, rows);
 }
 
 void ColumnIPv4::SaveBody(OutputStream* output) {
-    data_->SaveBody(output);
+    data_->GetSerialization()->SaveBody(data_.get(), output);
 }
 
 size_t ColumnIPv4::Size() const {
@@ -98,6 +106,21 @@ void ColumnIPv4::Swap(Column& other) {
 
 ItemView ColumnIPv4::GetItem(size_t index) const {
     return ItemView(Type::IPv4, data_->GetItem(index));
+}
+
+void ColumnIPv4::SetSerializationKind(Serialization::Kind kind) {
+    switch (kind)
+    {
+    case Serialization::Kind::DEFAULT:
+        serialization_ = Serialization::MakeDefault(this);
+        break;
+    case Serialization::Kind::SPARSE:
+        serialization_ = Serialization::MakeSparse(this, in_addr());
+        break;
+    default:
+        throw UnimplementedError("Serialization kind:" + std::to_string(static_cast<int>(kind))
+            + " is not supported for column of " + type_->GetName());
+    }
 }
 
 }
