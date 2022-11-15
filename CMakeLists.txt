@@ -27,9 +27,6 @@ PROJECT (CLICKHOUSE-CLIENT)
         SET (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Werror -Wno-deprecated-declarations")
     ENDIF ()
 
-    INCLUDE_DIRECTORIES (.)
-    INCLUDE_DIRECTORIES (contrib)
-
     SUBDIRS (
         clickhouse
         contrib/absl
