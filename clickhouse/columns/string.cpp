@@ -166,6 +166,13 @@ ColumnString::ColumnString()
 {
 }
 
+ColumnString::ColumnString(size_t element_count)
+    : Column(Type::CreateString())
+{
+    items_.reserve(element_count);
+    blocks_.reserve(element_count / 2);
+}
+
 ColumnString::ColumnString(const std::vector<std::string>& data)
     : ColumnString()
 {
@@ -291,7 +298,7 @@ size_t ColumnString::Size() const {
 }
 
 ColumnRef ColumnString::Slice(size_t begin, size_t len) const {
-    auto result = std::make_shared<ColumnString>();
+    auto result = std::make_shared<ColumnString>(len);
 
     if (begin < items_.size()) {
         len = std::min(len, items_.size() - begin);
