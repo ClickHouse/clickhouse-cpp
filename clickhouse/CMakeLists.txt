@@ -43,12 +43,18 @@ TARGET_LINK_LIBRARIES (clickhouse-cpp-lib
     cityhash-lib
     lz4-lib
 )
+TARGET_INCLUDE_DIRECTORIES (clickhouse-cpp-lib
+    PUBLIC ${PROJECT_SOURCE_DIR}
+)
 
 ADD_LIBRARY (clickhouse-cpp-lib-static STATIC ${clickhouse-cpp-lib-src})
 TARGET_LINK_LIBRARIES (clickhouse-cpp-lib-static
     absl-lib
     cityhash-lib
     lz4-lib
+)
+TARGET_INCLUDE_DIRECTORIES (clickhouse-cpp-lib-static
+    PUBLIC ${PROJECT_SOURCE_DIR}
 )
 
 IF (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
