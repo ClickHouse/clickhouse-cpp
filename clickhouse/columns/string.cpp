@@ -248,6 +248,7 @@ void ColumnString::Append(ColumnRef column) {
         if (blocks_.size() == 0 || blocks_.back().GetAvailable() < total_size)
             blocks_.emplace_back(std::max(DEFAULT_BLOCK_SIZE, total_size));
 
+        // Intentionally not doing items_.reserve() since that cripples performance.
         for (size_t i = 0; i < column->Size(); ++i) {
             this->AppendUnsafe((*col)[i]);
         }
