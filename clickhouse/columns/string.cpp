@@ -37,8 +37,7 @@ void ColumnFixedString::Append(std::string_view str) {
                                  + std::to_string(str.size()) + " bytes.");
     }
 
-    if (data_.capacity() - data_.size() < str.size())
-    {
+    if (data_.capacity() - data_.size() < str.size()) {
         // round up to the next block size
         const auto new_size = (((data_.size() + string_size_) / DEFAULT_BLOCK_SIZE) + 1) * DEFAULT_BLOCK_SIZE;
         data_.reserve(new_size);
@@ -129,13 +128,11 @@ struct ColumnString::Block
         data_(new CharT[capacity])
     {}
 
-    inline auto GetAvailable() const
-    {
+    inline auto GetAvailable() const {
         return capacity - size;
     }
 
-    std::string_view AppendUnsafe(std::string_view str)
-    {
+    std::string_view AppendUnsafe(std::string_view str) {
         const auto pos = &data_[size];
 
         memcpy(pos, str.data(), str.size());
@@ -144,13 +141,11 @@ struct ColumnString::Block
         return std::string_view(pos, str.size());
     }
 
-    auto GetCurrentWritePos()
-    {
+    auto GetCurrentWritePos() {
         return &data_[size];
     }
 
-    std::string_view ConsumeTailAsStringViewUnsafe(size_t len)
-    {
+    std::string_view ConsumeTailAsStringViewUnsafe(size_t len) {
         const auto start = &data_[size];
         size += len;
         return std::string_view(start, len);
@@ -170,7 +165,8 @@ ColumnString::ColumnString(size_t element_count)
     : Column(Type::CreateString())
 {
     items_.reserve(element_count);
-    blocks_.reserve(element_count / 2);
+    // 100 is arbitrary number, assumption that string values are about ~40 bytes long.
+    blocks_.reserve(std::max<size_t>(1, element_count / 100));
 }
 
 ColumnString::ColumnString(const std::vector<std::string>& data)
@@ -179,8 +175,7 @@ ColumnString::ColumnString(const std::vector<std::string>& data)
     items_.reserve(data.size());
     blocks_.emplace_back(ComputeTotalSize(data));
 
-    for (const auto & s : data)
-    {
+    for (const auto & s : data) {
         AppendUnsafe(s);
     }
 };
@@ -201,8 +196,7 @@ ColumnString::~ColumnString()
 {}
 
 void ColumnString::Append(std::string_view str) {
-    if (blocks_.size() == 0 || blocks_.back().GetAvailable() < str.length())
-    {
+    if (blocks_.size() == 0 || blocks_.back().GetAvailable() < str.length()) {
         blocks_.emplace_back(std::max(DEFAULT_BLOCK_SIZE, str.size()));
     }
 
@@ -210,12 +204,7 @@ void ColumnString::Append(std::string_view str) {
 }
 
 void ColumnString::Append(const char* str) {
-    auto len = strlen(str);
-    if (blocks_.size() == 0 || blocks_.back().GetAvailable() < len) {
-        blocks_.emplace_back(std::max(DEFAULT_BLOCK_SIZE, len));
-    }
-
-    items_.emplace_back(blocks_.back().AppendUnsafe(str));
+    Append(std::string_view(str, strlen(str)));
 }
 
 void ColumnString::Append(std::string&& steal_value) {
@@ -298,14 +287,14 @@ size_t ColumnString::Size() const {
 }
 
 ColumnRef ColumnString::Slice(size_t begin, size_t len) const {
-    auto result = std::make_shared<ColumnString>(len);
+    auto result = std::make_shared<ColumnString>();
 
     if (begin < items_.size()) {
         len = std::min(len, items_.size() - begin);
+        result->items_.reserve(len);
 
         result->blocks_.emplace_back(ComputeTotalSize(items_, begin, len));
-        for (size_t i = begin; i < begin + len; ++i)
-        {
+        for (size_t i = begin; i < begin + len; ++i) {
             result->Append(items_[i]);
         }
     }
