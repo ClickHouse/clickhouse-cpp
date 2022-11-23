@@ -78,6 +78,7 @@ public:
     ColumnString();
     ~ColumnString();
 
+    explicit ColumnString(size_t element_count);
     explicit ColumnString(const std::vector<std::string> & data);
     explicit ColumnString(std::vector<std::string>&& data);
     ColumnString& operator=(const ColumnString&) = delete;
