@@ -126,7 +126,11 @@ public:
                 : data_iterator_(data_iterator) {}
 
             using ValueType = std::pair<Key, Value>;
+            using difference_type = size_t;
             using value_type = ValueType;
+            using pointer = void;
+            using reference = ValueType&;
+            using iterator_category = std::forward_iterator_tag;
 
             inline auto operator*() const {
                 auto tuple = *data_iterator_;

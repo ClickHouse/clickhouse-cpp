@@ -73,7 +73,7 @@ public:
     inline ValueType operator[](size_t index) const { return GetTupleOfValues(index); }
 
     template <typename T, size_t index = std::tuple_size_v<T>>
-    inline void Append(T value) {
+    inline void Append([[maybe_unused]] T value) {
         static_assert(index <= std::tuple_size_v<T>);
         static_assert(std::tuple_size_v<TupleOfColumns> == std::tuple_size_v<T>);
         if constexpr (index == 0) {
