@@ -77,7 +77,7 @@ inline const char * getPrefix() {
 }
 
 template <typename T, size_t index = std::tuple_size_v<T> >
-inline std::ostream & printTuple(std::ostream & ostr, const T & t) {
+inline std::ostream & printTuple(std::ostream & ostr, [[maybe_unused]] const T & t) {
     static_assert(index <= std::tuple_size_v<T>);
     if constexpr (index == 0) {
         return ostr << "( ";

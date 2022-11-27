@@ -126,6 +126,7 @@ public:
                 : data_iterator_(data_iterator) {}
 
             using ValueType = std::pair<Key, Value>;
+            using value_type = ValueType;
 
             inline auto operator*() const {
                 auto tuple = *data_iterator_;

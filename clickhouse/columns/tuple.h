@@ -119,7 +119,7 @@ public:
 
 private:
     template <typename T, size_t index = std::tuple_size_v<T>>
-    inline static std::vector<ColumnRef> TupleToVector(const T& value) {
+    inline static std::vector<ColumnRef> TupleToVector([[maybe_unused]] const T& value) {
         static_assert(index <= std::tuple_size_v<T>);
         if constexpr (index == 0) {
             std::vector<ColumnRef> result;
@@ -133,7 +133,7 @@ private:
     }
 
     template <typename T, size_t column_index = std::tuple_size_v<TupleOfColumns>>
-    inline static auto VectorToTuple(T columns) {
+    inline static auto VectorToTuple([[maybe_unused]] T columns) {
         static_assert(column_index <= std::tuple_size_v<TupleOfColumns>);
         if constexpr (column_index == 0) {
             return std::make_tuple();
@@ -147,7 +147,7 @@ private:
     }
 
     template <size_t column_index = std::tuple_size_v<TupleOfColumns>>
-    inline auto GetTupleOfValues(size_t index) const {
+    inline auto GetTupleOfValues([[maybe_unused]]size_t index) const {
         static_assert(column_index <= std::tuple_size_v<TupleOfColumns>);
         if constexpr (column_index == 0) {
             return std::make_tuple();
