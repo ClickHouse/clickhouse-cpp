@@ -14,6 +14,7 @@
 #include "string.h"
 #include "tuple.h"
 #include "uuid.h"
+#include "map.h"
 
 #include "../types/type_parser.h"
 
@@ -86,7 +87,7 @@ static ColumnRef CreateTerminalColumn(const TypeAst& ast) {
     case Type::Date:
         return std::make_shared<ColumnDate>();
     case Type::Date32:
-        return std::make_shared<ColumnDate32>();    
+        return std::make_shared<ColumnDate32>();
 
     case Type::IPv4:
         return std::make_shared<ColumnIPv4>();
@@ -196,6 +197,27 @@ static ColumnRef CreateColumnFromAst(const TypeAst& ast, CreateColumnByTypeSetti
         }
         case TypeAst::SimpleAggregateFunction: {
             return CreateTerminalColumn(ast.elements.back());
+        }
+
+        case TypeAst::Map: {
+            if (ast.elements.size() != 2) {
+                throw ValidationError(ast.name + " content is not correct");
+            }
+
+            std::vector<ColumnRef> columns;
+
+            columns.reserve(ast.elements.size());
+            for (const auto& elem : ast.elements) {
+                if (auto col = CreateColumnFromAst(elem, settings)) {
+                    columns.push_back(col);
+                } else {
+                    return nullptr;
+                }
+            }
+
+            return std::make_shared<ColumnMap>(
+                std::make_shared<ColumnArray>(
+                    std::make_shared<ColumnTuple>(columns)));
         }
 
         case TypeAst::Assign:

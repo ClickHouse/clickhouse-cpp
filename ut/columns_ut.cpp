@@ -6,6 +6,7 @@
 #include <clickhouse/columns/lowcardinality.h>
 #include <clickhouse/columns/nullable.h>
 #include <clickhouse/columns/numeric.h>
+#include <clickhouse/columns/map.h>
 #include <clickhouse/columns/string.h>
 #include <clickhouse/columns/uuid.h>
 #include <clickhouse/columns/ip4.h>
@@ -786,4 +787,104 @@ TEST(ColumnsCase, ColumnLowCardinalityString_WithEmptyString_3) {
     for (size_t i = 0; i < values.size(); ++i) {
         EXPECT_EQ(values[i], col.At(i)) << " at pos: " << i;
     }
+}
+
+
+TEST(ColumnsCase, ColumnTupleT) {
+    using TestTuple = ColumnTupleT<ColumnUInt64, ColumnString, ColumnFixedString>;
+
+    TestTuple col(
+        std::make_tuple(
+            std::make_shared<ColumnUInt64>(),
+            std::make_shared<ColumnString>(),
+            std::make_shared<ColumnFixedString>(3)
+        )
+    );
+    const auto val = std::make_tuple(1, "a", "bcd");
+    col.Append(val);
+    static_assert(std::is_same_v<uint64_t, std::tuple_element<0,decltype(col.At(0))>::type>);
+    static_assert(std::is_same_v<std::string_view, std::tuple_element<1,decltype(col.At(0))>::type>);
+    static_assert(std::is_same_v<std::string_view, std::tuple_element<2,decltype(col.At(0))>::type>);
+    EXPECT_EQ(val, col.At(0));
+}
+
+TEST(ColumnsCase, ColumnTupleT_Wrap) {
+    ColumnTuple col ({
+            std::make_shared<ColumnUInt64>(),
+            std::make_shared<ColumnString>(),
+            std::make_shared<ColumnFixedString>(3)
+        }
+    );
+
+    const auto val = std::make_tuple(1, "a", "bcd");
+
+    col[0]->AsStrict<ColumnUInt64>()->Append(std::get<0>(val));
+    col[1]->AsStrict<ColumnString>()->Append(std::get<1>(val));
+    col[2]->AsStrict<ColumnFixedString>()->Append(std::get<2>(val));
+
+    using TestTuple = ColumnTupleT<ColumnUInt64, ColumnString, ColumnFixedString>;
+    auto wrapped_col = TestTuple::Wrap(std::move(col));
+
+    EXPECT_EQ(wrapped_col->Size(), 1u);
+    EXPECT_EQ(val, wrapped_col->At(0));
+}
+
+TEST(ColumnsCase, ColumnTupleT_Empty) {
+    using TestTuple = ColumnTupleT<>;
+
+    TestTuple col(std::make_tuple());
+    const auto val = std::make_tuple();
+    col.Append(val);
+    EXPECT_EQ(col.Size(), 0u);
+}
+
+TEST(ColumnsCase, ColumnMapT) {
+    ColumnMapT<ColumnUInt64, ColumnString> col(
+            std::make_shared<ColumnUInt64>(),
+            std::make_shared<ColumnString>());
+
+    std::map<uint64_t, std::string> val;
+    val[1] = "123";
+    val[2] = "abc";
+    col.Append(val);
+
+    auto map_view = col.At(0);
+
+    EXPECT_THROW(map_view.At(0), ValidationError);
+    EXPECT_EQ(val[1], map_view.At(1));
+    EXPECT_EQ(val[2], map_view.At(2));
+
+    std::map<uint64_t, std::string_view> map{map_view.begin(), map_view.end()};
+
+    EXPECT_EQ(val[1], map.at(1));
+    EXPECT_EQ(val[2], map.at(2));
+}
+
+TEST(ColumnsCase, ColumnMapT_Wrap) {
+    auto tupls = std::make_shared<ColumnTuple>(std::vector<ColumnRef>{
+            std::make_shared<ColumnUInt64>(),
+            std::make_shared<ColumnString>()});
+
+    auto data = std::make_shared<ColumnArray>(tupls);
+
+    auto val = tupls->CloneEmpty()->As<ColumnTuple>();
+
+    (*val)[0]->AsStrict<ColumnUInt64>()->Append(1);
+    (*val)[1]->AsStrict<ColumnString>()->Append("123");
+
+    (*val)[0]->AsStrict<ColumnUInt64>()->Append(2);
+    (*val)[1]->AsStrict<ColumnString>()->Append("abc");
+
+    data->AppendAsColumn(val);
+
+    ColumnMap col{data};
+
+    using TestMap = ColumnMapT<ColumnUInt64, ColumnString>;
+    auto wrapped_col = TestMap::Wrap(std::move(col));
+
+    auto map_view = wrapped_col->At(0);
+
+    EXPECT_THROW(map_view.At(0), ValidationError);
+    EXPECT_EQ("123", map_view.At(1));
+    EXPECT_EQ("abc", map_view.At(2));
 }

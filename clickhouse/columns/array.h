@@ -2,6 +2,7 @@
 
 #include "column.h"
 #include "numeric.h"
+#include "utils.h"
 
 #include <memory>
 
@@ -121,13 +122,8 @@ public:
      *  This is a static method to make such conversion verbose.
      */
     static auto Wrap(ColumnArray&& col) {
-        if constexpr (std::is_base_of_v<ColumnArray, NestedColumnType> && !std::is_same_v<ColumnArray, NestedColumnType>) {
-            // assuming NestedColumnType is ArrayT specialization
-            return std::make_shared<ColumnArrayT<NestedColumnType>>(NestedColumnType::Wrap(col.GetData()), col.offsets_);
-        } else {
-            auto nested_data = col.GetData()->template AsStrict<NestedColumnType>();
-            return std::make_shared<ColumnArrayT<NestedColumnType>>(nested_data, col.offsets_);
-        }
+        auto nested_data = WrapColumn<NestedColumnType>(col.GetData());
+        return std::make_shared<ColumnArrayT<NestedColumnType>>(nested_data, col.offsets_);
     }
 
     static auto Wrap(Column&& col) {
@@ -146,7 +142,7 @@ public:
         const size_t size_;
 
     public:
-        using ValueType = typename NestedColumnType::ValueType;
+        using ValueType = std::decay_t<decltype(std::declval<NestedColumnType>().At(0))>;
 
         ArrayValueView(std::shared_ptr<NestedColumnType> data, size_t offset = 0, size_t size = std::numeric_limits<size_t>::max())
             : typed_nested_data_(data)
@@ -178,7 +174,7 @@ public:
                 , index_(index)
             {}
 
-            using ValueType = typename NestedColumnType::ValueType;
+            using ValueType = typename ArrayValueView::ValueType;
 
             inline auto operator*() const {
                 return typed_nested_data_->At(offset_ + index_);
@@ -226,6 +222,22 @@ public:
         inline size_t Size() const {
             return size_;
         }
+
+        inline bool operator==(const ArrayValueView& other) const {
+            if (size() != other.size()) {
+                return false;
+            }
+            for (size_t i = 0; i < size_; ++i) {
+                if ((*this)[i] != other[i]) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        inline bool operator!=(const ArrayValueView& other) const {
+            return !(*this == other);
+        }
     };
 
     inline auto At(size_t index) const {
@@ -265,6 +277,20 @@ public:
 
         // Even if there are 0 items, increase counter, creating empty array item.
         AddOffset(counter);
+    }
+
+    ColumnRef Slice(size_t begin, size_t size) const override {
+        return Wrap(ColumnArray::Slice(begin, size));
+    }
+
+    ColumnRef CloneEmpty() const override {
+        return Wrap(ColumnArray::CloneEmpty());
+    }
+
+    void Swap(Column& other) override {
+        auto & col = dynamic_cast<ColumnArrayT<NestedColumnType> &>(other);
+        typed_nested_data_.swap(col.typed_nested_data_);
+        ColumnArray::Swap(other);
     }
 
 private:

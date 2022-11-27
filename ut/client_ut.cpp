@@ -1022,6 +1022,35 @@ TEST_P(ClientCase, RoundtripArrayTString) {
     EXPECT_TRUE(CompareRecursive(*array, *result_typed));
 }
 
+TEST_P(ClientCase, RoundtripMapTUint64String) {
+    using Map = ColumnMapT<ColumnUInt64, ColumnString>;
+    auto map = std::make_shared<Map>(std::make_shared<ColumnUInt64>(), std::make_shared<ColumnString>());
+
+    std::map<uint64_t, std::string> row;
+    row[1] = "hello";
+    row[2] = "world";
+    map->Append(row);
+
+    auto result_typed = Map::Wrap(RoundtripColumnValues(*client_, map));
+    EXPECT_TRUE(CompareRecursive(*map, *result_typed));
+}
+
+TEST_P(ClientCase, RoundtripMapUUID_Tuple_String_Array_Uint64) {
+    using Tuple = ColumnTupleT<ColumnString, ColumnArrayT<ColumnUInt64>>;
+    using Map = ColumnMapT<ColumnUUID, Tuple>;
+    auto map = std::make_shared<Map>(std::make_shared<ColumnUUID>(), std::make_shared<Tuple>(
+       std::make_tuple(std::make_shared<ColumnString>(), std::make_shared<ColumnArrayT<ColumnUInt64>>())));
+
+
+    std::map<UUID, std::tuple<std::string, std::vector<uint64_t>>> row;
+    row[UUID{1, 1}] = std::make_tuple("hello", std::vector<uint64_t>{1, 2, 3}) ;
+    row[UUID{2, 2}] = std::make_tuple("world", std::vector<uint64_t>{4, 5, 6}) ;
+    map->Append(row);
+
+    auto result_typed = Map::Wrap(RoundtripColumnValues(*client_, map));
+    EXPECT_TRUE(CompareRecursive(*map, *result_typed));
+}
+
 TEST_P(ClientCase, OnProgress) {
     Block block;
     createTableWithOneColumn<ColumnString>(block);

@@ -32,6 +32,8 @@ TEST(TypesCase, TypeName) {
         Type::CreateEnum8({})->GetName(),
         "Enum8()"
     );
+
+    ASSERT_EQ(Type::CreateMap(Type::CreateSimple<int32_t>(), Type::CreateString())->GetName(), "Map(Int32, String)");
 }
 
 TEST(TypesCase, NullableType) {
@@ -103,6 +105,11 @@ TEST(TypesCase, IsEqual) {
         "Array(Array(Array(Nullable(Tuple(String, Int8, Date, DateTime)))))",
         "Array(Array(Array(Array(Nullable(Tuple(String, Int8, Date, DateTime('UTC')))))))"
         "Array(Array(Array(Array(Nullable(Tuple(String, Int8, Date, DateTime('UTC'), Tuple(LowCardinality(String), Enum8('READ'=1, 'WRITE'=0))))))))",
+        "Map(String, Int8)",
+        "Map(String, Tuple(String, Int8, Date, DateTime))",
+        "Map(UUID, Array(Tuple(String, Int8, Date, DateTime)))",
+        "Map(String, Array(Array(Array(Nullable(Tuple(String, Int8, Date, DateTime))))))",
+        "Map(LowCardinality(FixedString(10)), Array(Array(Array(Array(Nullable(Tuple(String, Int8, Date, DateTime('UTC'))))))))"
     };
 
     // Check that Type::IsEqual returns true only if:
@@ -133,7 +140,7 @@ TEST(TypesCase, ErrorEnumContent) {
         "Enum8('ONE'=1,'TWO')",
         "Enum16('TWO'=,'TWO')",
     };
- 
+
     for (const auto& type_name : type_names) {
         SCOPED_TRACE(type_name);
         EXPECT_THROW(clickhouse::CreateColumnByType(type_name)->Type(), ValidationError);

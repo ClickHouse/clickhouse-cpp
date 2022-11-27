@@ -226,3 +226,16 @@ TEST(TypeParserCase, ParseDateTime64) {
     ASSERT_EQ(ast.elements[1].value_string, "UTC");
     ASSERT_EQ(ast.elements[1].value, 0);
 }
+
+TEST(TypeParserCase, ParseMap) {
+    TypeAst ast;
+    TypeParser("Map(Int32, String)").Parse(&ast);
+    ASSERT_EQ(ast.meta, TypeAst::Map);
+    ASSERT_EQ(ast.name, "Map");
+    ASSERT_EQ(ast.code, Type::Map);
+    ASSERT_EQ(ast.elements.size(), 2u);
+    ASSERT_EQ(ast.elements[0].meta, TypeAst::Terminal);
+    ASSERT_EQ(ast.elements[0].name, "Int32");
+    ASSERT_EQ(ast.elements[1].meta, TypeAst::Terminal);
+    ASSERT_EQ(ast.elements[1].name, "String");
+}
