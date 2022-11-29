@@ -21,6 +21,7 @@ C++ client for [ClickHouse](https://clickhouse.com/).
 * UInt8, UInt16, UInt32, UInt64, Int8, Int16, Int32, Int64
 * Int128
 * UUID
+* Map
 
 ## Building
 
@@ -87,7 +88,7 @@ int main()
 
 ## Retries
 If you wish to implement some retry logic atop of `clickhouse::Client` there are few simple rules to make you life easier:
-- If previous attempt threw an exception, then make sure to call `clickhouse::Client::ResetConnection()` before the next try. 
+- If previous attempt threw an exception, then make sure to call `clickhouse::Client::ResetConnection()` before the next try.
 - For `clickhouse::Client::Insert()` you can reuse a block from previous try, no need to rebuild it from scratch.
 
 See https://github.com/ClickHouse/clickhouse-cpp/issues/184 for details.

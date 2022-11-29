@@ -10,6 +10,7 @@
 #include <clickhouse/columns/ip4.h>
 #include <clickhouse/columns/ip6.h>
 #include <clickhouse/columns/numeric.h>
+#include <clickhouse/columns/map.h>
 #include <clickhouse/columns/string.h>
 #include <clickhouse/columns/tuple.h>
 #include <clickhouse/columns/uuid.h>
@@ -125,6 +126,27 @@ bool doPrintValue<ColumnUUID, void>(const ColumnRef & c, const size_t row, std::
     return false;
 }
 
+template <>
+bool doPrintValue<ColumnMap, void>(const ColumnRef & c, const size_t row, std::ostream & ostr) {
+    // via temporary stream to preserve fill and alignment of the ostr
+    std::stringstream sstr;
+    if (const auto & map_col = c->As<ColumnMap>()) {
+        sstr << "{";
+        const auto tuples = map_col->GetAsColumn(row);
+        for (size_t i = 0; i < tuples->Size(); ++i) {
+            printColumnValue(tuples, i, sstr);
+
+            if (i < tuples->Size() - 1)
+                sstr << ", ";
+        }
+
+        sstr << "}";
+        ostr << sstr.str();
+        return true;
+    }
+    return false;
+}
+
 std::ostream & printColumnValue(const ColumnRef& c, const size_t row, std::ostream & ostr) {
 
     const auto r = false
@@ -150,7 +172,8 @@ std::ostream & printColumnValue(const ColumnRef& c, const size_t row, std::ostre
         || doPrintValue<ColumnIPv6>(c, row, ostr)
         || doPrintValue<ColumnArray, void>(c, row, ostr)
         || doPrintValue<ColumnTuple, void>(c, row, ostr)
-        || doPrintValue<ColumnUUID, void>(c, row, ostr);
+        || doPrintValue<ColumnUUID, void>(c, row, ostr)
+        || doPrintValue<ColumnMap, void>(c, row, ostr);
     if (!r)
         ostr << "Unable to print value of type " << c->GetType().GetName();
 

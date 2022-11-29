@@ -46,6 +46,7 @@ const char* Type::TypeName(Type::Code code) {
         case Type::Code::LowCardinality: return "LowCardinality";
         case Type::Code::DateTime64:     return "DateTime64";
         case Type::Code::Date32:         return "Date32";
+        case Type::Code::Map:            return "Map";
     }
 
     return "Unknown type";
@@ -94,6 +95,8 @@ std::string Type::GetName() const {
             return As<DecimalType>()->GetName();
         case LowCardinality:
             return As<LowCardinalityType>()->GetName();
+        case Map:
+            return As<MapType>()->GetName();
     }
 
     // XXX: NOT REACHED!
@@ -138,7 +141,8 @@ uint64_t Type::GetTypeUniqueId() const {
         case Decimal32:
         case Decimal64:
         case Decimal128:
-        case LowCardinality: {
+        case LowCardinality:
+        case Map: {
             // For complex types, exact unique ID depends on nested types and/or parameters,
             // the easiest way is to lazy-compute unique ID from name once.
             // Here we do not care if multiple threads are computing value simultaneosly since it is both:
@@ -223,6 +227,10 @@ TypeRef Type::CreateUUID() {
 
 TypeRef Type::CreateLowCardinality(TypeRef item_type) {
     return std::make_shared<LowCardinalityType>(item_type);
+}
+
+TypeRef Type::CreateMap(TypeRef key_type, TypeRef value_type) {
+    return std::make_shared<MapType>(key_type, value_type);
 }
 
 /// class ArrayType
@@ -402,6 +410,17 @@ std::string TupleType::GetName() const {
     result += ")";
 
     return result;
+}
+
+/// class MapType
+MapType::MapType(TypeRef key_type, TypeRef value_type)
+    : Type(Map)
+    , key_type_(key_type)
+    , value_type_(value_type) {
+}
+
+std::string MapType::GetName() const {
+    return std::string("Map(") + key_type_->GetName() + ", " +value_type_->GetName() + ")";
 }
 
 }  // namespace clickhouse

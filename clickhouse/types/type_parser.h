@@ -21,7 +21,8 @@ struct TypeAst {
         Tuple,
         Enum,
         LowCardinality,
-        SimpleAggregateFunction
+        SimpleAggregateFunction,
+        Map
     };
 
     /// Type's category.

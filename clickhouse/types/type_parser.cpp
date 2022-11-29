@@ -46,6 +46,7 @@ static const std::unordered_map<std::string, Type::Code> kTypeCode = {
     { "Decimal64",   Type::Decimal64 },
     { "Decimal128",  Type::Decimal128 },
     { "LowCardinality", Type::LowCardinality },
+    { "Map", Type::Map},
 };
 
 static Type::Code GetTypeCode(const std::string& name) {
@@ -83,6 +84,10 @@ static TypeAst::Meta GetTypeMeta(const StringView& name) {
 
     if (name == "SimpleAggregateFunction") {
         return TypeAst::SimpleAggregateFunction;
+    }
+
+    if (name == "Map") {
+        return TypeAst::Map;
     }
 
     return TypeAst::Terminal;

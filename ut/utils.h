@@ -76,6 +76,27 @@ inline const char * getPrefix() {
     return prefix;
 }
 
+template <typename T, size_t index = std::tuple_size_v<T> >
+inline std::ostream & printTuple(std::ostream & ostr, [[maybe_unused]] const T & t) {
+    static_assert(index <= std::tuple_size_v<T>);
+    if constexpr (index == 0) {
+        return ostr << "( ";
+    } else {
+        printTuple<T, index - 1>(ostr, t);
+        using ElementType = std::tuple_element_t<index - 1, T>;
+        if constexpr (is_container_v<ElementType>) {
+            ostr << PrintContainer{std::get<index - 1>(t)};
+        } else {
+            ostr << std::get<0>(t);
+        }
+        if constexpr (index == std::tuple_size_v<T>) {
+            return ostr << " )";
+        } else {
+            return ostr << ", ";
+        }
+    }
+}
+
 namespace std {
 template <typename R, typename P>
 inline ostream & operator<<(ostream & ostr, const chrono::duration<R, P> & d) {
@@ -85,6 +106,11 @@ inline ostream & operator<<(ostream & ostr, const chrono::duration<R, P> & d) {
 template <typename F, typename S>
 inline ostream & operator<<(ostream & ostr, const pair<F, S> & t) {
     return ostr << "{ " << t.first << ", " << t.second << " }";
+}
+
+template <typename ... T>
+inline ostream & operator<<(ostream & ostr, const tuple<T...> & t) {
+    return printTuple(ostr, t);
 }
 }
 

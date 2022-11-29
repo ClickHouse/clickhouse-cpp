@@ -18,6 +18,7 @@ SET ( clickhouse-cpp-lib-src
     columns/lowcardinalityadaptor.h
     columns/nullable.cpp
     columns/numeric.cpp
+    columns/map.cpp
     columns/string.cpp
     columns/tuple.cpp
     columns/uuid.cpp
@@ -121,6 +122,7 @@ INSTALL(FILES columns/itemview.h DESTINATION include/clickhouse/columns/)
 INSTALL(FILES columns/lowcardinality.h DESTINATION include/clickhouse/columns/)
 INSTALL(FILES columns/nullable.h DESTINATION include/clickhouse/columns/)
 INSTALL(FILES columns/numeric.h DESTINATION include/clickhouse/columns/)
+INSTALL(FILES columns/map.h DESTINATION include/clickhouse/columns/)
 INSTALL(FILES columns/string.h DESTINATION include/clickhouse/columns/)
 INSTALL(FILES columns/tuple.h DESTINATION include/clickhouse/columns/)
 INSTALL(FILES columns/utils.h DESTINATION include/clickhouse/columns/)

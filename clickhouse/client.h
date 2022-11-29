@@ -12,6 +12,7 @@
 #include "columns/lowcardinality.h"
 #include "columns/nullable.h"
 #include "columns/numeric.h"
+#include "columns/map.h"
 #include "columns/string.h"
 #include "columns/tuple.h"
 #include "columns/uuid.h"

@@ -80,6 +80,7 @@ TEST(ItemView, ErrorTypes) {
     EXPECT_ITEMVIEW_ERROR(Type::Code::Nullable, int);
     EXPECT_ITEMVIEW_ERROR(Type::Code::Tuple, int);
     EXPECT_ITEMVIEW_ERROR(Type::Code::LowCardinality, int);
+    EXPECT_ITEMVIEW_ERROR(Type::Code::Map, int);
 }
 
 TEST(ItemView, TypeSizeMismatch) {
