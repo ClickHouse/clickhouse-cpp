@@ -20,6 +20,7 @@ SET ( clickhouse-cpp-ut-src
     CreateColumnByType_ut.cpp
     Column_ut.cpp
     roundtrip_column.cpp
+    roundtrip_tests.cpp
 
     utils.cpp
     value_generators.cpp

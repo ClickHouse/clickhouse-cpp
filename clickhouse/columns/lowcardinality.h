@@ -53,9 +53,16 @@ private:
     UniqueItems unique_items_map_;
 
 public:
+    ColumnLowCardinality(ColumnLowCardinality&& col) = default;
     // c-tor makes a deep copy of the dictionary_column.
     explicit ColumnLowCardinality(ColumnRef dictionary_column);
     explicit ColumnLowCardinality(std::shared_ptr<ColumnNullable> dictionary_column);
+
+    template <typename T>
+    explicit ColumnLowCardinality(std::shared_ptr<ColumnNullableT<T>> dictionary_column)
+        : ColumnLowCardinality(dictionary_column->template As<ColumnNullable>())
+    {}
+
     ~ColumnLowCardinality();
 
     /// Appends another LowCardinality column to the end of this one, updating dictionary.
@@ -117,6 +124,13 @@ public:
     // Type this column takes as argument of Append and returns with At() and operator[]
     using ValueType = typename DictionaryColumnType::ValueType;
 
+    explicit ColumnLowCardinalityT(ColumnLowCardinality&& col)
+        : ColumnLowCardinality(std::move(col))
+        ,  typed_dictionary_(dynamic_cast<DictionaryColumnType &>(*GetDictionary()))
+        ,  type_(GetTypeCode(typed_dictionary_))
+    {
+    }
+
     template <typename ...Args>
     explicit ColumnLowCardinalityT(Args &&... args)
         : ColumnLowCardinalityT(std::make_shared<DictionaryColumnType>(std::forward<Args>(args)...))
@@ -124,9 +138,9 @@ public:
 
     // Create LC<T> column from existing T-column, making a deep copy of all contents.
     explicit ColumnLowCardinalityT(std::shared_ptr<DictionaryColumnType> dictionary_col)
-        : ColumnLowCardinality(dictionary_col),
-          typed_dictionary_(dynamic_cast<DictionaryColumnType &>(*GetDictionary())),
-          type_(typed_dictionary_.Type()->GetCode())
+        : ColumnLowCardinality(dictionary_col)
+        , typed_dictionary_(dynamic_cast<DictionaryColumnType &>(*GetDictionary()))
+        , type_(GetTypeCode(typed_dictionary_))
     {}
 
     /// Extended interface to simplify reading/adding individual items.
@@ -145,13 +159,56 @@ public:
     using ColumnLowCardinality::Append;
 
     inline void Append(const ValueType & value) {
-        AppendUnsafe(ItemView{type_, value});
+        if constexpr (IsNullable<WrappedColumnType>) {
+            if (value.has_value()) {
+                AppendUnsafe(ItemView{type_, *value});
+            } else {
+                AppendUnsafe(ItemView{});
+            }
+        } else {
+            AppendUnsafe(ItemView{type_, value});
+        }
     }
 
     template <typename T>
     inline void AppendMany(const T& container) {
         for (const auto & item : container) {
             Append(item);
+        }
+    }
+
+    /** Create a ColumnLowCardinalityT from a ColumnLowCardinality, without copying data and offsets, but by
+     * 'stealing' those from `col`.
+     *
+     *  Ownership of column internals is transferred to returned object, original (argument) object
+     *  MUST NOT BE USED IN ANY WAY, it is only safe to dispose it.
+     *
+     *  Throws an exception if `col` is of wrong type, it is safe to use original col in this case.
+     *  This is a static method to make such conversion verbose.
+     */
+    static auto Wrap(ColumnLowCardinality&& col) {
+        return std::make_shared<ColumnLowCardinalityT<WrappedColumnType>>(std::move(col));
+    }
+
+    static auto Wrap(Column&& col) { return Wrap(std::move(dynamic_cast<ColumnLowCardinality&&>(col))); }
+
+    // Helper to simplify integration with other APIs
+    static auto Wrap(ColumnRef&& col) { return Wrap(std::move(*col->AsStrict<ColumnLowCardinality>())); }
+
+    ColumnRef Slice(size_t begin, size_t size) const override {
+        return Wrap(ColumnLowCardinality::Slice(begin, size));
+    }
+
+    ColumnRef CloneEmpty() const override { return Wrap(ColumnLowCardinality::CloneEmpty()); }
+
+private:
+
+    template <typename T>
+    static auto GetTypeCode(T& column) {
+        if constexpr (IsNullable<T>) {
+            return GetTypeCode(*column.Nested()->template AsStrict<typename T::NestedColumnType>());
+        } else {
+            return column.Type()->GetCode();
         }
     }
 };

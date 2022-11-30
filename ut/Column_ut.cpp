@@ -106,6 +106,28 @@ public:
 
         return std::tuple{column, values};
     }
+
+    static std::optional<std::string> SkipTest(clickhouse::Client& client) {
+        if constexpr (std::is_same_v<ColumnType, ColumnDate32>) {
+            // Date32 first appeared in v21.9.2.17-stable
+            const auto server_info = client.GetServerInfo();
+            if (versionNumber(server_info) < versionNumber(21, 9)) {
+                std::stringstream buffer;
+                buffer << "Date32 is available since v21.9.2.17-stable and can't be tested against server: " << server_info;
+                return buffer.str();
+            }
+        }
+
+        if constexpr (std::is_same_v<ColumnType, ColumnInt128>) {
+            const auto server_info = client.GetServerInfo();
+            if (versionNumber(server_info) < versionNumber(21, 7)) {
+                std::stringstream buffer;
+                buffer <<  "ColumnInt128 is available since v21.7.2.7-stable and can't be tested against server: " << server_info;
+                return buffer.str();
+            }
+        }
+        return std::nullopt;
+    }
 };
 
 using ValueColumns = ::testing::Types<
@@ -279,21 +301,33 @@ TYPED_TEST(GenericColumnTest, RoundTrip) {
 
     clickhouse::Client client(LocalHostEndpoint);
 
-    if constexpr (std::is_same_v<typename TestFixture::ColumnType, ColumnDate32>) {
-        // Date32 first appeared in v21.9.2.17-stable
-        const auto server_info = client.GetServerInfo();
-        if (versionNumber(server_info) < versionNumber(21, 9)) {
-            GTEST_SKIP() << "Date32 is available since v21.9.2.17-stable and can't be tested against server: " << server_info;
-        }
-    }
-
-    if constexpr (std::is_same_v<typename TestFixture::ColumnType, ColumnInt128>) {
-        const auto server_info = client.GetServerInfo();
-        if (versionNumber(server_info) < versionNumber(21, 7)) {
-            GTEST_SKIP() << "ColumnInt128 is available since v21.7.2.7-stable and can't be tested against server: " << server_info;
-        }
+    if (auto message = this->SkipTest(client)) {
+        GTEST_SKIP() << *message;
     }
 
     auto result_typed = RoundtripColumnValues(client, column)->template AsStrict<typename TestFixture::ColumnType>();
+    EXPECT_TRUE(CompareRecursive(*column, *result_typed));
+}
+
+TYPED_TEST(GenericColumnTest, NulableT_RoundTrip) {
+    using NullableType = ColumnNullableT<TypeParam>;
+    auto column = std::make_shared<NullableType>(this->MakeColumn());
+    auto values = this->GenerateValues(100);
+    FromVectorGenerator<bool> is_null({true, false});
+    for (size_t i = 0; i < values.size(); ++i) {
+        if (is_null(i)) {
+            column->Append(std::nullopt);
+        } else {
+            column->Append(values[i]);
+        }
+    }
+
+    clickhouse::Client client(LocalHostEndpoint);
+
+    if (auto message = this->SkipTest(client)) {
+        GTEST_SKIP() << *message;
+    }
+
+    auto result_typed = WrapColumn<NullableType>(RoundtripColumnValues(client, column));
     EXPECT_TRUE(CompareRecursive(*column, *result_typed));
 }
