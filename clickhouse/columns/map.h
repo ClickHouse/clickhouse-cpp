@@ -5,6 +5,7 @@
 #include "column.h"
 #include "tuple.h"
 
+#include <functional>
 #include <map>
 
 namespace clickhouse {
