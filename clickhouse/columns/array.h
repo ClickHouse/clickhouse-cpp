@@ -167,6 +167,8 @@ public:
             const size_t size_;
             size_t index_;
         public:
+            Iterator() = default;
+
             Iterator(std::shared_ptr<NestedColumnType> typed_nested_data, size_t offset, size_t size, size_t index)
                 : typed_nested_data_(typed_nested_data)
                 , offset_(offset)

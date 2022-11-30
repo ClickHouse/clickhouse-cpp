@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../base/projected_iterator.h"
 #include "array.h"
 #include "column.h"
 #include "tuple.h"
@@ -122,6 +123,8 @@ public:
             typename ArrayColumnType::ArrayValueView::Iterator data_iterator_;
 
         public:
+            Iterator() = default;
+
             Iterator(typename ArrayColumnType::ArrayValueView::Iterator data_iterator)
                 : data_iterator_(data_iterator) {}
 
@@ -187,13 +190,16 @@ public:
             if (size() != other.size()) {
                 return false;
             }
-            using Vector = std::vector<std::pair<Key, Value>>;
-            Vector l(begin(), end());
-            Vector r(other.begin(), other.end());
-            auto comp = [](const auto& l, const auto& r) { return l.frist < r.first; };
-            std::sort(l.begin(), l.end(), comp);
-            std::sort(r.begin(), r.end(), comp);
-            return std::equal(l.begin(), l.end(), r.begin(), r.end());
+            const auto make_index = [](const auto& data) {
+                std::vector<size_t> result{data.Size()};
+                std::generate(result.begin(), result.end(), [i = 0] () mutable { return i++; });
+                std::sort(result.begin(), result.end(), [&data](size_t l, size_t r) {return data[l] < data[r];});
+                return result;
+            };
+            const auto l_index = make_index(data_);
+            const auto r_index = make_index(other.data_);
+            return std::equal(l_index.begin(), l_index.end(), r_index.begin(), r_index.end(),
+                [&l_data = data_, &r_data = other.data_](size_t l, size_t r) { return l_data[l] == r_data[r];});
             return true;
         }
 
@@ -214,13 +220,17 @@ public:
 
     template <typename T>
     inline void Append(const T& value) {
-        // TODO  Refuse to copy.
-        std::vector<std::tuple<typename T::key_type, typename T::mapped_type>> container;
-        container.reserve(value.size());
-        for (const auto& i : value) {
-            container.emplace_back(i.first, i.second);
-        }
-        typed_data_->Append(container.begin(), container.end());
+        using BaseIter = typename T::const_iterator;
+        using KeyOfT = decltype(std::declval<BaseIter>()->first);
+        using ValOfT = decltype(std::declval<BaseIter>()->second);
+        using Functor = std::function<std::tuple<KeyOfT, ValOfT>(const BaseIter&)>;
+        using Iterator = ProjectedIterator<Functor, BaseIter>;
+
+        Functor functor = [](const BaseIter& i) {
+            return std::make_tuple(i->first, i->second);
+        };
+
+        typed_data_->Append(Iterator{value.begin(), functor}, Iterator{value.end(), functor});
     }
 
     static auto Wrap(ColumnMap&& col) {
