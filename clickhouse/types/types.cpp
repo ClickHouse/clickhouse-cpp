@@ -47,6 +47,10 @@ const char* Type::TypeName(Type::Code code) {
         case Type::Code::DateTime64:     return "DateTime64";
         case Type::Code::Date32:         return "Date32";
         case Type::Code::Map:            return "Map";
+        case Type::Code::Point:          return "Point";
+        case Type::Code::Ring:           return "Ring";
+        case Type::Code::Polygon:        return "Polygon";
+        case Type::Code::MultiPolygon:   return "MultiPolygon";
     }
 
     return "Unknown type";
@@ -72,6 +76,10 @@ std::string Type::GetName() const {
         case IPv6:
         case Date:
         case Date32:
+        case Point:
+        case Ring:
+        case Polygon:
+        case MultiPolygon:
             return TypeName(code_);
         case FixedString:
             return As<FixedStringType>()->GetName();
@@ -126,6 +134,10 @@ uint64_t Type::GetTypeUniqueId() const {
         case IPv6:
         case Date:
         case Date32:
+        case Point:
+        case Ring:
+        case Polygon:
+        case MultiPolygon:
             // For simple types, unique ID is the same as Type::Code
             return code_;
 
@@ -231,6 +243,22 @@ TypeRef Type::CreateLowCardinality(TypeRef item_type) {
 
 TypeRef Type::CreateMap(TypeRef key_type, TypeRef value_type) {
     return std::make_shared<MapType>(key_type, value_type);
+}
+
+TypeRef Type::CreatePoint() {
+    return TypeRef(new Type(Type::Point));
+}
+
+TypeRef Type::CreateRing() {
+    return TypeRef(new Type(Type::Ring));
+}
+
+TypeRef Type::CreatePolygon() {
+    return TypeRef(new Type(Type::Polygon));
+}
+
+TypeRef Type::CreateMultiPolygon() {
+    return TypeRef(new Type(Type::MultiPolygon));
 }
 
 /// class ArrayType

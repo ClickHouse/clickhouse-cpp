@@ -22,6 +22,7 @@ C++ client for [ClickHouse](https://clickhouse.com/).
 * Int128
 * UUID
 * Map
+* Point, Ring, Polygon, MultiPolygon
 
 ## Building
 

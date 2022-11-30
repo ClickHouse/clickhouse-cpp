@@ -67,6 +67,21 @@ protected:
         }
     }
 
+    std::string GetSettingValue(const std::string& name) {
+        std::string result;
+        client_->Select("SELECT value FROM system.settings WHERE name = \'" + name + "\'",
+                [&result](const Block& block)
+            {
+                if (block.GetRowCount() == 0) {
+                    return;
+                }
+                result = block[0]->AsStrict<ColumnString>()->At(0);
+            }
+        );
+        return result;
+    }
+
+
     std::unique_ptr<Client> client_;
     const std::string table_name = "test_clickhouse_cpp_test_ut_table";
     const std::string column_name = "test_column";
@@ -1049,6 +1064,79 @@ TEST_P(ClientCase, RoundtripMapUUID_Tuple_String_Array_Uint64) {
 
     auto result_typed = Map::Wrap(RoundtripColumnValues(*client_, map));
     EXPECT_TRUE(CompareRecursive(*map, *result_typed));
+}
+
+TEST_P(ClientCase, RoundtripPoint) {
+    if (GetSettingValue("allow_experimental_geo_types") != "1") {
+       GTEST_SKIP() << "Test is skipped because experimental geo types are not allowed. Set setting allow_experimental_geo_types = 1 in order to allow it." << std::endl;
+    }
+
+    auto col = std::make_shared<ColumnPoint>();
+    col->Append({1.0, 2.0});
+    col->Append({0.1, 0.2});
+
+    auto result_typed = RoundtripColumnValues(*client_, col)->AsStrict<ColumnPoint>();
+    EXPECT_TRUE(CompareRecursive(*col, *result_typed));
+}
+
+TEST_P(ClientCase, RoundtripRing) {
+    if (GetSettingValue("allow_experimental_geo_types") != "1") {
+       GTEST_SKIP() << "Test is skipped because experimental geo types are not allowed. Set setting allow_experimental_geo_types = 1 in order to allow it." << std::endl;
+    }
+
+    auto col = std::make_shared<ColumnRing>();
+    {
+        std::vector<ColumnPoint::ValueType> ring{{1.0, 2.0}, {3.0, 4.0}};
+        col->Append(ring);
+    }
+    {
+        std::vector<ColumnPoint::ValueType> ring{{0.1, 0.2}, {0.3, 0.4}};
+        col->Append(ring);
+    }
+    auto result_typed = RoundtripColumnValues(*client_, col)->AsStrict<ColumnRing>();
+    EXPECT_TRUE(CompareRecursive(*col, *result_typed));
+}
+
+TEST_P(ClientCase, RoundtripPolygon) {
+    if (GetSettingValue("allow_experimental_geo_types") != "1") {
+       GTEST_SKIP() << "Test is skipped because experimental geo types are not allowed. Set setting allow_experimental_geo_types = 1 in order to allow it." << std::endl;
+    }
+
+    auto col = std::make_shared<ColumnPolygon>();
+    {
+        std::vector<std::vector<ColumnPoint::ValueType>> polygon
+            {{{1.0, 2.0}, {3.0, 4.0}}, {{5.0, 6.0}, {7.0, 8.0}}};
+        col->Append(polygon);
+    }
+    {
+        std::vector<std::vector<ColumnPoint::ValueType>> polygon
+            {{{0.1, 0.2}, {0.3, 0.4}}, {{0.5, 0.6}, {0.7, 0.8}}};
+        col->Append(polygon);
+    }
+    auto result_typed = RoundtripColumnValues(*client_, col)->AsStrict<ColumnPolygon>();
+    EXPECT_TRUE(CompareRecursive(*col, *result_typed));
+}
+
+TEST_P(ClientCase, RoundtripMultiPolygon) {
+    if (GetSettingValue("allow_experimental_geo_types") != "1") {
+       GTEST_SKIP() << "Test is skipped because experimental geo types are not allowed. Set setting allow_experimental_geo_types = 1 in order to allow it." << std::endl;
+    }
+
+    auto col = std::make_shared<ColumnMultiPolygon>();
+    {
+        std::vector<std::vector<std::vector<ColumnPoint::ValueType>>> multi_polygon
+            {{{{1.0, 2.0}, {3.0, 4.0}}, {{5.0, 6.0}, {7.0, 8.0}}},
+             {{{1.1, 2.2}, {3.3, 4.4}}, {{5.5, 6.6}, {7.7, 8.8}}}};
+        col->Append(multi_polygon);
+    }
+    {
+        std::vector<std::vector<std::vector<ColumnPoint::ValueType>>> multi_polygon
+            {{{{0.1, 0.2}, {0.3, 0.4}}, {{0.5, 0.6}, {0.7, 0.8}}},
+             {{{1.1, 1.2}, {1.3, 1.4}}, {{1.5, 1.6}, {1.7, 1.8}}}};
+        col->Append(multi_polygon);
+    }
+    auto result_typed = RoundtripColumnValues(*client_, col)->AsStrict<ColumnMultiPolygon>();
+    EXPECT_TRUE(CompareRecursive(*col, *result_typed));
 }
 
 TEST_P(ClientCase, OnProgress) {
