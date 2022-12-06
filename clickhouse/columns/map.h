@@ -193,14 +193,17 @@ public:
             }
             const auto make_index = [](const auto& data) {
                 std::vector<size_t> result{data.Size()};
-                std::generate(result.begin(), result.end(), [i = 0] () mutable { return i++; });
+                std::generate(result.begin(), result.end(), [i = 0] () mutable {return i++;});
                 std::sort(result.begin(), result.end(), [&data](size_t l, size_t r) {return data[l] < data[r];});
                 return result;
             };
-            const auto l_index = make_index(data_);
-            const auto r_index = make_index(other.data_);
-            return std::equal(l_index.begin(), l_index.end(), r_index.begin(), r_index.end(),
-                [&l_data = data_, &r_data = other.data_](size_t l, size_t r) { return l_data[l] == r_data[r];});
+            const auto index = make_index(data_);
+            for (const auto& val : other.data_) {
+                if (!std::binary_search(index.begin(), index.end(), val,
+                        [&data = data_](const auto& l, size_t r) {return l < data[r];})) {
+                    return false;
+                }
+            }
             return true;
         }
 
@@ -221,14 +224,14 @@ public:
 
     template <typename T>
     inline void Append(const T& value) {
-        using BaseIter = typename T::const_iterator;
+        using BaseIter = decltype(value.begin());
         using KeyOfT = decltype(std::declval<BaseIter>()->first);
         using ValOfT = decltype(std::declval<BaseIter>()->second);
         using Functor = std::function<std::tuple<KeyOfT, ValOfT>(const BaseIter&)>;
         using Iterator = ProjectedIterator<Functor, BaseIter>;
 
         Functor functor = [](const BaseIter& i) {
-            return std::make_tuple(i->first, i->second);
+            return std::make_tuple(std::cref(i->first), std::cref(i->second));
         };
 
         typed_data_->Append(Iterator{value.begin(), functor}, Iterator{value.end(), functor});

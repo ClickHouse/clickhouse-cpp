@@ -272,7 +272,7 @@ public:
         size_t counter = 0;
 
         while (begin != end) {
-            nested_data.Append(*begin);
+            nested_data.Append(std::move(*begin));
             ++begin;
             ++counter;
         }
