@@ -19,6 +19,11 @@ Query::Query(const std::string& query, const std::string& query_id)
 {
 }
 
+Query::Query(std::string&& query, std::string&& query_id)
+    : query_(std::move(query))
+    , query_id_(std::move(query_id))
+{}
+
 Query::~Query()
 { }
 

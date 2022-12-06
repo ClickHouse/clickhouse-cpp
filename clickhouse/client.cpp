@@ -902,22 +902,6 @@ void Client::Execute(const Query& query) {
     impl_->ExecuteQuery(query);
 }
 
-void Client::Select(const std::string& query, SelectCallback cb) {
-    Execute(Query(query).OnData(std::move(cb)));
-}
-
-void Client::Select(const std::string& query, const std::string& query_id, SelectCallback cb) {
-    Execute(Query(query, query_id).OnData(std::move(cb)));
-}
-
-void Client::SelectCancelable(const std::string& query, SelectCancelableCallback cb) {
-    Execute(Query(query).OnDataCancelable(std::move(cb)));
-}
-
-void Client::SelectCancelable(const std::string& query, const std::string& query_id, SelectCancelableCallback cb) {
-    Execute(Query(query, query_id).OnDataCancelable(std::move(cb)));
-}
-
 void Client::Select(const Query& query) {
     Execute(query);
 }
