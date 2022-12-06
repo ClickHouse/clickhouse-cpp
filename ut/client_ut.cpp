@@ -1225,7 +1225,7 @@ TEST_P(ClientCase, OnProfileEvents) {
 }
 
 const auto LocalHostEndpoint = ClientOptions()
-        .SetHost(           getEnvOrDefault("CLICKHOUSE_HOST",     "192.168.152.129"))
+        .SetHost(           getEnvOrDefault("CLICKHOUSE_HOST",     "localhost"))
         .SetPort(   getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "9000"))
         .SetUser(           getEnvOrDefault("CLICKHOUSE_USER",     "default"))
         .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", ""))
@@ -1267,7 +1267,7 @@ INSTANTIATE_TEST_SUITE_P(ClientLocalReadonly, ReadonlyClientTest,
 INSTANTIATE_TEST_SUITE_P(ClientLocalFailed, ConnectionFailedClientTest,
     ::testing::Values(ConnectionFailedClientTest::ParamType{
         ClientOptions()
-            .SetHost(           getEnvOrDefault("CLICKHOUSE_HOST",     "192.168.152.129"))
+            .SetHost(           getEnvOrDefault("CLICKHOUSE_HOST",     "localhost"))
             .SetPort(   getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "9000"))
             .SetUser("non_existing_user_clickhouse_cpp_test")
             .SetPassword("wrongpwd")
