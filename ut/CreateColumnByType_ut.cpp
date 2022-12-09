@@ -59,6 +59,12 @@ TEST(CreateColumnByType, AggregateFunction) {
 class CreateColumnByTypeWithName : public ::testing::TestWithParam<const char* /*Column Type String*/>
 {};
 
+TEST(CreateColumnByType, Bool) {
+    const auto col = CreateColumnByType("Bool");
+    ASSERT_NE(nullptr, col);
+    EXPECT_EQ(col->GetType().GetName(), "UInt8");
+}
+
 TEST_P(CreateColumnByTypeWithName, CreateColumnByType)
 {
     const auto col = CreateColumnByType(GetParam());
