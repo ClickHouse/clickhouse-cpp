@@ -273,16 +273,17 @@ TEST_P(ClientCase, LowCardinalityString_AsString) {
 
 TEST_P(ClientCase, Generic) {
     client_->Execute(
-            "CREATE TEMPORARY TABLE IF NOT EXISTS test_clickhouse_cpp_client (id UInt64, name String) ");
+            "CREATE TEMPORARY TABLE IF NOT EXISTS test_clickhouse_cpp_client (id UInt64, name String, f Bool) ");
 
     const struct {
         uint64_t id;
         std::string name;
+        bool f;
     } TEST_DATA[] = {
-        { 1, "id" },
-        { 3, "foo" },
-        { 5, "bar" },
-        { 7, "name" },
+        { 1, "id", true },
+        { 3, "foo", false },
+        { 5, "bar", true },
+        { 7, "name", false },
     };
 
     /// Insert some values.
@@ -291,20 +292,23 @@ TEST_P(ClientCase, Generic) {
 
         auto id = std::make_shared<ColumnUInt64>();
         auto name = std::make_shared<ColumnString>();
+        auto f = std::make_shared<ColumnUInt8> ();
         for (auto const& td : TEST_DATA) {
             id->Append(td.id);
             name->Append(td.name);
+            f->Append(td.f);
         }
 
         block.AppendColumn("id"  , id);
         block.AppendColumn("name", name);
+        block.AppendColumn("f",    f);
 
         client_->Insert("test_clickhouse_cpp_client", block);
     }
 
     /// Select values inserted in the previous step.
     size_t row = 0;
-    client_->Select("SELECT id, name FROM test_clickhouse_cpp_client", [TEST_DATA, &row](const Block& block)
+    client_->Select("SELECT id, name, f FROM test_clickhouse_cpp_client", [TEST_DATA, &row](const Block& block)
         {
             if (block.GetRowCount() == 0) {
                 return;
@@ -314,6 +318,7 @@ TEST_P(ClientCase, Generic) {
             for (size_t c = 0; c < block.GetRowCount(); ++c, ++row) {
                 EXPECT_EQ(TEST_DATA[row].id, (*block[0]->As<ColumnUInt64>())[c]);
                 EXPECT_EQ(TEST_DATA[row].name, (*block[1]->As<ColumnString>())[c]);
+                EXPECT_EQ(TEST_DATA[row].f, (*block[2]->As<ColumnUInt8>())[c]);
             }
         }
     );
