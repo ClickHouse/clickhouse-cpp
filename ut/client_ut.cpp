@@ -1196,7 +1196,6 @@ const auto QUERIES = std::vector<std::string>{
     "SELECT fqdn()",
     "SELECT buildId()",
     "SELECT uptime()",
-    "SELECT filesystemFree()",
     "SELECT now()"
 };
 }

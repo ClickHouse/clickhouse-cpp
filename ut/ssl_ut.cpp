@@ -16,7 +16,6 @@ namespace {
         "SELECT fqdn()",
         "SELECT buildId()",
         "SELECT uptime()",
-        "SELECT filesystemFree()",
         "SELECT now()"
     };
 }
