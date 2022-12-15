@@ -21,6 +21,10 @@ public:
         return columns_[n];
     }
 
+    ColumnRef At(size_t n) const {
+        return columns_[n];
+    }
+
 public:
     /// Appends content of given column to the end of current one.
     void Append(ColumnRef column) override;
