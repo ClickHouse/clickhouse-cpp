@@ -109,7 +109,11 @@ TEST(TypesCase, IsEqual) {
         "Map(String, Tuple(String, Int8, Date, DateTime))",
         "Map(UUID, Array(Tuple(String, Int8, Date, DateTime)))",
         "Map(String, Array(Array(Array(Nullable(Tuple(String, Int8, Date, DateTime))))))",
-        "Map(LowCardinality(FixedString(10)), Array(Array(Array(Array(Nullable(Tuple(String, Int8, Date, DateTime('UTC'))))))))"
+        "Map(LowCardinality(FixedString(10)), Array(Array(Array(Array(Nullable(Tuple(String, Int8, Date, DateTime('UTC'))))))))",
+        "Point",
+        "Ring",
+        "Polygon",
+        "MultiPolygon"
     };
 
     // Check that Type::IsEqual returns true only if:

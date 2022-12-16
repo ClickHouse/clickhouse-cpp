@@ -4,17 +4,19 @@
 #include "date.h"
 #include "decimal.h"
 #include "enum.h"
+#include "geo.h"
 #include "ip4.h"
 #include "ip6.h"
 #include "lowcardinality.h"
 #include "lowcardinalityadaptor.h"
+#include "map.h"
 #include "nothing.h"
 #include "nullable.h"
 #include "numeric.h"
 #include "string.h"
 #include "tuple.h"
 #include "uuid.h"
-#include "map.h"
+
 
 #include "../types/type_parser.h"
 
@@ -96,6 +98,18 @@ static ColumnRef CreateTerminalColumn(const TypeAst& ast) {
 
     case Type::UUID:
         return std::make_shared<ColumnUUID>();
+
+    case Type::Point:
+        return std::make_shared<ColumnPoint>();
+
+    case Type::Ring:
+        return std::make_shared<ColumnRing>();
+
+    case Type::Polygon:
+        return std::make_shared<ColumnPolygon>();
+
+    case Type::MultiPolygon:
+        return std::make_shared<ColumnMultiPolygon>();
 
     default:
         return nullptr;

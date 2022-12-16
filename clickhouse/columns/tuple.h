@@ -76,16 +76,11 @@ public:
 
     inline ValueType operator[](size_t index) const { return GetTupleOfValues(index); }
 
-    template <typename T, size_t index = std::tuple_size_v<T>>
-    inline void Append([[maybe_unused]] T value) {
-        static_assert(index <= std::tuple_size_v<T>);
-        static_assert(std::tuple_size_v<TupleOfColumns> == std::tuple_size_v<T>);
-        if constexpr (index == 0) {
-            return;
-        } else {
-            std::get<index - 1>(typed_columns_)->Append(std::move(std::get<index - 1>(value)));
-            Append<T, index - 1>(std::move(value));
-        }
+    using ColumnTuple::Append;
+
+    template <typename... T>
+    inline void Append(std::tuple<T...> value) {
+        AppendTuple(std::move(value));
     }
 
     /** Create a ColumnTupleT from a ColumnTuple, without copying data and offsets, but by
@@ -122,6 +117,18 @@ public:
     }
 
 private:
+    template <typename T, size_t index = std::tuple_size_v<T>>
+    inline void AppendTuple([[maybe_unused]] T value) {
+        static_assert(index <= std::tuple_size_v<T>);
+        static_assert(std::tuple_size_v<TupleOfColumns> == std::tuple_size_v<T>);
+        if constexpr (index == 0) {
+            return;
+        } else {
+            std::get<index - 1>(typed_columns_)->Append(std::move(std::get<index - 1>(value)));
+            AppendTuple<T, index - 1>(std::move(value));
+        }
+    }
+
     template <typename T, size_t index = std::tuple_size_v<T>>
     inline static std::vector<ColumnRef> TupleToVector([[maybe_unused]] const T& value) {
         static_assert(index <= std::tuple_size_v<T>);

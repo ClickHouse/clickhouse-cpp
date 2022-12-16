@@ -7,6 +7,7 @@
 #include <clickhouse/columns/date.h>
 #include <clickhouse/columns/decimal.h>
 #include <clickhouse/columns/enum.h>
+#include <clickhouse/columns/geo.h>
 #include <clickhouse/columns/ip4.h>
 #include <clickhouse/columns/ip6.h>
 #include <clickhouse/columns/numeric.h>
@@ -47,10 +48,14 @@ std::ostream& operator<<(std::ostream & ostr, const DateTimeValue & time) {
     return ostr << buffer;
 }
 
-template <typename ColumnType, typename AsType = typename ColumnType::ValueType>
+template <typename ColumnType, typename AsType = decltype(std::declval<ColumnType>().At(0)) >
 bool doPrintValue(const ColumnRef & c, const size_t row, std::ostream & ostr) {
     if (const auto & casted_c = c->As<ColumnType>()) {
-        ostr << static_cast<AsType>(casted_c->At(row));
+        if constexpr (is_container_v<std::decay_t<AsType>>) {
+            ostr << PrintContainer{static_cast<AsType>(casted_c->At(row))};
+        } else {
+            ostr << static_cast<AsType>(casted_c->At(row));
+        }
         return true;
     }
     return false;
@@ -173,7 +178,11 @@ std::ostream & printColumnValue(const ColumnRef& c, const size_t row, std::ostre
         || doPrintValue<ColumnArray, void>(c, row, ostr)
         || doPrintValue<ColumnTuple, void>(c, row, ostr)
         || doPrintValue<ColumnUUID, void>(c, row, ostr)
-        || doPrintValue<ColumnMap, void>(c, row, ostr);
+        || doPrintValue<ColumnMap, void>(c, row, ostr)
+        || doPrintValue<ColumnPoint>(c, row, ostr)
+        || doPrintValue<ColumnRing>(c, row, ostr)
+        || doPrintValue<ColumnPolygon>(c, row, ostr)
+        || doPrintValue<ColumnMultiPolygon>(c, row, ostr);
     if (!r)
         ostr << "Unable to print value of type " << c->GetType().GetName();
 

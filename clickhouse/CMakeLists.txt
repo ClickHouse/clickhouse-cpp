@@ -12,6 +12,7 @@ SET ( clickhouse-cpp-lib-src
     columns/decimal.cpp
     columns/enum.cpp
     columns/factory.cpp
+    columns/geo.cpp
     columns/ip4.cpp
     columns/ip6.cpp
     columns/lowcardinality.cpp
@@ -117,6 +118,7 @@ INSTALL(FILES columns/date.h DESTINATION include/clickhouse/columns/)
 INSTALL(FILES columns/decimal.h DESTINATION include/clickhouse/columns/)
 INSTALL(FILES columns/enum.h DESTINATION include/clickhouse/columns/)
 INSTALL(FILES columns/factory.h DESTINATION include/clickhouse/columns/)
+INSTALL(FILES columns/geo.h DESTINATION include/clickhouse/columns/)
 INSTALL(FILES columns/ip4.h DESTINATION include/clickhouse/columns/)
 INSTALL(FILES columns/ip6.h DESTINATION include/clickhouse/columns/)
 INSTALL(FILES columns/itemview.h DESTINATION include/clickhouse/columns/)
