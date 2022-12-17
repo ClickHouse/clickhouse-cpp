@@ -177,7 +177,7 @@ ColumnString::ColumnString()
 }
 
 ColumnString::ColumnString(size_t element_count)
-    : Column(Type::CreateString())
+    : Column(Type::CreateString(), Serialization::MakeDefault(this))
 {
     items_.reserve(element_count);
     // 100 is arbitrary number, assumption that string values are about ~40 bytes long.
