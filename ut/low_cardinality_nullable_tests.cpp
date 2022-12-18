@@ -78,6 +78,43 @@ TEST(LowCardinalityOfNullable, InsertAndQuery) {
     });
 }
 
+TEST(LowCardinalityOfNullable, InsertAndQueryOneRow) {
+    const auto rowsData = std::vector<std::string> {
+        "eminem"
+    };
+
+    const auto nulls = std::vector<uint8_t> {
+        false
+    };
+
+    auto column = buildTestColumn(rowsData, nulls);
+
+    Block block;
+    block.AppendColumn("words", column);
+
+    Client client(ClientOptions(localHostEndpoint)
+                             .SetBakcwardCompatibilityFeatureLowCardinalityAsWrappedColumn(false)
+                             .SetPingBeforeQuery(true));
+
+    createTable(client);
+
+    client.Insert("lc_of_nullable", block);
+
+    client.Select("SELECT * FROM lc_of_nullable", [&](const Block& bl) {
+        for (size_t row = 0; row < bl.GetRowCount(); row++) {
+            auto lc_col = bl[0]->As<ColumnLowCardinality>();
+            auto item = lc_col->GetItem(row);
+
+            if (nulls[row]) {
+                ASSERT_EQ(Type::Code::Void, item.type);
+            } else {
+                ASSERT_EQ(rowsData[row], item.get<std::string_view>());
+            }
+        }
+    });
+}
+
+
 TEST(LowCardinalityOfNullable, InsertAndQueryEmpty) {
     auto column = buildTestColumn({}, {});
 
