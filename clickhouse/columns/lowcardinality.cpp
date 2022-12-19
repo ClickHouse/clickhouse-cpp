@@ -281,7 +281,7 @@ auto Load(ColumnRef new_dictionary_column, InputStream& input, size_t rows) {
 
     if (auto nullable = new_dictionary_column->As<ColumnNullable>()) {
         nullable->Append(true);
-        for(std::size_t i = 1; i < new_index_column->Size(); i++) {
+        for(std::size_t i = 1; i < dataColumn->Size(); i++) {
             nullable->Append(false);
         }
     }
