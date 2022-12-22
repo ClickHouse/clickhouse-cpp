@@ -84,7 +84,11 @@ bool ColumnArray::LoadBody(InputStream* input, size_t rows) {
     if (!offsets_->LoadBody(input, rows)) {
         return false;
     }
-    if (!data_->LoadBody(input, (*offsets_)[rows - 1])) {
+    const auto nested_rows = (*offsets_)[rows - 1];
+    if (nested_rows == 0) {
+        return true;
+    }
+    if (!data_->LoadBody(input, nested_rows)) {
         return false;
     }
     return true;
@@ -96,7 +100,9 @@ void ColumnArray::SavePrefix(OutputStream* output) {
 
 void ColumnArray::SaveBody(OutputStream* output) {
     offsets_->SaveBody(output);
-    data_->SaveBody(output);
+    if (data_->Size() > 0) {
+        data_->SaveBody(output);
+    }
 }
 
 void ColumnArray::Clear() {

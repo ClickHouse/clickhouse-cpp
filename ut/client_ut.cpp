@@ -1037,6 +1037,31 @@ TEST_P(ClientCase, RoundtripArrayTString) {
     EXPECT_TRUE(CompareRecursive(*array, *result_typed));
 }
 
+TEST_P(ClientCase, RoundtripArrayLowCardinalityTString) {
+    // TODO replase by Roundtrip test
+    using TestColumn = ColumnArrayT<ColumnLowCardinalityT<ColumnString>>;
+
+    Block block;
+    auto array = createTableWithOneColumn<TestColumn>(block);
+    array->Append(std::vector<std::string>{});
+    array->Append(std::vector<std::string>{});
+
+    block.RefreshRowCount();
+    client_->Insert(table_name, block);
+
+    size_t total_rows = 0;
+    client_->Select(getOneColumnSelectQuery(),
+        [&total_rows](const Block& block) {
+            total_rows += block.GetRowCount();
+            if (block.GetRowCount() == 0) {
+                return;
+            }
+        }
+    );
+
+    ASSERT_EQ(total_rows, 2u);
+}
+
 TEST_P(ClientCase, RoundtripMapTUint64String) {
     using Map = ColumnMapT<ColumnUInt64, ColumnString>;
     auto map = std::make_shared<Map>(std::make_shared<ColumnUInt64>(), std::make_shared<ColumnString>());
