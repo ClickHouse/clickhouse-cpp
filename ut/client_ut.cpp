@@ -1313,6 +1313,17 @@ TEST_P(ClientCase, OnProfileEvents) {
     }
 }
 
+TEST_P(ClientCase, Issue266) {
+    client_->Execute("CREATE TEMPORARY TABLE IF NOT EXISTS tableplus_crash_example (col AggregateFunction(argMax, Int32, DateTime(3))) engine = Memory");
+    client_->Execute("insert into tableplus_crash_example values (unhex('010000000001089170A883010000'))");
+
+    client_->Select("select col from tableplus_crash_example",
+    [&](const Block& block) {
+        std::cerr << PrettyPrintBlock{block} << std::endl;
+    });
+}
+
+
 const auto LocalHostEndpoint = ClientOptions()
         .SetHost(           getEnvOrDefault("CLICKHOUSE_HOST",     "localhost"))
         .SetPort(   getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "9000"))
