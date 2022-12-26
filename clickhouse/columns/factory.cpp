@@ -34,7 +34,7 @@ namespace {
 // * -1 - last element
 // * -2 - one before last, etc.
 const auto& GetASTChildElement(const TypeAst & ast, int position) {
-    if (abs(position) >= ast.elements.size())
+    if (static_cast<size_t>(abs(position)) >= ast.elements.size())
         throw ValidationError("AST child element index out of bounds: " + std::to_string(position));
 
     if (position < 0)

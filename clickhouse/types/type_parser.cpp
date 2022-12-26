@@ -111,6 +111,7 @@ bool TypeParser::Parse(TypeAst* type) {
     type_ = type;
     open_elements_.push(type_);
 
+    size_t processed_tokens = 0;
     do {
         const Token & token = NextToken();
         switch (token.type) {
@@ -159,11 +160,17 @@ bool TypeParser::Parse(TypeAst* type) {
                 // Ubalanced braces, brackets, etc is an error.
                 if (open_elements_.size() != 1)
                     return false;
+
+                // Empty input string, no tokens produced
+                if (processed_tokens == 0)
+                    return false;
+
                 return true;
             }
             case Token::Invalid:
                 return false;
         }
+        ++processed_tokens;
     } while (true);
 }
 

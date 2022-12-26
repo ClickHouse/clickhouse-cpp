@@ -239,3 +239,22 @@ TEST(TypeParserCase, ParseMap) {
     ASSERT_EQ(ast.elements[1].meta, TypeAst::Terminal);
     ASSERT_EQ(ast.elements[1].name, "String");
 }
+
+TEST(TypeParser, EmptyName) {
+    {
+        TypeAst ast;
+        EXPECT_EQ(false, TypeParser("").Parse(&ast));
+    }
+
+    {
+        TypeAst ast;
+        EXPECT_EQ(false, TypeParser(" ").Parse(&ast));
+    }
+}
+
+TEST(ParseTypeName, EmptyName) {
+    // Empty and invalid names shouldn't produce any AST and shoudn't crash
+    EXPECT_EQ(nullptr, ParseTypeName(""));
+    EXPECT_EQ(nullptr, ParseTypeName(" "));
+    EXPECT_EQ(nullptr, ParseTypeName(std::string(5, '\0')));
+}
