@@ -258,3 +258,15 @@ TEST(ParseTypeName, EmptyName) {
     EXPECT_EQ(nullptr, ParseTypeName(" "));
     EXPECT_EQ(nullptr, ParseTypeName(std::string(5, '\0')));
 }
+
+TEST(TypeParser, AggregateFunction) {
+    {
+        TypeAst ast;
+        EXPECT_FALSE(TypeParser("AggregateFunction(argMax, Int32, DateTime(3))").Parse(&ast));
+    }
+
+    {
+        TypeAst ast;
+        EXPECT_FALSE(TypeParser("AggregateFunction(argMax, LowCardinality(Nullable(FixedString(4))), DateTime(3, 'UTC'))").Parse(&ast));
+    }
+}
