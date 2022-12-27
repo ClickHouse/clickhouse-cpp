@@ -80,7 +80,7 @@ TEST(TypesCase, IsEqual) {
     const std::string type_names[] = {
         "UInt8",
         "Int8",
-        "UInt128",
+//        "UInt128",
         "String",
         "FixedString(0)",
         "FixedString(10000)",
@@ -128,7 +128,11 @@ TEST(TypesCase, IsEqual) {
         EXPECT_TRUE(type->IsEqual(*type));
 
         for (const auto & other_type_name : type_names) {
-            const auto other_type = clickhouse::CreateColumnByType(other_type_name)->Type();
+            SCOPED_TRACE(other_type_name);
+            const auto other_column = clickhouse::CreateColumnByType(other_type_name);
+            ASSERT_NE(nullptr, other_column);
+
+            const auto other_type = other_column->Type();
 
             const auto should_be_equal = type_name == other_type_name;
             EXPECT_EQ(should_be_equal, type->IsEqual(other_type))

@@ -1,9 +1,20 @@
 #include "type_parser.h"
 
+#include "clickhouse/exceptions.h"
+#include "clickhouse/base/platform.h" // for _win_
+
 #include <algorithm>
+#include <cmath>
 #include <map>
 #include <mutex>
 #include <unordered_map>
+
+#if defined _win_
+#include <string.h>
+#else
+#include <strings.h>
+#endif
+
 
 namespace clickhouse {
 
@@ -16,6 +27,7 @@ bool TypeAst::operator==(const TypeAst & other) const {
 }
 
 static const std::unordered_map<std::string, Type::Code> kTypeCode = {
+    { "Void",        Type::Void },
     { "Int8",        Type::Int8 },
     { "Int16",       Type::Int16 },
     { "Int32",       Type::Int32 },
@@ -41,23 +53,38 @@ static const std::unordered_map<std::string, Type::Code> kTypeCode = {
     { "IPv4",        Type::IPv4 },
     { "IPv6",        Type::IPv6 },
     { "Int128",      Type::Int128 },
+//    { "UInt128",      Type::UInt128 },
     { "Decimal",     Type::Decimal },
     { "Decimal32",   Type::Decimal32 },
     { "Decimal64",   Type::Decimal64 },
     { "Decimal128",  Type::Decimal128 },
     { "LowCardinality", Type::LowCardinality },
-    { "Map",         Type::Map},
-    { "Point",       Type::Point},
-    { "Ring",        Type::Ring},
-    { "Polygon",     Type::Polygon},
-    { "MultiPolygon", Type::MultiPolygon},
+    { "Map",         Type::Map },
+    { "Point",       Type::Point },
+    { "Ring",        Type::Ring },
+    { "Polygon",     Type::Polygon },
+    { "MultiPolygon", Type::MultiPolygon },
 };
+
+template <typename L, typename R>
+inline int CompateStringsCaseInsensitive(const L& left, const R& right) {
+    int64_t size_diff = left.size() - right.size();
+    if (size_diff != 0)
+        return size_diff > 0 ? 1 : -1;
+
+#if defined _win_
+    return _strnicmp(left.data(), right.data(), left.size());
+#else
+    return strncasecmp(left.data(), right.data(), left.size());
+#endif
+}
 
 static Type::Code GetTypeCode(const std::string& name) {
     auto it = kTypeCode.find(name);
     if (it != kTypeCode.end()) {
         return it->second;
     }
+
     return Type::Void;
 }
 
@@ -97,6 +124,17 @@ static TypeAst::Meta GetTypeMeta(const StringView& name) {
     return TypeAst::Terminal;
 }
 
+bool ValidateAST(const TypeAst& ast) {
+    // Void terminal that is not actually "void" produced when unknown type is encountered.
+    if (ast.meta == TypeAst::Terminal
+            && ast.code == Type::Void
+            && CompateStringsCaseInsensitive(ast.name, std::string_view("void")) != 0)
+        //throw UnimplementedError("Unsupported type: " + ast.name);
+        return false;
+
+    return true;
+}
+
 
 TypeParser::TypeParser(const StringView& name)
     : cur_(name.data())
@@ -111,6 +149,7 @@ bool TypeParser::Parse(TypeAst* type) {
     type_ = type;
     open_elements_.push(type_);
 
+    size_t processed_tokens = 0;
     do {
         const Token & token = NextToken();
         switch (token.type) {
@@ -159,11 +198,17 @@ bool TypeParser::Parse(TypeAst* type) {
                 // Ubalanced braces, brackets, etc is an error.
                 if (open_elements_.size() != 1)
                     return false;
-                return true;
+
+                // Empty input string, no tokens produced
+                if (processed_tokens == 0)
+                    return false;
+
+                return ValidateAST(*type);
             }
             case Token::Invalid:
                 return false;
         }
+        ++processed_tokens;
     } while (true);
 }
 

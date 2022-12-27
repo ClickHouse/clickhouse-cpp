@@ -1313,6 +1313,25 @@ TEST_P(ClientCase, OnProfileEvents) {
     }
 }
 
+TEST_P(ClientCase, SelectAggregateFunction) {
+    // Verifies that perofing SELECT value of type AggregateFunction(...) doesn't crash the client.
+    // For details: https://github.com/ClickHouse/clickhouse-cpp/issues/266
+    client_->Execute("CREATE TEMPORARY TABLE IF NOT EXISTS tableplus_crash_example (col AggregateFunction(argMax, Int32, DateTime(3))) engine = Memory");
+    client_->Execute("insert into tableplus_crash_example values (unhex('010000000001089170A883010000'))");
+
+    client_->Select("select version()",
+    [&](const Block& block) {
+        std::cerr << PrettyPrintBlock{block} << std::endl;
+    });
+
+    // Column type `AggregateFunction` is not supported.
+    EXPECT_THROW(client_->Select("select toTypeName(col), col from tableplus_crash_example",
+    [&](const Block& block) {
+        std::cerr << PrettyPrintBlock{block} << std::endl;
+    }), clickhouse::UnimplementedError);
+}
+
+
 const auto LocalHostEndpoint = ClientOptions()
         .SetHost(           getEnvOrDefault("CLICKHOUSE_HOST",     "localhost"))
         .SetPort(   getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "9000"))

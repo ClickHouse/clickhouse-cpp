@@ -23,9 +23,25 @@
 #include "../exceptions.h"
 
 #include <stdexcept>
+#include <string>
 
 namespace clickhouse {
 namespace {
+
+// Like Python's list's []:
+// * 0 - first element
+// * 1 - second element
+// * -1 - last element
+// * -2 - one before last, etc.
+const auto& GetASTChildElement(const TypeAst & ast, int position) {
+    if (static_cast<size_t>(abs(position)) >= ast.elements.size())
+        throw ValidationError("AST child element index out of bounds: " + std::to_string(position));
+
+    if (position < 0)
+        position = ast.elements.size() + position;
+
+    return ast.elements[static_cast<size_t>(position)];
+}
 
 static ColumnRef CreateTerminalColumn(const TypeAst& ast) {
     switch (ast.code) {
@@ -58,24 +74,24 @@ static ColumnRef CreateTerminalColumn(const TypeAst& ast) {
         return std::make_shared<ColumnFloat64>();
 
     case Type::Decimal:
-        return std::make_shared<ColumnDecimal>(ast.elements.front().value, ast.elements.back().value);
+        return std::make_shared<ColumnDecimal>(GetASTChildElement(ast, 0).value, GetASTChildElement(ast, -1).value);
     case Type::Decimal32:
-        return std::make_shared<ColumnDecimal>(9, ast.elements.front().value);
+        return std::make_shared<ColumnDecimal>(9, GetASTChildElement(ast, 0).value);
     case Type::Decimal64:
-        return std::make_shared<ColumnDecimal>(18, ast.elements.front().value);
+        return std::make_shared<ColumnDecimal>(18, GetASTChildElement(ast, 0).value);
     case Type::Decimal128:
-        return std::make_shared<ColumnDecimal>(38, ast.elements.front().value);
+        return std::make_shared<ColumnDecimal>(38, GetASTChildElement(ast, 0).value);
 
     case Type::String:
         return std::make_shared<ColumnString>();
     case Type::FixedString:
-        return std::make_shared<ColumnFixedString>(ast.elements.front().value);
+        return std::make_shared<ColumnFixedString>(GetASTChildElement(ast, 0).value);
 
     case Type::DateTime:
         if (ast.elements.empty()) {
             return std::make_shared<ColumnDateTime>();
         } else {
-            return std::make_shared<ColumnDateTime>(ast.elements[0].value_string);
+            return std::make_shared<ColumnDateTime>(GetASTChildElement(ast, 0).value_string);
         }
     case Type::DateTime64:
         if (ast.elements.empty()) {
@@ -120,13 +136,13 @@ static ColumnRef CreateColumnFromAst(const TypeAst& ast, CreateColumnByTypeSetti
     switch (ast.meta) {
         case TypeAst::Array: {
             return std::make_shared<ColumnArray>(
-                CreateColumnFromAst(ast.elements.front(), settings)
+                CreateColumnFromAst(GetASTChildElement(ast, 0), settings)
             );
         }
 
         case TypeAst::Nullable: {
             return std::make_shared<ColumnNullable>(
-                CreateColumnFromAst(ast.elements.front(), settings),
+                CreateColumnFromAst(GetASTChildElement(ast, 0), settings),
                 std::make_shared<ColumnUInt8>()
             );
         }
@@ -159,9 +175,10 @@ static ColumnRef CreateColumnFromAst(const TypeAst& ast, CreateColumnByTypeSetti
 
             enum_items.reserve(ast.elements.size() / 2);
             for (size_t i = 0; i < ast.elements.size(); i += 2) {
-                enum_items.push_back(
-                    Type::EnumItem{ ast.elements[i].value_string,
-                                   (int16_t)ast.elements[i + 1].value });
+                enum_items.push_back(Type::EnumItem{
+                    ast.elements[i].value_string,
+                    static_cast<int16_t>(ast.elements[i + 1].value)
+                });
             }
 
             if (ast.code == Type::Enum8) {
@@ -176,14 +193,14 @@ static ColumnRef CreateColumnFromAst(const TypeAst& ast, CreateColumnByTypeSetti
             break;
         }
         case TypeAst::LowCardinality: {
-            const auto nested = ast.elements.front();
+            const auto nested = GetASTChildElement(ast, 0);
             if (settings.low_cardinality_as_wrapped_column) {
                 switch (nested.code) {
                     // TODO (nemkov): update this to maximize code reuse.
                     case Type::String:
                         return std::make_shared<LowCardinalitySerializationAdaptor<ColumnString>>();
                     case Type::FixedString:
-                        return std::make_shared<LowCardinalitySerializationAdaptor<ColumnFixedString>>(nested.elements.front().value);
+                        return std::make_shared<LowCardinalitySerializationAdaptor<ColumnFixedString>>(GetASTChildElement(nested, 0).value);
                     case Type::Nullable:
                         throw UnimplementedError("LowCardinality(" + nested.name + ") is not supported with LowCardinalityAsWrappedColumn on");
                     default:
@@ -196,11 +213,11 @@ static ColumnRef CreateColumnFromAst(const TypeAst& ast, CreateColumnByTypeSetti
                     case Type::String:
                         return std::make_shared<ColumnLowCardinalityT<ColumnString>>();
                     case Type::FixedString:
-                        return std::make_shared<ColumnLowCardinalityT<ColumnFixedString>>(nested.elements.front().value);
+                        return std::make_shared<ColumnLowCardinalityT<ColumnFixedString>>(GetASTChildElement(nested, 0).value);
                     case Type::Nullable:
                         return std::make_shared<ColumnLowCardinality>(
                             std::make_shared<ColumnNullable>(
-                                CreateColumnFromAst(nested.elements.front(), settings),
+                                CreateColumnFromAst(GetASTChildElement(nested, 0), settings),
                                 std::make_shared<ColumnUInt8>()
                             )
                         );
@@ -210,7 +227,7 @@ static ColumnRef CreateColumnFromAst(const TypeAst& ast, CreateColumnByTypeSetti
             }
         }
         case TypeAst::SimpleAggregateFunction: {
-            return CreateTerminalColumn(ast.elements.back());
+            return CreateTerminalColumn(GetASTChildElement(ast, -1));
         }
 
         case TypeAst::Map: {
