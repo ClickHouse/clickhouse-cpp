@@ -71,11 +71,7 @@ IF (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
         # /usr/bin/ld: CMakeFiles/simple-test.dir/main.cpp.o: undefined reference to symbol '_Unwind_Resume@@GCC_3.0'
         # /usr/bin/ld: /lib/x86_64-linux-gnu/libgcc_s.so.1: error adding symbols: DSO missing from command line
         # FIXME: that workaround breaks clang build on mingw
-        IF (BUILD_SHARED_LIBS)
-            TARGET_LINK_LIBRARIES (clickhouse-cpp-lib gcc_s)
-        ELSE()
-            TARGET_LINK_LIBRARIES (clickhouse-cpp-lib-static gcc_s)
-        ENDIF()
+        TARGET_LINK_LIBRARIES (clickhouse-cpp-lib gcc_s)
     ENDIF ()
 ENDIF ()
 
