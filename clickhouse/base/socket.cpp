@@ -202,7 +202,7 @@ SOCKET SocketConnect(const NetworkAddress& addr, const SocketTimeoutParams& time
                 fd.fd = *s;
                 fd.events = POLLOUT;
                 fd.revents = 0;
-                ssize_t rval = Poll(&fd, 1, 5000);
+                ssize_t rval = Poll(&fd, 1, timeout_params.connect_timeout.count());
 
                 if (rval == -1) {
                     throw std::system_error(getSocketErrorCode(), getErrorCategory(), "fail to connect");
@@ -372,7 +372,7 @@ std::unique_ptr<SocketBase> NonSecureSocketFactory::connect(const ClientOptions 
 }
 
 std::unique_ptr<Socket> NonSecureSocketFactory::doConnect(const NetworkAddress& address, const ClientOptions& opts) {
-    SocketTimeoutParams timeout_params { opts.connection_recv_timeout, opts.connection_send_timeout };
+    SocketTimeoutParams timeout_params { opts.connection_connect_timeout, opts.connection_recv_timeout, opts.connection_send_timeout };
     return std::make_unique<Socket>(address, timeout_params);
 }
 

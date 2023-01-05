@@ -43,7 +43,7 @@ TEST(Socketcase, timeoutrecv) {
 
     std::this_thread::sleep_for(std::chrono::seconds(1));
     try {
-        Socket socket(addr, SocketTimeoutParams { Seconds(5), Seconds(5) });
+        Socket socket(addr, SocketTimeoutParams { Seconds(5), Seconds(5), Seconds(5) });
 
         std::unique_ptr<InputStream> ptr_input_stream = socket.makeInputStream();
         char buf[1024];
@@ -61,6 +61,30 @@ TEST(Socketcase, timeoutrecv) {
 
     std::this_thread::sleep_for(std::chrono::seconds(1));
     server.stop();
+}
+
+TEST(Socketcase, connecttimeout) {
+    using Clock = std::chrono::steady_clock;
+
+    try {
+        NetworkAddress("::1", "19980");
+    } catch (const std::system_error& e) {
+        GTEST_SKIP() << "missing IPv6 support";
+    }
+
+    NetworkAddress addr("100::1", "19980");  // "discard" IPv6 address
+
+    const auto connect_start = Clock::now();
+    try {
+        Socket socket(addr, SocketTimeoutParams{std::chrono::milliseconds(100)});
+        FAIL();
+    } catch (const std::system_error& e) {
+        if (e.code().value() == ENETUNREACH) {
+            GTEST_SKIP() << "missing IPv6 support";
+        }
+        EXPECT_EQ(EINPROGRESS, e.code().value());
+        EXPECT_LT(Clock::now() - connect_start, std::chrono::seconds(5));
+    }
 }
 
 // Test to verify that reading from empty socket doesn't hangs.
