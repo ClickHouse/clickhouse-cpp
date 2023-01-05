@@ -274,7 +274,7 @@ NetworkAddress::NetworkAddress(const std::string& host, const std::string& port)
     const int error = getaddrinfo(host.c_str(), port.c_str(), &hints, &info_);
 
 #if defined(_unix_)
-    if (error != EAI_SYSTEM) {
+    if (error && error != EAI_SYSTEM) {
         throw std::system_error(error, getaddrinfoErrorCategory::category());
     }
 #endif
