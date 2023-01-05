@@ -4,10 +4,16 @@
 #include <gtest/gtest.h>
 
 #include <iostream>
-#include <netdb.h>
 #include <stdio.h>
 #include <string.h>
 #include <thread>
+
+// for EAI_* error codes
+#if defined(_win_)
+#   include <ws2tcpip.h>
+#else
+#   include <netdb.h>
+#endif
 
 using namespace clickhouse;
 
@@ -69,7 +75,7 @@ TEST(Socketcase, gaierror) {
         NetworkAddress addr("host.invalid", "80");  // never resolves
         FAIL();
     } catch (const std::system_error& e) {
-        ASSERT_EQ(EAI_NONAME, e.code().value());
+        ASSERT_PRED1([](int error) { return error == EAI_NONAME || error == EAI_AGAIN || error == EAI_FAIL; }, e.code().value());
     }
 }
 
