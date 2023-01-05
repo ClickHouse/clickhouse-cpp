@@ -4,6 +4,7 @@
 #include <gtest/gtest.h>
 
 #include <iostream>
+#include <netdb.h>
 #include <stdio.h>
 #include <string.h>
 #include <thread>
@@ -61,6 +62,15 @@ TEST(Socketcase, timeoutrecv) {
 
     std::this_thread::sleep_for(std::chrono::seconds(1));
     server.stop();
+}
+
+TEST(Socketcase, gaierror) {
+    try {
+        NetworkAddress addr("host.invalid", "80");  // never resolves
+        FAIL();
+    } catch (const std::system_error& e) {
+        ASSERT_EQ(EAI_NONAME, e.code().value());
+    }
 }
 
 // Test to verify that reading from empty socket doesn't hangs.
