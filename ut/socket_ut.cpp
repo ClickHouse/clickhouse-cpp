@@ -79,10 +79,20 @@ TEST(Socketcase, connecttimeout) {
         Socket socket(addr, SocketTimeoutParams{std::chrono::milliseconds(100)});
         FAIL();
     } catch (const std::system_error& e) {
-        if (e.code().value() == ENETUNREACH) {
+        const int error = e.code().value();
+        if (error == ENETUNREACH || error == EHOSTUNREACH
+#if defined(_win_)
+            || error == WSAENETUNREACH
+#endif
+        ) {
             GTEST_SKIP() << "missing IPv6 support";
         }
-        EXPECT_EQ(EINPROGRESS, e.code().value());
+#if defined(_win_)
+        const auto expected = WSAETIMEDOUT;
+#else
+        const auto expected = ETIMEDOUT;
+#endif
+        EXPECT_EQ(expected, error);
         EXPECT_LT(Clock::now() - connect_start, std::chrono::seconds(5));
     }
 }

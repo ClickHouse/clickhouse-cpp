@@ -207,6 +207,13 @@ SOCKET SocketConnect(const NetworkAddress& addr, const SocketTimeoutParams& time
                 if (rval == -1) {
                     throw std::system_error(getSocketErrorCode(), getErrorCategory(), "fail to connect");
                 }
+                if (rval == 0) {
+#if defined(_win_)
+                    last_err = WSAETIMEDOUT;
+#else
+                    last_err = ETIMEDOUT;
+#endif
+                }
                 if (rval > 0) {
                     socklen_t len = sizeof(err);
                     getsockopt(*s, SOL_SOCKET, SO_ERROR, (char*)&err, &len);
