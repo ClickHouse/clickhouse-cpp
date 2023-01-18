@@ -95,6 +95,7 @@ public:
 
 
 struct SocketTimeoutParams {
+    std::chrono::milliseconds connect_timeout{ 5000 };
     std::chrono::milliseconds recv_timeout{ 0 };
     std::chrono::milliseconds send_timeout{ 0 };
 };
