@@ -8,6 +8,13 @@
 #include <string.h>
 #include <thread>
 
+// for EAI_* error codes
+#if defined(_win_)
+#   include <ws2tcpip.h>
+#else
+#   include <netdb.h>
+#endif
+
 using namespace clickhouse;
 
 TEST(Socketcase, connecterror) {
@@ -61,6 +68,15 @@ TEST(Socketcase, timeoutrecv) {
 
     std::this_thread::sleep_for(std::chrono::seconds(1));
     server.stop();
+}
+
+TEST(Socketcase, gaierror) {
+    try {
+        NetworkAddress addr("host.invalid", "80");  // never resolves
+        FAIL();
+    } catch (const std::system_error& e) {
+        ASSERT_PRED1([](int error) { return error == EAI_NONAME || error == EAI_AGAIN || error == EAI_FAIL; }, e.code().value());
+    }
 }
 
 TEST(Socketcase, connecttimeout) {

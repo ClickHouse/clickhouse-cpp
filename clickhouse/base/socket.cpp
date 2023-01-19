@@ -43,6 +43,21 @@ windowsErrorCategory const& windowsErrorCategory::category() {
 }
 #endif
 
+#if defined(_unix_)
+char const* getaddrinfoErrorCategory::name() const noexcept {
+    return "getaddrinfoError";
+}
+
+std::string getaddrinfoErrorCategory::message(int c) const {
+    return gai_strerror(c);
+}
+
+getaddrinfoErrorCategory const& getaddrinfoErrorCategory::category() {
+    static getaddrinfoErrorCategory c;
+    return c;
+}
+#endif
+
 namespace {
 
 class LocalNames : public std::unordered_set<std::string> {
@@ -264,6 +279,12 @@ NetworkAddress::NetworkAddress(const std::string& host, const std::string& port)
 #endif
 
     const int error = getaddrinfo(host.c_str(), port.c_str(), &hints, &info_);
+
+#if defined(_unix_)
+    if (error && error != EAI_SYSTEM) {
+        throw std::system_error(error, getaddrinfoErrorCategory::category());
+    }
+#endif
 
     if (error) {
         throw std::system_error(getSocketErrorCode(), getErrorCategory());
