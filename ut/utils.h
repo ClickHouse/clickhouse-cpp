@@ -6,6 +6,7 @@
 #include "utils_meta.h"
 #include "utils_comparison.h"
 
+#include <optional>
 #include <ostream>
 #include <ratio>
 #include <string_view>
@@ -111,6 +112,15 @@ inline ostream & operator<<(ostream & ostr, const pair<F, S> & t) {
 template <typename ... T>
 inline ostream & operator<<(ostream & ostr, const tuple<T...> & t) {
     return printTuple(ostr, t);
+}
+
+template <typename T>
+inline ostream & operator<<(ostream & ostr, const optional<T> & t) {
+    if (t.has_value()) {
+        return ostr << *t;
+    } else {
+        return ostr << "NULL";
+    }
 }
 }
 
