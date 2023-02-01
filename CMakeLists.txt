@@ -6,6 +6,7 @@ INCLUDE (cmake/openssl.cmake)
 
 OPTION (BUILD_BENCHMARK "Build benchmark" OFF)
 OPTION (BUILD_TESTS "Build tests" OFF)
+OPTION (BUILD_SHARED_LIBS "Build shared libs" OFF)
 OPTION (WITH_OPENSSL "Use OpenSSL for TLS connections" OFF)
 
 PROJECT (CLICKHOUSE-CLIENT)
@@ -26,6 +27,12 @@ PROJECT (CLICKHOUSE-CLIENT)
         # -Wno-deprecated-declarations to produce less cluttered output when building library itself (`deprecated` attributes are for library users)
         SET (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Werror -Wno-deprecated-declarations")
     ENDIF ()
+
+    IF (APPLE OR MSVC)
+        IF(BUILD_SHARED_LIBS)
+            MESSAGE(FATAL "Does not support shared on this platform")
+        ENDIF()
+    ENDIF()
 
     SUBDIRS (
         clickhouse
