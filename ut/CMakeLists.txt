@@ -39,3 +39,7 @@ TARGET_LINK_LIBRARIES (clickhouse-cpp-ut
     clickhouse-cpp-lib
     gtest-lib
 )
+
+IF (MSVC)
+    TARGET_COMPILE_OPTIONS(clickhouse-cpp-ut PRIVATE /bigobj)
+ENDIF()
