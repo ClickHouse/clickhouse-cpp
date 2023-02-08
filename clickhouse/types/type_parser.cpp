@@ -32,6 +32,7 @@ static const std::unordered_map<std::string, Type::Code> kTypeCode = {
     { "Int16",       Type::Int16 },
     { "Int32",       Type::Int32 },
     { "Int64",       Type::Int64 },
+    { "Bool",        Type::UInt8 },
     { "UInt8",       Type::UInt8 },
     { "UInt16",      Type::UInt16 },
     { "UInt32",      Type::UInt32 },
