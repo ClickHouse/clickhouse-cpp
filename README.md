@@ -24,6 +24,17 @@ C++ client for [ClickHouse](https://clickhouse.com/).
 * Map
 * Point, Ring, Polygon, MultiPolygon
 
+## Dependencies
+In the most basic case one needs only:
+- C++-17 complaint compiler (e.g. Clang-6, GCC-7)
+- `cmake` (3.20 or newer)
+- `ninja`
+
+Optional dependencies:
+- openssl
+- liblz4
+- libabsl
+
 ## Building
 
 ```sh
@@ -32,6 +43,13 @@ $ cd build
 $ cmake .. [-DBUILD_TESTS=ON]
 $ make
 ```
+
+Plese refer to the workflows for the reference on dependencies/build options
+- https://github.com/ClickHouse/clickhouse-cpp/blob/master/.github/workflows/linux.yml
+- https://github.com/ClickHouse/clickhouse-cpp/blob/master/.github/workflows/windows_msvc.yml
+- https://github.com/ClickHouse/clickhouse-cpp/blob/master/.github/workflows/windows_mingw.yml
+- https://github.com/ClickHouse/clickhouse-cpp/blob/master/.github/workflows/macos.yml
+
 
 ## Example
 
