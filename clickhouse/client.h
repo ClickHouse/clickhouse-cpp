@@ -45,12 +45,13 @@ enum class CompressionMethod {
 };
 
 struct ClientOptions {
+    // Setter goes first, so it is possible to apply 'deprecated' annotation safely.
 #define DECLARE_FIELD(name, type, setter, default_value) \
-    type name = default_value; \
     inline auto & setter(const type& value) { \
         name = value; \
         return *this; \
-    }
+    } \
+    type name = default_value
 
     /// Hostname of the server.
     DECLARE_FIELD(host, std::string, SetHost, std::string());
