@@ -1123,16 +1123,6 @@ TEST_P(ClientCase, OnProfile) {
     std::optional<Profile> profile;
     query.OnProfile([&profile](const Profile & new_profile) {
         profile = new_profile;
-
-        std::cout <<
-            "Profile:" <<
-            "\n\trows: " << new_profile.rows <<
-            "\n\tblocks: " << new_profile.blocks <<
-            "\n\tbytes: " << new_profile.bytes <<
-            "\n\trows_before_limit: " << new_profile.rows_before_limit <<
-            "\n\tapplied_limit: " << new_profile.applied_limit <<
-            "\n\tcalculated_rows_before_limit: " << new_profile.calculated_rows_before_limit <<
-            std::endl;
     });
 
     client_->Execute(query);
