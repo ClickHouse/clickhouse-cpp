@@ -6,6 +6,7 @@
 
 #include <gtest/gtest.h>
 
+#include <optional>
 #include <thread>
 #include <chrono>
 
@@ -1114,6 +1115,37 @@ TEST_P(ClientCase, OnProfileEvents) {
     if (client_->GetServerInfo().revision >= DBMS_MIN_REVISION_WITH_INCREMENTAL_PROFILE_EVENTS) {
         EXPECT_GT(received_row_count, 0U);
     }
+}
+
+TEST_P(ClientCase, OnProfile) {
+    Query query("SELECT * FROM system.numbers LIMIT 10;");
+
+    std::optional<Profile> profile;
+    query.OnProfile([&profile](const Profile & new_profile) {
+        profile = new_profile;
+
+        std::cout <<
+            "Profile:" <<
+            "\n\trows: " << new_profile.rows <<
+            "\n\tblocks: " << new_profile.blocks <<
+            "\n\tbytes: " << new_profile.bytes <<
+            "\n\trows_before_limit: " << new_profile.rows_before_limit <<
+            "\n\tapplied_limit: " << new_profile.applied_limit <<
+            "\n\tcalculated_rows_before_limit: " << new_profile.calculated_rows_before_limit <<
+            std::endl;
+    });
+
+    client_->Execute(query);
+
+    // Make sure that profile event came through
+    ASSERT_NE(profile, std::nullopt);
+
+    EXPECT_GE(profile->rows, 10u);
+    EXPECT_GE(profile->blocks, 1u);
+    EXPECT_GT(profile->bytes, 1u);
+    EXPECT_GE(profile->rows_before_limit, 10u);
+    EXPECT_EQ(profile->applied_limit, true);
+    EXPECT_EQ(profile->calculated_rows_before_limit, true);
 }
 
 TEST_P(ClientCase, SelectAggregateFunction) {
