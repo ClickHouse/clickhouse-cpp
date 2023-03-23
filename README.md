@@ -26,8 +26,8 @@ C++ client for [ClickHouse](https://clickhouse.com/).
 
 ## Dependencies
 In the most basic case one needs only:
-- C++-17 complaint compiler (e.g. Clang-6, GCC-7)
-- `cmake` (3.20 or newer)
+- a C++-17-complaint compiler,
+- `cmake` (3.12 or newer), and
 - `ninja`
 
 Optional dependencies:
@@ -51,7 +51,14 @@ Plese refer to the workflows for the reference on dependencies/build options
 - https://github.com/ClickHouse/clickhouse-cpp/blob/master/.github/workflows/macos.yml
 
 
-## Example
+## Example application build with clickhouse-cpp
+
+There are various ways to integrate clickhouse-cpp with the build system of an application. Below example uses the simple approach based on
+submodules presented in https://www.youtube.com/watch?v=ED-WUk440qc .
+
+- `mkdir clickhouse-app && cd clickhouse-app && git init`
+- `git submodule add https://github.com/ClickHouse/clickhouse-cpp.git contribs/clickhouse-cpp`
+- `touch app.cpp`, then copy the following C++ code into that file
 
 ```cpp
 #include <iostream>
@@ -100,7 +107,26 @@ int main()
 
     return 0;
 }
+
+- `touch CMakeLists.txt`, then copy the following CMake code into that file
+
+```cmake
+cmake_minimum_required(VERSION 3.12)
+project(application-example)
+
+set(CMAKE_CXX_STANDARD 17)
+
+add_subdirectory(contribs/clickhouse-cpp)
+
+add_executable(${PROJECT_NAME} "app.cpp")
+
+target_include_directories(${PROJECT_NAME} PRIVATE contribs/clickhouse-cpp/ contribs/clickhouse-cpp/contrib/absl)
+
+target_link_libraries(${PROJECT_NAME} PRIVATE clickhouse-cpp-lib)
 ```
+
+- run `rm -rf build && cmake -B build -S . && cmake --build build -j32` to remove remainders of the previous builds, run CMake and build the
+  application. The generated binary is located in location `build/application-example`.
 
 ## Thread-safety
 ⚠ Please note that `Client` instance is NOT thread-safe. I.e. you must create a separate `Client` for each thread or utilize some synchronization techniques. ⚠
