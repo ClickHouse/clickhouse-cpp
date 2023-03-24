@@ -107,6 +107,7 @@ int main()
 
     return 0;
 }
+```
 
 - `touch CMakeLists.txt`, then copy the following CMake code into that file
 
