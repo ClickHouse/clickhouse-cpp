@@ -34,14 +34,14 @@ namespace clickhouse {
 
 template <typename NestedColumnType, Type::Code type_code>
 ColumnGeo<NestedColumnType, type_code>::ColumnGeo()
-    : Column(std::move(CreateGeoType<type_code>())),
-      data_(std::move(CreateColumn<NestedColumnType>())) {
+    : Column(CreateGeoType<type_code>()),
+      data_(CreateColumn<NestedColumnType>()) {
 }
 
 template <typename NestedColumnType, Type::Code type_code>
 ColumnGeo<NestedColumnType, type_code>::ColumnGeo(ColumnRef data)
-    : Column(std::move(CreateGeoType<type_code>()))
-    , data_(std::move(WrapColumn<NestedColumnType>(std::move(data)))) {
+    : Column(CreateGeoType<type_code>())
+    , data_(WrapColumn<NestedColumnType>(std::move(data))) {
 }
 
 template <typename NestedColumnType, Type::Code type_code>

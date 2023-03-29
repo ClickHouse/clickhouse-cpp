@@ -137,7 +137,7 @@ private:
             result.reserve(std::tuple_size_v<T>);
             return result;
         } else {
-            auto result = std::move(TupleToVector<T, index - 1>(value));
+            auto result = TupleToVector<T, index - 1>(value);
             result.push_back(std::get<index - 1>(value));
             return result;
         }
