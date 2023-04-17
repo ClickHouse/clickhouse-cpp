@@ -310,6 +310,25 @@ std::ostream & operator<<(std::ostream & ostr, const ServerInfo & server_info) {
                 << " (" << server_info.revision << ")";
 }
 
+std::ostream & operator<<(std::ostream & ostr, const Profile & profile) {
+    return ostr
+        << "rows : " << profile.rows
+        << " blocks : " << profile.blocks
+        << " bytes : " << profile.bytes
+        << " rows_before_limit : " << profile.rows_before_limit
+        << " applied_limit : " << profile.applied_limit
+        << " calculated_rows_before_limit : " << profile.calculated_rows_before_limit;
+}
+
+std::ostream & operator<<(std::ostream & ostr, const Progress & progress) {
+    return ostr
+        << "rows : " << progress.rows
+        << " bytes : " << progress.bytes
+        << " total_rows : " << progress.total_rows
+        << " written_rows : " << progress.written_rows
+        << " written_bytes : " << progress.written_bytes;
+}
+
 }
 
 uint64_t versionNumber(const ServerInfo & server_info) {
