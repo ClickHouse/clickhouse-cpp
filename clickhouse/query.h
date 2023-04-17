@@ -19,6 +19,7 @@ struct QuerySettingsField {
     {
         IMPORTANT = 0x01,
         CUSTOM = 0x02,
+        OBSOLETE = 0x04,
     };
     std::string value;
     uint64_t flags{0};
