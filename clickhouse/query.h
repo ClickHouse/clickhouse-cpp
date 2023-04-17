@@ -80,6 +80,7 @@ using SelectCallback           = std::function<void(const Block& block)>;
 using SelectCancelableCallback = std::function<bool(const Block& block)>;
 using SelectServerLogCallback  = std::function<bool(const Block& block)>;
 using ProfileEventsCallback    = std::function<bool(const Block& block)>;
+using ProfileCallbak           = std::function<void(const Profile& profile)>;
 
 
 class Query : public QueryEvents {
@@ -159,6 +160,11 @@ public:
         return *this;
     }
 
+    inline Query& OnProfile(ProfileCallbak cb) {
+        profile_callback_cb_ = std::move(cb);
+        return *this;
+    }
+
     static const std::string default_query_id;
 
 private:
@@ -183,7 +189,8 @@ private:
     }
 
     void OnProfile(const Profile& profile) override {
-        (void)profile;
+        if (profile_callback_cb_)
+            profile_callback_cb_(profile);
     }
 
     void OnProgress(const Progress& progress) override {
@@ -218,6 +225,7 @@ private:
     SelectCancelableCallback select_cancelable_cb_;
     SelectServerLogCallback select_server_log_cb_;
     ProfileEventsCallback profile_events_callback_cb_;
+    ProfileCallbak profile_callback_cb_;
 };
 
 }

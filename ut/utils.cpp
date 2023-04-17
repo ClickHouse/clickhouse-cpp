@@ -21,6 +21,7 @@
 #include <cinttypes>
 #include <iomanip>
 #include <sstream>
+#include <type_traits>
 
 
 namespace {
@@ -51,7 +52,9 @@ std::ostream& operator<<(std::ostream & ostr, const DateTimeValue & time) {
 template <typename ColumnType, typename AsType = decltype(std::declval<ColumnType>().At(0)) >
 bool doPrintValue(const ColumnRef & c, const size_t row, std::ostream & ostr) {
     if (const auto & casted_c = c->As<ColumnType>()) {
-        if constexpr (is_container_v<std::decay_t<AsType>>) {
+        if constexpr (is_container_v<std::decay_t<AsType>>
+                && !std::is_same_v<ColumnType, ColumnString>
+                && !std::is_same_v<ColumnType, ColumnFixedString>) {
             ostr << PrintContainer{static_cast<AsType>(casted_c->At(row))};
         } else {
             ostr << static_cast<AsType>(casted_c->At(row));
