@@ -32,6 +32,7 @@ if (lz4_FOUND)
   if (NOT TARGET lz4::lz4)
     add_library(lz4::lz4 UNKNOWN IMPORTED)
     set_target_properties(lz4::lz4 PROPERTIES
+      INCLUDE_DIRECTORIES ${lz4_INCLUDE_DIRS}
       IMPORTED_LOCATION "${lz4_LIBRARY}"
       INTERFACE_INCLUDE_DIRECTORIES "${lz4_INCLUDE_DIR}")
   endif ()
