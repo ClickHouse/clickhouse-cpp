@@ -14,7 +14,6 @@
 #include <vector>
 #include <sstream>
 #include <stdexcept>
-#include <iostream>
 #if defined(WITH_OPENSSL)
 #include "base/sslsocket.h"
 #endif
@@ -205,10 +204,10 @@ ClientOptions modifyClientOptions(ClientOptions opts)
 {
     if (opts.hosts.size() != opts.ports.size())
         throw ValidationError("The sizes of lists of ports and hosts must match be equal.");
-    if (!opts.host.empty())
+    if (!opts.host.empty()) {
         opts.hosts.insert(opts.hosts.begin(), opts.host);
-
-    opts.ports.insert(opts.ports.begin(), opts.port);
+        opts.ports.insert(opts.ports.begin(), opts.port);
+    }
     return opts;
 }
 
