@@ -3,7 +3,7 @@
 #include "platform.h"
 #include "input.h"
 #include "output.h"
-#include "hosts_iterator.h"
+#include "endpoints_iterator.h"
 
 #include <cstddef>
 #include <string>
@@ -89,7 +89,7 @@ public:
 
     // TODO: move connection-related options to ConnectionOptions structure.
 
-    virtual std::unique_ptr<SocketBase> connect(const ClientOptions& opts, const std::shared_ptr<HostsIteratorBase> hosts_iterator) = 0;
+    virtual std::unique_ptr<SocketBase> connect(const ClientOptions& opts, const std::shared_ptr<EndpointsIteratorBase> endpoints_iterator) = 0;
 
     virtual void sleepFor(const std::chrono::milliseconds& duration);
 };
@@ -136,7 +136,7 @@ class NonSecureSocketFactory : public SocketFactory {
 public:
     ~NonSecureSocketFactory() override;
 
-    std::unique_ptr<SocketBase> connect(const ClientOptions& opts, const std::shared_ptr<HostsIteratorBase> hosts_iterator) override;
+    std::unique_ptr<SocketBase> connect(const ClientOptions& opts, const std::shared_ptr<EndpointsIteratorBase> endpoints_iterator) override;
 
 protected:
     virtual std::unique_ptr<Socket> doConnect(const NetworkAddress& address, const ClientOptions& opts);

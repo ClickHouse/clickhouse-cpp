@@ -7,10 +7,10 @@ namespace clickhouse {
 
 struct ClientOptions;
 
-class HostsIteratorBase
+class EndpointsIteratorBase
 {
  public: 
-   virtual ~HostsIteratorBase() = default;
+   virtual ~EndpointsIteratorBase() = default;
 
    virtual void next() = 0;
    virtual const std::string getHostAddr() const = 0;
@@ -20,17 +20,17 @@ class HostsIteratorBase
 };
 
 
-class RoundRobinHostsIterator : public HostsIteratorBase
+class RoundRobinEndpointsIterator : public EndpointsIteratorBase
 {
  public:
-    RoundRobinHostsIterator(const ClientOptions& opts);
+    RoundRobinEndpointsIterator(const ClientOptions& opts);
     const std::string getHostAddr() const override;
     unsigned int getPort() const override;
     void ResetIterations() override;
     bool nextIsExist() const override;
     void next() override;
     
-    ~RoundRobinHostsIterator() override;
+    ~RoundRobinEndpointsIterator() override;
 
  private:
 

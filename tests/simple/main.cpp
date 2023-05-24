@@ -504,7 +504,7 @@ int main() {
                            getEnvOrDefault("CLICKHOUSE_HOST",      "localhost"), 
                            })
                 .SetPorts({static_cast<unsigned int>(getEnvOrDefault<int>("CLICKHOUSE_PORT",     "9000")),
-                           static_cast<unsigned int>(getEnvOrDefault<int>("CLICKHOUSE_PORT",     "1212")),
+                           static_cast<unsigned int>(getEnvOrDefault<int>("CLICKHOUSE_PORT",     "9000")),
                            static_cast<unsigned int>(getEnvOrDefault<int>("CLICKHOUSE_PORT",     "9000")),
                            static_cast<unsigned int>(getEnvOrDefault<int>("CLICKHOUSE_PORT",     "9000")),
                            })

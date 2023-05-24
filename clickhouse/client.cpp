@@ -196,7 +196,7 @@ private:
     std::unique_ptr<InputStream> input_;
     std::unique_ptr<OutputStream> output_;
     std::unique_ptr<SocketBase> socket_;
-    std::shared_ptr<HostsIteratorBase> hosts_iterator;
+    std::shared_ptr<EndpointsIteratorBase> endpoints_iterator;
 
     ServerInfo server_info_;
 };
@@ -218,9 +218,9 @@ Client::Impl::Impl(const ClientOptions& opts,
     : options_(modifyClientOptions(opts))
     , events_(nullptr)
     , socket_factory_(std::move(socket_factory))
-    , hosts_iterator(new RoundRobinHostsIterator(options_))
+    , endpoints_iterator(new RoundRobinEndpointsIterator(options_))
 {
-    auto init_connection_with_host = [&](){
+    auto try_make_connection_with_endpoind = [this]() {
         for (unsigned int i = 0; ; ) {
             try {
                 ResetConnection();
@@ -234,13 +234,13 @@ Client::Impl::Impl(const ClientOptions& opts,
         }
     };
     
-    for (; hosts_iterator->nextIsExist(); hosts_iterator->next())
+    for (endpoints_iterator->ResetIterations(); ; endpoints_iterator->next())
     {
         try
         {
-            init_connection_with_host();
+            try_make_connection_with_endpoind();
         } catch (const std::system_error&) {
-            if(!hosts_iterator->nextIsExist()) 
+            if(!endpoints_iterator->nextIsExist()) 
                 throw;
         }
     }
@@ -353,7 +353,7 @@ void Client::Impl::Ping() {
 }
 
 void Client::Impl::ResetConnection() {
-    InitializeStreams(socket_factory_->connect(options_, hosts_iterator));
+    InitializeStreams(socket_factory_->connect(options_, endpoints_iterator));
 
     if (!Handshake()) {
         throw ProtocolError("fail to connect to " + options_.host);
@@ -885,14 +885,14 @@ bool Client::Impl::ReceiveHello() {
 }
 
 void Client::Impl::RetryGuard(std::function<void()> func) {
-    for(hosts_iterator->ResetIterations(); ; hosts_iterator->next())
+    for(endpoints_iterator->ResetIterations(); ; endpoints_iterator->next())
     {
         try
         {
             RetryToConstEndpoint(func);
             return;
         } catch (const std::system_error&) {
-            if (!hosts_iterator->nextIsExist())
+            if (!endpoints_iterator->nextIsExist())
                 throw;
         }
     }
