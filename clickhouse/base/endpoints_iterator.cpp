@@ -10,7 +10,7 @@ RoundRobinEndpointsIterator::RoundRobinEndpointsIterator(const ClientOptions& op
    , reseted (true)
    , iteration_counter(0)
 {
-   
+
 }
 
 const std::string RoundRobinEndpointsIterator::getHostAddr() const

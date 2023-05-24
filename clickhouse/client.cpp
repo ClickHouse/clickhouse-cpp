@@ -14,6 +14,7 @@
 #include <vector>
 #include <sstream>
 #include <stdexcept>
+
 #if defined(WITH_OPENSSL)
 #include "base/sslsocket.h"
 #endif
@@ -161,7 +162,7 @@ private:
     /// call fuc several times.
     void RetryGuard(std::function<void()> func);
     
-    void RetryToConstEndpoint(std::function<void()> func);
+    void RetryConnectToTheEndpoint(std::function<void()>& func);
 
 private:
     class EnsureNull {
@@ -242,7 +243,7 @@ Client::Impl::Impl(const ClientOptions& opts,
             try_make_connection_with_endpoint();
             break;
         } catch (const std::system_error&) {
-            if(!endpoints_iterator->nextIsExist()) 
+            if(!endpoints_iterator->nextIsExist())
                 throw;
         }
     }
@@ -891,7 +892,7 @@ void Client::Impl::RetryGuard(std::function<void()> func) {
     {
         try
         {
-            RetryToConstEndpoint(func);
+            RetryConnectToTheEndpoint(func);
             return;
         } catch (const std::system_error&) {
             if (!endpoints_iterator->nextIsExist())
@@ -900,7 +901,7 @@ void Client::Impl::RetryGuard(std::function<void()> func) {
     }
 }
 
-void Client::Impl::RetryToConstEndpoint(std::function<void()> func) {
+void Client::Impl::RetryConnectToTheEndpoint(std::function<void()>& func) {
     for (unsigned int i = 0; ; ++i) {
         try {
             func();
