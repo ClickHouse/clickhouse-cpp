@@ -21,6 +21,7 @@
 #include <cinttypes>
 #include <iomanip>
 #include <sstream>
+#include <type_traits>
 
 
 namespace {
@@ -51,7 +52,9 @@ std::ostream& operator<<(std::ostream & ostr, const DateTimeValue & time) {
 template <typename ColumnType, typename AsType = decltype(std::declval<ColumnType>().At(0)) >
 bool doPrintValue(const ColumnRef & c, const size_t row, std::ostream & ostr) {
     if (const auto & casted_c = c->As<ColumnType>()) {
-        if constexpr (is_container_v<std::decay_t<AsType>>) {
+        if constexpr (is_container_v<std::decay_t<AsType>>
+                && !std::is_same_v<ColumnType, ColumnString>
+                && !std::is_same_v<ColumnType, ColumnFixedString>) {
             ostr << PrintContainer{static_cast<AsType>(casted_c->At(row))};
         } else {
             ostr << static_cast<AsType>(casted_c->At(row));
@@ -308,6 +311,25 @@ std::ostream & operator<<(std::ostream & ostr, const ServerInfo & server_info) {
                 << server_info.version_minor << "."
                 << server_info.version_patch
                 << " (" << server_info.revision << ")";
+}
+
+std::ostream & operator<<(std::ostream & ostr, const Profile & profile) {
+    return ostr
+        << "rows : " << profile.rows
+        << " blocks : " << profile.blocks
+        << " bytes : " << profile.bytes
+        << " rows_before_limit : " << profile.rows_before_limit
+        << " applied_limit : " << profile.applied_limit
+        << " calculated_rows_before_limit : " << profile.calculated_rows_before_limit;
+}
+
+std::ostream & operator<<(std::ostream & ostr, const Progress & progress) {
+    return ostr
+        << "rows : " << progress.rows
+        << " bytes : " << progress.bytes
+        << " total_rows : " << progress.total_rows
+        << " written_rows : " << progress.written_rows
+        << " written_bytes : " << progress.written_bytes;
 }
 
 }

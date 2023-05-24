@@ -20,6 +20,7 @@ SET ( clickhouse-cpp-ut-src
     CreateColumnByType_ut.cpp
     Column_ut.cpp
     roundtrip_column.cpp
+    roundtrip_tests.cpp
 
     utils.cpp
     value_generators.cpp
@@ -36,9 +37,10 @@ ADD_EXECUTABLE (clickhouse-cpp-ut
 )
 
 TARGET_LINK_LIBRARIES (clickhouse-cpp-ut
-    clickhouse-cpp-lib-static
+    clickhouse-cpp-lib
     gtest-lib
 )
-IF (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --rtlib=compiler-rt")
-ENDIF ()
+
+IF (MSVC)
+    TARGET_COMPILE_OPTIONS(clickhouse-cpp-ut PRIVATE /bigobj)
+ENDIF()

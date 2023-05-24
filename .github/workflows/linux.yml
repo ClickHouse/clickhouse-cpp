@@ -14,44 +14,67 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-20.04
     strategy:
+      fail-fast: false
       matrix:
-        compiler: [clang-6, gcc-7, gcc-8, gcc-9]
+        os: [ubuntu-20.04]
+        compiler: [clang-6, clang-10-libc++, gcc-7, gcc-8, gcc-9]
         ssl: [ssl_ON, ssl_OFF]
+        dependencies: [dependencies_BUILT_IN]
+
         include:
         - compiler: clang-6
-          INSTALL: clang-6.0
+          COMPILER_INSTALL: clang-6.0 libc++-dev
           C_COMPILER: clang-6.0
           CXX_COMPILER: clang++-6.0
 
+        - compiler: clang-10-libc++
+          COMPILER_INSTALL: clang-10 libc++-dev
+          C_COMPILER: clang-10
+          CXX_COMPILER: clang++-10
+
         - compiler: gcc-7
-          INSTALL: gcc-7 g++-7
+          COMPILER_INSTALL: gcc-7 g++-7
           C_COMPILER: gcc-7
           CXX_COMPILER: g++-7
 
         - compiler: gcc-8
-          INSTALL: gcc-8 g++-8
+          COMPILER_INSTALL: gcc-8 g++-8
           C_COMPILER: gcc-8
           CXX_COMPILER: g++-8
 
         - compiler: gcc-9
-          INSTALL: gcc-9 g++-9
+          COMPILER_INSTALL: gcc-9 g++-9
           C_COMPILER: gcc-9
           CXX_COMPILER: g++-9
 
         - ssl: ssl_ON
-          INSTALL_SSL: libssl-dev
-          EXTRA_CMAKE_FLAGS: -DWITH_OPENSSL=ON
+          SSL_CMAKE_OPTION: -D WITH_OPENSSL=ON
 
-        - ssl: ssl_OFF
-          EXTRA_CMAKE_FLAGS: -DWITH_OPENSSL=OFF
+        - dependencies: dependencies_SYSTEM
+          compiler: compiler_SYSTEM
+          os: ubuntu-22.04
+          COMPILER_INSTALL: gcc g++
+          C_COMPILER: gcc
+          CXX_COMPILER: g++
+          DEPENDENCIES_INSTALL: libabsl-dev liblz4-dev
+          DEPENDENCIES_CMAKE_OPTIONS: >-
+            -D WITH_SYSTEM_LZ4=ON
+            -D WITH_SYSTEM_ABSEIL=ON
+
+    runs-on: ${{matrix.os}}
 
     steps:
     - uses: actions/checkout@v2
 
     - name: Install dependencies
-      run: sudo apt-get install -y docker cmake ${{ matrix.INSTALL }} ${{ matrix.INSTALL_SSL }}
+      run: |
+        sudo apt-get update && \
+        sudo apt-get install -y \
+          docker \
+          cmake \
+          ${{matrix.COMPILER_INSTALL}} \
+          ${{matrix.DEPENDENCIES_INSTALL}}
 
     - name: Install dependencies - Docker
       run: |
@@ -62,17 +85,24 @@ jobs:
         sudo apt update -q
         sudo apt install docker-ce docker-ce-cli containerd.io
 
-    - name: Configure CMake
+    - name: Configure project
       run: |
         cmake \
-          -DCMAKE_C_COMPILER=${{ matrix.C_COMPILER}} \
-          -DCMAKE_CXX_COMPILER=${{ matrix.CXX_COMPILER}} \
-          -B ${{github.workspace}}/build \
-          -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DBUILD_TESTS=ON \
-          ${{ matrix.EXTRA_CMAKE_FLAGS }}
+          -D CMAKE_C_COMPILER=${{matrix.C_COMPILER}} \
+          -D CMAKE_CXX_COMPILER=${{matrix.CXX_COMPILER}} \
+          -D CMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
+          -D BUILD_TESTS=ON \
+          ${{matrix.SSL_CMAKE_OPTION}} \
+          ${{matrix.DEPENDENCIES_CMAKE_OPTIONS}} \
+          -S ${{github.workspace}} \
+          -B ${{github.workspace}}/build 
 
-    - name: Build
-      run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} --target all
+    - name: Build project
+      run: |
+        cmake \
+          --build ${{github.workspace}}/build \
+          --config ${{env.BUILD_TYPE}} \
+          --target all
 
     - name: Test - Start ClickHouse server in background
       run: |

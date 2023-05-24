@@ -50,8 +50,20 @@ TEST(CreateColumnByType, DateTime) {
     ASSERT_EQ(CreateColumnByType("DateTime64(3, 'UTC')")->As<ColumnDateTime64>()->Timezone(), "UTC");
 }
 
+TEST(CreateColumnByType, AggregateFunction) {
+    EXPECT_EQ(nullptr, CreateColumnByType("AggregateFunction(argMax, Int32, DateTime64(3))"));
+    EXPECT_EQ(nullptr, CreateColumnByType("AggregateFunction(argMax, FIxedString(10), DateTime64(3, 'UTC'))"));
+}
+
+
 class CreateColumnByTypeWithName : public ::testing::TestWithParam<const char* /*Column Type String*/>
 {};
+
+TEST(CreateColumnByType, Bool) {
+    const auto col = CreateColumnByType("Bool");
+    ASSERT_NE(nullptr, col);
+    EXPECT_EQ(col->GetType().GetName(), "UInt8");
+}
 
 TEST_P(CreateColumnByTypeWithName, CreateColumnByType)
 {

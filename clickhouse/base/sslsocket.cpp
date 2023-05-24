@@ -268,7 +268,7 @@ SSLSocketFactory::SSLSocketFactory(const ClientOptions& opts)
 SSLSocketFactory::~SSLSocketFactory() = default;
 
 std::unique_ptr<Socket> SSLSocketFactory::doConnect(const NetworkAddress& address, const ClientOptions& opts) {
-    SocketTimeoutParams timeout_params { opts.connection_recv_timeout, opts.connection_send_timeout };
+    SocketTimeoutParams timeout_params { opts.connection_connect_timeout, opts.connection_recv_timeout, opts.connection_send_timeout };
     return std::make_unique<SSLSocket>(address, timeout_params, ssl_params_, *ssl_context_);
 }
 

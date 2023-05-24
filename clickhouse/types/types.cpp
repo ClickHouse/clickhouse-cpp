@@ -2,7 +2,7 @@
 
 #include "../exceptions.h"
 
-#include <cityhash/city.h>
+#include <city.h>
 
 #include <stdexcept>
 

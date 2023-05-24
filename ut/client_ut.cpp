@@ -3,10 +3,10 @@
 #include "readonly_client_test.h"
 #include "connection_failed_client_test.h"
 #include "utils.h"
-#include "roundtrip_column.h"
 
 #include <gtest/gtest.h>
 
+#include <optional>
 #include <thread>
 #include <chrono>
 
@@ -66,21 +66,6 @@ protected:
             }
         }
     }
-
-    std::string GetSettingValue(const std::string& name) {
-        std::string result;
-        client_->Select("SELECT value FROM system.settings WHERE name = \'" + name + "\'",
-                [&result](const Block& block)
-            {
-                if (block.GetRowCount() == 0) {
-                    return;
-                }
-                result = block[0]->AsStrict<ColumnString>()->At(0);
-            }
-        );
-        return result;
-    }
-
 
     std::unique_ptr<Client> client_;
     const std::string table_name = "test_clickhouse_cpp_test_ut_table";
@@ -288,16 +273,17 @@ TEST_P(ClientCase, LowCardinalityString_AsString) {
 
 TEST_P(ClientCase, Generic) {
     client_->Execute(
-            "CREATE TEMPORARY TABLE IF NOT EXISTS test_clickhouse_cpp_client (id UInt64, name String) ");
+            "CREATE TEMPORARY TABLE IF NOT EXISTS test_clickhouse_cpp_client (id UInt64, name String, f Bool) ");
 
     const struct {
         uint64_t id;
         std::string name;
+        bool f;
     } TEST_DATA[] = {
-        { 1, "id" },
-        { 3, "foo" },
-        { 5, "bar" },
-        { 7, "name" },
+        { 1, "id", true },
+        { 3, "foo", false },
+        { 5, "bar", true },
+        { 7, "name", false },
     };
 
     /// Insert some values.
@@ -306,20 +292,23 @@ TEST_P(ClientCase, Generic) {
 
         auto id = std::make_shared<ColumnUInt64>();
         auto name = std::make_shared<ColumnString>();
+        auto f = std::make_shared<ColumnUInt8> ();
         for (auto const& td : TEST_DATA) {
             id->Append(td.id);
             name->Append(td.name);
+            f->Append(td.f);
         }
 
         block.AppendColumn("id"  , id);
         block.AppendColumn("name", name);
+        block.AppendColumn("f",    f);
 
         client_->Insert("test_clickhouse_cpp_client", block);
     }
 
     /// Select values inserted in the previous step.
     size_t row = 0;
-    client_->Select("SELECT id, name FROM test_clickhouse_cpp_client", [TEST_DATA, &row](const Block& block)
+    client_->Select("SELECT id, name, f FROM test_clickhouse_cpp_client", [TEST_DATA, &row](const Block& block)
         {
             if (block.GetRowCount() == 0) {
                 return;
@@ -329,6 +318,7 @@ TEST_P(ClientCase, Generic) {
             for (size_t c = 0; c < block.GetRowCount(); ++c, ++row) {
                 EXPECT_EQ(TEST_DATA[row].id, (*block[0]->As<ColumnUInt64>())[c]);
                 EXPECT_EQ(TEST_DATA[row].name, (*block[1]->As<ColumnString>())[c]);
+                EXPECT_EQ(TEST_DATA[row].f, (*block[2]->As<ColumnUInt8>())[c]);
             }
         }
     );
@@ -978,167 +968,6 @@ TEST_P(ClientCase, DISABLED_ArrayArrayUInt64) {
     }
 }
 
-TEST_P(ClientCase, RoundtripArrayTUint64) {
-    auto array = std::make_shared<ColumnArrayT<ColumnUInt64>>();
-    array->Append({0, 1, 2});
-
-    auto result = RoundtripColumnValues(*client_, array)->AsStrict<ColumnArray>();
-    auto row = result->GetAsColumn(0)->As<ColumnUInt64>();
-
-    EXPECT_EQ(0u, row->At(0));
-    EXPECT_EQ(1u, (*row)[1]);
-    EXPECT_EQ(2u, (*row)[2]);
-}
-
-TEST_P(ClientCase, RoundtripArrayTArrayTUint64) {
-    const std::vector<std::vector<uint64_t>> row_values = {
-        {1, 2, 3},
-        {4, 5, 6},
-        {7, 8, 9, 10}
-    };
-
-    auto array = std::make_shared<ColumnArrayT<ColumnArrayT<ColumnUInt64>>>();
-    array->Append(row_values);
-
-    auto result_typed = ColumnArrayT<ColumnArrayT<ColumnUInt64>>::Wrap(RoundtripColumnValues(*client_, array));
-    EXPECT_TRUE(CompareRecursive(*array, *result_typed));
-}
-
-TEST_P(ClientCase, RoundtripArrayTArrayTArrayTUint64) {
-    using ColumnType = ColumnArrayT<ColumnArrayT<ColumnArrayT<ColumnUInt64>>>;
-    const std::vector<std::vector<std::vector<uint64_t>>> row_values = {
-        {{1, 2, 3}, {3, 2, 1}},
-        {{4, 5, 6}, {6, 5, 4}},
-        {{7, 8, 9, 10}, {}},
-        {{}, {10, 9, 8, 7}}
-    };
-
-    auto array = std::make_shared<ColumnType>();
-    array->Append(row_values);
-
-    auto result_typed = ColumnType::Wrap(RoundtripColumnValues(*client_, array));
-    EXPECT_TRUE(CompareRecursive(*array, *result_typed));
-}
-
-
-TEST_P(ClientCase, RoundtripArrayTFixedString) {
-    auto array = std::make_shared<ColumnArrayT<ColumnFixedString>>(6);
-    array->Append({"hello", "world"});
-
-    auto result_typed = ColumnArrayT<ColumnFixedString>::Wrap(RoundtripColumnValues(*client_, array));
-    EXPECT_TRUE(CompareRecursive(*array, *result_typed));
-}
-
-TEST_P(ClientCase, RoundtripArrayTString) {
-    auto array = std::make_shared<ColumnArrayT<ColumnString>>();
-    array->Append({"hello", "world"});
-
-    auto result_typed = ColumnArrayT<ColumnString>::Wrap(RoundtripColumnValues(*client_, array));
-    EXPECT_TRUE(CompareRecursive(*array, *result_typed));
-}
-
-TEST_P(ClientCase, RoundtripMapTUint64String) {
-    using Map = ColumnMapT<ColumnUInt64, ColumnString>;
-    auto map = std::make_shared<Map>(std::make_shared<ColumnUInt64>(), std::make_shared<ColumnString>());
-
-    std::map<uint64_t, std::string> row;
-    row[1] = "hello";
-    row[2] = "world";
-    map->Append(row);
-
-    auto result_typed = Map::Wrap(RoundtripColumnValues(*client_, map));
-    EXPECT_TRUE(CompareRecursive(*map, *result_typed));
-}
-
-TEST_P(ClientCase, RoundtripMapUUID_Tuple_String_Array_Uint64) {
-    using Tuple = ColumnTupleT<ColumnString, ColumnArrayT<ColumnUInt64>>;
-    using Map = ColumnMapT<ColumnUUID, Tuple>;
-    auto map = std::make_shared<Map>(std::make_shared<ColumnUUID>(), std::make_shared<Tuple>(
-       std::make_tuple(std::make_shared<ColumnString>(), std::make_shared<ColumnArrayT<ColumnUInt64>>())));
-
-
-    std::map<UUID, std::tuple<std::string, std::vector<uint64_t>>> row;
-    row[UUID{1, 1}] = std::make_tuple("hello", std::vector<uint64_t>{1, 2, 3}) ;
-    row[UUID{2, 2}] = std::make_tuple("world", std::vector<uint64_t>{4, 5, 6}) ;
-    map->Append(row);
-
-    auto result_typed = Map::Wrap(RoundtripColumnValues(*client_, map));
-    EXPECT_TRUE(CompareRecursive(*map, *result_typed));
-}
-
-TEST_P(ClientCase, RoundtripPoint) {
-    if (GetSettingValue("allow_experimental_geo_types") != "1") {
-       GTEST_SKIP() << "Test is skipped because experimental geo types are not allowed. Set setting allow_experimental_geo_types = 1 in order to allow it." << std::endl;
-    }
-
-    auto col = std::make_shared<ColumnPoint>();
-    col->Append({1.0, 2.0});
-    col->Append({0.1, 0.2});
-
-    auto result_typed = RoundtripColumnValues(*client_, col)->AsStrict<ColumnPoint>();
-    EXPECT_TRUE(CompareRecursive(*col, *result_typed));
-}
-
-TEST_P(ClientCase, RoundtripRing) {
-    if (GetSettingValue("allow_experimental_geo_types") != "1") {
-       GTEST_SKIP() << "Test is skipped because experimental geo types are not allowed. Set setting allow_experimental_geo_types = 1 in order to allow it." << std::endl;
-    }
-
-    auto col = std::make_shared<ColumnRing>();
-    {
-        std::vector<ColumnPoint::ValueType> ring{{1.0, 2.0}, {3.0, 4.0}};
-        col->Append(ring);
-    }
-    {
-        std::vector<ColumnPoint::ValueType> ring{{0.1, 0.2}, {0.3, 0.4}};
-        col->Append(ring);
-    }
-    auto result_typed = RoundtripColumnValues(*client_, col)->AsStrict<ColumnRing>();
-    EXPECT_TRUE(CompareRecursive(*col, *result_typed));
-}
-
-TEST_P(ClientCase, RoundtripPolygon) {
-    if (GetSettingValue("allow_experimental_geo_types") != "1") {
-       GTEST_SKIP() << "Test is skipped because experimental geo types are not allowed. Set setting allow_experimental_geo_types = 1 in order to allow it." << std::endl;
-    }
-
-    auto col = std::make_shared<ColumnPolygon>();
-    {
-        std::vector<std::vector<ColumnPoint::ValueType>> polygon
-            {{{1.0, 2.0}, {3.0, 4.0}}, {{5.0, 6.0}, {7.0, 8.0}}};
-        col->Append(polygon);
-    }
-    {
-        std::vector<std::vector<ColumnPoint::ValueType>> polygon
-            {{{0.1, 0.2}, {0.3, 0.4}}, {{0.5, 0.6}, {0.7, 0.8}}};
-        col->Append(polygon);
-    }
-    auto result_typed = RoundtripColumnValues(*client_, col)->AsStrict<ColumnPolygon>();
-    EXPECT_TRUE(CompareRecursive(*col, *result_typed));
-}
-
-TEST_P(ClientCase, RoundtripMultiPolygon) {
-    if (GetSettingValue("allow_experimental_geo_types") != "1") {
-       GTEST_SKIP() << "Test is skipped because experimental geo types are not allowed. Set setting allow_experimental_geo_types = 1 in order to allow it." << std::endl;
-    }
-
-    auto col = std::make_shared<ColumnMultiPolygon>();
-    {
-        std::vector<std::vector<std::vector<ColumnPoint::ValueType>>> multi_polygon
-            {{{{1.0, 2.0}, {3.0, 4.0}}, {{5.0, 6.0}, {7.0, 8.0}}},
-             {{{1.1, 2.2}, {3.3, 4.4}}, {{5.5, 6.6}, {7.7, 8.8}}}};
-        col->Append(multi_polygon);
-    }
-    {
-        std::vector<std::vector<std::vector<ColumnPoint::ValueType>>> multi_polygon
-            {{{{0.1, 0.2}, {0.3, 0.4}}, {{0.5, 0.6}, {0.7, 0.8}}},
-             {{{1.1, 1.2}, {1.3, 1.4}}, {{1.5, 1.6}, {1.7, 1.8}}}};
-        col->Append(multi_polygon);
-    }
-    auto result_typed = RoundtripColumnValues(*client_, col)->AsStrict<ColumnMultiPolygon>();
-    EXPECT_TRUE(CompareRecursive(*col, *result_typed));
-}
-
 TEST_P(ClientCase, OnProgress) {
     Block block;
     createTableWithOneColumn<ColumnString>(block);
@@ -1287,6 +1116,46 @@ TEST_P(ClientCase, OnProfileEvents) {
         EXPECT_GT(received_row_count, 0U);
     }
 }
+
+TEST_P(ClientCase, OnProfile) {
+    Query query("SELECT * FROM system.numbers LIMIT 10;");
+
+    std::optional<Profile> profile;
+    query.OnProfile([&profile](const Profile & new_profile) {
+        profile = new_profile;
+    });
+
+    client_->Execute(query);
+
+    // Make sure that profile event came through
+    ASSERT_NE(profile, std::nullopt);
+
+    EXPECT_GE(profile->rows, 10u);
+    EXPECT_GE(profile->blocks, 1u);
+    EXPECT_GT(profile->bytes, 1u);
+    EXPECT_GE(profile->rows_before_limit, 10u);
+    EXPECT_EQ(profile->applied_limit, true);
+    EXPECT_EQ(profile->calculated_rows_before_limit, true);
+}
+
+TEST_P(ClientCase, SelectAggregateFunction) {
+    // Verifies that perofing SELECT value of type AggregateFunction(...) doesn't crash the client.
+    // For details: https://github.com/ClickHouse/clickhouse-cpp/issues/266
+    client_->Execute("CREATE TEMPORARY TABLE IF NOT EXISTS tableplus_crash_example (col AggregateFunction(argMax, Int32, DateTime(3))) engine = Memory");
+    client_->Execute("insert into tableplus_crash_example values (unhex('010000000001089170A883010000'))");
+
+    client_->Select("select version()",
+    [&](const Block& block) {
+        std::cerr << PrettyPrintBlock{block} << std::endl;
+    });
+
+    // Column type `AggregateFunction` is not supported.
+    EXPECT_THROW(client_->Select("select toTypeName(col), col from tableplus_crash_example",
+    [&](const Block& block) {
+        std::cerr << PrettyPrintBlock{block} << std::endl;
+    }), clickhouse::UnimplementedError);
+}
+
 
 const auto LocalHostEndpoint = ClientOptions()
         .SetHost(           getEnvOrDefault("CLICKHOUSE_HOST",     "localhost"))

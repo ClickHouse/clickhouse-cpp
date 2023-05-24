@@ -60,6 +60,18 @@ public:
 
 #endif
 
+#if defined(_unix_)
+
+class getaddrinfoErrorCategory : public std::error_category {
+public:
+    char const* name() const noexcept override final;
+    std::string message(int c) const override final;
+
+    static getaddrinfoErrorCategory const& category();
+};
+
+#endif
+
 
 class SocketBase {
 public:
@@ -83,6 +95,7 @@ public:
 
 
 struct SocketTimeoutParams {
+    std::chrono::milliseconds connect_timeout{ 5000 };
     std::chrono::milliseconds recv_timeout{ 0 };
     std::chrono::milliseconds send_timeout{ 0 };
 };

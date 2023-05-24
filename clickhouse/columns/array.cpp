@@ -83,7 +83,12 @@ bool ColumnArray::LoadBody(InputStream* input, size_t rows) {
     if (!offsets_->GetSerialization()->LoadBody(offsets_.get(), input, rows)) {
         return false;
     }
-    if (!data_->GetSerialization()->LoadBody(data_.get(), input, (*offsets_)[rows - 1])) {
+
+    const auto nested_rows = (*offsets_)[rows - 1];
+    if (nested_rows == 0) {
+        return true;
+    }
+    if (!data_->GetSerialization()->LoadBody(data_.get(), input, nested_rows)) {
         return false;
     }
     return true;
@@ -95,7 +100,10 @@ void ColumnArray::SavePrefix(OutputStream* output) {
 
 void ColumnArray::SaveBody(OutputStream* output) {
     offsets_->GetSerialization()->SaveBody(offsets_.get(), output);
-    data_->GetSerialization()->SaveBody(data_.get(), output);
+
+    if (data_->Size() > 0) {
+        data_->GetSerialization()->SaveBody(data_.get(), output);
+    }
 }
 
 void ColumnArray::Clear() {

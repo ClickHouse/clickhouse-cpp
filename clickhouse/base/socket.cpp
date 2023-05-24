@@ -43,6 +43,21 @@ windowsErrorCategory const& windowsErrorCategory::category() {
 }
 #endif
 
+#if defined(_unix_)
+char const* getaddrinfoErrorCategory::name() const noexcept {
+    return "getaddrinfoError";
+}
+
+std::string getaddrinfoErrorCategory::message(int c) const {
+    return gai_strerror(c);
+}
+
+getaddrinfoErrorCategory const& getaddrinfoErrorCategory::category() {
+    static getaddrinfoErrorCategory c;
+    return c;
+}
+#endif
+
 namespace {
 
 class LocalNames : public std::unordered_set<std::string> {
@@ -202,10 +217,17 @@ SOCKET SocketConnect(const NetworkAddress& addr, const SocketTimeoutParams& time
                 fd.fd = *s;
                 fd.events = POLLOUT;
                 fd.revents = 0;
-                ssize_t rval = Poll(&fd, 1, 5000);
+                ssize_t rval = Poll(&fd, 1, timeout_params.connect_timeout.count());
 
                 if (rval == -1) {
                     throw std::system_error(getSocketErrorCode(), getErrorCategory(), "fail to connect");
+                }
+                if (rval == 0) {
+#if defined(_win_)
+                    last_err = WSAETIMEDOUT;
+#else
+                    last_err = ETIMEDOUT;
+#endif
                 }
                 if (rval > 0) {
                     socklen_t len = sizeof(err);
@@ -257,6 +279,12 @@ NetworkAddress::NetworkAddress(const std::string& host, const std::string& port)
 #endif
 
     const int error = getaddrinfo(host.c_str(), port.c_str(), &hints, &info_);
+
+#if defined(_unix_)
+    if (error && error != EAI_SYSTEM) {
+        throw std::system_error(error, getaddrinfoErrorCategory::category());
+    }
+#endif
 
     if (error) {
         throw std::system_error(getSocketErrorCode(), getErrorCategory());
@@ -372,7 +400,7 @@ std::unique_ptr<SocketBase> NonSecureSocketFactory::connect(const ClientOptions 
 }
 
 std::unique_ptr<Socket> NonSecureSocketFactory::doConnect(const NetworkAddress& address, const ClientOptions& opts) {
-    SocketTimeoutParams timeout_params { opts.connection_recv_timeout, opts.connection_send_timeout };
+    SocketTimeoutParams timeout_params { opts.connection_connect_timeout, opts.connection_recv_timeout, opts.connection_send_timeout };
     return std::make_unique<Socket>(address, timeout_params);
 }
 
