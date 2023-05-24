@@ -1210,3 +1210,87 @@ INSTANTIATE_TEST_SUITE_P(ClientLocalFailed, ConnectionFailedClientTest,
         ExpectingException{"Authentication failed: password is incorrect"}
     }
 ));
+
+
+class ConnectionSuccessTestCase : public testing::TestWithParam<ClientOptions> {};
+
+TEST_P(ConnectionSuccessTestCase, SuccessConnectionEstablished) {
+    const auto & client_options = GetParam();
+    std::unique_ptr<Client> client;
+    
+    try {
+        client = std::make_unique<Client>(client_options);
+        SUCCEED();
+    } catch (const std::exception & e) {
+        FAIL() << "Got an unexpected exception : " << e.what();
+    }
+}
+
+
+INSTANTIATE_TEST_SUITE_P(ClientMultipleEndpoints, ConnectionSuccessTestCase,
+    ::testing::Values(ClientCase::ParamType{
+        ClientOptions()
+            .SetHosts({
+                    getEnvOrDefault("CLICKHOUSE_HOST",     "somedeadhost"),
+                    getEnvOrDefault("CLICKHOUSE_HOST",     "deadaginghost"),
+                    getEnvOrDefault("CLICKHOUSE_HOST",     "localhost"),
+                    getEnvOrDefault("CLICKHOUSE_HOST",     "noalocalhost"),
+                })
+            .SetPorts( {
+                static_cast<unsigned int>(getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "9000")),
+                static_cast<unsigned int>(getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "1245")),
+                static_cast<unsigned int>(getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "9000")),
+                static_cast<unsigned int>(getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "6784")),
+                })
+            .SetUser(           getEnvOrDefault("CLICKHOUSE_USER",     "default"))
+            .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", ""))
+            .SetDefaultDatabase(getEnvOrDefault("CLICKHOUSE_DB",       "default"))
+            .SetPingBeforeQuery(true)
+            .SetConnectionConnectTimeout(std::chrono::milliseconds(200))
+            .SetRetryTimeout(std::chrono::seconds(1)),
+    }
+));
+
+INSTANTIATE_TEST_SUITE_P(MultipleEndpointsFailed, ConnectionFailedClientTest,
+    ::testing::Values(ConnectionFailedClientTest::ParamType{
+        ClientOptions()
+            .SetHosts({
+                    getEnvOrDefault("CLICKHOUSE_HOST",     "somedeadhost"),
+                    getEnvOrDefault("CLICKHOUSE_HOST",     "deadaginghost"),
+                    getEnvOrDefault("CLICKHOUSE_HOST",     "noalocalhost") 
+                })
+            .SetPorts( {
+                static_cast<unsigned int>(getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "9000")),
+                static_cast<unsigned int>(getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "1245")),
+                static_cast<unsigned int>(getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "6784")),
+                })
+            .SetUser(           getEnvOrDefault("CLICKHOUSE_USER",     "default"))
+            .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", ""))
+            .SetDefaultDatabase(getEnvOrDefault("CLICKHOUSE_DB",       "default"))
+            .SetPingBeforeQuery(true)
+            .SetConnectionConnectTimeout(std::chrono::milliseconds(200))
+            .SetRetryTimeout(std::chrono::seconds(1)),
+        ExpectingException{"Temporary failure in name resolution"}
+    }
+));
+
+INSTANTIATE_TEST_SUITE_P(MultipleEndpointsNonValidConfig, ConnectionFailedClientTest,
+    ::testing::Values(ConnectionFailedClientTest::ParamType{
+        ClientOptions()
+            .SetHosts({
+                    getEnvOrDefault("CLICKHOUSE_HOST",     "somedeadhost"),
+                    getEnvOrDefault("CLICKHOUSE_HOST",     "localhost"),
+                    getEnvOrDefault("CLICKHOUSE_HOST",     "noalocalhost"), 
+                })
+            .SetPorts( {
+                static_cast<unsigned int>(getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "9000")),
+                })
+            .SetUser(           getEnvOrDefault("CLICKHOUSE_USER",     "default"))
+            .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", ""))
+            .SetDefaultDatabase(getEnvOrDefault("CLICKHOUSE_DB",       "default"))
+            .SetPingBeforeQuery(true)
+            .SetConnectionConnectTimeout(std::chrono::milliseconds(200))
+            .SetRetryTimeout(std::chrono::seconds(1)),
+        ExpectingException{"The sizes of lists of ports and hosts must match be equal."}
+    }
+));
