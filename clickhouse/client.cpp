@@ -220,11 +220,11 @@ Client::Impl::Impl(const ClientOptions& opts,
     , socket_factory_(std::move(socket_factory))
     , endpoints_iterator(new RoundRobinEndpointsIterator(options_))
 {
-    auto try_make_connection_with_endpoind = [this]() {
+    auto try_make_connection_with_endpoint = [this]() {
         for (unsigned int i = 0; ; ) {
             try {
                 ResetConnection();
-                break;
+                return;
             } catch (const std::system_error&) {
                 if (++i > options_.send_retries) {
                     throw;
@@ -233,12 +233,13 @@ Client::Impl::Impl(const ClientOptions& opts,
             }
         }
     };
-    
+
     for (endpoints_iterator->ResetIterations(); ; endpoints_iterator->next())
     {
         try
         {
-            try_make_connection_with_endpoind();
+            try_make_connection_with_endpoint();
+            break;
         } catch (const std::system_error&) {
             if(!endpoints_iterator->nextIsExist()) 
                 throw;
