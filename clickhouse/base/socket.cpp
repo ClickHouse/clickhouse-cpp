@@ -390,9 +390,9 @@ std::unique_ptr<OutputStream> Socket::makeOutputStream() const {
 
 NonSecureSocketFactory::~NonSecureSocketFactory()  {}
 
-std::unique_ptr<SocketBase> NonSecureSocketFactory::connect(const ClientOptions &opts) {
-    const auto address = NetworkAddress(opts.host, std::to_string(opts.port));
-
+std::unique_ptr<SocketBase> NonSecureSocketFactory::connect(const ClientOptions &opts, const std::shared_ptr<HostsIteratorBase> hosts_iterator) {
+    
+    const auto address = NetworkAddress(hosts_iterator->getHostAddr(), std::to_string(hosts_iterator->getPort()));
     auto socket = doConnect(address, opts);
     setSocketOptions(*socket, opts);
 

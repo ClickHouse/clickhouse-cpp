@@ -14,7 +14,7 @@
 #include <vector>
 #include <sstream>
 #include <stdexcept>
-
+#include <iostream>
 #if defined(WITH_OPENSSL)
 #include "base/sslsocket.h"
 #endif
@@ -161,6 +161,8 @@ private:
     /// In case of network errors tries to reconnect to server and
     /// call fuc several times.
     void RetryGuard(std::function<void()> func);
+    
+    void RetryToConstEndpoint(std::function<void()> func);
 
 private:
     class EnsureNull {
@@ -194,30 +196,52 @@ private:
     std::unique_ptr<InputStream> input_;
     std::unique_ptr<OutputStream> output_;
     std::unique_ptr<SocketBase> socket_;
+    std::shared_ptr<HostsIteratorBase> hosts_iterator;
 
     ServerInfo server_info_;
 };
 
+ClientOptions modifyClientOptions(ClientOptions opts)
+{
+    if (!opts.host.empty())
+        opts.hosts.insert(opts.hosts.begin(), opts.host);
+    
+    opts.ports.insert(opts.ports.begin(), opts.port);
+    return opts;
+}
 
 Client::Impl::Impl(const ClientOptions& opts)
     : Impl(opts, GetSocketFactory(opts)) {}
 
 Client::Impl::Impl(const ClientOptions& opts,
                    std::unique_ptr<SocketFactory> socket_factory)
-    : options_(opts)
+    : options_(modifyClientOptions(opts))
     , events_(nullptr)
     , socket_factory_(std::move(socket_factory))
+    , hosts_iterator(new RoundRobinHostsIterator(options_))
 {
-    for (unsigned int i = 0; ; ) {
-        try {
-            ResetConnection();
-            break;
-        } catch (const std::system_error&) {
-            if (++i > options_.send_retries) {
-                throw;
+    auto init_connection_with_host = [&](){
+        for (unsigned int i = 0; ; ) {
+            try {
+                ResetConnection();
+                break;
+            } catch (const std::system_error&) {
+                if (++i > options_.send_retries) {
+                    throw;
+                }
+                socket_factory_->sleepFor(options_.retry_timeout);
             }
-
-            socket_factory_->sleepFor(options_.retry_timeout);
+        }
+    };
+    
+    for (; hosts_iterator->nextIsExist(); hosts_iterator->next())
+    {
+        try
+        {
+            init_connection_with_host();
+        } catch (const std::system_error&) {
+            if(!hosts_iterator->nextIsExist()) 
+                throw;
         }
     }
 
@@ -329,7 +353,7 @@ void Client::Impl::Ping() {
 }
 
 void Client::Impl::ResetConnection() {
-    InitializeStreams(socket_factory_->connect(options_));
+    InitializeStreams(socket_factory_->connect(options_, hosts_iterator));
 
     if (!Handshake()) {
         throw ProtocolError("fail to connect to " + options_.host);
@@ -861,6 +885,20 @@ bool Client::Impl::ReceiveHello() {
 }
 
 void Client::Impl::RetryGuard(std::function<void()> func) {
+    for(hosts_iterator->ResetIterations(); ; hosts_iterator->next())
+    {
+        try
+        {
+            RetryToConstEndpoint(func);
+            return;
+        } catch (const std::system_error&) {
+            if (!hosts_iterator->nextIsExist())
+                throw;
+        }
+    }
+}
+
+void Client::Impl::RetryToConstEndpoint(std::function<void()> func) {
     for (unsigned int i = 0; ; ++i) {
         try {
             func();

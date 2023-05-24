@@ -58,6 +58,9 @@ struct ClientOptions {
     /// Service port.
     DECLARE_FIELD(port, unsigned int, SetPort, 9000);
 
+    DECLARE_FIELD(hosts, std::vector<std::string>,  SetHosts, std::vector<std::string>());
+    DECLARE_FIELD(ports, std::vector<unsigned int>, SetPorts, std::vector<unsigned int>());
+
     /// Default database.
     DECLARE_FIELD(default_database, std::string, SetDefaultDatabase, "default");
     /// User name.

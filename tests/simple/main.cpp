@@ -496,8 +496,18 @@ static void RunTests(Client& client) {
 int main() {
     try {
         const auto localHostEndpoint = ClientOptions()
-                .SetHost(           getEnvOrDefault("CLICKHOUSE_HOST",     "localhost"))
-                .SetPort(   getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "9000"))
+                // .SetHost(           getEnvOrDefault("CLICKHOUSE_HOST",     "localhost"))
+                // .SetPort(   getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "9000"))
+                .SetHosts({getEnvOrDefault("CLICKHOUSE_HOST",      "asasdasd"), 
+                           getEnvOrDefault("CLICKHOUSE_HOST",      "localhost"),
+                           getEnvOrDefault("CLICKHOUSE_HOST",      "noalocalhost"), 
+                           getEnvOrDefault("CLICKHOUSE_HOST",      "localhost"), 
+                           })
+                .SetPorts({static_cast<unsigned int>(getEnvOrDefault<int>("CLICKHOUSE_PORT",     "9000")),
+                           static_cast<unsigned int>(getEnvOrDefault<int>("CLICKHOUSE_PORT",     "1212")),
+                           static_cast<unsigned int>(getEnvOrDefault<int>("CLICKHOUSE_PORT",     "9000")),
+                           static_cast<unsigned int>(getEnvOrDefault<int>("CLICKHOUSE_PORT",     "9000")),
+                           })
                 .SetUser(           getEnvOrDefault("CLICKHOUSE_USER",     "default"))
                 .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", ""))
                 .SetDefaultDatabase(getEnvOrDefault("CLICKHOUSE_DB",       "default"));
