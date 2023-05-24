@@ -252,26 +252,37 @@ void ColumnString::Append(ColumnRef column) {
 }
 
 bool ColumnString::LoadBody(InputStream* input, size_t rows) {
-    items_.clear();
-    blocks_.clear();
+    if (rows == 0) {
+        items_.clear();
+        blocks_.clear();
 
-    items_.reserve(rows);
-    Block * block = nullptr;
+        return true;
+    }
 
-    // TODO(performance): unroll a loop to a first row (to get rid of `blocks_.size() == 0` check) and the rest.
+    decltype(items_) new_items;
+    decltype(blocks_) new_blocks;
+
+    new_items.reserve(rows);
+
+    // Suboptimzal if the first row string is >DEFAULT_BLOCK_SIZE, but that must be a very rare case.
+    Block * block = &new_blocks.emplace_back(DEFAULT_BLOCK_SIZE);
+
     for (size_t i = 0; i < rows; ++i) {
         uint64_t len;
         if (!WireFormat::ReadUInt64(*input, &len))
             return false;
 
-        if (blocks_.size() == 0 || len > block->GetAvailable())
-            block = &blocks_.emplace_back(std::max<size_t>(DEFAULT_BLOCK_SIZE, len));
+        if (len > block->GetAvailable())
+            block = &new_blocks.emplace_back(std::max<size_t>(DEFAULT_BLOCK_SIZE, len));
 
         if (!WireFormat::ReadBytes(*input, block->GetCurrentWritePos(), len))
             return false;
 
-        items_.emplace_back(block->ConsumeTailAsStringViewUnsafe(len));
+        new_items.emplace_back(block->ConsumeTailAsStringViewUnsafe(len));
     }
+
+    items_.swap(new_items);
+    blocks_.swap(new_blocks);
 
     return true;
 }
