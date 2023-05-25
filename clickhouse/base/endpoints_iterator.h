@@ -30,7 +30,7 @@ class EndpointsIteratorBase
 class RoundRobinEndpointsIterator : public EndpointsIteratorBase
 {
  public:
-   RoundRobinEndpointsIterator(const ClientOptions& opts);
+   explicit RoundRobinEndpointsIterator(const ClientOptions& opts);
    std::string GetHostAddr() const override;
    unsigned int GetPort() const override;
    void ResetIterations() override;
