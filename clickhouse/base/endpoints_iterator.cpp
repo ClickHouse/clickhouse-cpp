@@ -7,13 +7,12 @@ RoundRobinEndpointsIterator::RoundRobinEndpointsIterator(const ClientOptions& op
      hosts (opts.hosts) 
    , ports (opts.ports)
    , current_index (0) 
-   , reseted (true)
    , iteration_counter(0)
 {
 
 }
 
-const std::string RoundRobinEndpointsIterator::getHostAddr() const
+std::string RoundRobinEndpointsIterator::getHostAddr() const
 {
    return hosts[current_index];
 }
@@ -25,7 +24,6 @@ unsigned int RoundRobinEndpointsIterator::getPort() const
 
 void RoundRobinEndpointsIterator::ResetIterations()
 {
-   reseted = true;
    iteration_counter = 0;
 }
 
