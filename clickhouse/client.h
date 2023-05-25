@@ -45,6 +45,11 @@ enum class CompressionMethod {
 };
 
 enum class EndpointsIterationAlgorithm {
+/**
+  * Client tries to connect to those endpoints one by one, on the round-robin basis:
+  * first default enpoint, then each of endpoints, from begin() to end(), 
+  * if previous are inaccessible.
+  */
     RoundRobin = 0,
 };
 
@@ -62,15 +67,12 @@ struct ClientOptions {
     /// Service port.
     DECLARE_FIELD(port, unsigned int, SetPort, 9000);
 
-    /*
-     * Client tries to connect to those endpoints one by one, on chosing alorithm basis:
-     * first default enpoint (set via SetHost() + SetPort()), then each of endpoints, from begin() to end(), 
-     * the first one to establish connection is used for the rest of the session.
-     * If port part is not specified, default port (@see SetPort()) is used.
-     */
+    /// Hostnames of the servers. The next host to connect is selected according to the EndpointsIterationAlgorithm.
+    /// Note: If SetHost and SetHosts are setted, host will be placed at the beginning of the hosts vector.  
     DECLARE_FIELD(hosts, std::vector<std::string>,  SetHosts, std::vector<std::string>());
+    /// Ports of the servers.
     DECLARE_FIELD(ports, std::vector<unsigned int>, SetPorts, std::vector<unsigned int>());
-
+    /// Algorithm for selecting the next endpoint for connection.
     DECLARE_FIELD(iteration_algo, EndpointsIterationAlgorithm, SetEndpointsIterationAlgorithm, EndpointsIterationAlgorithm::RoundRobin);
 
     /// Default database.

@@ -64,8 +64,12 @@ struct ClientInfo {
 };
 
 std::ostream& operator<<(std::ostream& os, const ClientOptions& opt) {
-    os << "Client(" << opt.user << '@' << opt.host << ":" << opt.port
-       << " ping_before_query:" << opt.ping_before_query
+    os << "Client(";
+    for (size_t i = 0; i < opt.hosts.size(); i++)
+        os << opt.user << '@' << opt.hosts[i] << ":" << opt.ports[i]
+           << ((i == opt.hosts[i].size() - 1) ? "" : ", ");
+
+    os << " ping_before_query:" << opt.ping_before_query
        << " send_retries:" << opt.send_retries
        << " retry_timeout:" << opt.retry_timeout.count()
        << " compression_method:"
@@ -111,9 +115,9 @@ std::unique_ptr<SocketFactory> GetSocketFactory(const ClientOptions& opts) {
         return std::make_unique<NonSecureSocketFactory>();
 }
 
-std::unique_ptr<EndpointsIteratorBase> GetEndpointsIterator(const ClientOptions& opts) {
+std::shared_ptr<EndpointsIteratorBase> GetEndpointsIterator(const ClientOptions& opts) {
     if (opts.iteration_algo == EndpointsIterationAlgorithm::RoundRobin) {
-        return std::make_unique<RoundRobinEndpointsIterator>(opts);
+        return std::make_shared<RoundRobinEndpointsIterator>(opts);
     } else 
         throw  UnimplementedError("Unimplemented endpoints iteration alorithm.");
 }

@@ -27,11 +27,6 @@ class EndpointsIteratorBase
    virtual bool nextIsExist() const = 0;
 };
 
-/**
-  * Client tries to connect to those endpoints one by one, on the round-robin basis:
-  * first default enpoint, then each of endpoints, from begin() to end(), 
-  * if previous are inaccessible.
-  */
 class RoundRobinEndpointsIterator : public EndpointsIteratorBase
 {
  public:
