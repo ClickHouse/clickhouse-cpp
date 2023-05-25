@@ -89,7 +89,7 @@ public:
 
     // TODO: move connection-related options to ConnectionOptions structure.
 
-    virtual std::unique_ptr<SocketBase> connect(const ClientOptions& opts, const std::shared_ptr<EndpointsIteratorBase> endpoints_iterator) = 0;
+    virtual std::unique_ptr<SocketBase> connect(const ClientOptions& opts, const std::string& host, const std::string& port) = 0;
 
     virtual void sleepFor(const std::chrono::milliseconds& duration);
 };
@@ -136,7 +136,7 @@ class NonSecureSocketFactory : public SocketFactory {
 public:
     ~NonSecureSocketFactory() override;
 
-    std::unique_ptr<SocketBase> connect(const ClientOptions& opts, const std::shared_ptr<EndpointsIteratorBase> endpoints_iterator) override;
+    std::unique_ptr<SocketBase> connect(const ClientOptions& opts, const std::string& host, const std::string& port) override;
 
 protected:
     virtual std::unique_ptr<Socket> doConnect(const NetworkAddress& address, const ClientOptions& opts);

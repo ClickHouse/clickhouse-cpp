@@ -1237,10 +1237,10 @@ INSTANTIATE_TEST_SUITE_P(ClientMultipleEndpoints, ConnectionSuccessTestCase,
                     getEnvOrDefault("CLICKHOUSE_HOST",     "noalocalhost"),
                 })
             .SetPorts( {
-                static_cast<unsigned int>(getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "9000")),
-                static_cast<unsigned int>(getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "1245")),
-                static_cast<unsigned int>(getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "9000")),
-                static_cast<unsigned int>(getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "6784")),
+                    getEnvOrDefault<unsigned int>("CLICKHOUSE_PORT",     "9000"),
+                    getEnvOrDefault<unsigned int>("CLICKHOUSE_PORT",     "1245"),
+                    getEnvOrDefault<unsigned int>("CLICKHOUSE_PORT",     "9000"),
+                    getEnvOrDefault<unsigned int>("CLICKHOUSE_PORT",     "6784"),
                 })
             .SetUser(           getEnvOrDefault("CLICKHOUSE_USER",     "default"))
             .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", ""))
@@ -1260,9 +1260,9 @@ INSTANTIATE_TEST_SUITE_P(MultipleEndpointsFailed, ConnectionFailedClientTest,
                     getEnvOrDefault("CLICKHOUSE_HOST",     "noalocalhost") 
                 })
             .SetPorts( {
-                static_cast<unsigned int>(getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "9000")),
-                static_cast<unsigned int>(getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "1245")),
-                static_cast<unsigned int>(getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "6784")),
+                    getEnvOrDefault<unsigned int>("CLICKHOUSE_PORT",     "9000"),
+                    getEnvOrDefault<unsigned int>("CLICKHOUSE_PORT",     "1245"),
+                    getEnvOrDefault<unsigned int>("CLICKHOUSE_PORT",     "6784"),
                 })
             .SetUser(           getEnvOrDefault("CLICKHOUSE_USER",     "default"))
             .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", ""))
@@ -1283,7 +1283,7 @@ INSTANTIATE_TEST_SUITE_P(MultipleEndpointsNonValidConfig, ConnectionFailedClient
                     getEnvOrDefault("CLICKHOUSE_HOST",     "noalocalhost"), 
                 })
             .SetPorts( {
-                static_cast<unsigned int>(getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "9000")),
+                    getEnvOrDefault<unsigned int>("CLICKHOUSE_PORT",     "9000"),
                 })
             .SetUser(           getEnvOrDefault("CLICKHOUSE_USER",     "default"))
             .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", ""))

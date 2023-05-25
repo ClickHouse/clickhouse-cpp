@@ -503,10 +503,10 @@ int main() {
                             getEnvOrDefault("CLICKHOUSE_HOST",      "noalocalhost"), 
                             getEnvOrDefault("CLICKHOUSE_HOST",      "localhost"), 
                            })
-                .SetPorts({ static_cast<unsigned int>(getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "9000")),
-                            static_cast<unsigned int>(getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "9000")),
-                            static_cast<unsigned int>(getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "1234")),
-                            static_cast<unsigned int>(getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "5678")),
+                .SetPorts({ getEnvOrDefault<unsigned int>("CLICKHOUSE_PORT",     "9000"),
+                            getEnvOrDefault<unsigned int>("CLICKHOUSE_PORT",     "9000"),
+                            getEnvOrDefault<unsigned int>("CLICKHOUSE_PORT",     "1234"),
+                            getEnvOrDefault<unsigned int>("CLICKHOUSE_PORT",     "5678"),
                            })
                 .SetUser(           getEnvOrDefault("CLICKHOUSE_USER",     "default"))
                 .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", ""))

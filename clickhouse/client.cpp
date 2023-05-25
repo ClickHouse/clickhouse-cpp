@@ -216,7 +216,8 @@ ClientOptions modifyClientOptions(ClientOptions opts)
 {
     if (opts.hosts.size() != opts.ports.size())
         throw ValidationError("The sizes of lists of ports and hosts must match be equal.");
-    if (!opts.host.empty()) {
+    if (!opts.host.empty() && std::find(opts.hosts.begin(), opts.hosts.end(), opts.host) == std::end(opts.hosts))
+    {
         opts.hosts.insert(opts.hosts.begin(), opts.host);
         opts.ports.insert(opts.ports.begin(), opts.port);
     }
@@ -247,14 +248,14 @@ Client::Impl::Impl(const ClientOptions& opts,
         }
     };
 
-    for (endpoints_iterator->ResetIterations(); ; endpoints_iterator->next())
+    for (endpoints_iterator->ResetIterations(); ; endpoints_iterator->Next())
     {
         try
         {
             try_make_connection_with_endpoint();
             break;
         } catch (const std::system_error&) {
-            if(!endpoints_iterator->nextIsExist())
+            if(!endpoints_iterator->NextIsExist())
                 throw;
         }
     }
@@ -367,7 +368,9 @@ void Client::Impl::Ping() {
 }
 
 void Client::Impl::ResetConnection() {
-    InitializeStreams(socket_factory_->connect(options_, endpoints_iterator));
+    InitializeStreams(socket_factory_->connect(options_, endpoints_iterator->GetHostAddr(),
+                                               std::to_string(endpoints_iterator->GetPort())
+                      ));
 
     if (!Handshake()) {
         throw ProtocolError("fail to connect to " + options_.host);
@@ -899,14 +902,14 @@ bool Client::Impl::ReceiveHello() {
 }
 
 void Client::Impl::RetryGuard(std::function<void()> func) {
-    for(endpoints_iterator->ResetIterations(); ; endpoints_iterator->next())
+    for(endpoints_iterator->ResetIterations(); ; endpoints_iterator->Next())
     {
         try
         {
             RetryConnectToTheEndpoint(func);
             return;
         } catch (const std::system_error&) {
-            if (!endpoints_iterator->nextIsExist())
+            if (!endpoints_iterator->NextIsExist())
                 throw;
         }
     }
