@@ -505,8 +505,8 @@ int main() {
                            })
                 .SetPorts({ static_cast<unsigned int>(getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "9000")),
                             static_cast<unsigned int>(getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "9000")),
-                            // static_cast<unsigned int>(getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "1234")),
-                            // static_cast<unsigned int>(getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "5678")),
+                            static_cast<unsigned int>(getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "1234")),
+                            static_cast<unsigned int>(getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "5678")),
                            })
                 .SetUser(           getEnvOrDefault("CLICKHOUSE_USER",     "default"))
                 .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", ""))

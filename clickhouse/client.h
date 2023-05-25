@@ -44,6 +44,10 @@ enum class CompressionMethod {
     LZ4     =  1,
 };
 
+enum class EndpointsIterationAlgorithm {
+    RoundRobin = 0,
+};
+
 struct ClientOptions {
     // Setter goes first, so it is possible to apply 'deprecated' annotation safely.
 #define DECLARE_FIELD(name, type, setter, default_value) \
@@ -58,8 +62,16 @@ struct ClientOptions {
     /// Service port.
     DECLARE_FIELD(port, unsigned int, SetPort, 9000);
 
+    /*
+     * Client tries to connect to those endpoints one by one, on chosing alorithm basis:
+     * first default enpoint (set via SetHost() + SetPort()), then each of endpoints, from begin() to end(), 
+     * the first one to establish connection is used for the rest of the session.
+     * If port part is not specified, default port (@see SetPort()) is used.
+     */
     DECLARE_FIELD(hosts, std::vector<std::string>,  SetHosts, std::vector<std::string>());
     DECLARE_FIELD(ports, std::vector<unsigned int>, SetPorts, std::vector<unsigned int>());
+
+    DECLARE_FIELD(iteration_algo, EndpointsIterationAlgorithm, SetEndpointsIterationAlgorithm, EndpointsIterationAlgorithm::RoundRobin);
 
     /// Default database.
     DECLARE_FIELD(default_database, std::string, SetDefaultDatabase, "default");

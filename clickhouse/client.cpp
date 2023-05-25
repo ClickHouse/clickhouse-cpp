@@ -111,6 +111,13 @@ std::unique_ptr<SocketFactory> GetSocketFactory(const ClientOptions& opts) {
         return std::make_unique<NonSecureSocketFactory>();
 }
 
+std::unique_ptr<EndpointsIteratorBase> GetEndpointsIterator(const ClientOptions& opts) {
+    if (opts.iteration_algo == EndpointsIterationAlgorithm::RoundRobin) {
+        return std::make_unique<RoundRobinEndpointsIterator>(opts);
+    } else 
+        throw  UnimplementedError("Unimplemented endpoints iteration alorithm.");
+}
+
 }
 
 class Client::Impl {
@@ -220,7 +227,7 @@ Client::Impl::Impl(const ClientOptions& opts,
     : options_(modifyClientOptions(opts))
     , events_(nullptr)
     , socket_factory_(std::move(socket_factory))
-    , endpoints_iterator(new RoundRobinEndpointsIterator(options_))
+    , endpoints_iterator(GetEndpointsIterator(options_))
 {
     auto try_make_connection_with_endpoint = [this]() {
         for (unsigned int i = 0; ; ) {
