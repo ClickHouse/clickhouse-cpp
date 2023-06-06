@@ -8,7 +8,8 @@
 #include <stdexcept>
 #include <iostream>
 #include <cmath>
-
+#include <thread>
+#include <iostream>
 #if defined(_MSC_VER)
 #   pragma warning(disable : 4996)
 #endif
@@ -498,16 +499,10 @@ int main() {
         const auto localHostEndpoint = ClientOptions()
                 .SetHost(   getEnvOrDefault("CLICKHOUSE_HOST",     "localhost"))
                 .SetPort(   getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "9000"))
-                .SetHosts({ getEnvOrDefault("CLICKHOUSE_HOST",      "asasdasd"), 
-                            getEnvOrDefault("CLICKHOUSE_HOST",      "localhost"),
-                            getEnvOrDefault("CLICKHOUSE_HOST",      "noalocalhost"), 
-                            getEnvOrDefault("CLICKHOUSE_HOST",      "localhost"), 
-                           })
-                .SetPorts({ getEnvOrDefault<unsigned int>("CLICKHOUSE_PORT",     "9000"),
-                            getEnvOrDefault<unsigned int>("CLICKHOUSE_PORT",     "9000"),
-                            getEnvOrDefault<unsigned int>("CLICKHOUSE_PORT",     "1234"),
-                            getEnvOrDefault<unsigned int>("CLICKHOUSE_PORT",     "5678"),
-                           })
+                .SetEndpoints({   {"asasdasd", 9000}
+                                 ,{"localhost"}
+                                 ,{"noalocalhost", 9000}
+                               })
                 .SetUser(           getEnvOrDefault("CLICKHOUSE_USER",     "default"))
                 .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", ""))
                 .SetDefaultDatabase(getEnvOrDefault("CLICKHOUSE_DB",       "default"));
@@ -516,6 +511,7 @@ int main() {
             Client client(ClientOptions(localHostEndpoint)
                     .SetPingBeforeQuery(true));
             RunTests(client);
+            std::cout << "current endpoint : " <<  client.GetCurrentEndpoint().value().host << "\n";
         }
 
         {

@@ -1,11 +1,10 @@
 #include "endpoints_iterator.h"
-#include "../client.h"
+#include <clickhouse/client.h>
 
 namespace clickhouse {
 
-RoundRobinEndpointsIterator::RoundRobinEndpointsIterator(const ClientOptions& opts) :
-     hosts (opts.hosts) 
-   , ports (opts.ports)
+RoundRobinEndpointsIterator::RoundRobinEndpointsIterator(const std::vector<Endpoint>& _endpoints) :
+     endpoints (_endpoints)
    , current_index (0) 
    , iteration_counter(0)
 {
@@ -14,12 +13,12 @@ RoundRobinEndpointsIterator::RoundRobinEndpointsIterator(const ClientOptions& op
 
 std::string RoundRobinEndpointsIterator::GetHostAddr() const
 {
-   return hosts[current_index];
+   return endpoints[current_index].host;
 }
 
 unsigned int RoundRobinEndpointsIterator::GetPort() const
 {
-   return ports[current_index];
+   return endpoints[current_index].port;
 }
 
 void RoundRobinEndpointsIterator::ResetIterations()
@@ -29,13 +28,13 @@ void RoundRobinEndpointsIterator::ResetIterations()
 
 void RoundRobinEndpointsIterator::Next()
 {
-   current_index = (current_index + 1) % hosts.size();
+   current_index = (current_index + 1) % endpoints.size();
    iteration_counter++;
 }
 
 bool RoundRobinEndpointsIterator::NextIsExist() const
 {
-   return iteration_counter + 1 < hosts.size();
+   return iteration_counter + 1 < endpoints.size();
 }
 
 RoundRobinEndpointsIterator::~RoundRobinEndpointsIterator() = default;

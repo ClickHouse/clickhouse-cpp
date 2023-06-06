@@ -44,12 +44,16 @@ enum class CompressionMethod {
     LZ4     =  1,
 };
 
+struct Endpoint {
+    std::string host;
+    unsigned int port = 9000;
+
+    inline bool operator==(const Endpoint& right) const {
+        return host == right.host && port == right.port;
+    }
+};
+
 enum class EndpointsIterationAlgorithm {
-/**
-  * Client tries to connect to those endpoints one by one, on the round-robin basis:
-  * first default enpoint, then each of endpoints, from begin() to end(), 
-  * if previous are inaccessible.
-  */
     RoundRobin = 0,
 };
 
@@ -67,13 +71,13 @@ struct ClientOptions {
     /// Service port.
     DECLARE_FIELD(port, unsigned int, SetPort, 9000);
 
-    /// Hostnames of the servers. The next host to connect is selected according to the EndpointsIterationAlgorithm.
-    /// Note: If SetHost and SetHosts are setted, host will be placed at the beginning of the hosts vector.  
-    DECLARE_FIELD(hosts, std::vector<std::string>,  SetHosts, std::vector<std::string>());
-    /// Ports of the servers.
-    DECLARE_FIELD(ports, std::vector<unsigned int>, SetPorts, std::vector<unsigned int>());
-    /// Algorithm for selecting the next endpoint for connection.
-    DECLARE_FIELD(iteration_algo, EndpointsIterationAlgorithm, SetEndpointsIterationAlgorithm, EndpointsIterationAlgorithm::RoundRobin);
+    /** Set endpoints (host+port), only one is used.
+     * Client tries to connect to those endpoints one by one, on the round-robin basis:
+     * first default enpoint (set via SetHost() + SetPort()), then each of endpoints, from begin() to end(),
+     * the first one to establish connection is used for the rest of the session.
+     * If port isn't specified, default(9000) value will be used.
+     */
+    DECLARE_FIELD(endpoints, std::vector<Endpoint>, SetEndpoints, {});
 
     /// Default database.
     DECLARE_FIELD(default_database, std::string, SetDefaultDatabase, "default");
@@ -257,6 +261,11 @@ public:
 
     const ServerInfo& GetServerInfo() const;
 
+    /// Get current connected endpoint.
+    /// In case when client is not connected to any endpoint, nullopt will returned.
+    const std::optional<Endpoint>& GetCurrentEndpoint() const;
+
+    void ResetConnectionEndpoint();
 private:
     const ClientOptions options_;
 

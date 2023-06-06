@@ -1217,9 +1217,12 @@ class ConnectionSuccessTestCase : public testing::TestWithParam<ClientOptions> {
 TEST_P(ConnectionSuccessTestCase, SuccessConnectionEstablished) {
     const auto & client_options = GetParam();
     std::unique_ptr<Client> client;
-    
+
     try {
         client = std::make_unique<Client>(client_options);
+        auto endpoint = client->GetCurrentEndpoint().value();
+        ASSERT_EQ("localhost", endpoint.host);
+        ASSERT_EQ(9000u, endpoint.port);
         SUCCEED();
     } catch (const std::exception & e) {
         FAIL() << "Got an unexpected exception : " << e.what();
@@ -1230,17 +1233,29 @@ TEST_P(ConnectionSuccessTestCase, SuccessConnectionEstablished) {
 INSTANTIATE_TEST_SUITE_P(ClientMultipleEndpoints, ConnectionSuccessTestCase,
     ::testing::Values(ClientCase::ParamType{
         ClientOptions()
-            .SetHosts({
-                    getEnvOrDefault("CLICKHOUSE_HOST",     "somedeadhost"),
-                    getEnvOrDefault("CLICKHOUSE_HOST",     "deadaginghost"),
-                    getEnvOrDefault("CLICKHOUSE_HOST",     "localhost"),
-                    getEnvOrDefault("CLICKHOUSE_HOST",     "noalocalhost"),
+            .SetEndpoints({
+                      {"somedeadhost", 9000}
+                    , {"deadaginghost", 1245}
+                    , {"localhost", 9000}
+                    , {"noalocalhost", 6784}
                 })
-            .SetPorts( {
-                    getEnvOrDefault<unsigned int>("CLICKHOUSE_PORT",     "9000"),
-                    getEnvOrDefault<unsigned int>("CLICKHOUSE_PORT",     "1245"),
-                    getEnvOrDefault<unsigned int>("CLICKHOUSE_PORT",     "9000"),
-                    getEnvOrDefault<unsigned int>("CLICKHOUSE_PORT",     "6784"),
+            .SetUser(           getEnvOrDefault("CLICKHOUSE_USER",     "default"))
+            .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", ""))
+            .SetDefaultDatabase(getEnvOrDefault("CLICKHOUSE_DB",       "default"))
+            .SetPingBeforeQuery(true)
+            .SetConnectionConnectTimeout(std::chrono::milliseconds(200))
+            .SetRetryTimeout(std::chrono::seconds(1)),
+    }
+));
+
+INSTANTIATE_TEST_SUITE_P(ClientMultipleEndpointsWithDefaultPort, ConnectionSuccessTestCase,
+    ::testing::Values(ClientCase::ParamType{
+        ClientOptions()
+            .SetEndpoints({
+                      {"somedeadhost"}
+                    , {"deadaginghost", 1245}
+                    , {"localhost"}
+                    , {"noalocalhost", 6784}
                 })
             .SetUser(           getEnvOrDefault("CLICKHOUSE_USER",     "default"))
             .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", ""))
@@ -1254,15 +1269,10 @@ INSTANTIATE_TEST_SUITE_P(ClientMultipleEndpoints, ConnectionSuccessTestCase,
 INSTANTIATE_TEST_SUITE_P(MultipleEndpointsFailed, ConnectionFailedClientTest,
     ::testing::Values(ConnectionFailedClientTest::ParamType{
         ClientOptions()
-            .SetHosts({
-                    getEnvOrDefault("CLICKHOUSE_HOST",     "somedeadhost"),
-                    getEnvOrDefault("CLICKHOUSE_HOST",     "deadaginghost"),
-                    getEnvOrDefault("CLICKHOUSE_HOST",     "noalocalhost") 
-                })
-            .SetPorts( {
-                    getEnvOrDefault<unsigned int>("CLICKHOUSE_PORT",     "9000"),
-                    getEnvOrDefault<unsigned int>("CLICKHOUSE_PORT",     "1245"),
-                    getEnvOrDefault<unsigned int>("CLICKHOUSE_PORT",     "6784"),
+            .SetEndpoints({
+                     {"deadaginghost", 9000}
+                    ,{"somedeadhost",  1245}
+                    ,{"noalocalhost",  6784}
                 })
             .SetUser(           getEnvOrDefault("CLICKHOUSE_USER",     "default"))
             .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", ""))
@@ -1274,23 +1284,70 @@ INSTANTIATE_TEST_SUITE_P(MultipleEndpointsFailed, ConnectionFailedClientTest,
     }
 ));
 
-INSTANTIATE_TEST_SUITE_P(MultipleEndpointsNonValidConfig, ConnectionFailedClientTest,
-    ::testing::Values(ConnectionFailedClientTest::ParamType{
+class ResetConnectionTestCase : public testing::TestWithParam<ClientOptions> {};
+
+TEST_P(ResetConnectionTestCase, ResetConnectionEndpointTest) {
+    const auto & client_options = GetParam();
+    std::unique_ptr<Client> client;
+
+    try {
+        client = std::make_unique<Client>(client_options);
+        auto endpoint = client->GetCurrentEndpoint().value();
+        ASSERT_EQ("localhost", endpoint.host);
+        ASSERT_EQ(9000u, endpoint.port);
+
+        client->ResetConnectionEndpoint();
+        endpoint = client->GetCurrentEndpoint().value();
+        ASSERT_EQ("127.0.0.1", endpoint.host);
+        ASSERT_EQ(9000u, endpoint.port);
+
+        client->ResetConnectionEndpoint();
+
+        endpoint = client->GetCurrentEndpoint().value();
+        ASSERT_EQ("localhost", endpoint.host);
+        ASSERT_EQ(9000u, endpoint.port);
+
+        SUCCEED();
+    } catch (const std::exception & e) {
+        FAIL() << "Got an unexpected exception : " << e.what();
+    }
+}
+
+TEST_P(ResetConnectionTestCase, ResetConnectionTest) {
+    const auto & client_options = GetParam();
+    std::unique_ptr<Client> client;
+
+    try {
+        client = std::make_unique<Client>(client_options);
+        auto endpoint = client->GetCurrentEndpoint().value();
+        ASSERT_EQ("localhost", endpoint.host);
+        ASSERT_EQ(9000u, endpoint.port);
+
+        client->ResetConnection();
+        endpoint = client->GetCurrentEndpoint().value();
+        ASSERT_EQ("localhost", endpoint.host);
+        ASSERT_EQ(9000u, endpoint.port);
+
+        SUCCEED();
+    } catch (const std::exception & e) {
+        FAIL() << "Got an unexpected exception : " << e.what();
+    }
+}
+
+INSTANTIATE_TEST_SUITE_P(ResetConnectionClientTest, ResetConnectionTestCase,
+    ::testing::Values(ResetConnectionTestCase::ParamType {
         ClientOptions()
-            .SetHosts({
-                    getEnvOrDefault("CLICKHOUSE_HOST",     "somedeadhost"),
-                    getEnvOrDefault("CLICKHOUSE_HOST",     "localhost"),
-                    getEnvOrDefault("CLICKHOUSE_HOST",     "noalocalhost"), 
-                })
-            .SetPorts( {
-                    getEnvOrDefault<unsigned int>("CLICKHOUSE_PORT",     "9000"),
+            .SetEndpoints({
+                     {"localhost", 9000}
+                    ,{"somedeadhost",  1245}
+                    ,{"noalocalhost",  6784}
+                    ,{"127.0.0.1", 9000}
                 })
             .SetUser(           getEnvOrDefault("CLICKHOUSE_USER",     "default"))
             .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", ""))
             .SetDefaultDatabase(getEnvOrDefault("CLICKHOUSE_DB",       "default"))
             .SetPingBeforeQuery(true)
             .SetConnectionConnectTimeout(std::chrono::milliseconds(200))
-            .SetRetryTimeout(std::chrono::seconds(1)),
-        ExpectingException{"The sizes of lists of ports and hosts must match be equal."}
+            .SetRetryTimeout(std::chrono::seconds(1))
     }
 ));

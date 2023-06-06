@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../client.h"
+#include "clickhouse/client.h"
 #include <vector>
 
 namespace clickhouse {
@@ -30,21 +30,19 @@ class EndpointsIteratorBase
 class RoundRobinEndpointsIterator : public EndpointsIteratorBase
 {
  public:
-   explicit RoundRobinEndpointsIterator(const ClientOptions& opts);
-   std::string GetHostAddr() const override;
-   unsigned int GetPort() const override;
-   void ResetIterations() override;
-   bool NextIsExist() const override;
-   void Next() override;
+    explicit RoundRobinEndpointsIterator(const std::vector<Endpoint>& opts);
+    std::string GetHostAddr() const override;
+    unsigned int GetPort() const override;
+    void ResetIterations() override;
+    bool NextIsExist() const override;
+    void Next() override;
     
-   ~RoundRobinEndpointsIterator() override;
+    ~RoundRobinEndpointsIterator() override;
 
  private:
-
-   const std::vector<std::string>& hosts;
-   const std::vector<unsigned int>& ports;
-   int current_index;
-   size_t iteration_counter;
+    const std::vector<Endpoint>& endpoints;
+    int current_index;
+    size_t iteration_counter;
 };
 
 }
