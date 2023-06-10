@@ -24,23 +24,15 @@ PROJECT (CLICKHOUSE-CLIENT)
         SET (CMAKE_BUILD_TYPE "RelWithDebInfo")
     ENDIF ()
 
-    if (MSVC)
-        add_definitions(-D_CRT_SECURE_NO_WARNINGS)
-        add_compile_options(/W4)
-        add_compile_options(/wd4996)
-    endif()
-
     IF (UNIX)
         IF (NOT APPLE)
             SET (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
         ENDIF ()
         SET (CMAKE_EXE_LINKER_FLAGS, "${CMAKE_EXE_LINKER_FLAGS} -lpthread")
 
-        set(cxx_extra_wall "-Wno-deprecated-declarations -Wempty-body -Wconversion -Wreturn-type -Wparentheses -Wno-format -Wuninitialized -Wunreachable-code -Wunused-function -Wunused-value -Wunused-variable")
-
         # -Wpedantic makes int128 support somewhat harder and less performant (by not allowing builtin __int128)
         # -Wno-deprecated-declarations to produce less cluttered output when building library itself (`deprecated` attributes are for library users)
-        SET (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Werror ${cxx_extra_wall}")
+        SET (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Werror")
     ENDIF ()
 
     IF (APPLE OR MSVC)

@@ -90,7 +90,7 @@ bool CompressedInput::Decompress() {
 
         data_ = Buffer(original);
 
-        if (LZ4_decompress_safe((const char*)tmp.data() + HEADER_SIZE, (char*)data_.data(), compressed - HEADER_SIZE, original) < 0) {
+        if (LZ4_decompress_safe((const char*)tmp.data() + HEADER_SIZE, (char*)data_.data(), static_cast<int>(compressed - HEADER_SIZE), original) < 0) {
             throw LZ4Error("can't decompress data");
         } else {
             mem_.Reset(data_.data(), original);

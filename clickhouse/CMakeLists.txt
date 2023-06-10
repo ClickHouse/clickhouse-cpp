@@ -34,6 +34,17 @@ SET ( clickhouse-cpp-lib-src
     query.cpp
 )
 
+if (MSVC)
+    add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+    add_compile_options(/W4)
+    add_compile_options(/wd4996)
+endif()
+
+if (UNIX)     
+    set(cxx_extra_wall "-Wno-deprecated-declarations -Wempty-body -Wconversion -Wreturn-type -Wparentheses -Wno-format -Wuninitialized -Wunreachable-code -Wunused-function -Wunused-value -Wunused-variable")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${cxx_extra_wall}")
+endif ()
+
 IF (WITH_OPENSSL)
     LIST(APPEND clickhouse-cpp-lib-src base/sslsocket.cpp)
 ENDIF ()
