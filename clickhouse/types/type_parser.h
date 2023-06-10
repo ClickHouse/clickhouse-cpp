@@ -1,6 +1,5 @@
 #pragma once
 
-#include "../base/string_view.h"
 #include "types.h"
 
 #include <list>
@@ -63,11 +62,11 @@ class TypeParser {
         };
 
         Type type;
-        StringView value;
+        std::string_view value;
     };
 
 public:
-    explicit TypeParser(const StringView& name);
+    explicit TypeParser(std::string_view name);
     ~TypeParser();
 
     bool Parse(TypeAst* type);

@@ -32,10 +32,5 @@ inline constexpr bool is_container_v = is_container<T>::value;
 
 // Since result_of is deprecated in C++17, and invoke_result_of is unavailable until C++20...
 template <class F, class... ArgTypes>
-using my_result_of_t =
-#if __cplusplus >= 201703L
-    std::invoke_result_t<F, ArgTypes...>;
-#else
-    std::result_of_t<F(ArgTypes...)>;
-#endif
+using my_result_of_t = std::invoke_result_t<F, ArgTypes...>;
 
