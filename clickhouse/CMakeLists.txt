@@ -40,8 +40,9 @@ if (MSVC)
     add_compile_options(/wd4996)
 endif()
 
-if (UNIX)     
+if (UNIX)
     set(cxx_extra_wall "-Wno-deprecated-declarations -Wempty-body -Wconversion -Wreturn-type -Wparentheses -Wno-format -Wuninitialized -Wunreachable-code -Wunused-function -Wunused-value -Wunused-variable")
+    
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${cxx_extra_wall}")
 endif ()
 
@@ -66,6 +67,8 @@ ENDIF()
 
 
 IF (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    # a little abnormal when clang check conversion
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${cxx_extra_wall} -Wno-conversion")
     INCLUDE (CheckCXXSourceCompiles)
 
     CHECK_CXX_SOURCE_COMPILES("#include <bits/c++config.h>\nint main() { return __GLIBCXX__ != 0; }"
