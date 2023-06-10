@@ -38,13 +38,15 @@ if (MSVC)
     add_definitions(-D_CRT_SECURE_NO_WARNINGS)
     add_compile_options(/W4)
     add_compile_options(/wd4996)
-endif()
-
-if (UNIX)
-    set(cxx_extra_wall "-Wno-deprecated-declarations -Wempty-body -Wconversion -Wreturn-type -Wparentheses -Wno-format -Wuninitialized -Wunreachable-code -Wunused-function -Wunused-value -Wunused-variable")
-    
+else()
+    set(cxx_extra_wall "-Wno-deprecated-declarations -Wempty-body -Wconversion -Wreturn-type -Wparentheses -Wno-format -Wuninitialized -Wunreachable-code -Wunused-function -Wunused-value -Wunused-variable")   
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${cxx_extra_wall}")
-endif ()
+
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
+        # a little abnormal when clang check conversion
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${cxx_extra_wall} -Wno-conversion")
+    endif()
+endif()
 
 IF (WITH_OPENSSL)
     LIST(APPEND clickhouse-cpp-lib-src base/sslsocket.cpp)
@@ -67,8 +69,6 @@ ENDIF()
 
 
 IF (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    # a little abnormal when clang check conversion
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${cxx_extra_wall} -Wno-conversion")
     INCLUDE (CheckCXXSourceCompiles)
 
     CHECK_CXX_SOURCE_COMPILES("#include <bits/c++config.h>\nint main() { return __GLIBCXX__ != 0; }"
