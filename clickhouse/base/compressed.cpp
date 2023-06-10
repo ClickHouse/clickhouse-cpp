@@ -141,7 +141,7 @@ void CompressedOutput::Compress(const void * data, size_t len) {
     const auto compressed_size = LZ4_compress_default(
             (const char*)data,
             (char*)compressed_buffer_.data() + HEADER_SIZE,
-            len,
+            static_cast<int>(len),
             static_cast<int>(compressed_buffer_.size() - HEADER_SIZE));
     if (compressed_size <= 0)
         throw LZ4Error("Failed to compress chunk of " + std::to_string(len) + " bytes, "

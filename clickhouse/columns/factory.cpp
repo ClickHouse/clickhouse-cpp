@@ -38,7 +38,7 @@ const auto& GetASTChildElement(const TypeAst & ast, int position) {
         throw ValidationError("AST child element index out of bounds: " + std::to_string(position));
 
     if (position < 0)
-        position = ast.elements.size() + position;
+        position = static_cast<int>(ast.elements.size() + position);
 
     return ast.elements[static_cast<size_t>(position)];
 }
