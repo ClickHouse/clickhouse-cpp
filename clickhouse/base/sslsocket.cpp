@@ -295,6 +295,10 @@ SSLSocketOutput::SSLSocketOutput(SSL *ssl)
 {}
 
 size_t SSLSocketOutput::DoWrite(const void* data, size_t len) {
+    if (len > std::numeric_limits<int>::max())
+        // FIXME(vnemkov): We should do multiple `SSL_write`s in this case.
+        throw AssertionError("Failed to write too big chunk at once "
+                + std::to_string(len) + " > " + std::to_string(std::numeric_limits<int>::max()));
     return static_cast<size_t>(HANDLE_SSL_ERROR(ssl_, SSL_write(ssl_, data, static_cast<int>(len))));
 }
 
