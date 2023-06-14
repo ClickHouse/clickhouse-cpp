@@ -217,7 +217,7 @@ SOCKET SocketConnect(const NetworkAddress& addr, const SocketTimeoutParams& time
                 fd.fd = *s;
                 fd.events = POLLOUT;
                 fd.revents = 0;
-                ssize_t rval = Poll(&fd, 1, timeout_params.connect_timeout.count());
+                ssize_t rval = Poll(&fd, 1, static_cast<int>(timeout_params.connect_timeout.count()));
 
                 if (rval == -1) {
                     throw std::system_error(getSocketErrorCode(), getErrorCategory(), "fail to connect");

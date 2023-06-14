@@ -411,12 +411,12 @@ bool Client::Impl::ReceivePacket(uint64_t* server_packet) {
         if (!WireFormat::ReadUInt64(*input_, &info.bytes)) {
             return false;
         }
-        if (REVISION >= DBMS_MIN_REVISION_WITH_TOTAL_ROWS_IN_PROGRESS) {
+        if constexpr(REVISION >= DBMS_MIN_REVISION_WITH_TOTAL_ROWS_IN_PROGRESS) {
             if (!WireFormat::ReadUInt64(*input_, &info.total_rows)) {
                 return false;
             }
         }
-        if (REVISION >= DBMS_MIN_REVISION_WITH_CLIENT_WRITE_INFO)
+        if constexpr (REVISION >= DBMS_MIN_REVISION_WITH_CLIENT_WRITE_INFO)
         {
             if (!WireFormat::ReadUInt64(*input_, &info.written_rows)) {
                 return false;
@@ -499,13 +499,11 @@ bool Client::Impl::ReceivePacket(uint64_t* server_packet) {
         throw UnimplementedError("unimplemented " + std::to_string((int)packet_type));
         break;
     }
-
-    return false;
 }
 
 bool Client::Impl::ReadBlock(InputStream& input, Block* block) {
     // Additional information about block.
-    if (REVISION >= DBMS_MIN_REVISION_WITH_BLOCK_INFO) {
+    if constexpr (REVISION >= DBMS_MIN_REVISION_WITH_BLOCK_INFO) {
         uint64_t num;
         BlockInfo info;
 
@@ -569,7 +567,7 @@ bool Client::Impl::ReadBlock(InputStream& input, Block* block) {
 bool Client::Impl::ReceiveData() {
     Block block;
 
-    if (REVISION >= DBMS_MIN_REVISION_WITH_TEMPORARY_TABLES) {
+    if constexpr (REVISION >= DBMS_MIN_REVISION_WITH_TEMPORARY_TABLES) {
         if (!WireFormat::SkipString(*input_)) {
             return false;
         }

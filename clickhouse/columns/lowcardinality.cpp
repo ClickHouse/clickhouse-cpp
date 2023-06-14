@@ -199,7 +199,7 @@ std::uint64_t ColumnLowCardinality::getDictionaryIndex(std::uint64_t item_index)
 void ColumnLowCardinality::appendIndex(std::uint64_t item_index) {
     // TODO (nemkov): handle case when index should go from UInt8 to UInt16, etc.
     VisitIndexColumn([item_index](auto & arg) {
-        arg.Append(item_index);
+        arg.Append(static_cast<typename std::decay_t<decltype(arg)>::DataType>(item_index));
     }, *index_column_);
 }
 

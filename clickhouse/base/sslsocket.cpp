@@ -109,7 +109,7 @@ SSL_CTX * prepareSSLContext(const clickhouse::SSLParams & context_params) {
 
 #define HANDLE_SSL_CTX_ERROR(statement) do { \
     if (const auto ret_code = (statement); !ret_code) \
-        throwSSLError(nullptr, ERR_peek_error(), LOCATION, #statement); \
+        throwSSLError(nullptr, static_cast<int>(ERR_peek_error()), LOCATION, #statement); \
 } while(false);
 
     if (context_params.use_default_ca_locations)
@@ -185,7 +185,7 @@ SSL_CTX * SSLContext::getContext() {
 // Allows caller to use returned value of `statement` if there was no error, throws exception otherwise.
 #define HANDLE_SSL_ERROR(SSL_PTR, statement) [&] { \
     if (const auto ret_code = (statement); ret_code <= 0) { \
-        throwSSLError(SSL_PTR, SSL_get_error(SSL_PTR, ret_code), LOCATION, #statement); \
+        throwSSLError(SSL_PTR, SSL_get_error(SSL_PTR, static_cast<int>(ret_code)), LOCATION, #statement); \
         return static_cast<std::decay_t<decltype(ret_code)>>(0); \
     } \
     else \
@@ -209,7 +209,7 @@ SSLSocket::SSLSocket(const NetworkAddress& addr, const SocketTimeoutParams& time
 
     std::unique_ptr<ASN1_OCTET_STRING, decltype(&ASN1_OCTET_STRING_free)> ip_addr(a2i_IPADDRESS(addr.Host().c_str()), &ASN1_OCTET_STRING_free);
 
-    HANDLE_SSL_ERROR(ssl, SSL_set_fd(ssl, handle_));
+    HANDLE_SSL_ERROR(ssl, SSL_set_fd(ssl, static_cast<int>(handle_)));
     if (ssl_params.use_SNI)
         HANDLE_SSL_ERROR(ssl, SSL_set_tlsext_host_name(ssl, addr.Host().c_str()));
 
@@ -295,7 +295,11 @@ SSLSocketOutput::SSLSocketOutput(SSL *ssl)
 {}
 
 size_t SSLSocketOutput::DoWrite(const void* data, size_t len) {
-    return static_cast<size_t>(HANDLE_SSL_ERROR(ssl_, SSL_write(ssl_, data, len)));
+    if (len > std::numeric_limits<int>::max())
+        // FIXME(vnemkov): We should do multiple `SSL_write`s in this case.
+        throw AssertionError("Failed to write too big chunk at once "
+                + std::to_string(len) + " > " + std::to_string(std::numeric_limits<int>::max()));
+    return static_cast<size_t>(HANDLE_SSL_ERROR(ssl_, SSL_write(ssl_, data, static_cast<int>(len))));
 }
 
 #undef HANDLE_SSL_ERROR
