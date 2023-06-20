@@ -20,7 +20,7 @@ class EndpointsIteratorBase
    virtual std::string GetHostAddr() const = 0;
 
    // Get the port of current endpoint.
-   virtual unsigned int GetPort() const = 0;
+   virtual uint16_t GetPort() const = 0;
 
    // Reset iterations.
    virtual void ResetIterations() = 0; 
@@ -32,7 +32,7 @@ class RoundRobinEndpointsIterator : public EndpointsIteratorBase
  public:
     explicit RoundRobinEndpointsIterator(const std::vector<Endpoint>& opts);
     std::string GetHostAddr() const override;
-    unsigned int GetPort() const override;
+    uint16_t GetPort() const override;
     void ResetIterations() override;
     bool NextIsExist() const override;
     void Next() override;

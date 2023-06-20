@@ -16,7 +16,7 @@ std::string RoundRobinEndpointsIterator::GetHostAddr() const
    return endpoints[current_index].host;
 }
 
-unsigned int RoundRobinEndpointsIterator::GetPort() const
+uint16_t RoundRobinEndpointsIterator::GetPort() const
 {
    return endpoints[current_index].port;
 }

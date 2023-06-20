@@ -46,8 +46,7 @@ enum class CompressionMethod {
 
 struct Endpoint {
     std::string host;
-    unsigned int port = 9000;
-
+    uint16_t port = 9000;
     inline bool operator==(const Endpoint& right) const {
         return host == right.host && port == right.port;
     }
@@ -69,7 +68,7 @@ struct ClientOptions {
     /// Hostname of the server.
     DECLARE_FIELD(host, std::string, SetHost, std::string());
     /// Service port.
-    DECLARE_FIELD(port, unsigned int, SetPort, 9000);
+    DECLARE_FIELD(port, uint16_t, SetPort, 9000);
 
     /** Set endpoints (host+port), only one is used.
      * Client tries to connect to those endpoints one by one, on the round-robin basis:

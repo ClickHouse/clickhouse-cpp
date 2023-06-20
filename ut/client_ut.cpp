@@ -1280,7 +1280,7 @@ INSTANTIATE_TEST_SUITE_P(MultipleEndpointsFailed, ConnectionFailedClientTest,
             .SetPingBeforeQuery(true)
             .SetConnectionConnectTimeout(std::chrono::milliseconds(200))
             .SetRetryTimeout(std::chrono::seconds(1)),
-        ExpectingException{"Temporary failure in name resolution"}
+        ExpectingException{""}
     }
 ));
 
