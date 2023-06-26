@@ -264,6 +264,7 @@ public:
     /// In case when client is not connected to any endpoint, nullopt will returned.
     const std::optional<Endpoint>& GetCurrentEndpoint() const;
 
+    // Try to connect to different endpoints one by one only one time. If it doesn't work, throw an exception.
     void ResetConnectionEndpoint();
 private:
     const ClientOptions options_;

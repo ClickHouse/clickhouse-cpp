@@ -64,7 +64,8 @@ struct ClientInfo {
 };
 
 std::ostream& operator<<(std::ostream& os, const ClientOptions& opt) {
-    os << "Client(";
+    os << "Client(" << opt.user << '@' << opt.host << ":" << opt.port
+       << "Endpoints :";
     for (size_t i = 0; i < opt.endpoints.size(); i++)
         os << opt.user << '@' << opt.endpoints[i].host << ":" << opt.endpoints[i].port
            << ((i == opt.endpoints.size() - 1) ? "" : ", ");
@@ -115,8 +116,13 @@ std::unique_ptr<SocketFactory> GetSocketFactory(const ClientOptions& opts) {
         return std::make_unique<NonSecureSocketFactory>();
 }
 
-std::unique_ptr<EndpointsIteratorBase> GetEndpointsIterator(const std::vector<Endpoint>& endpoints) {
-    return std::make_unique<RoundRobinEndpointsIterator>(endpoints);
+std::unique_ptr<EndpointsIteratorBase> GetEndpointsIterator(const ClientOptions& opts) {
+    if (opts.endpoints.empty())
+    {
+        throw ValidationError("The list of endpoints is empty");
+    }
+
+    return std::make_unique<RoundRobinEndpointsIterator>(opts.endpoints);
 }
 
 }
@@ -171,11 +177,16 @@ private:
 
     void InitializeStreams(std::unique_ptr<SocketBase>&& socket);
 
+    inline size_t GetConnectionAttempts() const
+    {
+        return options_.endpoints.size() * options_.send_retries;
+    }
+
 private:
     /// In case of network errors tries to reconnect to server and
     /// call fuc several times.
     void RetryGuard(std::function<void()> func);
-    
+
     void RetryConnectToTheEndpoint(std::function<void()>& func);
 
 private:
@@ -222,10 +233,8 @@ ClientOptions modifyClientOptions(ClientOptions opts)
     if (opts.host.empty())
         return opts;
 
-    Endpoint endpoint_single({opts.host, opts.port});
-    if (std::find(opts.endpoints.begin(), opts.endpoints.end(), endpoint_single) == std::end(opts.endpoints)) {
-        opts.endpoints.emplace(opts.endpoints.begin(),endpoint_single);
-    }
+    Endpoint default_endpoint({opts.host, opts.port});
+    opts.endpoints.emplace(opts.endpoints.begin(), default_endpoint);
     return opts;
 }
 
@@ -237,7 +246,7 @@ Client::Impl::Impl(const ClientOptions& opts,
     : options_(modifyClientOptions(opts))
     , events_(nullptr)
     , socket_factory_(std::move(socket_factory))
-    , endpoints_iterator(GetEndpointsIterator(options_.endpoints))
+    , endpoints_iterator(GetEndpointsIterator(options_))
 {
     CreateConnection();
 
@@ -349,9 +358,7 @@ void Client::Impl::Ping() {
 }
 
 void Client::Impl::ResetConnection() {
-    InitializeStreams(socket_factory_->connect(options_, endpoints_iterator->GetHostAddr(),
-                                               std::to_string(endpoints_iterator->GetPort())
-                      ));
+    InitializeStreams(socket_factory_->connect(options_, current_endpoint_.value()));
 
     if (!Handshake()) {
         throw ProtocolError("fail to connect to " + options_.host);
@@ -359,37 +366,36 @@ void Client::Impl::ResetConnection() {
 }
 
 void Client::Impl::ResetConnectionEndpoint() {
-    endpoints_iterator->ResetIterations();
-    endpoints_iterator->Next();
-    CreateConnection();
-}
-
-void Client::Impl::CreateConnection() {
     current_endpoint_.reset();
-    auto try_make_connection_with_endpoint = [this]() {
-        for (unsigned int i = 0; ; ) {
-            try {
-                ResetConnection();
-                return;
-            } catch (const std::system_error&) {
-                if (++i > options_.send_retries) {
-                    throw;
-                }
-                socket_factory_->sleepFor(options_.retry_timeout);
-            }
-        }
-    };
-
-    for (endpoints_iterator->ResetIterations(); ; endpoints_iterator->Next())
+    for (size_t i = 0; i < options_.endpoints.size();)
     {
         try
         {
-            try_make_connection_with_endpoint();
-            current_endpoint_ = {endpoints_iterator->GetHostAddr(), endpoints_iterator->GetPort()};
-            break;
+            current_endpoint_ = endpoints_iterator->Next();
+            ResetConnection();
+            return;
         } catch (const std::system_error&) {
-            if(!endpoints_iterator->NextIsExist())
+            if (++i == options_.endpoints.size())
+            {
+                current_endpoint_.reset();
                 throw;
+            }
+        }
+    }
+}
+
+void Client::Impl::CreateConnection() {
+    for (size_t i = 0; i < options_.send_retries;)
+    {
+        try
+        {
+            ResetConnectionEndpoint();
+            return;
+        } catch (const std::system_error&) {
+            if (++i == options_.send_retries)
+            {
+                throw;
+            }
         }
     }
 }
@@ -924,40 +930,45 @@ bool Client::Impl::ReceiveHello() {
 }
 
 void Client::Impl::RetryGuard(std::function<void()> func) {
-    for(endpoints_iterator->ResetIterations(); ; endpoints_iterator->Next())
+
+    if (current_endpoint_)
+    {
+        for (unsigned int i = 0; ; ++i) {
+            try {
+                func();
+                return;
+            } catch (const std::system_error&) {
+                bool ok = true;
+
+                try {
+                    socket_factory_->sleepFor(options_.retry_timeout);
+                    ResetConnection();
+                } catch (...) {
+                    ok = false;
+                }
+
+                if (!ok && i == options_.send_retries) {
+                    break;
+                }
+            }
+        }
+    }
+    // Connectiong with current_endpoint_ are broken.
+    // Trying to establish  with the another one from the list.
+    size_t connection_attempts_count = GetConnectionAttempts();
+    for (size_t i = 0; i < connection_attempts_count;)
     {
         try
         {
-            RetryConnectToTheEndpoint(func);
-            if (!current_endpoint_) {
-                current_endpoint_ = {endpoints_iterator->GetHostAddr(), endpoints_iterator->GetPort()};
-            }
-            return;
-        } catch (const std::system_error&) {
-            if (!endpoints_iterator->NextIsExist())
-                throw;
-            //If the exceptions was catched here, that's mean that we should change the current_endpoint.
-            current_endpoint_.reset();
-        }
-    }
-}
-
-void Client::Impl::RetryConnectToTheEndpoint(std::function<void()>& func) {
-    for (unsigned int i = 0; ; ++i) {
-        try {
+            socket_factory_->sleepFor(options_.retry_timeout);
+            current_endpoint_ = endpoints_iterator->Next();
+            ResetConnection();
             func();
             return;
         } catch (const std::system_error&) {
-            bool ok = true;
-
-            try {
-                socket_factory_->sleepFor(options_.retry_timeout);
-                ResetConnection();
-            } catch (...) {
-                ok = false;
-            }
-
-            if (!ok && i == options_.send_retries) {
+            if (++i == connection_attempts_count)
+            {
+                current_endpoint_.reset();
                 throw;
             }
         }
