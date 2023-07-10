@@ -65,7 +65,12 @@ struct ClientInfo {
 
 std::ostream& operator<<(std::ostream& os, const ClientOptions& opt) {
     os << "Client(" << opt.user << '@' << opt.host << ":" << opt.port
-       << " ping_before_query:" << opt.ping_before_query
+       << "Endpoints :";
+    for (size_t i = 0; i < opt.endpoints.size(); i++)
+        os << opt.user << '@' << opt.endpoints[i].host << ":" << opt.endpoints[i].port
+           << ((i == opt.endpoints.size() - 1) ? "" : ", ");
+
+    os << " ping_before_query:" << opt.ping_before_query
        << " send_retries:" << opt.send_retries
        << " retry_timeout:" << opt.retry_timeout.count()
        << " compression_method:"
@@ -111,6 +116,15 @@ std::unique_ptr<SocketFactory> GetSocketFactory(const ClientOptions& opts) {
         return std::make_unique<NonSecureSocketFactory>();
 }
 
+std::unique_ptr<EndpointsIteratorBase> GetEndpointsIterator(const ClientOptions& opts) {
+    if (opts.endpoints.empty())
+    {
+        throw ValidationError("The list of endpoints is empty");
+    }
+
+    return std::make_unique<RoundRobinEndpointsIterator>(opts.endpoints);
+}
+
 }
 
 class Client::Impl {
@@ -130,7 +144,11 @@ public:
 
     void ResetConnection();
 
+    void ResetConnectionEndpoint();
+
     const ServerInfo& GetServerInfo() const;
+
+    const std::optional<Endpoint>& GetCurrentEndpoint() const;
 
 private:
     bool Handshake();
@@ -155,12 +173,21 @@ private:
 
     void WriteBlock(const Block& block, OutputStream& output);
 
+    void CreateConnection();
+
     void InitializeStreams(std::unique_ptr<SocketBase>&& socket);
+
+    inline size_t GetConnectionAttempts() const
+    {
+        return options_.endpoints.size() * options_.send_retries;
+    }
 
 private:
     /// In case of network errors tries to reconnect to server and
     /// call fuc several times.
     void RetryGuard(std::function<void()> func);
+
+    void RetryConnectToTheEndpoint(std::function<void()>& func);
 
 private:
     class EnsureNull {
@@ -194,32 +221,34 @@ private:
     std::unique_ptr<InputStream> input_;
     std::unique_ptr<OutputStream> output_;
     std::unique_ptr<SocketBase> socket_;
+    std::unique_ptr<EndpointsIteratorBase> endpoints_iterator;
+
+    std::optional<Endpoint> current_endpoint_;
 
     ServerInfo server_info_;
 };
 
+ClientOptions modifyClientOptions(ClientOptions opts)
+{
+    if (opts.host.empty())
+        return opts;
+
+    Endpoint default_endpoint({opts.host, opts.port});
+    opts.endpoints.emplace(opts.endpoints.begin(), default_endpoint);
+    return opts;
+}
 
 Client::Impl::Impl(const ClientOptions& opts)
     : Impl(opts, GetSocketFactory(opts)) {}
 
 Client::Impl::Impl(const ClientOptions& opts,
                    std::unique_ptr<SocketFactory> socket_factory)
-    : options_(opts)
+    : options_(modifyClientOptions(opts))
     , events_(nullptr)
     , socket_factory_(std::move(socket_factory))
+    , endpoints_iterator(GetEndpointsIterator(options_))
 {
-    for (unsigned int i = 0; ; ) {
-        try {
-            ResetConnection();
-            break;
-        } catch (const std::system_error&) {
-            if (++i > options_.send_retries) {
-                throw;
-            }
-
-            socket_factory_->sleepFor(options_.retry_timeout);
-        }
-    }
+    CreateConnection();
 
     if (options_.compression_method != CompressionMethod::None) {
         compression_ = CompressionState::Enable;
@@ -329,15 +358,55 @@ void Client::Impl::Ping() {
 }
 
 void Client::Impl::ResetConnection() {
-    InitializeStreams(socket_factory_->connect(options_));
+    InitializeStreams(socket_factory_->connect(options_, current_endpoint_.value()));
 
     if (!Handshake()) {
         throw ProtocolError("fail to connect to " + options_.host);
     }
 }
 
+void Client::Impl::ResetConnectionEndpoint() {
+    current_endpoint_.reset();
+    for (size_t i = 0; i < options_.endpoints.size();)
+    {
+        try
+        {
+            current_endpoint_ = endpoints_iterator->Next();
+            ResetConnection();
+            return;
+        } catch (const std::system_error&) {
+            if (++i == options_.endpoints.size())
+            {
+                current_endpoint_.reset();
+                throw;
+            }
+        }
+    }
+}
+
+void Client::Impl::CreateConnection() {
+    for (size_t i = 0; i < options_.send_retries;)
+    {
+        try
+        {
+            ResetConnectionEndpoint();
+            return;
+        } catch (const std::system_error&) {
+            if (++i == options_.send_retries)
+            {
+                throw;
+            }
+        }
+    }
+}
+
 const ServerInfo& Client::Impl::GetServerInfo() const {
     return server_info_;
+}
+
+
+const std::optional<Endpoint>& Client::Impl::GetCurrentEndpoint() const {
+    return current_endpoint_;
 }
 
 bool Client::Impl::Handshake() {
@@ -859,21 +928,45 @@ bool Client::Impl::ReceiveHello() {
 }
 
 void Client::Impl::RetryGuard(std::function<void()> func) {
-    for (unsigned int i = 0; ; ++i) {
-        try {
+
+    if (current_endpoint_)
+    {
+        for (unsigned int i = 0; ; ++i) {
+            try {
+                func();
+                return;
+            } catch (const std::system_error&) {
+                bool ok = true;
+
+                try {
+                    socket_factory_->sleepFor(options_.retry_timeout);
+                    ResetConnection();
+                } catch (...) {
+                    ok = false;
+                }
+
+                if (!ok && i == options_.send_retries) {
+                    break;
+                }
+            }
+        }
+    }
+    // Connectiong with current_endpoint_ are broken.
+    // Trying to establish  with the another one from the list.
+    size_t connection_attempts_count = GetConnectionAttempts();
+    for (size_t i = 0; i < connection_attempts_count;)
+    {
+        try
+        {
+            socket_factory_->sleepFor(options_.retry_timeout);
+            current_endpoint_ = endpoints_iterator->Next();
+            ResetConnection();
             func();
             return;
         } catch (const std::system_error&) {
-            bool ok = true;
-
-            try {
-                socket_factory_->sleepFor(options_.retry_timeout);
-                ResetConnection();
-            } catch (...) {
-                ok = false;
-            }
-
-            if (!ok && i == options_.send_retries) {
+            if (++i == connection_attempts_count)
+            {
+                current_endpoint_.reset();
                 throw;
             }
         }
@@ -934,6 +1027,14 @@ void Client::Ping() {
 
 void Client::ResetConnection() {
     impl_->ResetConnection();
+}
+
+void Client::ResetConnectionEndpoint() {
+    impl_->ResetConnectionEndpoint();
+}
+
+const std::optional<Endpoint>& Client::GetCurrentEndpoint() const {
+    return impl_->GetCurrentEndpoint();
 }
 
 const ServerInfo& Client::GetServerInfo() const {

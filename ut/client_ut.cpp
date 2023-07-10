@@ -1210,3 +1210,144 @@ INSTANTIATE_TEST_SUITE_P(ClientLocalFailed, ConnectionFailedClientTest,
         ExpectingException{"Authentication failed: password is incorrect"}
     }
 ));
+
+
+class ConnectionSuccessTestCase : public testing::TestWithParam<ClientOptions> {};
+
+TEST_P(ConnectionSuccessTestCase, SuccessConnectionEstablished) {
+    const auto & client_options = GetParam();
+    std::unique_ptr<Client> client;
+
+    try {
+        client = std::make_unique<Client>(client_options);
+        auto endpoint = client->GetCurrentEndpoint().value();
+        ASSERT_EQ("localhost", endpoint.host);
+        ASSERT_EQ(9000u, endpoint.port);
+        SUCCEED();
+    } catch (const std::exception & e) {
+        FAIL() << "Got an unexpected exception : " << e.what();
+    }
+}
+
+
+INSTANTIATE_TEST_SUITE_P(ClientMultipleEndpoints, ConnectionSuccessTestCase,
+    ::testing::Values(ClientCase::ParamType{
+        ClientOptions()
+            .SetEndpoints({
+                      {"somedeadhost", 9000}
+                    , {"deadaginghost", 1245}
+                    , {"localhost", 9000}
+                    , {"noalocalhost", 6784}
+                })
+            .SetUser(           getEnvOrDefault("CLICKHOUSE_USER",     "default"))
+            .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", ""))
+            .SetDefaultDatabase(getEnvOrDefault("CLICKHOUSE_DB",       "default"))
+            .SetPingBeforeQuery(true)
+            .SetConnectionConnectTimeout(std::chrono::milliseconds(200))
+            .SetRetryTimeout(std::chrono::seconds(1)),
+    }
+));
+
+INSTANTIATE_TEST_SUITE_P(ClientMultipleEndpointsWithDefaultPort, ConnectionSuccessTestCase,
+    ::testing::Values(ClientCase::ParamType{
+        ClientOptions()
+            .SetEndpoints({
+                      {"somedeadhost"}
+                    , {"deadaginghost", 1245}
+                    , {"localhost"}
+                    , {"noalocalhost", 6784}
+                })
+            .SetUser(           getEnvOrDefault("CLICKHOUSE_USER",     "default"))
+            .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", ""))
+            .SetDefaultDatabase(getEnvOrDefault("CLICKHOUSE_DB",       "default"))
+            .SetPingBeforeQuery(true)
+            .SetConnectionConnectTimeout(std::chrono::milliseconds(200))
+            .SetRetryTimeout(std::chrono::seconds(1)),
+    }
+));
+
+INSTANTIATE_TEST_SUITE_P(MultipleEndpointsFailed, ConnectionFailedClientTest,
+    ::testing::Values(ConnectionFailedClientTest::ParamType{
+        ClientOptions()
+            .SetEndpoints({
+                     {"deadaginghost", 9000}
+                    ,{"somedeadhost",  1245}
+                    ,{"noalocalhost",  6784}
+                })
+            .SetUser(           getEnvOrDefault("CLICKHOUSE_USER",     "default"))
+            .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", ""))
+            .SetDefaultDatabase(getEnvOrDefault("CLICKHOUSE_DB",       "default"))
+            .SetPingBeforeQuery(true)
+            .SetConnectionConnectTimeout(std::chrono::milliseconds(200))
+            .SetRetryTimeout(std::chrono::seconds(1)),
+        ExpectingException{""}
+    }
+));
+
+class ResetConnectionTestCase : public testing::TestWithParam<ClientOptions> {};
+
+TEST_P(ResetConnectionTestCase, ResetConnectionEndpointTest) {
+    const auto & client_options = GetParam();
+    std::unique_ptr<Client> client;
+
+    try {
+        client = std::make_unique<Client>(client_options);
+        auto endpoint = client->GetCurrentEndpoint().value();
+        ASSERT_EQ("localhost", endpoint.host);
+        ASSERT_EQ(9000u, endpoint.port);
+
+        client->ResetConnectionEndpoint();
+        endpoint = client->GetCurrentEndpoint().value();
+        ASSERT_EQ("127.0.0.1", endpoint.host);
+        ASSERT_EQ(9000u, endpoint.port);
+
+        client->ResetConnectionEndpoint();
+
+        endpoint = client->GetCurrentEndpoint().value();
+        ASSERT_EQ("localhost", endpoint.host);
+        ASSERT_EQ(9000u, endpoint.port);
+
+        SUCCEED();
+    } catch (const std::exception & e) {
+        FAIL() << "Got an unexpected exception : " << e.what();
+    }
+}
+
+TEST_P(ResetConnectionTestCase, ResetConnectionTest) {
+    const auto & client_options = GetParam();
+    std::unique_ptr<Client> client;
+
+    try {
+        client = std::make_unique<Client>(client_options);
+        auto endpoint = client->GetCurrentEndpoint().value();
+        ASSERT_EQ("localhost", endpoint.host);
+        ASSERT_EQ(9000u, endpoint.port);
+
+        client->ResetConnection();
+        endpoint = client->GetCurrentEndpoint().value();
+        ASSERT_EQ("localhost", endpoint.host);
+        ASSERT_EQ(9000u, endpoint.port);
+
+        SUCCEED();
+    } catch (const std::exception & e) {
+        FAIL() << "Got an unexpected exception : " << e.what();
+    }
+}
+
+INSTANTIATE_TEST_SUITE_P(ResetConnectionClientTest, ResetConnectionTestCase,
+    ::testing::Values(ResetConnectionTestCase::ParamType {
+        ClientOptions()
+            .SetEndpoints({
+                     {"localhost", 9000}
+                    ,{"somedeadhost",  1245}
+                    ,{"noalocalhost",  6784}
+                    ,{"127.0.0.1", 9000}
+                })
+            .SetUser(           getEnvOrDefault("CLICKHOUSE_USER",     "default"))
+            .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", ""))
+            .SetDefaultDatabase(getEnvOrDefault("CLICKHOUSE_DB",       "default"))
+            .SetPingBeforeQuery(true)
+            .SetConnectionConnectTimeout(std::chrono::milliseconds(200))
+            .SetRetryTimeout(std::chrono::seconds(1))
+    }
+));

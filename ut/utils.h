@@ -51,7 +51,8 @@ auto getEnvOrDefault(const std::string& env, const char * default_val) {
                 return std::stoll(value);
         } else if constexpr (std::is_unsigned_v<ResultType>) {
             if constexpr (sizeof(ResultType) <= sizeof(unsigned long))
-                return std::stoul(value);
+                // For cases when ResultType is unsigned int.
+                return static_cast<ResultType>(std::stoul(value));
             else if constexpr (sizeof(ResultType) <= sizeof(unsigned long long))
                 return std::stoull(value);
         }
