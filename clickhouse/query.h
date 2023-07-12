@@ -1,6 +1,7 @@
 #pragma once
 
 #include "block.h"
+#include "buffer.h"
 #include "server_exception.h"
 
 #include "base/open_telemetry.h"
@@ -55,6 +56,8 @@ public:
     virtual void OnData(const Block& block) = 0;
     virtual bool OnDataCancelable(const Block& block) = 0;
 
+    virtual void OnData(const Buffer& raw) = 0;
+
     virtual void OnServerException(const Exception& e) = 0;
 
     virtual void OnProfile(const Profile& profile) = 0;
@@ -78,6 +81,7 @@ using ExceptionCallback        = std::function<void(const Exception& e)>;
 using ProgressCallback         = std::function<void(const Progress& progress)>;
 using SelectCallback           = std::function<void(const Block& block)>;
 using SelectCancelableCallback = std::function<bool(const Block& block)>;
+using SelectRawCallback        = std::function<void(const Buffer& raw)>;
 using SelectServerLogCallback  = std::function<bool(const Block& block)>;
 using ProfileEventsCallback    = std::function<bool(const Block& block)>;
 using ProfileCallbak           = std::function<void(const Profile& profile)>;
@@ -128,6 +132,11 @@ public:
     /// Set handler for receiving result data.
     inline Query& OnData(SelectCallback cb) {
         select_cb_ = std::move(cb);
+        return *this;
+    }
+
+    inline Query& OnData(SelectRawCallback cb) {
+        select_raw_cb_ = std::move(cb);
         return *this;
     }
 
@@ -182,6 +191,12 @@ private:
         }
     }
 
+    void OnData(const Buffer& raw) override {
+        if (select_raw_cb_) {
+            select_raw_cb_(raw);
+        }
+    }
+
     void OnServerException(const Exception& e) override {
         if (exception_cb_) {
             exception_cb_(e);
@@ -223,6 +238,7 @@ private:
     ProgressCallback progress_cb_;
     SelectCallback select_cb_;
     SelectCancelableCallback select_cancelable_cb_;
+    SelectRawCallback select_raw_cb_;
     SelectServerLogCallback select_server_log_cb_;
     ProfileEventsCallback profile_events_callback_cb_;
     ProfileCallbak profile_callback_cb_;
