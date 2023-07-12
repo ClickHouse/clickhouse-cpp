@@ -1,7 +1,7 @@
 #pragma once
 
 #include "block.h"
-#include "buffer.h"
+#include "base/buffer.h"
 #include "server_exception.h"
 
 #include "base/open_telemetry.h"
