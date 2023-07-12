@@ -59,6 +59,10 @@ inline void ArrayExample(Client& client) {
             }
         }
     );
+    client.Select("SELECT arr FROM test_array", [](const Buffer& buf) {
+        std::string s(buf.begin(), buf.end());
+        std::cout << s;
+    });
 
     /// Delete table.
     client.Execute("DROP TEMPORARY TABLE test_array");
@@ -334,7 +338,6 @@ inline void CancelableExample(Client& client) {
         b.AppendColumn("x", x);
         client.Insert("test_client", b);
     }
-
     /// Send a query which is canceled after receiving the first block (note:
     /// due to the low number of rows in this test, this will not actually have
     /// any effect, it just tests for errors)
@@ -416,6 +419,39 @@ inline void SelectNull(Client& client) {
     );
 }
 
+inline void SelectDummy(Client& client) {
+    client.Select("SELECT *", []([[maybe_unused]] const Buffer& buf) {
+        std::string s(buf.begin(), buf.end());
+        std::cout << s;
+    });
+    std::cout << '\n';
+}
+
+inline void SelectWithNull(Client& client) {
+    client.Execute("CREATE TEMPORARY TABLE IF NOT EXISTS t_null (x Int8, y Nullable(Int8))");
+    
+    {
+        Block block;
+        auto x = std::make_shared<ColumnInt8>();
+        x->Append(1);
+        x->Append(2);
+
+        auto y = std::make_shared<ColumnNullableT<ColumnInt8>>();
+        y->Append(nullopt);
+        y->Append(3);
+
+        block.AppendColumn("x", x);
+        block.AppendColumn("y", y);
+        client.Insert("t_null", block);
+    }
+
+    client.Select("SELECT x + y FROM t_null", [](const Buffer& buf) {
+        std::string s(buf.begin(), buf.end());
+        std::cout << s;
+    });
+    std::cout << '\n';
+}
+
 inline void ShowTables(Client& client) {
     /// Select values inserted in the previous step.
     client.Select("SHOW TABLES", [](const Block& block)
@@ -490,8 +526,11 @@ static void RunTests(Client& client) {
     MultiArrayExample(client);
     NullableExample(client);
     NumbersExample(client);
-    SelectNull(client);
+    SelectDummy(client);
+    SelectWithNull(client);
+    // SelectNull(client);
     ShowTables(client);
+    std::cout << "finih all tests\n";
 }
 
 int main() {
@@ -504,7 +543,7 @@ int main() {
                                  ,{"noalocalhost", 9000}
                                })
                 .SetUser(           getEnvOrDefault("CLICKHOUSE_USER",     "default"))
-                .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", ""))
+                .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", "Mingjie123."))
                 .SetDefaultDatabase(getEnvOrDefault("CLICKHOUSE_DB",       "default"));
 
         {
