@@ -240,6 +240,8 @@ public:
     void Select(const std::string& query, SelectCallback cb);
     void Select(const std::string& query, const std::string& query_id, SelectCallback cb);
 
+    void Select(const std::string& query, SelectRawCallback cb);
+    void Select(const std::string& query, const std::string& query_id, SelectRawCallback cb);
     /// Executes a select query which can be canceled by returning false from
     /// the data handler function \p cb.
     void SelectCancelable(const std::string& query, SelectCancelableCallback cb);

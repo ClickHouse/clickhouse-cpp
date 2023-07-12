@@ -635,6 +635,8 @@ bool Client::Impl::ReadBlock(InputStream& input, Block* block) {
 
 bool Client::Impl::ReceiveData() {
     Block block;
+    Buffer raw_data;
+    BufferOutput raw_output(&raw_data);
 
     if constexpr (REVISION >= DBMS_MIN_REVISION_WITH_TEMPORARY_TABLES) {
         if (!WireFormat::SkipString(*input_)) {
@@ -653,8 +655,10 @@ bool Client::Impl::ReceiveData() {
         }
     }
 
+    WriteBlock(block, raw_output);
     if (events_) {
         events_->OnData(block);
+        events_->OnData(raw_data);
         if (!events_->OnDataCancelable(block)) {
             SendCancel();
         }
@@ -998,6 +1002,14 @@ void Client::Select(const std::string& query, SelectCallback cb) {
 }
 
 void Client::Select(const std::string& query, const std::string& query_id, SelectCallback cb) {
+    Execute(Query(query, query_id).OnData(std::move(cb)));
+}
+
+void Client::Select(const std::string& query, SelectRawCallback cb) {
+    Execute(Query(query).OnData(std::move(cb)));
+}
+
+void Client::Select(const std::string& query, const std::string& query_id, SelectRawCallback cb) {
     Execute(Query(query, query_id).OnData(std::move(cb)));
 }
 
