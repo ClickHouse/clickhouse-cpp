@@ -1,0 +1,3 @@
+sources:
+  "2.5.0":
+    url: https://github.com/caaatch22/clickhouse-cpp/archive/refs/tags/v2.4.1-beta.tar.gz

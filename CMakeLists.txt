@@ -7,7 +7,7 @@ INCLUDE (subdirs)
 INCLUDE (openssl)
 
 OPTION (BUILD_BENCHMARK "Build benchmark" OFF)
-OPTION (BUILD_TESTS "Build tests" ON)
+OPTION (BUILD_TESTS "Build tests" OFF)
 OPTION (BUILD_SHARED_LIBS "Build shared libs" OFF)
 OPTION (WITH_OPENSSL "Use OpenSSL for TLS connections" OFF)
 OPTION (WITH_SYSTEM_ABSEIL "Use system ABSEIL" OFF)
@@ -100,36 +100,3 @@ PROJECT (CLICKHOUSE-CLIENT)
             ut
         )
     ENDIF (BUILD_TESTS)
-
-    if(DEBUG_DEPENDENCIES)
-        function(print_target_properties target)
-            MESSAGE("${target} properties:")
-            set(properties "${ARGN}")
-            foreach(property_name ${properties})
-                get_target_property(PROPERTY ${target} ${property_name})
-                MESSAGE(NOTICE "\t${property_name} : ${PROPERTY}")
-            endforeach()
-
-            # Can't get path to the target file at configure time,
-            # so have to create a target to fetch that info at generate time.
-            string(REPLACE ":" "_" target_plain_name ${target})
-            add_custom_target(${target_plain_name}_print_debug_info COMMAND ${CMAKE_COMMAND} -E echo "${target} : $<TARGET_FILE:${target}>")
-            add_dependencies(clickhouse-cpp-lib ${target_plain_name}_print_debug_info)
-        endfunction()
-
-        function(print_target_debug_info target)
-            print_target_properties(${target}
-                INCLUDE_DIRECTORIES
-                BINARY_DIR
-                INTERFACE_INCLUDE_DIRECTORIES
-                INTERFACE_LINK_LIBRARIES
-                LINK_LIBRARIES
-                LINK_LIBRARIES_ONLY_TARGETS
-                IMPORTED_LOCATION
-            )
-        endfunction()
-
-        print_target_debug_info(absl::int128)
-        print_target_debug_info(cityhash::cityhash)
-        print_target_debug_info(lz4::lz4)
-    endif()
