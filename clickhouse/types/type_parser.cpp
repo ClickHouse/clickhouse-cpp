@@ -1,7 +1,7 @@
 #include "type_parser.h"
 
-#include "clickhouse/exceptions.h"
-#include "clickhouse/base/platform.h" // for _win_
+#include "../exceptions.h"
+#include "../base/platform.h" // for _win_
 
 #include <algorithm>
 #include <cmath>

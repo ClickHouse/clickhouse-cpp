@@ -1,5 +1,5 @@
 #include "endpoints_iterator.h"
-#include <clickhouse/client.h>
+#include "../client.h"
 
 namespace clickhouse {
 

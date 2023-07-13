@@ -1,6 +1,6 @@
 #pragma once
 
-#include "clickhouse/client.h"
+#include "../client.h"
 #include <vector>
 
 namespace clickhouse {
