@@ -639,9 +639,14 @@ bool Client::Impl::ReceiveData() {
     BufferOutput raw_output(&raw_data);
 
     if constexpr (REVISION >= DBMS_MIN_REVISION_WITH_TEMPORARY_TABLES) {
-        if (!WireFormat::SkipString(*input_)) {
+        std::string skip; 
+        if (!WireFormat::ReadString(*input_, &skip)) {
             return false;
-        }
+        };
+        WireFormat::WriteString(raw_output, skip);
+        // if (!WireFormat::SkipString(*input_)) {
+        //     return false;
+        // }
     }
 
     if (compression_ == CompressionState::Enable) {

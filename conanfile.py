@@ -23,7 +23,7 @@ class ClickHouseCppConan(ConanFile):
         "with_openssl": [True, False]
     }
     default_options = {
-        "shared": False,
+        "shared": True,
         "fPIC": True,
         "enable_benchmark": False,
         "with_openssl": False

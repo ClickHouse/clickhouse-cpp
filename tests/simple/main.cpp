@@ -543,7 +543,7 @@ int main() {
                                  ,{"noalocalhost", 9000}
                                })
                 .SetUser(           getEnvOrDefault("CLICKHOUSE_USER",     "default"))
-                .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", "Mingjie123."))
+                .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", ""))
                 .SetDefaultDatabase(getEnvOrDefault("CLICKHOUSE_DB",       "default"));
 
         {
