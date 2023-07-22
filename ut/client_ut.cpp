@@ -1,6 +1,7 @@
 #include <clickhouse/client.h>
 
 #include "readonly_client_test.h"
+#include "abnormal_column_names_test.h"
 #include "connection_failed_client_test.h"
 #include "utils.h"
 
@@ -1195,6 +1196,22 @@ INSTANTIATE_TEST_SUITE_P(ClientLocalReadonly, ReadonlyClientTest,
         QUERIES
     }
 ));
+
+INSTANTIATE_TEST_SUITE_P(ColumnNames, AbnormalColumnNamesTest,
+    ::testing::Values(AbnormalColumnNamesTest::ParamType{
+        ClientOptions()
+            .SetHost(           getEnvOrDefault("CLICKHOUSE_HOST",     "localhost"))
+            .SetPort(           getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "9000"))
+            .SetUser(           getEnvOrDefault("CLICKHOUSE_USER",     "default"))
+            .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", ""))
+            .SetDefaultDatabase(getEnvOrDefault("CLICKHOUSE_DB",       "default"))
+            .SetSendRetries(1)
+            .SetPingBeforeQuery(true)
+            .SetCompressionMethod(CompressionMethod::None),
+            {"select 123,231,113", "select 'ABC','AAA','BBB','CCC'"}
+    }
+));
+
 
 INSTANTIATE_TEST_SUITE_P(ClientLocalFailed, ConnectionFailedClientTest,
     ::testing::Values(ConnectionFailedClientTest::ParamType{
