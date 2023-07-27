@@ -1,4 +1,5 @@
 #include "date.h"
+#include <cstdint>
 
 namespace clickhouse {
 
@@ -9,7 +10,7 @@ ColumnDate::ColumnDate()
 }
 
 void ColumnDate::Append(const std::time_t& value) {
-    /// TODO: This code is fundamentally wrong.
+    /// The implementation is fundamentally wrong, ignores timezones, leap years and daylight saving.
     data_->Append(static_cast<uint16_t>(value / std::time_t(86400)));
 }
 
@@ -18,7 +19,21 @@ void ColumnDate::Clear() {
 }
 
 std::time_t ColumnDate::At(size_t n) const {
+    /// The implementation is fundamentally wrong, ignores timezones, leap years and daylight saving.
     return static_cast<std::time_t>(data_->At(n)) * 86400;
+}
+
+
+void ColumnDate::Append(uint16_t value) {
+    data_->Append(value);
+}
+
+uint16_t ColumnDate::RawAt(size_t n) const {
+    return data_->At(n);
+}
+
+uint16_t ColumnDate::operator [] (size_t n) const {
+    return (*data_)[n];
 }
 
 void ColumnDate::Append(ColumnRef column) {
@@ -70,7 +85,7 @@ ColumnDate32::ColumnDate32()
 }
 
 void ColumnDate32::Append(const std::time_t& value) {
-    /// TODO: This code is fundamentally wrong.
+    /// The implementation is fundamentally wrong, ignores timezones, leap years and daylight saving.
     data_->Append(static_cast<int32_t>(value / std::time_t(86400)));
 }
 
@@ -79,6 +94,7 @@ void ColumnDate32::Clear() {
 }
 
 std::time_t ColumnDate32::At(size_t n) const {
+    /// The implementation is fundamentally wrong, ignores timezones, leap years and daylight saving.
     return static_cast<std::time_t>(data_->At(n)) * 86400;
 }
 
@@ -86,6 +102,18 @@ void ColumnDate32::Append(ColumnRef column) {
     if (auto col = column->As<ColumnDate32>()) {
         data_->Append(col->data_);
     }
+}
+
+void ColumnDate32::Append(int32_t value) {
+    data_->Append(value);
+}
+
+int32_t ColumnDate32::RawAt(size_t n) const {
+    return data_->At(n);
+}
+
+int32_t ColumnDate32::operator [] (size_t n) const {
+    return (*data_)[n];
 }
 
 bool ColumnDate32::LoadBody(InputStream* input, size_t rows) {

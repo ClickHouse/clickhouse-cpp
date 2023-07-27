@@ -15,12 +15,18 @@ public:
     ColumnDate();
 
     /// Appends one element to the end of column.
-    /// TODO: The implementation is fundamentally wrong.
+    /// The implementation is fundamentally wrong, ignores timezones, leap years and daylight saving.
     void Append(const std::time_t& value);
 
     /// Returns element at given row number.
-    /// TODO: The implementation is fundamentally wrong.
+    /// The implementation is fundamentally wrong, ignores timezones, leap years and daylight saving.
     std::time_t At(size_t n) const;
+
+    /// Do data as is -- number of day in Unix epoch, no conversions performed
+    void Append(uint16_t value);
+    void AppendRaw(uint16_t value) { Append(value); }
+    uint16_t RawAt(size_t n) const;
+    uint16_t operator [] (size_t n) const;
 
     /// Appends content of given column to the end of current one.
     void Append(ColumnRef column) override;
@@ -56,15 +62,21 @@ public:
     ColumnDate32();
 
     /// Appends one element to the end of column.
-    /// TODO: The implementation is fundamentally wrong.
+    /// The implementation is fundamentally wrong, ignores timezones, leap years and daylight saving.
     void Append(const std::time_t& value);
 
     /// Returns element at given row number.
-    /// TODO: The implementation is fundamentally wrong.
+    /// The implementation is fundamentally wrong, ignores timezones, leap years and daylight saving.
     std::time_t At(size_t n) const;
 
     /// Appends content of given column to the end of current one.
     void Append(ColumnRef column) override;
+
+    /// Do data as is -- number of day in Unix epoch, no conversions performed
+    void Append(int32_t value);
+    void AppendRaw(int32_t value) { Append(value); }
+    int32_t RawAt(size_t n) const;
+    int32_t operator [] (size_t n) const;
 
     /// Loads column data from input stream.
     bool LoadBody(InputStream* input, size_t rows) override;
