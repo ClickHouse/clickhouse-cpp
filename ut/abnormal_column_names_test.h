@@ -8,7 +8,7 @@
 #include <tuple>
 #include <vector>
 
-class AbnormalColumnNamesTest : public testing::TestWithParam<
+class AbnormalColumnNamesClientTest : public testing::TestWithParam<
         std::tuple<clickhouse::ClientOptions, std::vector<std::string> > /*queries*/> {
 protected:
     void SetUp() override;

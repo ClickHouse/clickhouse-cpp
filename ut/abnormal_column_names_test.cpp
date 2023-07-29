@@ -10,38 +10,66 @@ namespace {
     using namespace clickhouse;
 }
 
-void AbnormalColumnNamesTest::SetUp() {
+void AbnormalColumnNamesClientTest::SetUp() {
     client_ = std::make_unique<Client>(std::get<0>(GetParam()));
 }
 
-void AbnormalColumnNamesTest::TearDown() {
+void AbnormalColumnNamesClientTest::TearDown() {
     client_.reset();
 }
 
 // Sometimes gtest fails to detect that this test is instantiated elsewhere, suppress the error explicitly.
-GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(AbnormalColumnNamesTest);
-TEST_P(AbnormalColumnNamesTest, Select) {
-
+GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(AbnormalColumnNamesClientTest);
+TEST_P(AbnormalColumnNamesClientTest, Select) {
+    static const std::vector<std::string> expect_results {
+        "+-------+-------+-------+\n"\
+        "|   123 |   231 |   113 |\n"\
+        "+-------+-------+-------+\n"\
+        "| UInt8 | UInt8 | UInt8 |\n"\
+        "+-------+-------+-------+\n"\
+        "|   123 |   231 |   113 |\n"\
+        "+-------+-------+-------+\n",
+        "+--------+--------+--------+--------+\n"\
+        "|  'ABC' |  'AAA' |  'BBB' |  'CCC' |\n"\
+        "+--------+--------+--------+--------+\n"\
+        "| String | String | String | String |\n"\
+        "+--------+--------+--------+--------+\n"\
+        "|    ABC |    AAA |    BBB |    CCC |\n"\
+        "+--------+--------+--------+--------+\n"
+    };
     const auto & queries = std::get<1>(GetParam());
-    for (const auto & query : queries) {
-        std::unordered_set<std::string> names;
-        size_t count = 0;
+    for (size_t i = 0; i < queries.size(); ++i) {
+        const auto & query = queries.at(i);
         client_->Select(query,
-            [& query,& names, & count](const Block& block) {
+            [& queries, i](const Block& block) {
                 if (block.GetRowCount() == 0 || block.GetColumnCount() == 0)
                     return;
+                EXPECT_EQ(1UL, block.GetRowCount());
+                EXPECT_EQ(i == 0 ? 3UL: 4UL, block.GetColumnCount());
 
-                std::cout << "query => " << query <<"\n" << PrettyPrintBlock{block}; 
-                for (size_t i = 0; i < block.GetColumnCount(); ++i)
-                {
-                    count++;
-                    names.insert(block.GetColumnName(i));
-                }
+                std::stringstream sstr;
+                sstr << PrettyPrintBlock{block}; 
+                auto result = sstr.str(); 
+                std::cout << "query => " << queries.at(i) <<"\n" << PrettyPrintBlock{block}; 
+                ASSERT_EQ(expect_results.at(i), result);
             }
         );
-        EXPECT_EQ(count, names.size());
-        for(auto& name: names) {
-            std::cout << name << ", count=" << count<< std::endl;
-        }
     }
 }
+
+
+INSTANTIATE_TEST_SUITE_P(ClientColumnNames, AbnormalColumnNamesClientTest,
+    ::testing::Values(AbnormalColumnNamesClientTest::ParamType{
+        ClientOptions()
+            .SetHost(           getEnvOrDefault("CLICKHOUSE_HOST",     "localhost"))
+            .SetPort(           getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "9000"))
+            .SetUser(           getEnvOrDefault("CLICKHOUSE_USER",     "default"))
+            .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", ""))
+            .SetDefaultDatabase(getEnvOrDefault("CLICKHOUSE_DB",       "default"))
+            .SetSendRetries(1)
+            .SetPingBeforeQuery(true)
+            .SetCompressionMethod(CompressionMethod::None),
+            {"select 123,231,113", "select 'ABC','AAA','BBB','CCC'"}
+    }
+));
+
