@@ -21,6 +21,7 @@ void AbnormalColumnNamesClientTest::TearDown() {
 // Sometimes gtest fails to detect that this test is instantiated elsewhere, suppress the error explicitly.
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(AbnormalColumnNamesClientTest);
 TEST_P(AbnormalColumnNamesClientTest, Select) {
+    // TODO(vnemkov): move expected results into the test parameters, also get rid of PrettyPrintBlock
     static const std::vector<std::string> expect_results {
         "+-------+-------+-------+\n"\
         "|   123 |   231 |   113 |\n"\
