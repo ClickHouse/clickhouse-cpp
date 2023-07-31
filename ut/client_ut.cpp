@@ -1196,6 +1196,7 @@ INSTANTIATE_TEST_SUITE_P(ClientLocalReadonly, ReadonlyClientTest,
     }
 ));
 
+
 INSTANTIATE_TEST_SUITE_P(ClientLocalFailed, ConnectionFailedClientTest,
     ::testing::Values(ConnectionFailedClientTest::ParamType{
         ClientOptions()
