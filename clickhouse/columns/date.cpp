@@ -269,6 +269,7 @@ void ColumnDateTime64::SaveBody(OutputStream* output) {
 void ColumnDateTime64::Clear() {
     data_->Clear();
 }
+
 size_t ColumnDateTime64::Size() const {
     return data_->Size();
 }
