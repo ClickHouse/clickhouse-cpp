@@ -1,60 +1,64 @@
-#include "abnormal_column_names_test.h"
-#include "utils.h"
 
 #include <clickhouse/columns/column.h>
 #include <clickhouse/block.h>
+
+#include "utils.h"
+
+#include <gtest/gtest.h>
+
 #include <unordered_set>
 #include <iostream>
 
 namespace {
-    using namespace clickhouse;
+using namespace clickhouse;
+
+std::string getColumnNames(const Block& block) {
+    std::string result;
+    for (size_t i = 0; i < block.GetColumnCount(); ++i) {
+        result += block.GetColumnName(i);
+        if (i != block.GetColumnCount() - 1)
+            result += ',';
+    }
+
+    return result;
+}
 }
 
-void AbnormalColumnNamesClientTest::SetUp() {
-    client_ = std::make_unique<Client>(std::get<0>(GetParam()));
-}
+struct AbnormalColumnNamesClientTestCase {
+    ClientOptions client_options;
+    std::vector<std::string> queries;
+    std::vector<std::string> expected_names;
+};
 
-void AbnormalColumnNamesClientTest::TearDown() {
-    client_.reset();
-}
+class AbnormalColumnNamesClientTest : public testing::TestWithParam<AbnormalColumnNamesClientTestCase> {
+protected:
+    void SetUp() override {
+        client_ = std::make_unique<Client>(GetParam().client_options);
+    }
+    void TearDown() override {
+        client_.reset();
+    }
 
-// Sometimes gtest fails to detect that this test is instantiated elsewhere, suppress the error explicitly.
-GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(AbnormalColumnNamesClientTest);
+    std::unique_ptr<clickhouse::Client> client_;
+};
+
+
 TEST_P(AbnormalColumnNamesClientTest, Select) {
-    // TODO(vnemkov): move expected results into the test parameters, also get rid of PrettyPrintBlock
-    static const std::vector<std::string> expect_results {
-        "+-------+-------+-------+\n"\
-        "|   123 |   231 |   113 |\n"\
-        "+-------+-------+-------+\n"\
-        "| UInt8 | UInt8 | UInt8 |\n"\
-        "+-------+-------+-------+\n"\
-        "|   123 |   231 |   113 |\n"\
-        "+-------+-------+-------+\n",
-        "+--------+--------+--------+--------+\n"\
-        "|  'ABC' |  'AAA' |  'BBB' |  'CCC' |\n"\
-        "+--------+--------+--------+--------+\n"\
-        "| String | String | String | String |\n"\
-        "+--------+--------+--------+--------+\n"\
-        "|    ABC |    AAA |    BBB |    CCC |\n"\
-        "+--------+--------+--------+--------+\n"
-    };
-    const auto & queries = std::get<1>(GetParam());
+    const auto & queries = GetParam().queries;
     for (size_t i = 0; i < queries.size(); ++i) {
-        const auto & query = queries.at(i);
-        client_->Select(query,
-            [& queries, i](const Block& block) {
-                if (block.GetRowCount() == 0 || block.GetColumnCount() == 0)
-                    return;
-                EXPECT_EQ(1UL, block.GetRowCount());
-                EXPECT_EQ(i == 0 ? 3UL: 4UL, block.GetColumnCount());
 
-                std::stringstream sstr;
-                sstr << PrettyPrintBlock{block}; 
-                auto result = sstr.str(); 
-                std::cout << "query => " << queries.at(i) <<"\n" << PrettyPrintBlock{block}; 
-                ASSERT_EQ(expect_results.at(i), result);
-            }
-        );
+        const auto & query = queries.at(i);
+        const auto & expected = GetParam().expected_names[i];
+
+        client_->Select(query, [query, expected](const Block& block) {
+            if (block.GetRowCount() == 0 || block.GetColumnCount() == 0)
+                return;
+
+            EXPECT_EQ(1UL, block.GetRowCount());
+
+            EXPECT_EQ(expected, getColumnNames(block))
+                << "For query: " << query;
+        });
     }
 }
 
@@ -70,7 +74,8 @@ INSTANTIATE_TEST_SUITE_P(ClientColumnNames, AbnormalColumnNamesClientTest,
             .SetSendRetries(1)
             .SetPingBeforeQuery(true)
             .SetCompressionMethod(CompressionMethod::None),
-            {"select 123,231,113", "select 'ABC','AAA','BBB','CCC'"}
+            {"select 123,231,113", "select 'ABC','AAA','BBB','CCC'"},
+            {"123,231,113", "'ABC','AAA','BBB','CCC'"},
     }
 ));
 
