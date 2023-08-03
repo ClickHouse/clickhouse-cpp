@@ -23,8 +23,11 @@ std::time_t ColumnDate::At(size_t n) const {
     return static_cast<std::time_t>(data_->At(n)) * 86400;
 }
 
-
 void ColumnDate::Append(uint16_t value) {
+    data_->Append(value);
+}
+
+void ColumnDate::AppendRaw(uint16_t value) {
     data_->Append(value);
 }
 
@@ -77,7 +80,6 @@ ItemView ColumnDate::GetItem(size_t index) const {
 }
 
 
-
 ColumnDate32::ColumnDate32()
     : Column(Type::CreateDate32())
     , data_(std::make_shared<ColumnInt32>())
@@ -105,6 +107,10 @@ void ColumnDate32::Append(ColumnRef column) {
 }
 
 void ColumnDate32::Append(int32_t value) {
+    data_->Append(value);
+}
+
+void ColumnDate32::AppendRaw(int32_t value) {
     data_->Append(value);
 }
 

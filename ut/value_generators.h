@@ -33,14 +33,30 @@ std::vector<uint8_t> MakeBools();
 std::vector<std::string> MakeFixedStrings(size_t string_size);
 std::vector<std::string> MakeStrings();
 std::vector<clickhouse::Int64> MakeDateTime64s(size_t scale, size_t values_size = 200);
-std::vector<clickhouse::Int64> MakeDates();
-std::vector<clickhouse::Int64> MakeDates32();
+std::vector<int32_t> MakeDates32();
 std::vector<clickhouse::Int64> MakeDateTimes();
 std::vector<in_addr> MakeIPv4s();
 std::vector<in6_addr> MakeIPv6s();
 std::vector<clickhouse::UUID> MakeUUIDs();
 std::vector<clickhouse::Int128> MakeInt128s();
 std::vector<clickhouse::Int128> MakeDecimals(size_t precision, size_t scale);
+
+template <typename ResultType>
+std::vector<ResultType> MakeDates() {
+    std::vector<ResultType> result {0, 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536 - 1};
+
+    if constexpr (std::is_same_v<time_t, ResultType>) {
+        // in CH Date internally a UInt16 and stores a day number
+        // ColumnDate expects values to be seconds, which is then
+        // converted to day number internally, hence the `* 86400`.
+        std::for_each(result.begin(), result.end(), [](auto& value) {
+            value *= 86400;
+        });
+    }
+
+    return result;
+}
+
 
 std::string FooBarGenerator(size_t i);
 

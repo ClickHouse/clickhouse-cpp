@@ -24,7 +24,7 @@ public:
 
     /// Do data as is -- number of day in Unix epoch, no conversions performed
     void Append(uint16_t value);
-    void AppendRaw(uint16_t value) { Append(value); }
+    void AppendRaw(uint16_t value);
     uint16_t RawAt(size_t n) const;
     uint16_t operator [] (size_t n) const;
 
@@ -74,7 +74,7 @@ public:
 
     /// Do data as is -- number of day in Unix epoch, no conversions performed
     void Append(int32_t value);
-    void AppendRaw(int32_t value) { Append(value); }
+    void AppendRaw(int32_t value);
     int32_t RawAt(size_t n) const;
     int32_t operator [] (size_t n) const;
 

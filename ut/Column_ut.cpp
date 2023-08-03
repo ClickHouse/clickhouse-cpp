@@ -66,7 +66,7 @@ public:
         } else if constexpr (std::is_same_v<ColumnType, ColumnFixedString>) {
             return GenerateVector(values_size, FromVectorGenerator{MakeFixedStrings(12)});
         } else if constexpr (std::is_same_v<ColumnType, ColumnDate>) {
-            return GenerateVector(values_size, FromVectorGenerator{MakeDates()});
+            return GenerateVector(values_size, FromVectorGenerator{MakeDates<time_t>()});
         } else if constexpr (std::is_same_v<ColumnType, ColumnDateTime>) {
             return GenerateVector(values_size, FromVectorGenerator{MakeDateTimes()});
         } else if constexpr (std::is_same_v<ColumnType, ColumnDateTime64>) {
@@ -142,6 +142,14 @@ using ValueColumns = ::testing::Types<
     , ColumnUUID
 >;
 TYPED_TEST_SUITE(GenericColumnTest, ValueColumns);
+
+//TestCase(TypeCreatorFunc, ValuesGeneratorFunc)
+
+
+//class GenericColumnTestCase
+//{
+//    virutual
+//};
 
 TYPED_TEST(GenericColumnTest, Construct) {
     auto column = this->MakeColumn();
