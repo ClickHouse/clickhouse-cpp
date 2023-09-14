@@ -120,6 +120,7 @@ INSTALL(FILES base/string_utils.h DESTINATION include/clickhouse/base/)
 INSTALL(FILES base/string_view.h DESTINATION include/clickhouse/base/)
 INSTALL(FILES base/uuid.h DESTINATION include/clickhouse/base/)
 INSTALL(FILES base/wire_format.h DESTINATION include/clickhouse/base/)
+INSTALL(FILES base/endpoints_iterator.h DESTINATION include/clickhouse/base/)
 
 # columns
 INSTALL(FILES columns/array.h DESTINATION include/clickhouse/columns/)
