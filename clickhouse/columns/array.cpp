@@ -11,14 +11,14 @@ ColumnArray::ColumnArray(ColumnRef data)
 }
 
 ColumnArray::ColumnArray(ColumnRef data, std::shared_ptr<ColumnUInt64> offsets)
-    : Column(Type::CreateArray(data->Type()))
+    : Column(Type::CreateArray(data->Type()), Serialization::MakeDefault(this))
     , data_(data)
     , offsets_(offsets)
 {
 }
 
 ColumnArray::ColumnArray(ColumnArray&& other)
-    : Column(other.Type())
+    : Column(other.Type(), Serialization::MakeDefault(this))
     , data_(std::move(other.data_))
     , offsets_(std::move(other.offsets_))
 {
@@ -73,35 +73,36 @@ bool ColumnArray::LoadPrefix(InputStream* input, size_t rows) {
     if (!rows) {
         return true;
     }
-
-    return data_->LoadPrefix(input, rows);
+    return data_->GetSerialization()->LoadPrefix(data_.get(), input, rows);
 }
 
 bool ColumnArray::LoadBody(InputStream* input, size_t rows) {
     if (!rows) {
         return true;
     }
-    if (!offsets_->LoadBody(input, rows)) {
+    if (!offsets_->GetSerialization()->LoadBody(offsets_.get(), input, rows)) {
         return false;
     }
+
     const auto nested_rows = (*offsets_)[rows - 1];
     if (nested_rows == 0) {
         return true;
     }
-    if (!data_->LoadBody(input, nested_rows)) {
+    if (!data_->GetSerialization()->LoadBody(data_.get(), input, nested_rows)) {
         return false;
     }
     return true;
 }
 
 void ColumnArray::SavePrefix(OutputStream* output) {
-    data_->SavePrefix(output);
+    data_->GetSerialization()->SavePrefix(data_.get(), output);
 }
 
 void ColumnArray::SaveBody(OutputStream* output) {
-    offsets_->SaveBody(output);
+    offsets_->GetSerialization()->SaveBody(offsets_.get(), output);
+
     if (data_->Size() > 0) {
-        data_->SaveBody(output);
+        data_->GetSerialization()->SaveBody(data_.get(), output);
     }
 }
 
@@ -118,6 +119,18 @@ void ColumnArray::Swap(Column& other) {
     auto & col = dynamic_cast<ColumnArray &>(other);
     data_.swap(col.data_);
     offsets_.swap(col.offsets_);
+}
+
+void ColumnArray::SetSerializationKind(Serialization::Kind kind) {
+    switch (kind)
+    {
+    case Serialization::Kind::DEFAULT:
+        serialization_ = Serialization::MakeDefault(this);
+        break;
+    default:
+        throw UnimplementedError("Serialization kind:" + std::to_string(static_cast<int>(kind))
+            + " is not supported for column of " + type_->GetName());
+    }
 }
 
 void ColumnArray::OffsetsIncrease(size_t n) {

@@ -68,17 +68,6 @@ public:
     /// Appends another LowCardinality column to the end of this one, updating dictionary.
     void Append(ColumnRef /*column*/) override;
 
-    bool LoadPrefix(InputStream* input, size_t rows) override;
-
-    /// Loads column data from input stream.
-    bool LoadBody(InputStream* input, size_t rows) override;
-
-    /// Saves column prefix to output stream.
-    void SavePrefix(OutputStream* output) override;
-
-    /// Saves column data to output stream.
-    void SaveBody(OutputStream* output) override;
-
     /// Clear column data.
     void Clear() override;
 
@@ -90,6 +79,7 @@ public:
     ColumnRef CloneEmpty() const override;
     void Swap(Column& other) override;
     ItemView GetItem(size_t index) const override;
+    void SetSerializationKind(Serialization::Kind kind)  override;
 
     size_t GetDictionarySize() const;
     TypeRef GetNestedType() const;
@@ -103,10 +93,22 @@ protected:
     void AppendUnsafe(const ItemView &);
 
 private:
+    bool LoadPrefix(InputStream* input, size_t rows);
+
+    /// Loads column data from input stream.
+    bool LoadBody(InputStream* input, size_t rows);
+
+    /// Saves column prefix to output stream.
+    void SavePrefix(OutputStream* output);
+
+    /// Saves column data to output stream.
+    void SaveBody(OutputStream* output);
+
     void Setup(ColumnRef dictionary_column);
     void AppendNullItem();
     void AppendDefaultItem();
 
+    friend SerializationDefault<ColumnLowCardinality>;
 public:
     static details::LowCardinalityHashKey computeHashKey(const ItemView &);
 };

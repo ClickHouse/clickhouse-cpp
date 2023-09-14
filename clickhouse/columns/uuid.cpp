@@ -7,13 +7,13 @@
 namespace clickhouse {
 
 ColumnUUID::ColumnUUID()
-    : Column(Type::CreateUUID())
+    : Column(Type::CreateUUID(), Serialization::MakeDefault(this))
     , data_(std::make_shared<ColumnUInt64>())
 {
 }
 
 ColumnUUID::ColumnUUID(ColumnRef data)
-    : Column(Type::CreateUUID())
+    : Column(Type::CreateUUID(), Serialization::MakeDefault(this))
     , data_(data->As<ColumnUInt64>())
 {
     if (data_->Size() % 2 != 0) {
@@ -45,11 +45,11 @@ void ColumnUUID::Append(ColumnRef column) {
 }
 
 bool ColumnUUID::LoadBody(InputStream* input, size_t rows) {
-    return data_->LoadBody(input, rows * 2);
+    return data_->GetSerialization()->LoadBody(data_.get(), input, rows * 2);
 }
 
 void ColumnUUID::SaveBody(OutputStream* output) {
-    data_->SaveBody(output);
+    data_->GetSerialization()->SaveBody(data_.get(), output);
 }
 
 size_t ColumnUUID::Size() const {
@@ -75,6 +75,21 @@ ItemView ColumnUUID::GetItem(size_t index) const {
     const auto data_item_view = data_->GetItem(index * 2);
 
     return ItemView{Type::UUID, std::string_view{data_item_view.data.data(), data_item_view.data.size() * 2}};
+}
+
+void ColumnUUID::SetSerializationKind(Serialization::Kind kind) {
+    switch (kind)
+    {
+    case Serialization::Kind::DEFAULT:
+        serialization_ = Serialization::MakeDefault(this);
+        break;
+    case Serialization::Kind::SPARSE:
+        serialization_ = Serialization::MakeSparse(this, UUID{0,0});
+        break;
+    default:
+        throw UnimplementedError("Serialization kind:" + std::to_string(static_cast<int>(kind))
+            + " is not supported for column of " + type_->GetName());
+    }
 }
 
 }

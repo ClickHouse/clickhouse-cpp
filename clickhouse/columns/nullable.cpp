@@ -6,7 +6,7 @@
 namespace clickhouse {
 
 ColumnNullable::ColumnNullable(ColumnRef nested, ColumnRef nulls)
-    : Column(Type::CreateNullable(nested->Type()))
+    : Column(Type::CreateNullable(nested->Type()), Serialization::MakeDefault(this))
     , nested_(nested)
     , nulls_(nulls->As<ColumnUInt8>())
 {
@@ -51,26 +51,26 @@ void ColumnNullable::Clear() {
 }
 
 bool ColumnNullable::LoadPrefix(InputStream* input, size_t rows) {
-    return nested_->LoadPrefix(input, rows);
+    return nested_->GetSerialization()->LoadPrefix(nested_.get(), input, rows);
 }
 
 bool ColumnNullable::LoadBody(InputStream* input, size_t rows) {
-    if (!nulls_->LoadBody(input, rows)) {
+    if (!nulls_->GetSerialization()->LoadBody(nulls_.get(), input, rows)) {
         return false;
     }
-    if (!nested_->LoadBody(input, rows)) {
+    if (!nested_->GetSerialization()->LoadBody(nested_.get(), input, rows)) {
         return false;
     }
     return true;
 }
 
 void ColumnNullable::SavePrefix(OutputStream* output) {
-    nested_->SavePrefix(output);
+    nested_->GetSerialization()->SavePrefix(nested_.get(), output);
 }
 
 void ColumnNullable::SaveBody(OutputStream* output) {
-    nulls_->SaveBody(output);
-    nested_->SaveBody(output);
+    nulls_->GetSerialization()->SaveBody(nulls_.get(), output);
+    nested_->GetSerialization()->SaveBody(nested_.get(), output);
 }
 
 size_t ColumnNullable::Size() const {
@@ -99,6 +99,18 @@ ItemView ColumnNullable::GetItem(size_t index) const  {
         return ItemView();
 
     return nested_->GetItem(index);
+}
+
+void ColumnNullable::SetSerializationKind(Serialization::Kind kind) {
+    switch (kind)
+    {
+    case Serialization::Kind::DEFAULT:
+        serialization_ = Serialization::MakeDefault(this);
+        break;
+    default:
+        throw UnimplementedError("Serialization kind:" + std::to_string(static_cast<int>(kind))
+            + " is not supported for column of " + type_->GetName());
+    }
 }
 
 }

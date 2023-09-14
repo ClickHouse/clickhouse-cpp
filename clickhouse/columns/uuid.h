@@ -29,12 +29,6 @@ public:
     /// Appends content of given column to the end of current one.
     void Append(ColumnRef column) override;
 
-    /// Loads column data from input stream.
-    bool LoadBody(InputStream* input, size_t rows) override;
-
-    /// Saves column data to output stream.
-    void SaveBody(OutputStream* output) override;
-
     /// Clear column data .
     void Clear() override;
 
@@ -48,7 +42,17 @@ public:
 
     ItemView GetItem(size_t) const override;
 
+    void SetSerializationKind(Serialization::Kind kind)  override;
+
 private:
+    /// Loads column data from input stream.
+    bool LoadBody(InputStream* input, size_t rows);
+
+    /// Saves column data to output stream.
+    void SaveBody(OutputStream* output);
+
+    friend SerializationDefault<ColumnUUID>;
+
     std::shared_ptr<ColumnUInt64> data_;
 };
 

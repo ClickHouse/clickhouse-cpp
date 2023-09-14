@@ -42,8 +42,11 @@
 #define DBMS_MIN_REVISION_WITH_DISTRIBUTED_DEPTH        54448
 #define DBMS_MIN_REVISION_WITH_INITIAL_QUERY_START_TIME 54449
 #define DBMS_MIN_REVISION_WITH_INCREMENTAL_PROFILE_EVENTS 54451
+// #define DBMS_MIN_REVISION_WITH_AGGREGATE_FUNCTIONS_VERSIONING 54452
+#define DBMS_MIN_REVISION_WITH_PARALLEL_REPLICAS        54453
+#define DBMS_MIN_REVISION_WITH_CUSTOM_SERIALIZATION     54454
 
-#define REVISION  DBMS_MIN_REVISION_WITH_INCREMENTAL_PROFILE_EVENTS
+#define REVISION  DBMS_MIN_REVISION_WITH_CUSTOM_SERIALIZATION
 
 namespace clickhouse {
 
@@ -619,7 +622,19 @@ bool Client::Impl::ReadBlock(InputStream& input, Block* block) {
             return false;
         }
 
+        uint8_t has_custom_serialization = 0;
+        if (REVISION >= DBMS_MIN_REVISION_WITH_CUSTOM_SERIALIZATION) {
+            if (!WireFormat::ReadFixed(input, &has_custom_serialization)) {
+                return false;
+            }
+        }
+
         if (ColumnRef col = CreateColumnByType(type, create_column_settings)) {
+
+            if (has_custom_serialization) {
+                col->LoadSerializationKind(&input);
+            }
+
             if (num_rows && !col->Load(&input, num_rows)) {
                 throw ProtocolError("can't load column '" + name + "' of type " + type);
             }
@@ -775,6 +790,16 @@ void Client::Impl::SendQuery(const Query& query) {
                 throw UnimplementedError(std::string("Can't send open telemetry tracing context to a server, server version is too old"));
             }
         }
+
+        if (server_info_.revision >=  DBMS_MIN_REVISION_WITH_PARALLEL_REPLICAS)
+        {
+            // collaborate_with_initiator
+            WireFormat::WriteUInt64 (*output_,  0u);
+            // count_participating_replicas
+            WireFormat::WriteUInt64 (*output_,  0u);
+            // number_of_current_replica
+            WireFormat::WriteUInt64 (*output_,  0u);
+        }
     }
 
     /// Per query settings
@@ -823,6 +848,17 @@ void Client::Impl::WriteBlock(const Block& block, OutputStream& output) {
     for (Block::Iterator bi(block); bi.IsValid(); bi.Next()) {
         WireFormat::WriteString(output, bi.Name());
         WireFormat::WriteString(output, bi.Type()->GetName());
+
+        bool has_custom = bi.Column()->HasCustomSerialization();
+        if (server_info_.revision >= DBMS_MIN_REVISION_WITH_CUSTOM_SERIALIZATION) {
+            WireFormat::WriteFixed(output, static_cast<uint8_t>(has_custom));
+            if (has_custom) {
+                bi.Column()->SaveSerializationKind(&output);
+            }
+        } else {
+            // Current implementation works only for server version >= v22.1.2.2-stable
+            throw UnimplementedError(std::string("Can't send column with custom serialisation to a server, server version is too old"));
+        }
 
         // Empty columns are not serialized and occupy exactly 0 bytes.
         // ref https://github.com/ClickHouse/ClickHouse/blob/39b37a3240f74f4871c8c1679910e065af6bea19/src/Formats/NativeWriter.cpp#L163

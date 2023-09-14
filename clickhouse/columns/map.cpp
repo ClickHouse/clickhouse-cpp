@@ -30,7 +30,8 @@ TypeRef GetMapType(const Type& data_type) {
 namespace clickhouse {
 
 ColumnMap::ColumnMap(ColumnRef data)
-    : Column(GetMapType(data->GetType())), data_(data->As<ColumnArray>()) {
+    : Column(GetMapType(data->GetType()), Serialization::MakeDefault(this))
+    , data_(data->As<ColumnArray>()) {
 }
 
 void ColumnMap::Clear() {
@@ -44,19 +45,19 @@ void ColumnMap::Append(ColumnRef column) {
 }
 
 bool ColumnMap::LoadPrefix(InputStream* input, size_t rows) {
-    return data_->LoadPrefix(input, rows);
+    return data_->GetSerialization()->LoadPrefix(data_.get(), input, rows);
 }
 
 bool ColumnMap::LoadBody(InputStream* input, size_t rows) {
-    return data_->LoadBody(input, rows);
+    return data_->GetSerialization()->LoadBody(data_.get(),input, rows);
 }
 
 void ColumnMap::SavePrefix(OutputStream* output) {
-    data_->SavePrefix(output);
+    data_->GetSerialization()->SavePrefix(data_.get(), output);
 }
 
 void ColumnMap::SaveBody(OutputStream* output) {
-    data_->SaveBody(output);
+    data_->GetSerialization()->SaveBody(data_.get(), output);
 }
 
 size_t ColumnMap::Size() const {
@@ -74,6 +75,18 @@ ColumnRef ColumnMap::CloneEmpty() const {
 void ColumnMap::Swap(Column& other) {
     auto& col = dynamic_cast<ColumnMap&>(other);
     data_.swap(col.data_);
+}
+
+void ColumnMap::SetSerializationKind(Serialization::Kind kind) {
+    switch (kind)
+    {
+    case Serialization::Kind::DEFAULT:
+        serialization_ = Serialization::MakeDefault(this);
+        break;
+    default:
+        throw UnimplementedError("Serialization kind:" + std::to_string(static_cast<int>(kind))
+            + " is not supported for column of " + type_->GetName());
+    }
 }
 
 ColumnRef ColumnMap::GetAsColumn(size_t n) const {

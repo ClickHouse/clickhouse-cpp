@@ -4,18 +4,30 @@
 
 #include <stdexcept>
 
+bool operator==(const in6_addr& l, const in6_addr& r) {
+    const uint64_t* const l_array = reinterpret_cast<const uint64_t*>(&l);
+    const uint64_t* const r_array = reinterpret_cast<const uint64_t*>(&r);
+    return l_array[0] == r_array[0] && l_array[1] == r_array[1];
+}
+
+bool operator!=(const in6_addr& l, const in6_addr& r) {
+    const uint64_t* const l_array = reinterpret_cast<const uint64_t*>(&l);
+    const uint64_t* const r_array = reinterpret_cast<const uint64_t*>(&r);
+    return l_array[0] != r_array[0] || l_array[1] != r_array[1];
+}
+
 namespace clickhouse {
 
 static_assert(sizeof(struct in6_addr) == 16, "sizeof in6_addr should be 16 bytes");
 
 ColumnIPv6::ColumnIPv6()
-    : Column(Type::CreateIPv6())
+    : Column(Type::CreateIPv6(), Serialization::MakeDefault(this))
     , data_(std::make_shared<ColumnFixedString>(16))
 {
 }
 
 ColumnIPv6::ColumnIPv6(ColumnRef data)
-    : Column(Type::CreateIPv6())
+    : Column(Type::CreateIPv6(), Serialization::MakeDefault(this))
     , data_(data ? data->As<ColumnFixedString>() : nullptr)
 {
     if (!data_ || data_->FixedSize() != sizeof(in6_addr))
@@ -72,11 +84,11 @@ void ColumnIPv6::Append(ColumnRef column) {
 }
 
 bool ColumnIPv6::LoadBody(InputStream* input, size_t rows) {
-    return data_->LoadBody(input, rows);
+    return data_->GetSerialization()->LoadBody(data_.get(), input, rows);
 }
 
 void ColumnIPv6::SaveBody(OutputStream* output) {
-    data_->SaveBody(output);
+    data_->GetSerialization()->SaveBody(data_.get(), output);
 }
 
 size_t ColumnIPv6::Size() const {
@@ -98,6 +110,21 @@ void ColumnIPv6::Swap(Column& other) {
 
 ItemView ColumnIPv6::GetItem(size_t index) const {
     return ItemView{Type::IPv6, data_->GetItem(index)};
+}
+
+void ColumnIPv6::SetSerializationKind(Serialization::Kind kind) {
+    switch (kind)
+    {
+    case Serialization::Kind::DEFAULT:
+        serialization_ = Serialization::MakeDefault(this);
+        break;
+    case Serialization::Kind::SPARSE:
+        serialization_ = Serialization::MakeSparse(this, in6_addr());
+        break;
+    default:
+        throw UnimplementedError("Serialization kind:" + std::to_string(static_cast<int>(kind))
+            + " is not supported for column of " + type_->GetName());
+    }
 }
 
 }

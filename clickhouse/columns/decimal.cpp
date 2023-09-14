@@ -100,7 +100,7 @@ inline bool mulOverflow(const Int128 & l, const T & r, Int128 * result)
 namespace clickhouse {
 
 ColumnDecimal::ColumnDecimal(size_t precision, size_t scale)
-    : Column(Type::CreateDecimal(precision, scale))
+    : Column(Type::CreateDecimal(precision, scale), Serialization::MakeDefault(this))
 {
     if (precision <= 9) {
         data_ = std::make_shared<ColumnInt32>();
@@ -112,7 +112,7 @@ ColumnDecimal::ColumnDecimal(size_t precision, size_t scale)
 }
 
 ColumnDecimal::ColumnDecimal(TypeRef type, ColumnRef data)
-    : Column(type),
+    : Column(type, Serialization::MakeDefault(this)),
       data_(data)
 {
 }
@@ -198,11 +198,11 @@ void ColumnDecimal::Append(ColumnRef column) {
 }
 
 bool ColumnDecimal::LoadBody(InputStream * input, size_t rows) {
-    return data_->LoadBody(input, rows);
+    return data_->GetSerialization()->LoadBody(data_.get(), input, rows);
 }
 
 void ColumnDecimal::SaveBody(OutputStream* output) {
-    data_->SaveBody(output);
+    data_->GetSerialization()->SaveBody(data_.get(), output);
 }
 
 void ColumnDecimal::Clear() {
@@ -230,6 +230,21 @@ void ColumnDecimal::Swap(Column& other) {
 
 ItemView ColumnDecimal::GetItem(size_t index) const {
     return ItemView{GetType().GetCode(), data_->GetItem(index)};
+}
+
+void ColumnDecimal::SetSerializationKind(Serialization::Kind kind) {
+    switch (kind)
+    {
+    case Serialization::Kind::DEFAULT:
+        serialization_ = Serialization::MakeDefault(this);
+        break;
+    case Serialization::Kind::SPARSE:
+        serialization_ = Serialization::MakeSparse(this, Int128{});
+        break;
+    default:
+        throw UnimplementedError("Serialization kind:" + std::to_string(static_cast<int>(kind))
+            + " is not supported for column of " + type_->GetName());
+    }
 }
 
 size_t ColumnDecimal::GetScale() const

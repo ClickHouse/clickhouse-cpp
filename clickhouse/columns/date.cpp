@@ -3,7 +3,7 @@
 namespace clickhouse {
 
 ColumnDate::ColumnDate()
-    : Column(Type::CreateDate())
+    : Column(Type::CreateDate(), Serialization::MakeDefault(this))
     , data_(std::make_shared<ColumnUInt16>())
 {
 }
@@ -28,11 +28,11 @@ void ColumnDate::Append(ColumnRef column) {
 }
 
 bool ColumnDate::LoadBody(InputStream* input, size_t rows) {
-    return data_->LoadBody(input, rows);
+    return data_->GetSerialization()->LoadBody(data_.get(), input, rows);
 }
 
 void ColumnDate::SaveBody(OutputStream* output) {
-    data_->SaveBody(output);
+    data_->GetSerialization()->SaveBody(data_.get(), output);
 }
 
 size_t ColumnDate::Size() const {
@@ -61,10 +61,23 @@ ItemView ColumnDate::GetItem(size_t index) const {
     return ItemView(Type::Date, data_->GetItem(index));
 }
 
-
+void ColumnDate::SetSerializationKind(Serialization::Kind kind) {
+    switch (kind)
+    {
+    case Serialization::Kind::DEFAULT:
+        serialization_ = Serialization::MakeDefault(this);
+        break;
+    case Serialization::Kind::SPARSE:
+        serialization_ = Serialization::MakeSparse(this, static_cast<uint16_t>(0));
+        break;
+    default:
+        throw UnimplementedError("Serialization kind:" + std::to_string(static_cast<int>(kind))
+            + " is not supported for column of " + type_->GetName());
+    }
+}
 
 ColumnDate32::ColumnDate32()
-    : Column(Type::CreateDate32())
+    : Column(Type::CreateDate32(), Serialization::MakeDefault(this))
     , data_(std::make_shared<ColumnInt32>())
 {
 }
@@ -89,11 +102,11 @@ void ColumnDate32::Append(ColumnRef column) {
 }
 
 bool ColumnDate32::LoadBody(InputStream* input, size_t rows) {
-    return data_->LoadBody(input, rows);
+    return data_->GetSerialization()->LoadBody(data_.get(), input, rows);
 }
 
 void ColumnDate32::SaveBody(OutputStream* output) {
-    data_->SaveBody(output);
+    data_->GetSerialization()->SaveBody(data_.get(), output);
 }
 
 size_t ColumnDate32::Size() const {
@@ -122,15 +135,29 @@ ItemView ColumnDate32::GetItem(size_t index) const {
     return ItemView{Type()->GetCode(), data_->GetItem(index)};
 }
 
+void ColumnDate32::SetSerializationKind(Serialization::Kind kind) {
+    switch (kind)
+    {
+    case Serialization::Kind::DEFAULT:
+        serialization_ = Serialization::MakeDefault(this);
+        break;
+    case Serialization::Kind::SPARSE:
+        serialization_ = Serialization::MakeSparse(this, static_cast<int32_t>(0));
+        break;
+    default:
+        throw UnimplementedError("Serialization kind:" + std::to_string(static_cast<int>(kind))
+            + " is not supported for column of " + type_->GetName());
+    }
+}
 
 ColumnDateTime::ColumnDateTime()
-    : Column(Type::CreateDateTime())
+    : Column(Type::CreateDateTime(), Serialization::MakeDefault(this))
     , data_(std::make_shared<ColumnUInt32>())
 {
 }
 
 ColumnDateTime::ColumnDateTime(std::string timezone)
-    : Column(Type::CreateDateTime(std::move(timezone)))
+    : Column(Type::CreateDateTime(std::move(timezone)), Serialization::MakeDefault(this))
     , data_(std::make_shared<ColumnUInt32>())
 {
 }
@@ -154,11 +181,11 @@ void ColumnDateTime::Append(ColumnRef column) {
 }
 
 bool ColumnDateTime::LoadBody(InputStream* input, size_t rows) {
-    return data_->LoadBody(input, rows);
+    return data_->GetSerialization()->LoadBody(data_.get(), input, rows);
 }
 
 void ColumnDateTime::SaveBody(OutputStream* output) {
-    data_->SaveBody(output);
+    data_->GetSerialization()->SaveBody(data_.get(), output);
 }
 
 size_t ColumnDateTime::Size() const {
@@ -191,6 +218,21 @@ ItemView ColumnDateTime::GetItem(size_t index) const {
     return ItemView(Type::DateTime, data_->GetItem(index));
 }
 
+void ColumnDateTime::SetSerializationKind(Serialization::Kind kind) {
+    switch (kind)
+    {
+    case Serialization::Kind::DEFAULT:
+        serialization_ = Serialization::MakeDefault(this);
+        break;
+    case Serialization::Kind::SPARSE:
+        serialization_ = Serialization::MakeSparse(this, static_cast<uint32_t>(0));
+        break;
+    default:
+        throw UnimplementedError("Serialization kind:" + std::to_string(static_cast<int>(kind))
+            + " is not supported for column of " + type_->GetName());
+    }
+}
+
 ColumnDateTime64::ColumnDateTime64(size_t precision)
     : ColumnDateTime64(Type::CreateDateTime64(precision), std::make_shared<ColumnDecimal>(18ul, precision))
 {}
@@ -200,7 +242,7 @@ ColumnDateTime64::ColumnDateTime64(size_t precision, std::string timezone)
 {}
 
 ColumnDateTime64::ColumnDateTime64(TypeRef type, std::shared_ptr<ColumnDecimal> data)
-    : Column(type),
+    : Column(type, Serialization::MakeDefault(this)),
       data_(data),
       precision_(type->As<DateTime64Type>()->GetPrecision())
 {}
@@ -231,11 +273,11 @@ void ColumnDateTime64::Append(ColumnRef column) {
 }
 
 bool ColumnDateTime64::LoadBody(InputStream* input, size_t rows) {
-    return data_->LoadBody(input, rows);
+    return data_->GetSerialization()->LoadBody(data_.get(), input, rows);
 }
 
 void ColumnDateTime64::SaveBody(OutputStream* output) {
-    data_->SaveBody(output);
+    data_->GetSerialization()->SaveBody(data_.get(), output);
 }
 
 void ColumnDateTime64::Clear() {
@@ -247,6 +289,21 @@ size_t ColumnDateTime64::Size() const {
 
 ItemView ColumnDateTime64::GetItem(size_t index) const {
     return ItemView(Type::DateTime64, data_->GetItem(index));
+}
+
+void ColumnDateTime64::SetSerializationKind(Serialization::Kind kind) {
+    switch (kind)
+    {
+    case Serialization::Kind::DEFAULT:
+        serialization_ = Serialization::MakeDefault(this);
+        break;
+    case Serialization::Kind::SPARSE:
+        serialization_ = Serialization::MakeSparse(this, static_cast<int64_t>(0));
+        break;
+    default:
+        throw UnimplementedError("Serialization kind:" + std::to_string(static_cast<int>(kind))
+            + " is not supported for column of " + type_->GetName());
+    }
 }
 
 void ColumnDateTime64::Swap(Column& other) {

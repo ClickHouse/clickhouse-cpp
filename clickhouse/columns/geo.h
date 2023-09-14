@@ -32,12 +32,6 @@ public:
     /// Appends content of given column to the end of current one.
     void Append(ColumnRef column) override;
 
-    /// Loads column data from input stream.
-    bool LoadBody(InputStream* input, size_t rows) override;
-
-    /// Saves column data to output stream.
-    void SaveBody(OutputStream* output) override;
-
     /// Clear column data .
     void Clear() override;
 
@@ -49,7 +43,23 @@ public:
     ColumnRef CloneEmpty() const override;
     void Swap(Column& other) override;
 
+    void SetSerializationKind(Serialization::Kind kind) override;
+
 private:
+    /// Loads column prefix from input stream.
+    bool LoadPrefix(InputStream* input, size_t rows);
+
+    /// Loads column data from input stream.
+    bool LoadBody(InputStream* input, size_t rows);
+
+    /// Saves column prefix to output stream.
+    void SavePrefix(OutputStream* output);
+
+    /// Saves column data to output stream.
+    void SaveBody(OutputStream* output);
+
+    friend SerializationDefault<ColumnGeo<NestedColumnType, type_code>>;
+
     std::shared_ptr<NestedColumnType> data_;
 };
 

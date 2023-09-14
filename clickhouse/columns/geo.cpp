@@ -34,13 +34,13 @@ namespace clickhouse {
 
 template <typename NestedColumnType, Type::Code type_code>
 ColumnGeo<NestedColumnType, type_code>::ColumnGeo()
-    : Column(CreateGeoType<type_code>()),
+    : Column(CreateGeoType<type_code>(), Serialization::MakeDefault(this)),
       data_(CreateColumn<NestedColumnType>()) {
 }
 
 template <typename NestedColumnType, Type::Code type_code>
 ColumnGeo<NestedColumnType, type_code>::ColumnGeo(ColumnRef data)
-    : Column(CreateGeoType<type_code>())
+    : Column(CreateGeoType<type_code>(), Serialization::MakeDefault(this))
     , data_(WrapColumn<NestedColumnType>(std::move(data))) {
 }
 
@@ -67,16 +67,6 @@ void ColumnGeo<NestedColumnType, type_code>::Append(ColumnRef column) {
 }
 
 template <typename NestedColumnType, Type::Code type_code>
-bool ColumnGeo<NestedColumnType, type_code>::LoadBody(InputStream* input, size_t rows) {
-    return data_->LoadBody(input, rows);
-}
-
-template <typename NestedColumnType, Type::Code type_code>
-void ColumnGeo<NestedColumnType, type_code>::SaveBody(OutputStream* output) {
-    data_->SaveBody(output);
-}
-
-template <typename NestedColumnType, Type::Code type_code>
 size_t ColumnGeo<NestedColumnType, type_code>::Size() const {
     return data_->Size();
 }
@@ -96,6 +86,40 @@ void ColumnGeo<NestedColumnType, type_code>::Swap(Column& other) {
     auto& col = dynamic_cast<ColumnGeo&>(other);
     data_.swap(col.data_);
 }
+
+template <typename NestedColumnType, Type::Code type_code>
+void ColumnGeo<NestedColumnType, type_code>::SetSerializationKind(Serialization::Kind kind) {
+    switch (kind)
+    {
+    case Serialization::Kind::DEFAULT:
+        serialization_ = Serialization::MakeDefault(this);
+        break;
+    default:
+        throw UnimplementedError("Serialization kind:" + std::to_string(static_cast<int>(kind))
+            + " is not supported for column of " + type_->GetName());
+    }
+}
+
+template <typename NestedColumnType, Type::Code type_code>
+bool ColumnGeo<NestedColumnType, type_code>::LoadPrefix(InputStream* input, size_t rows) {
+    return data_->GetSerialization()->LoadPrefix(data_.get(), input, rows);
+}
+
+template <typename NestedColumnType, Type::Code type_code>
+bool ColumnGeo<NestedColumnType, type_code>::LoadBody(InputStream* input, size_t rows) {
+    return data_->GetSerialization()->LoadBody(data_.get(), input, rows);
+}
+
+template <typename NestedColumnType, Type::Code type_code>
+void ColumnGeo<NestedColumnType, type_code>::SavePrefix(OutputStream* output) {
+    data_->GetSerialization()->SavePrefix(data_.get(), output);
+}
+
+template <typename NestedColumnType, Type::Code type_code>
+void ColumnGeo<NestedColumnType, type_code>::SaveBody(OutputStream* output) {
+    data_->GetSerialization()->SaveBody(data_.get(), output);
+}
+
 
 template class ColumnGeo<ColumnTupleT<ColumnFloat64, ColumnFloat64>, Type::Code::Point>;
 

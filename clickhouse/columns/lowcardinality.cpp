@@ -155,7 +155,8 @@ inline void AppendToDictionary(Column& dictionary, const ItemView & item) {
 
 namespace clickhouse {
 ColumnLowCardinality::ColumnLowCardinality(ColumnRef dictionary_column)
-    : Column(Type::CreateLowCardinality(dictionary_column->Type())),
+    : Column(Type::CreateLowCardinality(dictionary_column->Type()),
+        Serialization::MakeDefault(this)),
       dictionary_column_(dictionary_column->CloneEmpty()), // safe way to get an column of the same type.
       index_column_(std::make_shared<ColumnUInt32>())
 {
@@ -163,7 +164,8 @@ ColumnLowCardinality::ColumnLowCardinality(ColumnRef dictionary_column)
 }
 
 ColumnLowCardinality::ColumnLowCardinality(std::shared_ptr<ColumnNullable> dictionary_column)
-    : Column(Type::CreateLowCardinality(dictionary_column->Type())),
+    : Column(Type::CreateLowCardinality(dictionary_column->Type()),
+        Serialization::MakeDefault(this)),
       dictionary_column_(dictionary_column->CloneEmpty()), // safe way to get an column of the same type.
       index_column_(std::make_shared<ColumnUInt32>())
 {
@@ -267,7 +269,7 @@ auto Load(ColumnRef new_dictionary_column, InputStream& input, size_t rows) {
         dataColumn = nullable->Nested();
     }
 
-    if (!dataColumn->LoadBody(&input, number_of_keys))
+    if (!dataColumn->GetSerialization()->LoadBody(dataColumn.get(), &input, number_of_keys))
         throw ProtocolError("Failed to read values of dictionary column.");
 
     uint64_t number_of_rows;
@@ -277,7 +279,7 @@ auto Load(ColumnRef new_dictionary_column, InputStream& input, size_t rows) {
     if (number_of_rows != rows)
         throw AssertionError("LowCardinality column must be read in full.");
 
-    new_index_column->LoadBody(&input, number_of_rows);
+    new_index_column->GetSerialization()->LoadBody(new_index_column.get(), &input, number_of_rows);
 
     if (auto nullable = new_dictionary_column->As<ColumnNullable>()) {
         nullable->Append(true);
@@ -339,15 +341,15 @@ void ColumnLowCardinality::SaveBody(OutputStream* output) {
     WireFormat::WriteFixed(*output, number_of_keys);
 
     if (auto columnNullable = dictionary_column_->As<ColumnNullable>()) {
-        columnNullable->Nested()->SaveBody(output);
+        columnNullable->Nested()->GetSerialization()->SaveBody(columnNullable->Nested().get(), output);
     } else {
-        dictionary_column_->SaveBody(output);
+        dictionary_column_->GetSerialization()->SaveBody(dictionary_column_.get(), output);
     }
 
     const uint64_t number_of_rows = index_column_->Size();
     WireFormat::WriteFixed(*output, number_of_rows);
 
-    index_column_->SaveBody(output);
+    index_column_->GetSerialization()->SaveBody(index_column_.get(), output);
 }
 
 void ColumnLowCardinality::Clear() {
@@ -407,6 +409,18 @@ ItemView ColumnLowCardinality::GetItem(size_t index) const {
     }
 
     return dictionary_column_->GetItem(dictionaryIndex);
+}
+
+void ColumnLowCardinality::SetSerializationKind(Serialization::Kind kind) {
+    switch (kind)
+    {
+    case Serialization::Kind::DEFAULT:
+        serialization_ = Serialization::MakeDefault(this);
+        break;
+    default:
+        throw UnimplementedError("Serialization kind:" + std::to_string(static_cast<int>(kind))
+            + " is not supported for column of " + type_->GetName());
+    }
 }
 
 // No checks regarding value type or validity of value is made.

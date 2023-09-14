@@ -15,13 +15,13 @@ namespace clickhouse {
 class ColumnNothing : public Column {
 public:
     ColumnNothing()
-        : Column(Type::CreateNothing())
+        : Column(Type::CreateNothing(), Serialization::MakeDefault(this))
         , size_(0)
     {
     }
 
     explicit ColumnNothing(size_t n)
-        : Column(Type::CreateNothing())
+        : Column(Type::CreateNothing(), Serialization::MakeDefault(this))
         , size_(n)
     {
     }
@@ -46,24 +46,24 @@ public:
 
     ItemView GetItem(size_t /*index*/) const override { return ItemView{}; }
 
+    void SetSerializationKind(Serialization::Kind kind)  override {
+        switch (kind)
+        {
+        case Serialization::Kind::DEFAULT:
+            serialization_ = Serialization::MakeDefault(this);
+            break;
+        default:
+            throw UnimplementedError("Serialization kind:" + std::to_string(static_cast<int>(kind))
+                + " is not supported for column of " + type_->GetName());
+        }
+    }
+
 public:
     /// Appends content of given column to the end of current one.
     void Append(ColumnRef column) override {
         if (auto col = column->As<ColumnNothing>()) {
             size_ += col->Size();
         }
-    }
-
-    /// Loads column data from input stream.
-    bool LoadBody(InputStream* input, size_t rows) override {
-        input->Skip(rows);
-        size_ += rows;
-        return true;
-    }
-
-    /// Saves column data to output stream.
-    void SaveBody(OutputStream*) override {
-        throw UnimplementedError("method SaveBody is not supported for Nothing column");
     }
 
     /// Clear column data .
@@ -78,6 +78,20 @@ public:
     }
 
 private:
+    /// Loads column data from input stream.
+    bool LoadBody(InputStream* input, size_t rows) {
+        input->Skip(rows);
+        size_ += rows;
+        return true;
+    }
+
+    /// Saves column data to output stream.
+    void SaveBody(OutputStream*) {
+        throw UnimplementedError("method SaveBody is not supported for Nothing column");
+    }
+
+    friend SerializationDefault<ColumnNothing>;
+
     size_t size_;
 };
 
