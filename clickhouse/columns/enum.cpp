@@ -21,6 +21,13 @@ ColumnEnum<T>::ColumnEnum(TypeRef type, const std::vector<T>& data)
 }
 
 template <typename T>
+ColumnEnum<T>::ColumnEnum(TypeRef type, std::vector<T>&& data)
+    : Column(type)
+    , data_(std::move(data))
+{
+}
+
+template <typename T>
 void ColumnEnum<T>::Append(const T& value, bool checkValue) {
     if  (checkValue) {
         // TODO: type_->HasEnumValue(value), "Enum type doesn't have value " + std::to_string(value);
