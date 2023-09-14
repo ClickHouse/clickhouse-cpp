@@ -12,6 +12,7 @@ public:
 
     ColumnEnum(TypeRef type);
     ColumnEnum(TypeRef type, const std::vector<T>& data);
+    ColumnEnum(TypeRef type, std::vector<T>&& data);
 
     /// Appends one element to the end of column.
     void Append(const T& value, bool checkValue = false);
