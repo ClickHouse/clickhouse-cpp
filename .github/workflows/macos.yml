@@ -67,5 +67,5 @@ jobs:
         # It is impossible to start CH server in docker on macOS due to github actions limitations,
         # so we use remote server to execute tests, some do not allow some features for anonymoust/free users:
         # - system.query_log used by 'Client/ClientCase.Query_ID'
-        GTEST_FILTER: "-Client/ClientCase.Query_ID*"
+        GTEST_FILTER: "-Client/ClientCase.Query_ID*:Client/ClientCase.TracingContext/*"
       run: ./clickhouse-cpp-ut ${GTEST_FILTER}
