@@ -79,7 +79,7 @@ inline std::vector<T> MakeNumbers() {
     const auto min_value = std::pow(10, std::numeric_limits<T>::min_exponent10);
 
     // cover most of the precision ranges
-    for (T i = std::numeric_limits<T>::max(); i >= /*std::numeric_limits<T>::epsilon()*/ min_value * step; i /= step)
+    for (T i = std::numeric_limits<T>::max(); i >= min_value * step; i /= step)
     {
         result.push_back(i);
         result.push_back(-1 * i);
