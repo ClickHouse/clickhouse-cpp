@@ -26,7 +26,7 @@ public:
     const T& At(size_t n) const;
 
     /// Returns element at given row number.
-    const T& operator [] (size_t n) const;
+    inline const T& operator [] (size_t n) const { return At(n); }
 
     void Erase(size_t pos, size_t count = 1);
 

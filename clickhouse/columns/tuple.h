@@ -17,11 +17,11 @@ public:
     /// Returns count of columns in the tuple.
     size_t TupleSize() const;
 
-    ColumnRef operator [] (size_t n) const {
+    inline ColumnRef operator [] (size_t n) const {
         return columns_[n];
     }
 
-    ColumnRef At(size_t n) const {
+    inline ColumnRef At(size_t n) const {
         return columns_[n];
     }
 

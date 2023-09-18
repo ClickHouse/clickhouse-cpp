@@ -49,11 +49,6 @@ std::string_view ColumnEnum<T>::NameAt(size_t n) const {
 }
 
 template <typename T>
-const T& ColumnEnum<T>::operator[] (size_t n) const {
-    return data_[n];
-}
-
-template <typename T>
 void ColumnEnum<T>::SetAt(size_t n, const T& value, bool checkValue) {
     if (checkValue) {
         // TODO: type_->HasEnumValue(value), "Enum type doesn't have value " + std::to_string(value);

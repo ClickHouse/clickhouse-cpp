@@ -160,10 +160,6 @@ std::time_t ColumnDateTime::At(size_t n) const {
     return data_->At(n);
 }
 
-std::time_t ColumnDateTime::operator[](size_t n) const {
-    return data_->At(n);
-}
-
 std::string ColumnDateTime::Timezone() const {
     return type_->As<DateTimeType>()->Timezone();
 }
@@ -239,10 +235,6 @@ void ColumnDateTime64::Append(const Int64& value) {
 Int64 ColumnDateTime64::At(size_t n) const {
     // make sure to use Absl's Int128 conversion
     return static_cast<Int64>(data_->At(n));
-}
-
-Int64 ColumnDateTime64::operator[](size_t n) const {
-    return this->At(n);
 }
 
 std::string ColumnDateTime64::Timezone() const {

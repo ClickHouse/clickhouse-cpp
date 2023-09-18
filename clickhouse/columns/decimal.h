@@ -18,6 +18,7 @@ public:
     void Append(const std::string& value);
 
     Int128 At(size_t i) const;
+    inline auto operator[](size_t i) const { return At(i); }
 
 public:
     void Append(ColumnRef column) override;

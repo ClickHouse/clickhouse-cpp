@@ -26,7 +26,7 @@ public:
     const ValueType At(size_t n) const;
 
     /// Returns element at given row number.
-    const ValueType operator[](size_t n) const;
+    inline const ValueType operator[](size_t n) const { return At(n); }
 
 public:
     /// Appends content of given column to the end of current one.

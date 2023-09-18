@@ -21,7 +21,7 @@ public:
     /// Returns element at given row number.
     /// The implementation is fundamentally wrong, ignores timezones, leap years and daylight saving.
     std::time_t At(size_t n) const;
-    inline std::time_t operator [] (size_t n) const { return this->At(n); }
+    inline std::time_t operator [] (size_t n) const { return At(n); }
 
     /// Do append data as is -- number of day in Unix epoch, no conversions performed.
     void AppendRaw(uint16_t value);
@@ -71,7 +71,7 @@ public:
     /// Appends content of given column to the end of current one.
     void Append(ColumnRef column) override;
 
-    inline auto operator [] (size_t n) const { return this->At(n); }
+    inline std::time_t operator [] (size_t n) const { return At(n); }
 
     /// Do append data as is -- number of day in Unix epoch (32bit signed), no conversions performed.
     void AppendRaw(int32_t value);
@@ -114,7 +114,7 @@ public:
 
     /// Returns element at given row number.
     std::time_t At(size_t n) const;
-    std::time_t operator [] (size_t n) const;
+    inline std::time_t operator [] (size_t n) const { return At(n); }
 
     /// Timezone associated with a data column.
     std::string Timezone() const;
@@ -164,7 +164,7 @@ public:
     /// Returns element at given row number.
     Int64 At(size_t n) const;
 
-    Int64 operator[](size_t n) const;
+    inline Int64 operator[](size_t n) const { return At(n); }
 
     /// Timezone associated with a data column.
     std::string Timezone() const;

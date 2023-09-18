@@ -49,11 +49,6 @@ const T& ColumnVector<T>::At(size_t n) const {
 }
 
 template <typename T>
-const T& ColumnVector<T>::operator [] (size_t n) const {
-    return data_[n];
-}
-
-template <typename T>
 void ColumnVector<T>::Append(ColumnRef column) {
     if (auto col = column->As<ColumnVector<T>>()) {
         data_.insert(data_.end(), col->data_.begin(), col->data_.end());

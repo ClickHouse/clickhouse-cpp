@@ -33,7 +33,7 @@ public:
     std::nullptr_t At(size_t) const { return nullptr; };
 
     /// Returns element at given row number.
-    std::nullptr_t operator [] (size_t) const { return nullptr; };
+    inline std::nullptr_t operator [] (size_t) const { return nullptr; };
 
     /// Makes slice of the current column.
     ColumnRef Slice(size_t, size_t len) const override {

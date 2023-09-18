@@ -34,7 +34,7 @@ public:
     std::string_view At(size_t n) const;
 
     /// Returns element at given row number.
-    std::string_view operator [] (size_t n) const;
+    inline std::string_view operator [] (size_t n) const { return At(n); }
 
     /// Returns the max size of the fixed string
     size_t FixedSize() const;
@@ -101,7 +101,7 @@ public:
     std::string_view At(size_t n) const;
 
     /// Returns element at given row number.
-    std::string_view operator [] (size_t n) const;
+    inline std::string_view operator [] (size_t n) const { return At(n); }
 
 public:
     /// Appends content of given column to the end of current one.
