@@ -8,6 +8,7 @@
 
 #include <string_view>
 #include <cstring>
+#include <cmath>
 
 namespace clickhouse {
     class Block;
@@ -153,10 +154,17 @@ template <typename Left, typename Right>
             return result << "\nExpected container: " << PrintContainer{l}
                           << "\nActual container  : " << PrintContainer{r};
     } else {
-        if (left != right)
+        if (left != right) {
+
+            if constexpr (std::is_floating_point_v<Left> && std::is_floating_point_v<Right>) {
+                if (std::isnan(left) && std::isnan(right))
+                    return ::testing::AssertionSuccess();
+            }
+
             return ::testing::AssertionFailure()
                     << "\nExpected value: " << left
                     << "\nActual value  : " << right;
+        }
 
         return ::testing::AssertionSuccess();
     }

@@ -41,8 +41,73 @@ std::vector<clickhouse::UUID> MakeUUIDs();
 std::vector<clickhouse::Int128> MakeInt128s();
 std::vector<clickhouse::Int128> MakeDecimals(size_t precision, size_t scale);
 
+template <typename T, std::enable_if_t<std::is_integral<T>::value, bool> = true>
+inline std::vector<T> MakeNumbers() {
+
+    std::vector<T> result;
+    result.reserve(32);
+
+    // to reach from in to max in 32 steps, it also has to be lower than 7 to work for int8 values.
+    const T step = static_cast<T>(1) << (sizeof(T)*8 - 5);
+
+    // `- step` to avoid accidential overflow
+    for (T i = std::numeric_limits<T>::min(); i <= std::numeric_limits<T>::max() - step; i += step)
+    {
+        result.push_back(i);
+    }
+    result.push_back(std::numeric_limits<T>::max());
+
+    return result;
+}
+
+template <typename T, std::enable_if_t<std::is_floating_point<T>::value, bool> = true>
+inline std::vector<T> MakeNumbers() {
+
+    std::vector<T> result {
+        std::numeric_limits<T>::min(),
+        std::numeric_limits<T>::max(),
+        std::numeric_limits<T>::quiet_NaN(),
+        std::numeric_limits<T>::infinity(),
+        -std::numeric_limits<T>::infinity(),
+        static_cast<T>(0),
+        static_cast<T>(0) + std::numeric_limits<T>::epsilon(),
+        static_cast<T>(0) - std::numeric_limits<T>::epsilon()
+    };
+
+    const auto total_steps = 100;
+    const auto step = std::pow(10, (std::numeric_limits<T>::max_exponent - std::numeric_limits<T>::min_exponent) / total_steps);
+    const auto min_value = std::pow(10, std::numeric_limits<T>::min_exponent10);
+
+    // cover most of the precision ranges
+    for (T i = std::numeric_limits<T>::max(); i >= /*std::numeric_limits<T>::epsilon()*/ min_value * step; i /= step)
+    {
+        result.push_back(i);
+        result.push_back(-1 * i);
+    }
+    result.push_back(min_value);
+    result.push_back(-min_value);
+
+    return result;
+}
+
+template <size_t size>
+inline std::vector<std::string> MakeFixedStrings() {
+    return MakeFixedStrings(size);
+}
+
+template <size_t scale>
+inline std::vector<clickhouse::Int64> MakeDateTime64s() {
+    return MakeDateTime64s(scale);
+}
+
+template <size_t precision, size_t scale>
+inline std::vector<clickhouse::Int128> MakeDecimals() {
+    return MakeDecimals(precision, scale);
+}
+
+
 template <typename ResultType>
-std::vector<ResultType> MakeDates() {
+inline auto MakeDates() {
     std::vector<ResultType> result {0, 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536 - 1};
 
     if constexpr (std::is_same_v<time_t, ResultType>) {
