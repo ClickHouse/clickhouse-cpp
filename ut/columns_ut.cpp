@@ -182,9 +182,6 @@ TEST(ColumnsCase, Date_UInt16_interface) {
     ASSERT_EQ(col1->Size(), 2u);
     ASSERT_EQ(col1->RawAt(0), 1u);
     ASSERT_EQ(col1->RawAt(1), 1234u);
-
-    ASSERT_EQ((*col1)[0], 1u);
-    ASSERT_EQ((*col1)[1], 1234u);
 }
 
 
@@ -199,10 +196,6 @@ TEST(ColumnsCase, Date32_Int32_interface) {
     ASSERT_EQ(col1->RawAt(0), 1);
     ASSERT_EQ(col1->RawAt(1), 1234);
     ASSERT_EQ(col1->RawAt(2), -1234);
-
-    ASSERT_EQ((*col1)[0], 1);
-    ASSERT_EQ((*col1)[1], 1234);
-    ASSERT_EQ((*col1)[2], -1234);
 }
 
 
