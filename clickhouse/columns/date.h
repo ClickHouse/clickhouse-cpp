@@ -21,12 +21,11 @@ public:
     /// Returns element at given row number.
     /// The implementation is fundamentally wrong, ignores timezones, leap years and daylight saving.
     std::time_t At(size_t n) const;
+    inline std::time_t operator [] (size_t n) const { return this->At(n); }
 
-    /// Do data as is -- number of day in Unix epoch, no conversions performed
-    void Append(uint16_t value);
+    /// Do append data as is -- number of day in Unix epoch, no conversions performed.
     void AppendRaw(uint16_t value);
     uint16_t RawAt(size_t n) const;
-    uint16_t operator [] (size_t n) const;
 
     /// Appends content of given column to the end of current one.
     void Append(ColumnRef column) override;
@@ -72,11 +71,11 @@ public:
     /// Appends content of given column to the end of current one.
     void Append(ColumnRef column) override;
 
-    /// Do data as is -- number of day in Unix epoch, no conversions performed
-    void Append(int32_t value);
+    inline auto operator [] (size_t n) const { return this->At(n); }
+
+    /// Do append data as is -- number of day in Unix epoch (32bit signed), no conversions performed.
     void AppendRaw(int32_t value);
     int32_t RawAt(size_t n) const;
-    int32_t operator [] (size_t n) const;
 
     /// Loads column data from input stream.
     bool LoadBody(InputStream* input, size_t rows) override;
@@ -115,6 +114,7 @@ public:
 
     /// Returns element at given row number.
     std::time_t At(size_t n) const;
+    std::time_t operator [] (size_t n) const;
 
     /// Timezone associated with a data column.
     std::string Timezone() const;
@@ -163,6 +163,8 @@ public:
 
     /// Returns element at given row number.
     Int64 At(size_t n) const;
+
+    Int64 operator[](size_t n) const;
 
     /// Timezone associated with a data column.
     std::string Timezone() const;

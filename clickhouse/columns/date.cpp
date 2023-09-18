@@ -23,20 +23,12 @@ std::time_t ColumnDate::At(size_t n) const {
     return static_cast<std::time_t>(data_->At(n)) * 86400;
 }
 
-void ColumnDate::Append(uint16_t value) {
-    data_->Append(value);
-}
-
 void ColumnDate::AppendRaw(uint16_t value) {
     data_->Append(value);
 }
 
 uint16_t ColumnDate::RawAt(size_t n) const {
     return data_->At(n);
-}
-
-uint16_t ColumnDate::operator [] (size_t n) const {
-    return (*data_)[n];
 }
 
 void ColumnDate::Append(ColumnRef column) {
@@ -106,20 +98,12 @@ void ColumnDate32::Append(ColumnRef column) {
     }
 }
 
-void ColumnDate32::Append(int32_t value) {
-    data_->Append(value);
-}
-
 void ColumnDate32::AppendRaw(int32_t value) {
     data_->Append(value);
 }
 
 int32_t ColumnDate32::RawAt(size_t n) const {
     return data_->At(n);
-}
-
-int32_t ColumnDate32::operator [] (size_t n) const {
-    return (*data_)[n];
 }
 
 bool ColumnDate32::LoadBody(InputStream* input, size_t rows) {
@@ -156,7 +140,6 @@ ItemView ColumnDate32::GetItem(size_t index) const {
     return ItemView{Type()->GetCode(), data_->GetItem(index)};
 }
 
-
 ColumnDateTime::ColumnDateTime()
     : Column(Type::CreateDateTime())
     , data_(std::make_shared<ColumnUInt32>())
@@ -174,6 +157,10 @@ void ColumnDateTime::Append(const std::time_t& value) {
 }
 
 std::time_t ColumnDateTime::At(size_t n) const {
+    return data_->At(n);
+}
+
+std::time_t ColumnDateTime::operator[](size_t n) const {
     return data_->At(n);
 }
 
@@ -252,6 +239,10 @@ void ColumnDateTime64::Append(const Int64& value) {
 Int64 ColumnDateTime64::At(size_t n) const {
     // make sure to use Absl's Int128 conversion
     return static_cast<Int64>(data_->At(n));
+}
+
+Int64 ColumnDateTime64::operator[](size_t n) const {
+    return this->At(n);
 }
 
 std::string ColumnDateTime64::Timezone() const {
