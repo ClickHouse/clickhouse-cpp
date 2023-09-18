@@ -237,8 +237,8 @@ inline auto convertValueForGetItem(const ColumnType& col, ValueType&& t) {
     using T = std::remove_cv_t<std::decay_t<ValueType>>;
 
     if constexpr (std::is_same_v<ColumnType, ColumnDecimal>) {
-            // Since ColumnDecimal can hold 32, 64, 128-bit wide data and there is no way telling at run-time.
-            const ItemView item = col.GetItem(0);
+        // Since ColumnDecimal can hold 32, 64, 128-bit wide data and there is no way telling at run-time.
+        const ItemView item = col.GetItem(0);
         return std::string_view(reinterpret_cast<const char*>(&t), item.data.size());
     } else if constexpr (std::is_same_v<T, clickhouse::UInt128>
             || std::is_same_v<T, clickhouse::Int128>) {

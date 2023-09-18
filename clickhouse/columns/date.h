@@ -101,7 +101,7 @@ private:
 };
 
 
-/** */
+/** DateTime64 supports date-time values (number of seconds since UNIX epoch), from 1970 up to 2130. */
 class ColumnDateTime : public Column {
 public:
     using ValueType = std::time_t;
@@ -147,7 +147,7 @@ private:
 };
 
 
-/** */
+/** DateTime64 supports date-time values of arbitrary sub-second precision, from 1900 up to 2300. */
 class ColumnDateTime64 : public Column {
 public:
     using ValueType = Int64;
