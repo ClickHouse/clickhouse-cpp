@@ -5,6 +5,7 @@
 
 #include <gtest/gtest.h>
 #include <map>
+#include <optional>
 
 using namespace clickhouse;
 
@@ -213,12 +214,16 @@ TEST_P(RoundtripCase, LowCardinalityTString) {
 TEST_P(RoundtripCase, LowCardinalityTNullableString) {
     using TestColumn = ColumnLowCardinalityT<ColumnNullableT<ColumnString>>;
     auto col = std::make_shared<TestColumn>();
+
     col->Append("abc");
     col->Append("def");
     col->Append("abc");
+    col->Append(std::nullopt);
     col->Append("abc");
     col->Append(std::nullopt);
     col->Append(std::nullopt);
+    col->Append("foobar");
+
     auto result_typed = WrapColumn<TestColumn>(RoundtripColumnValues(*client_, col));
     EXPECT_TRUE(CompareRecursive(*col, *result_typed));
 }

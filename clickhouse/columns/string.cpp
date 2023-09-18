@@ -58,11 +58,6 @@ std::string_view ColumnFixedString::At(size_t n) const {
     return std::string_view(&data_.at(pos), string_size_);
 }
 
-std::string_view ColumnFixedString::operator [](size_t n) const {
-    const auto pos = n * string_size_;
-    return std::string_view(&data_[pos], string_size_);
-}
-
 size_t ColumnFixedString::FixedSize() const {
        return string_size_;
 }
@@ -230,10 +225,6 @@ void ColumnString::Clear() {
 
 std::string_view ColumnString::At(size_t n) const {
     return items_.at(n);
-}
-
-std::string_view ColumnString::operator [] (size_t n) const {
-    return items_[n];
 }
 
 void ColumnString::Append(ColumnRef column) {

@@ -1,6 +1,7 @@
 #include "value_generators.h"
 
 #include <algorithm>
+#include <type_traits>
 #include <math.h>
 
 namespace {
@@ -53,25 +54,13 @@ std::vector<Int64> MakeDateTime64s(size_t scale, size_t values_size) {
         });
 }
 
-std::vector<clickhouse::Int64> MakeDates() {
-    // in CH Date internally a UInt16 and stores a day number
-    // ColumnDate expects values to be seconds, which is then
-    // converted to day number internally, hence the `* 86400`.
-    std::vector<clickhouse::Int64> result {0, 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536 - 1};
-    std::for_each(result.begin(), result.end(), [](auto& value) {
-        value *= 86400;
-    });
-
-    return result;
-}
-
-std::vector<clickhouse::Int64> MakeDates32() {
+std::vector<int32_t> MakeDates32() {
     // in CH Date32 internally a UInt32 and stores a day number
     // ColumnDate expects values to be seconds, which is then
     // converted to day number internally, hence the `* 86400`.
     // 114634 * 86400 is 2282-11-10, last integer that fits into DateTime32 range
     // (max is 2283-11-11)
-    std::vector<clickhouse::Int64> result  = MakeDates();
+    std::vector<int32_t> result = MakeDates<int32_t>();
 
     // add corresponding negative values, since pre-epoch date are supported too.
     const auto size = result.size();
@@ -103,7 +92,7 @@ std::vector<clickhouse::Int128> MakeInt128s() {
 
 std::vector<clickhouse::Int128> MakeDecimals(size_t /*precision*/, size_t scale) {
     const auto scale_multiplier = static_cast<size_t>(std::pow(10, scale));
-    const auto rhs_value = 12345678910;
+    const long long int rhs_value = 12345678910;
 
     const std::vector<long long int> vals {0, 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536 - 1};
 

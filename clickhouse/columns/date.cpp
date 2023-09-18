@@ -1,4 +1,5 @@
 #include "date.h"
+#include <cstdint>
 
 namespace clickhouse {
 
@@ -9,7 +10,7 @@ ColumnDate::ColumnDate()
 }
 
 void ColumnDate::Append(const std::time_t& value) {
-    /// TODO: This code is fundamentally wrong.
+    /// The implementation is fundamentally wrong, ignores timezones, leap years and daylight saving.
     data_->Append(static_cast<uint16_t>(value / std::time_t(86400)));
 }
 
@@ -18,7 +19,16 @@ void ColumnDate::Clear() {
 }
 
 std::time_t ColumnDate::At(size_t n) const {
+    /// The implementation is fundamentally wrong, ignores timezones, leap years and daylight saving.
     return static_cast<std::time_t>(data_->At(n)) * 86400;
+}
+
+void ColumnDate::AppendRaw(uint16_t value) {
+    data_->Append(value);
+}
+
+uint16_t ColumnDate::RawAt(size_t n) const {
+    return data_->At(n);
 }
 
 void ColumnDate::Append(ColumnRef column) {
@@ -62,7 +72,6 @@ ItemView ColumnDate::GetItem(size_t index) const {
 }
 
 
-
 ColumnDate32::ColumnDate32()
     : Column(Type::CreateDate32())
     , data_(std::make_shared<ColumnInt32>())
@@ -70,7 +79,7 @@ ColumnDate32::ColumnDate32()
 }
 
 void ColumnDate32::Append(const std::time_t& value) {
-    /// TODO: This code is fundamentally wrong.
+    /// The implementation is fundamentally wrong, ignores timezones, leap years and daylight saving.
     data_->Append(static_cast<int32_t>(value / std::time_t(86400)));
 }
 
@@ -79,6 +88,7 @@ void ColumnDate32::Clear() {
 }
 
 std::time_t ColumnDate32::At(size_t n) const {
+    /// The implementation is fundamentally wrong, ignores timezones, leap years and daylight saving.
     return static_cast<std::time_t>(data_->At(n)) * 86400;
 }
 
@@ -86,6 +96,14 @@ void ColumnDate32::Append(ColumnRef column) {
     if (auto col = column->As<ColumnDate32>()) {
         data_->Append(col->data_);
     }
+}
+
+void ColumnDate32::AppendRaw(int32_t value) {
+    data_->Append(value);
+}
+
+int32_t ColumnDate32::RawAt(size_t n) const {
+    return data_->At(n);
 }
 
 bool ColumnDate32::LoadBody(InputStream* input, size_t rows) {
@@ -121,7 +139,6 @@ void ColumnDate32::Swap(Column& other) {
 ItemView ColumnDate32::GetItem(size_t index) const {
     return ItemView{Type()->GetCode(), data_->GetItem(index)};
 }
-
 
 ColumnDateTime::ColumnDateTime()
     : Column(Type::CreateDateTime())
@@ -241,6 +258,7 @@ void ColumnDateTime64::SaveBody(OutputStream* output) {
 void ColumnDateTime64::Clear() {
     data_->Clear();
 }
+
 size_t ColumnDateTime64::Size() const {
     return data_->Size();
 }

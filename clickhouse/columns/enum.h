@@ -23,7 +23,7 @@ public:
     std::string_view NameAt(size_t n) const;
 
     /// Returns element at given row number.
-    const T& operator[] (size_t n) const;
+    inline const T& operator[] (size_t n) const { return At(n); }
 
     /// Set element at given row number.
     void SetAt(size_t n, const T& value, bool checkValue = false);

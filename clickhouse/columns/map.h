@@ -212,7 +212,7 @@ public:
 
     inline auto At(size_t index) const { return MapValueView{typed_data_->At(index)}; }
 
-    inline auto operator[](size_t index) const { return MapValueView{typed_data_->At(index)}; }
+    inline auto operator[](size_t index) const { return At(index); }
 
     using ColumnMap::Append;
 

@@ -17,7 +17,6 @@ SET ( clickhouse-cpp-lib-src
     columns/ip4.cpp
     columns/ip6.cpp
     columns/lowcardinality.cpp
-    columns/lowcardinalityadaptor.h
     columns/nullable.cpp
     columns/numeric.cpp
     columns/map.cpp
@@ -33,6 +32,55 @@ SET ( clickhouse-cpp-lib-src
     block.cpp
     client.cpp
     query.cpp
+
+    # Headers
+    base/buffer.h
+    base/compressed.h
+    base/endpoints_iterator.h
+    base/input.h
+    base/open_telemetry.h
+    base/output.h
+    base/platform.h
+    base/projected_iterator.h
+    base/singleton.h
+    base/socket.h
+    base/sslsocket.h
+    base/string_utils.h
+    base/string_view.h
+    base/uuid.h
+    base/wire_format.h
+
+    columns/array.h
+    columns/column.h
+    columns/date.h
+    columns/decimal.h
+    columns/enum.h
+    columns/factory.h
+    columns/geo.h
+    columns/ip4.h
+    columns/ip6.h
+    columns/itemview.h
+    columns/lowcardinality.h
+    columns/lowcardinalityadaptor.h
+    columns/map.h
+    columns/nothing.h
+    columns/nullable.h
+    columns/numeric.h
+    columns/string.h
+    columns/tuple.h
+    columns/utils.h
+    columns/uuid.h
+
+    types/type_parser.h
+    types/types.h
+
+    block.h
+    client.h
+    error_codes.h
+    exceptions.h
+    protocol.h
+    query.h
+    server_exception.h
 )
 
 if (MSVC)

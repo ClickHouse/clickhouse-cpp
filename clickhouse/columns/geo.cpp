@@ -55,11 +55,6 @@ const typename ColumnGeo<NestedColumnType, type_code>::ValueType ColumnGeo<Neste
 }
 
 template <typename NestedColumnType, Type::Code type_code>
-const typename ColumnGeo<NestedColumnType, type_code>::ValueType ColumnGeo<NestedColumnType, type_code>::operator[](size_t n) const {
-    return data_->At(n);
-}
-
-template <typename NestedColumnType, Type::Code type_code>
 void ColumnGeo<NestedColumnType, type_code>::Append(ColumnRef column) {
     if (auto col = column->template As<ColumnGeo>()) {
         data_->Append(col->data_->template As<Column>());
