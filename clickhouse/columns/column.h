@@ -80,6 +80,12 @@ public:
     /// Returns count of rows in the column.
     virtual size_t Size() const = 0;
 
+    /// Increase the capacity of the column
+    virtual void Reserve([[maybe_unused]]size_t new_cap) {}
+
+    /// Returns the capacity of the column
+    virtual size_t Capacity() const { return 0; }
+
     /// Makes slice of the current column.
     virtual ColumnRef Slice(size_t begin, size_t len) const = 0;
 

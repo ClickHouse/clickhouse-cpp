@@ -39,6 +39,12 @@ void ColumnVector<T>::Erase(size_t pos, size_t count) {
 }
 
 template <typename T>
+void ColumnVector<T>::SwapElements(size_t pos1, size_t pos2) {
+    auto data_it = data_.begin();
+    std::iter_swap(data_it + pos1, data_it + pos2);
+}
+
+template <typename T>
 void ColumnVector<T>::Clear() {
     data_.clear();
 }
@@ -70,6 +76,16 @@ void ColumnVector<T>::SaveBody(OutputStream* output) {
 template <typename T>
 size_t ColumnVector<T>::Size() const {
     return data_.size();
+}
+
+template <typename T>
+void ColumnVector<T>::Reserve(size_t new_cap) {
+    data_.reserve(new_cap);
+}
+
+template <typename T>
+size_t ColumnVector<T>::Capacity() const {
+    return data_.capacity();
 }
 
 template <typename T>

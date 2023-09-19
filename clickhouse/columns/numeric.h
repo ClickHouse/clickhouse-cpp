@@ -30,6 +30,8 @@ public:
 
     void Erase(size_t pos, size_t count = 1);
 
+    void SwapElements(size_t pos1, size_t pos2);
+
 public:
     /// Appends content of given column to the end of current one.
     void Append(ColumnRef column) override;
@@ -45,6 +47,12 @@ public:
 
     /// Returns count of rows in the column.
     size_t Size() const override;
+
+    /// Increase the capacity of the column
+    void Reserve(size_t new_cap) override;
+
+    /// Returns the capacity of the column
+    size_t Capacity() const override;
 
     /// Makes slice of the current column.
     ColumnRef Slice(size_t begin, size_t len) const override;
