@@ -122,6 +122,20 @@ inline auto MakeDates() {
     return result;
 }
 
+template <typename ValueType, std::vector<ValueType> (*Generator)()>
+inline auto MakeArrays() {
+    const auto nested_values = Generator();
+    std::vector<std::vector<ValueType>> result;
+    result.reserve(nested_values.size());
+
+    for (size_t i = 0; i < nested_values.size(); ++i)
+    {
+        result.emplace_back(nested_values.begin(), nested_values.begin() + i);
+    }
+
+    return result;
+}
+
 
 std::string FooBarGenerator(size_t i);
 

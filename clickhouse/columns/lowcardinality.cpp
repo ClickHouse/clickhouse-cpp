@@ -227,12 +227,21 @@ ColumnRef ColumnLowCardinality::GetDictionary() {
 }
 
 void ColumnLowCardinality::Append(ColumnRef col) {
-    auto c = col->As<ColumnLowCardinality>();
-    if (!c || !dictionary_column_->Type()->IsEqual(c->dictionary_column_->Type()))
-        return;
+    // Append values from col only if it is either
+    // - exactly same type as `this`: LowCardinality wrapping same dictionary type
+    // - same type as dictionary column
 
-    for (size_t i = 0; i < c->Size(); ++i) {
-        AppendUnsafe(c->GetItem(i));
+    auto c = col->As<ColumnLowCardinality>();
+    // If not LowCardinality of same dictionary type
+    if (!c || !dictionary_column_->Type()->IsEqual(c->dictionary_column_->Type())) {
+        // If not column of the same type as dictionary type
+        if (!dictionary_column_->Type()->IsEqual(col->GetType())) {
+            return;
+        }
+    }
+
+    for (size_t i = 0; i < col->Size(); ++i) {
+        AppendUnsafe(col->GetItem(i));
     }
 }
 

@@ -4,10 +4,29 @@
 #include <clickhouse/block.h>
 
 #include <gtest/gtest.h>
+#include <type_traits>
+#include "clickhouse/columns/numeric.h"
 
 namespace {
 using namespace clickhouse;
+
+template <typename T>
+std::vector<T> GenerateConsecutiveNumbers(size_t count, T start = 0)
+{
+    std::vector<T> result;
+    result.reserve(count);
+
+    T value = start;
+    for (size_t i = 0; i < count; ++i, ++value)
+    {
+        result.push_back(value);
+    }
+
+    return result;
 }
+
+}
+
 
 ColumnRef RoundtripColumnValues(Client& client, ColumnRef expected) {
     // Create a temporary table with a single column
@@ -16,16 +35,18 @@ ColumnRef RoundtripColumnValues(Client& client, ColumnRef expected) {
     auto result = expected->CloneEmpty();
 
     const std::string type_name = result->GetType().GetName();
-    client.Execute("DROP TEMPORARY TABLE IF EXISTS temporary_roundtrip_table;");
-    client.Execute("CREATE TEMPORARY TABLE IF NOT EXISTS temporary_roundtrip_table (col " + type_name + ");");
+    client.Execute("DROP TABLE IF EXISTS temporary_roundtrip_table;");
+    // id column is to have same order of rows on SELECT
+    client.Execute("CREATE TABLE IF NOT EXISTS temporary_roundtrip_table (id UInt32, col " + type_name + ") Engine=MergeTree() ORDER BY id;");
     {
         Block block;
         block.AppendColumn("col", expected);
+        block.AppendColumn("id", std::make_shared<ColumnUInt32>(GenerateConsecutiveNumbers<uint32_t>(expected->Size())));
         block.RefreshRowCount();
         client.Insert("temporary_roundtrip_table", block);
     }
 
-    client.Select("SELECT col FROM temporary_roundtrip_table", [&result](const Block& b) {
+    client.Select("SELECT col FROM temporary_roundtrip_table ORDER BY id", [&result](const Block& b) {
         if (b.GetRowCount() == 0)
             return;
 
