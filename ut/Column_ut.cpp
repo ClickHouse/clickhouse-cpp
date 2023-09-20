@@ -264,7 +264,7 @@ TYPED_TEST(GenericColumnTest, EmptyColumn) {
 
 TYPED_TEST(GenericColumnTest, Append) {
     auto column = this->MakeColumn();
-    const auto values = this->GenerateValues(100);
+    const auto values = this->GenerateValues(10'000);
 
     for (const auto & v : values) {
         EXPECT_NO_THROW(column->Append(v));
@@ -301,7 +301,7 @@ inline auto convertValueForGetItem(const ColumnType& col, ValueType&& t) {
 }
 
 TYPED_TEST(GenericColumnTest, GetItem) {
-    auto [column, values] = this->MakeColumnWithValues(100);
+    auto [column, values] = this->MakeColumnWithValues(10'000);
 
     ASSERT_EQ(values.size(), column->Size());
     const auto wrapping_types = std::set<Type::Code>{
@@ -323,7 +323,7 @@ TYPED_TEST(GenericColumnTest, GetItem) {
 }
 
 TYPED_TEST(GenericColumnTest, Slice) {
-    auto [column, values] = this->MakeColumnWithValues(100);
+    auto [column, values] = this->MakeColumnWithValues(10'000);
 
     auto untyped_slice = column->Slice(0, column->Size());
     auto slice = untyped_slice->template AsStrict<typename TestFixture::ColumnType>();
@@ -335,7 +335,7 @@ TYPED_TEST(GenericColumnTest, Slice) {
 }
 
 TYPED_TEST(GenericColumnTest, CloneEmpty) {
-    auto [column, values] = this->MakeColumnWithValues(100);
+    auto [column, values] = this->MakeColumnWithValues(10'000);
     EXPECT_EQ(values.size(), column->Size());
 
     auto clone_untyped = column->CloneEmpty();
@@ -347,7 +347,7 @@ TYPED_TEST(GenericColumnTest, CloneEmpty) {
 }
 
 TYPED_TEST(GenericColumnTest, Clear) {
-    auto [column, values] = this->MakeColumnWithValues(100);
+    auto [column, values] = this->MakeColumnWithValues(10'000);
     EXPECT_EQ(values.size(), column->Size());
 
     column->Clear();
@@ -355,7 +355,7 @@ TYPED_TEST(GenericColumnTest, Clear) {
 }
 
 TYPED_TEST(GenericColumnTest, Swap) {
-    auto [column_A, values] = this->MakeColumnWithValues(100);
+    auto [column_A, values] = this->MakeColumnWithValues(10'000);
     auto column_B = this->MakeColumn();
 
     column_A->Swap(*column_B);
@@ -398,22 +398,10 @@ const auto AllCompressionMethods = {
 };
 
 TYPED_TEST(GenericColumnTest, RoundTrip) {
-    auto [column, values] = this->MakeColumnWithValues(100);
+    auto [column, values] = this->MakeColumnWithValues(10'000);
     EXPECT_EQ(values.size(), column->Size());
 
     this->TestColumnRoundtrip(column, LocalHostEndpoint, AllCompressionMethods);
-//    for (auto compressionMethod : AllCompressionMethods)
-//    {
-//        clickhouse::Client client(ClientOptions(LocalHostEndpoint)
-//                .SetCompressionMethod(compressionMethod));
-
-//        if (auto message = this->CheckIfShouldSkipTest(client)) {
-//            GTEST_SKIP() << *message;
-//        }
-
-//        auto result_typed = RoundtripColumnValues(client, column)->template AsStrict<typename TestFixture::ColumnType>();
-//        EXPECT_TRUE(CompareRecursive(*column, *result_typed));
-//    }
 }
 
 TYPED_TEST(GenericColumnTest, NullableT_RoundTrip) {
@@ -422,10 +410,10 @@ TYPED_TEST(GenericColumnTest, NullableT_RoundTrip) {
     auto non_nullable_column = this->MakeColumn();
     if (non_nullable_column->GetType().GetCode() == Type::Code::LowCardinality)
         // TODO (vnemkov): wrap as ColumnLowCardinalityT<ColumnNullableT<NestedColumn>> instead of ColumnNullableT<ColumnLowCardinalityT<NestedColumn>>
-        GTEST_SKIP() << "Can't wrap " << non_nullable_column->GetType().GetName() << " into Nullable";
+        GTEST_SKIP() << "Can't have " << non_nullable_column->GetType().GetName() << " in Nullable";
 
     auto column = std::make_shared<NullableType>(std::move(non_nullable_column));
-    auto values = this->GenerateValues(100);
+    auto values = this->GenerateValues(10'000);
 
     FromVectorGenerator<bool> is_null({true, false});
     for (size_t i = 0; i < values.size(); ++i) {
@@ -437,24 +425,12 @@ TYPED_TEST(GenericColumnTest, NullableT_RoundTrip) {
     }
 
     this->TestColumnRoundtrip(column, LocalHostEndpoint, AllCompressionMethods);
-//    for (auto compressionMethod : AllCompressionMethods)
-//    {
-//        clickhouse::Client client(ClientOptions(LocalHostEndpoint)
-//                .SetCompressionMethod(compressionMethod));
-
-//        if (auto message = this->CheckIfShouldSkipTest(client)) {
-//            GTEST_SKIP() << *message;
-//        }
-
-//        auto result_typed = WrapColumn<NullableType>(RoundtripColumnValues(client, column));
-//        EXPECT_TRUE(CompareRecursive(*column, *result_typed));
-//    }
 }
 
 TYPED_TEST(GenericColumnTest, ArrayT_RoundTrip) {
     using ColumnArrayType = ColumnArrayT<typename TestFixture::ColumnType>;
 
-    auto [nested_column, values] = this->MakeColumnWithValues(10);
+    auto [nested_column, values] = this->MakeColumnWithValues(1000);
 
     auto column = std::make_shared<ColumnArrayType>(nested_column->CloneEmpty()->template As<typename TestFixture::ColumnType>());
     for (size_t i = 0; i < values.size(); ++i)
@@ -467,22 +443,5 @@ TYPED_TEST(GenericColumnTest, ArrayT_RoundTrip) {
     EXPECT_EQ(values.size(), column->Size());
 
     this->TestColumnRoundtrip(column, LocalHostEndpoint, AllCompressionMethods);
-
-//    SCOPED_TRACE(::testing::Message("Column type: ") << column->GetType().GetName());
-
-//    for (auto compressionMethod : AllCompressionMethods)
-//    {
-//        const ClientOptions client_options = ClientOptions(LocalHostEndpoint).SetCompressionMethod(compressionMethod);
-//        SCOPED_TRACE(::testing::Message("Client options: ") << client_options);
-
-//        clickhouse::Client client(client_options);
-
-//        if (auto message = this->CheckIfShouldSkipTest(client)) {
-//            GTEST_SKIP() << *message;
-//        }
-
-//        auto result_typed = RoundtripColumnValues(client, column)->template AsStrict<ColumnArrayType>();
-//        EXPECT_TRUE(CompareRecursive(*column, *result_typed));
-//    }
 }
 
