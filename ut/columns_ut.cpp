@@ -58,6 +58,19 @@ TEST(ColumnsCase, NumericSlice) {
     ASSERT_EQ(sub->At(2), 13u);
 }
 
+TEST(ColumnsCase, NumericSwap) {
+    auto col = std::make_shared<ColumnUInt32>(MakeNumbers());
+
+    ASSERT_EQ(col->Size(), 11u);
+    ASSERT_EQ(col->At(3),   7u);
+    ASSERT_EQ(col->At(10), 31u);
+
+    col->SwapElements(3, 10);
+
+    ASSERT_EQ(col->Size(), 11u);
+    ASSERT_EQ(col->At(3),  31u);
+    ASSERT_EQ(col->At(10),  7u);
+}
 
 TEST(ColumnsCase, FixedStringInit) {
     const auto column_data = MakeFixedStrings(3);

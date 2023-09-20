@@ -305,6 +305,47 @@ TYPED_TEST(GenericColumnTest, Clear) {
     EXPECT_EQ(0u, column->Size());
 }
 
+// Check if ColumnType is numeric
+template <typename ColumnType>
+inline bool isNumericColumnType([[maybe_unused]]const ColumnType& col) {
+    if        constexpr (std::is_same_v<ColumnType, ColumnUInt8>) {
+        return true;
+    } else if constexpr (std::is_same_v<ColumnType, ColumnUInt16>) {
+        return true;
+    } else if constexpr (std::is_same_v<ColumnType, ColumnUInt32>) {
+        return true;
+    } else if constexpr (std::is_same_v<ColumnType, ColumnUInt64>) {
+        return true;
+    } else if constexpr (std::is_same_v<ColumnType, ColumnInt8>) {
+        return true;
+    } else if constexpr (std::is_same_v<ColumnType, ColumnInt16>) {
+        return true;
+    } else if constexpr (std::is_same_v<ColumnType, ColumnInt32>) {
+        return true;
+    } else if constexpr (std::is_same_v<ColumnType, ColumnInt64>) {
+        return true;
+    } else if constexpr (std::is_same_v<ColumnType, ColumnFloat32>) {
+        return true;
+    } else if constexpr (std::is_same_v<ColumnType, ColumnFloat64>) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+TYPED_TEST(GenericColumnTest, Capacity) {
+    auto [column, values] = this->MakeColumnWithValues(100);
+    EXPECT_EQ(values.size(), column->Size());
+
+    column->Reserve(200);
+
+    if (isNumericColumnType(*column)) {
+        EXPECT_EQ(200u, column->Capacity());
+    } else {
+        EXPECT_EQ(100u, column->Capacity());
+    }
+}
+
 TYPED_TEST(GenericColumnTest, Swap) {
     auto [column_A, values] = this->MakeColumnWithValues(100);
     auto column_B = this->MakeColumn();
