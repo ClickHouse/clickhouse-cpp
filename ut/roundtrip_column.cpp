@@ -29,15 +29,15 @@ std::vector<T> GenerateConsecutiveNumbers(size_t count, T start = 0)
 
 
 ColumnRef RoundtripColumnValues(Client& client, ColumnRef expected) {
-    // Create a temporary table with a single column
-    // insert values from `expected`
-    // select and aggregate all values from block into `result` column
+    // Create a temporary table with a corresponding data column
+    // INSERT values from `expected`
+    // SELECT and collect all values from block into `result` column
     auto result = expected->CloneEmpty();
 
     const std::string type_name = result->GetType().GetName();
-    client.Execute("DROP TABLE IF EXISTS temporary_roundtrip_table;");
-    // id column is to have same order of rows on SELECT
-    client.Execute("CREATE TABLE IF NOT EXISTS temporary_roundtrip_table (id UInt32, col " + type_name + ") Engine=MergeTree() ORDER BY id;");
+    client.Execute("DROP TEMPORARY TABLE IF EXISTS temporary_roundtrip_table;");
+    // id column is to have the same order of rows on SELECT
+    client.Execute("CREATE TEMPORARY TABLE IF NOT EXISTS temporary_roundtrip_table (id UInt32, col " + type_name + ") Engine=MergeTree() ORDER BY id;");
     {
         Block block;
         block.AppendColumn("col", expected);
