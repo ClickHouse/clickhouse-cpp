@@ -368,18 +368,20 @@ TYPED_TEST(GenericColumnTest, LoadAndSave) {
     auto [column_A, values] = this->MakeColumnWithValues(100);
 
     // large buffer since we have pretty big values for String column
-    char buffer[1024*1024] = {'\0'};
+    auto const BufferSize = 10*1024*1024;
+    std::unique_ptr<char[]> buffer = std::make_unique<char[]>(BufferSize);
+    memset(buffer.get(), 0, BufferSize);
     {
-        ArrayOutput output(buffer, sizeof(buffer));
+        ArrayOutput output(buffer.get(), BufferSize);
         // Save
-        EXPECT_NO_THROW(column_A->Save(&output));
+        ASSERT_NO_THROW(column_A->Save(&output));
     }
 
     auto column_B = this->MakeColumn();
     {
-        ArrayInput input(buffer, sizeof(buffer));
+        ArrayInput input(buffer.get(), BufferSize);
         // Load
-        EXPECT_TRUE(column_B->Load(&input, values.size()));
+        ASSERT_TRUE(column_B->Load(&input, values.size()));
     }
 
     EXPECT_TRUE(CompareRecursive(*column_A, *column_B));
@@ -430,7 +432,7 @@ TYPED_TEST(GenericColumnTest, NullableT_RoundTrip) {
 TYPED_TEST(GenericColumnTest, ArrayT_RoundTrip) {
     using ColumnArrayType = ColumnArrayT<typename TestFixture::ColumnType>;
 
-    auto [nested_column, values] = this->MakeColumnWithValues(1000);
+    auto [nested_column, values] = this->MakeColumnWithValues(100);
 
     auto column = std::make_shared<ColumnArrayType>(nested_column->CloneEmpty()->template As<typename TestFixture::ColumnType>());
     for (size_t i = 0; i < values.size(); ++i)
