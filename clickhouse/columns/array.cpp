@@ -25,14 +25,9 @@ ColumnArray::ColumnArray(ColumnArray&& other)
 }
 
 void ColumnArray::AppendAsColumn(ColumnRef array) {
-    if (!data_->Type()->IsEqual(array->Type())) {
-        throw ValidationError(
-            "can't append column of type " + array->Type()->GetName() + " "
-            "to column type " + data_->Type()->GetName());
-    }
-
-    AddOffset(array->Size());
+    // appending data may throw (i.e. due to ype check failure), so do it first to avoid partly modified state.
     data_->Append(array);
+    AddOffset(array->Size());
 }
 
 ColumnRef ColumnArray::GetAsColumn(size_t n) const {
@@ -59,10 +54,6 @@ ColumnRef ColumnArray::CloneEmpty() const {
 
 void ColumnArray::Append(ColumnRef column) {
     if (auto col = column->As<ColumnArray>()) {
-        if (!col->data_->Type()->IsEqual(data_->Type())) {
-            return;
-        }
-
         for (size_t i = 0; i < col->Size(); ++i) {
             AppendAsColumn(col->GetAsColumn(i));
         }

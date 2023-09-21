@@ -16,6 +16,9 @@
 #include <clickhouse/client.h>
 
 #include <gtest/gtest.h>
+#include <initializer_list>
+#include <memory>
+#include <type_traits>
 
 #include "utils.h"
 #include "roundtrip_column.h"
@@ -46,10 +49,12 @@ std::ostream& operator<<(std::ostream& ostr, const Type::Code& type_code) {
 template <typename ColumnTypeT,
           typename std::shared_ptr<ColumnTypeT> (*CreatorFunction)(),
           typename GeneratorValueType,
-          typename std::vector<GeneratorValueType> (*GeneratorFunc)()>
+          typename std::vector<GeneratorValueType> (*GeneratorFunction)()>
 struct GenericColumnTestCase
 {
     using ColumnType = ColumnTypeT;
+    static constexpr auto Creator = CreatorFunction;
+    static constexpr auto Generator = GeneratorFunction;
 
     static auto createColumn()
     {
@@ -58,7 +63,7 @@ struct GenericColumnTestCase
 
     static auto generateValues()
     {
-        return GeneratorFunc();
+        return GeneratorFunction();
     }
 };
 
@@ -92,7 +97,7 @@ public:
         return std::tuple{column, values};
     }
 
-    static std::optional<std::string> SkipTest(clickhouse::Client& client) {
+    static std::optional<std::string> CheckIfShouldSkipTest(clickhouse::Client& client) {
         if constexpr (std::is_same_v<ColumnType, ColumnDate32>) {
             // Date32 first appeared in v21.9.2.17-stable
             const auto server_info = client.GetServerInfo();
@@ -112,6 +117,33 @@ public:
             }
         }
         return std::nullopt;
+    }
+
+    template <typename ColumnType>
+    static void TestColumnRoundtrip(const std::shared_ptr<ColumnType> & column, const ClientOptions & client_options)
+    {
+        SCOPED_TRACE(::testing::Message("Column type: ") << column->GetType().GetName());
+        SCOPED_TRACE(::testing::Message("Client options: ") << client_options);
+
+        clickhouse::Client client(client_options);
+
+        if (auto message = CheckIfShouldSkipTest(client)) {
+            GTEST_SKIP() << *message;
+        }
+
+        auto result_typed = RoundtripColumnValues(client, column)->template AsStrict<ColumnType>();
+        EXPECT_TRUE(CompareRecursive(*column, *result_typed));
+    }
+
+
+    template <typename ColumnType, typename CompressionMethods>
+    static void TestColumnRoundtrip(const ColumnType & column, const ClientOptions & client_options, CompressionMethods && compression_methods)
+    {
+        for (auto compressionMethod : compression_methods)
+        {
+            ClientOptions new_options = ClientOptions(client_options).SetCompressionMethod(compressionMethod);
+            TestColumnRoundtrip(column, new_options);
+        }
     }
 };
 
@@ -184,7 +216,17 @@ using TestCases = ::testing::Types<
     DecimalColumnTestCase<ColumnDecimal, 12, 9>,
 
     DecimalColumnTestCase<ColumnDecimal, 6, 0>,
-    DecimalColumnTestCase<ColumnDecimal, 6, 3>
+    DecimalColumnTestCase<ColumnDecimal, 6, 3>,
+
+    GenericColumnTestCase<ColumnLowCardinalityT<ColumnString>, &makeColumn<ColumnLowCardinalityT<ColumnString>>, std::string, &MakeStrings>
+
+    // Array(String)
+//    GenericColumnTestCase<ColumnArrayT<ColumnString>, &makeColumn<ColumnArrayT<ColumnString>>, std::vector<std::string>, &MakeArrays<std::string, &MakeStrings>>
+
+//    // Array(Array(String))
+//    GenericColumnTestCase<ColumnArrayT<ColumnArrayT<ColumnString>>, &makeColumn<ColumnArrayT<ColumnArrayT<ColumnString>>>,
+//            std::vector<std::vector<std::string>>,
+//            &MakeArrays<std::vector<std::string>, &MakeArrays<std::string, &MakeStrings>>>
     >;
 
 TYPED_TEST_SUITE(GenericColumnTest, TestCases);
@@ -222,7 +264,7 @@ TYPED_TEST(GenericColumnTest, EmptyColumn) {
 
 TYPED_TEST(GenericColumnTest, Append) {
     auto column = this->MakeColumn();
-    const auto values = this->GenerateValues(100);
+    const auto values = this->GenerateValues(10'000);
 
     for (const auto & v : values) {
         EXPECT_NO_THROW(column->Append(v));
@@ -259,10 +301,17 @@ inline auto convertValueForGetItem(const ColumnType& col, ValueType&& t) {
 }
 
 TYPED_TEST(GenericColumnTest, GetItem) {
-    auto [column, values] = this->MakeColumnWithValues(100);
+    auto [column, values] = this->MakeColumnWithValues(10'000);
 
     ASSERT_EQ(values.size(), column->Size());
-    ASSERT_EQ(column->GetItem(0).type, column->GetType().GetCode());
+    const auto wrapping_types = std::set<Type::Code>{
+        Type::Code::LowCardinality, Type::Code::Array, Type::Code::Nullable
+    };
+
+    // For wrapping types, type of ItemView can be different from type of column
+    if (wrapping_types.find(column->GetType().GetCode()) == wrapping_types.end() ) {
+        EXPECT_EQ(column->GetItem(0).type, column->GetType().GetCode());
+    }
 
     for (size_t i = 0; i < values.size(); ++i) {
         const auto v = convertValueForGetItem(*column, values[i]);
@@ -274,7 +323,7 @@ TYPED_TEST(GenericColumnTest, GetItem) {
 }
 
 TYPED_TEST(GenericColumnTest, Slice) {
-    auto [column, values] = this->MakeColumnWithValues(100);
+    auto [column, values] = this->MakeColumnWithValues(10'000);
 
     auto untyped_slice = column->Slice(0, column->Size());
     auto slice = untyped_slice->template AsStrict<typename TestFixture::ColumnType>();
@@ -286,7 +335,7 @@ TYPED_TEST(GenericColumnTest, Slice) {
 }
 
 TYPED_TEST(GenericColumnTest, CloneEmpty) {
-    auto [column, values] = this->MakeColumnWithValues(100);
+    auto [column, values] = this->MakeColumnWithValues(10'000);
     EXPECT_EQ(values.size(), column->Size());
 
     auto clone_untyped = column->CloneEmpty();
@@ -298,7 +347,7 @@ TYPED_TEST(GenericColumnTest, CloneEmpty) {
 }
 
 TYPED_TEST(GenericColumnTest, Clear) {
-    auto [column, values] = this->MakeColumnWithValues(100);
+    auto [column, values] = this->MakeColumnWithValues(10'000);
     EXPECT_EQ(values.size(), column->Size());
 
     column->Clear();
@@ -306,7 +355,7 @@ TYPED_TEST(GenericColumnTest, Clear) {
 }
 
 TYPED_TEST(GenericColumnTest, Swap) {
-    auto [column_A, values] = this->MakeColumnWithValues(100);
+    auto [column_A, values] = this->MakeColumnWithValues(10'000);
     auto column_B = this->MakeColumn();
 
     column_A->Swap(*column_B);
@@ -318,18 +367,21 @@ TYPED_TEST(GenericColumnTest, Swap) {
 TYPED_TEST(GenericColumnTest, LoadAndSave) {
     auto [column_A, values] = this->MakeColumnWithValues(100);
 
-    char buffer[4096] = {'\0'};
+    // large buffer since we have pretty big values for String column
+    auto const BufferSize = 10*1024*1024;
+    std::unique_ptr<char[]> buffer = std::make_unique<char[]>(BufferSize);
+    memset(buffer.get(), 0, BufferSize);
     {
-        ArrayOutput output(buffer, sizeof(buffer));
+        ArrayOutput output(buffer.get(), BufferSize);
         // Save
-        EXPECT_NO_THROW(column_A->Save(&output));
+        ASSERT_NO_THROW(column_A->Save(&output));
     }
 
     auto column_B = this->MakeColumn();
     {
-        ArrayInput input(buffer, sizeof(buffer));
+        ArrayInput input(buffer.get(), BufferSize);
         // Load
-        EXPECT_TRUE(column_B->Load(&input, values.size()));
+        ASSERT_TRUE(column_B->Load(&input, values.size()));
     }
 
     EXPECT_TRUE(CompareRecursive(*column_A, *column_B));
@@ -342,25 +394,28 @@ const auto LocalHostEndpoint = ClientOptions()
         .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", ""))
         .SetDefaultDatabase(getEnvOrDefault("CLICKHOUSE_DB",       "default"));
 
+const auto AllCompressionMethods = {
+    clickhouse::CompressionMethod::None,
+    clickhouse::CompressionMethod::LZ4
+};
+
 TYPED_TEST(GenericColumnTest, RoundTrip) {
-    auto [column, values] = this->MakeColumnWithValues(100);
+    auto [column, values] = this->MakeColumnWithValues(10'000);
     EXPECT_EQ(values.size(), column->Size());
 
-    clickhouse::Client client(LocalHostEndpoint);
-
-    if (auto message = this->SkipTest(client)) {
-        GTEST_SKIP() << *message;
-    }
-
-    auto result_typed = RoundtripColumnValues(client, column)->template AsStrict<typename TestFixture::ColumnType>();
-    EXPECT_TRUE(CompareRecursive(*column, *result_typed));
+    this->TestColumnRoundtrip(column, LocalHostEndpoint, AllCompressionMethods);
 }
 
-TYPED_TEST(GenericColumnTest, NulableT_RoundTrip) {
+TYPED_TEST(GenericColumnTest, NullableT_RoundTrip) {
     using NullableType = ColumnNullableT<typename TestFixture::ColumnType>;
 
-    auto column = std::make_shared<NullableType>(this->MakeColumn());
-    auto values = this->GenerateValues(100);
+    auto non_nullable_column = this->MakeColumn();
+    if (non_nullable_column->GetType().GetCode() == Type::Code::LowCardinality)
+        // TODO (vnemkov): wrap as ColumnLowCardinalityT<ColumnNullableT<NestedColumn>> instead of ColumnNullableT<ColumnLowCardinalityT<NestedColumn>>
+        GTEST_SKIP() << "Can't have " << non_nullable_column->GetType().GetName() << " in Nullable";
+
+    auto column = std::make_shared<NullableType>(std::move(non_nullable_column));
+    auto values = this->GenerateValues(10'000);
 
     FromVectorGenerator<bool> is_null({true, false});
     for (size_t i = 0; i < values.size(); ++i) {
@@ -371,12 +426,24 @@ TYPED_TEST(GenericColumnTest, NulableT_RoundTrip) {
         }
     }
 
-    clickhouse::Client client(LocalHostEndpoint);
-
-    if (auto message = this->SkipTest(client)) {
-        GTEST_SKIP() << *message;
-    }
-
-    auto result_typed = WrapColumn<NullableType>(RoundtripColumnValues(client, column));
-    EXPECT_TRUE(CompareRecursive(*column, *result_typed));
+    this->TestColumnRoundtrip(column, LocalHostEndpoint, AllCompressionMethods);
 }
+
+TYPED_TEST(GenericColumnTest, ArrayT_RoundTrip) {
+    using ColumnArrayType = ColumnArrayT<typename TestFixture::ColumnType>;
+
+    auto [nested_column, values] = this->MakeColumnWithValues(100);
+
+    auto column = std::make_shared<ColumnArrayType>(nested_column->CloneEmpty()->template As<typename TestFixture::ColumnType>());
+    for (size_t i = 0; i < values.size(); ++i)
+    {
+        const std::vector<std::decay_t<decltype(values[0])>> row{values.begin(), values.begin() + i};
+        column->Append(values.begin(), values.begin() + i);
+
+        EXPECT_TRUE(CompareRecursive(row, (*column)[column->Size() - 1]));
+    }
+    EXPECT_EQ(values.size(), column->Size());
+
+    this->TestColumnRoundtrip(column, LocalHostEndpoint, AllCompressionMethods);
+}
+

@@ -105,9 +105,10 @@ TEST(ColumnsCase, FixedString_Append_LargeString) {
 }
 
 TEST(ColumnsCase, StringInit) {
-    auto col = std::make_shared<ColumnString>(MakeStrings());
+    auto values = MakeStrings();
+    auto col = std::make_shared<ColumnString>(values);
 
-    ASSERT_EQ(col->Size(), 4u);
+    ASSERT_EQ(col->Size(), values.size());
     ASSERT_EQ(col->At(1), "ab");
     ASSERT_EQ(col->At(3), "abcd");
 }

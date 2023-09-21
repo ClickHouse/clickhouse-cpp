@@ -143,7 +143,8 @@ struct PrintContainer;
 
 template <typename Left, typename Right>
 ::testing::AssertionResult CompareRecursive(const Left & left, const Right & right) {
-    if constexpr ((is_container_v<Left> || std::is_base_of_v<clickhouse::Column, std::decay_t<Left>>)
+    if constexpr (!is_string_v<Left> && !is_string_v<Right>
+            && (is_container_v<Left> || std::is_base_of_v<clickhouse::Column, std::decay_t<Left>>)
             && (is_container_v<Right> || std::is_base_of_v<clickhouse::Column, std::decay_t<Right>>) ) {
 
         const auto & l = maybeWrapColumnAsContainer(left);

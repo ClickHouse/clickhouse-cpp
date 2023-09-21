@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include "ut/value_generators.h"
 #include "utils.h"
 
 #include <limits>
@@ -112,4 +113,10 @@ TEST(CompareRecursive, OptionalNan) {
     // following will produce compile time error:
 //    EXPECT_FALSE(CompareRecursive(NaNdo, std::nullopt));
 //    EXPECT_FALSE(CompareRecursive(NaNfo, std::nullopt));
+}
+
+
+TEST(Generators, MakeArrays) {
+    auto arrays = MakeArrays<std::string, MakeStrings>();
+    ASSERT_LT(0u, arrays.size());
 }

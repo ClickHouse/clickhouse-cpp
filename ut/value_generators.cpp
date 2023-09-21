@@ -17,7 +17,7 @@ std::vector<uint8_t> MakeBools() {
 }
 
 std::vector<std::string> MakeFixedStrings(size_t string_size) {
-    std::vector<std::string> result {"aaa", "bbb", "ccc", "ddd"};
+    std::vector<std::string> result = MakeStrings();
 
     std::for_each(result.begin(), result.end(), [string_size](auto& value) {
         value.resize(string_size, '\0');
@@ -27,7 +27,28 @@ std::vector<std::string> MakeFixedStrings(size_t string_size) {
 }
 
 std::vector<std::string> MakeStrings() {
-    return {"a", "ab", "abc", "abcd"};
+    return {
+        "a", "ab", "abc", "abcd",
+        "long string to test how those are handled. Here goes more text. "
+        "long string to test how those are handled. Here goes more text. "
+        "long string to test how those are handled. Here goes more text. "
+        "long string to test how those are handled. Here goes more text. "
+        "long string to test how those are handled. Here goes more text. "
+        "long string to test how those are handled. Here goes more text. "
+        "long string to test how those are handled. Here goes more text. "
+        "long string to test how those are handled. Here goes more text. "
+        "long string to test how those are handled. Here goes more text. "
+        "long string to test how those are handled. Here goes more text. "
+        "long string to test how those are handled. Here goes more text. "
+        "long string to test how those are handled. Here goes more text. "
+        "long string to test how those are handled. Here goes more text. "
+        "long string to test how those are handled. Here goes more text. "
+        "long string to test how those are handled. Here goes more text. "
+        "long string to test how those are handled. Here goes more text. "
+        "long string to test how those are handled. Here goes more text. "
+        "long string to test how those are handled. Here goes more text. "
+        "long string to test how those are handled. Here goes more text. "
+    };
 }
 
 std::vector<UUID> MakeUUIDs() {

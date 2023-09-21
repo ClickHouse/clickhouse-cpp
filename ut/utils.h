@@ -167,7 +167,10 @@ std::ostream& operator<<(std::ostream & ostr, const PrintContainer<T>& print_con
     for (auto i = std::begin(container); i != std::end(container); /*intentionally no ++i*/) {
         const auto & elem = *i;
 
-        if constexpr (is_container_v<std::decay_t<decltype(elem)>>) {
+        if constexpr (is_string_v<decltype(elem)>) {
+            ostr << '"' << elem << '"';
+        }
+        else if constexpr (is_container_v<std::decay_t<decltype(elem)>>) {
             ostr << PrintContainer{elem};
         } else {
             ostr << elem;
