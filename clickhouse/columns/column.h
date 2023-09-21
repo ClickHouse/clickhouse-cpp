@@ -80,10 +80,10 @@ public:
     /// Returns count of rows in the column.
     virtual size_t Size() const = 0;
 
-    /// Increase the capacity of the column (currently only supported by numeric types at this time)
+    /// Increase the capacity of the column (currently only supported by numeric/date types at this time)
     virtual void Reserve([[maybe_unused]]size_t new_cap) {}
 
-    /// Returns the capacity of the column (currently only supported by numeric types at this time)
+    /// Returns the capacity of the column (currently only supported by numeric/date types at this time)
     virtual size_t Capacity() const { return Size(); }
 
     /// Makes slice of the current column.

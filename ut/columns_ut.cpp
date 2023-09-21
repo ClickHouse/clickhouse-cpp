@@ -72,6 +72,21 @@ TEST(ColumnsCase, NumericSwap) {
     ASSERT_EQ(col->At(10),  7u);
 }
 
+TEST(ColumnsCase, NumericCompare) {
+    auto col = std::make_shared<ColumnUInt32>(MakeNumbers());
+
+    ASSERT_EQ(col->Size(), 11u);
+    ASSERT_EQ(col->At(3),   7u);
+    ASSERT_EQ(col->At(10), 31u);
+
+    ASSERT_TRUE(col->CompareElementsLT( 3, 10));
+    ASSERT_TRUE(col->CompareElementsGT(10,  3));
+
+    ASSERT_EQ(col->Size(), 11u);
+    ASSERT_EQ(col->At(3),   7u);
+    ASSERT_EQ(col->At(10), 31u);
+}
+
 TEST(ColumnsCase, FixedStringInit) {
     const auto column_data = MakeFixedStrings(3);
     auto col = std::make_shared<ColumnFixedString>(3, column_data);
@@ -367,6 +382,251 @@ TEST(ColumnsCase, Date2038) {
 
     ASSERT_EQ(col1->Size(), 1u);
     ASSERT_EQ(largeDate, col1->At(0));
+}
+
+TEST(ColumnsCase, DateSwap) {
+    auto col = std::make_shared<ColumnDate>();
+
+    col->AppendRaw(1u);
+    col->AppendRaw(1234u);
+
+    ASSERT_EQ(col->Size(),   2u);
+    ASSERT_EQ(col->RawAt(0), 1u);
+    ASSERT_EQ(col->RawAt(1), 1234u);
+
+    col->SwapElements(0, 1);
+
+    ASSERT_EQ(col->Size(),   2u);
+    ASSERT_EQ(col->RawAt(0), 1234u);
+    ASSERT_EQ(col->RawAt(1), 1u);
+}
+
+TEST(ColumnsCase, Date32Swap) {
+    auto col = std::make_shared<ColumnDate32>();
+
+    col->AppendRaw(1);
+    col->AppendRaw(1234);
+
+    ASSERT_EQ(col->Size(),   2u);
+    ASSERT_EQ(col->RawAt(0), 1);
+    ASSERT_EQ(col->RawAt(1), 1234);
+
+    col->SwapElements(0, 1);
+
+    ASSERT_EQ(col->Size(),   2u);
+    ASSERT_EQ(col->RawAt(0), 1234);
+    ASSERT_EQ(col->RawAt(1), 1);
+}
+
+TEST(ColumnsCase, DateTimeSwap) {
+    auto col = std::make_shared<ColumnDateTime>();
+
+    col->Append(1u);
+    col->Append(1234u);
+
+    ASSERT_EQ(col->Size(), 2u);
+    ASSERT_EQ(col->At(0),  1u);
+    ASSERT_EQ(col->At(1),  1234u);
+
+    col->SwapElements(0, 1);
+
+    ASSERT_EQ(col->Size(), 2u);
+    ASSERT_EQ(col->At(0),  1234u);
+    ASSERT_EQ(col->At(1),  1u);
+}
+
+TEST(ColumnsCase, DateTime64Swap) {
+    auto col = std::make_shared<ColumnDateTime64>(6ul);
+
+    col->Append(1u);
+    col->Append(1234u);
+
+    ASSERT_EQ(col->Size(), 2u);
+    ASSERT_EQ(col->At(0),  1u);
+    ASSERT_EQ(col->At(1),  1234u);
+
+    col->SwapElements(0, 1);
+
+    ASSERT_EQ(col->Size(), 2u);
+    ASSERT_EQ(col->At(0),  1234u);
+    ASSERT_EQ(col->At(1),  1u);
+}
+
+TEST(ColumnsCase, Decimal32Swap) {
+    auto col = std::make_shared<ColumnDecimal>(9, 0);
+
+    col->Append(1);
+    col->Append(1234);
+
+    ASSERT_EQ(col->Size(), 2u);
+    ASSERT_EQ(col->At(0),  1);
+    ASSERT_EQ(col->At(1),  1234);
+
+    col->SwapElements(0, 1);
+
+    ASSERT_EQ(col->Size(), 2u);
+    ASSERT_EQ(col->At(0),  1234);
+    ASSERT_EQ(col->At(1),  1);
+}
+
+TEST(ColumnsCase, Decimal64Swap) {
+    auto col = std::make_shared<ColumnDecimal>(18, 0);
+
+    col->Append(1);
+    col->Append(1234);
+
+    ASSERT_EQ(col->Size(), 2u);
+    ASSERT_EQ(col->At(0),  1);
+    ASSERT_EQ(col->At(1),  1234);
+
+    col->SwapElements(0, 1);
+
+    ASSERT_EQ(col->Size(), 2u);
+    ASSERT_EQ(col->At(0),  1234);
+    ASSERT_EQ(col->At(1),  1);
+}
+
+TEST(ColumnsCase, Decimal128Swap) {
+    auto col = std::make_shared<ColumnDecimal>(38, 0);
+
+    col->Append(1);
+    col->Append(1234);
+
+    ASSERT_EQ(col->Size(), 2u);
+    ASSERT_EQ(col->At(0),  1);
+    ASSERT_EQ(col->At(1),  1234);
+
+    col->SwapElements(0, 1);
+
+    ASSERT_EQ(col->Size(), 2u);
+    ASSERT_EQ(col->At(0),  1234);
+    ASSERT_EQ(col->At(1),  1);
+}
+
+TEST(ColumnsCase, DateCompare) {
+    auto col = std::make_shared<ColumnDate>();
+
+    col->AppendRaw(1u);
+    col->AppendRaw(1234u);
+
+    ASSERT_EQ(col->Size(),   2u);
+    ASSERT_EQ(col->RawAt(0), 1u);
+    ASSERT_EQ(col->RawAt(1), 1234u);
+
+    ASSERT_TRUE(col->CompareElementsLT(0, 1));
+    ASSERT_TRUE(col->CompareElementsGT(1, 0));
+
+    ASSERT_EQ(col->Size(),   2u);
+    ASSERT_EQ(col->RawAt(0), 1u);
+    ASSERT_EQ(col->RawAt(1), 1234u);
+}
+
+TEST(ColumnsCase, Date32Compare) {
+    auto col = std::make_shared<ColumnDate32>();
+
+    col->AppendRaw(1);
+    col->AppendRaw(1234);
+
+    ASSERT_EQ(col->Size(),   2u);
+    ASSERT_EQ(col->RawAt(0), 1);
+    ASSERT_EQ(col->RawAt(1), 1234);
+
+    ASSERT_TRUE(col->CompareElementsLT(0, 1));
+    ASSERT_TRUE(col->CompareElementsGT(1, 0));
+
+    ASSERT_EQ(col->Size(),   2u);
+    ASSERT_EQ(col->RawAt(0), 1);
+    ASSERT_EQ(col->RawAt(1), 1234);
+}
+
+TEST(ColumnsCase, DateTimeCompare) {
+    auto col = std::make_shared<ColumnDateTime>();
+
+    col->Append(1u);
+    col->Append(1234u);
+
+    ASSERT_EQ(col->Size(), 2u);
+    ASSERT_EQ(col->At(0),  1u);
+    ASSERT_EQ(col->At(1),  1234u);
+
+    ASSERT_TRUE(col->CompareElementsLT(0, 1));
+    ASSERT_TRUE(col->CompareElementsGT(1, 0));
+
+    ASSERT_EQ(col->Size(), 2u);
+    ASSERT_EQ(col->At(0),  1u);
+    ASSERT_EQ(col->At(1),  1234u);
+}
+
+TEST(ColumnsCase, DateTime64Compare) {
+    auto col = std::make_shared<ColumnDateTime64>(6ul);
+
+    col->Append(1u);
+    col->Append(1234u);
+
+    ASSERT_EQ(col->Size(), 2u);
+    ASSERT_EQ(col->At(0),  1u);
+    ASSERT_EQ(col->At(1),  1234u);
+
+    ASSERT_TRUE(col->CompareElementsLT(0, 1));
+    ASSERT_TRUE(col->CompareElementsGT(1, 0));
+
+    ASSERT_EQ(col->Size(), 2u);
+    ASSERT_EQ(col->At(0),  1u);
+    ASSERT_EQ(col->At(1),  1234u);
+}
+
+TEST(ColumnsCase, Decimal32Compare) {
+    auto col = std::make_shared<ColumnDecimal>(9, 0);
+
+    col->Append(1);
+    col->Append(1234);
+
+    ASSERT_EQ(col->Size(), 2u);
+    ASSERT_EQ(col->At(0),  1);
+    ASSERT_EQ(col->At(1),  1234);
+
+    ASSERT_TRUE(col->CompareElementsLT(0, 1));
+    ASSERT_TRUE(col->CompareElementsGT(1, 0));
+
+    ASSERT_EQ(col->Size(), 2u);
+    ASSERT_EQ(col->At(0),  1);
+    ASSERT_EQ(col->At(1),  1234);
+}
+
+TEST(ColumnsCase, Decimal64Compare) {
+    auto col = std::make_shared<ColumnDecimal>(18, 0);
+
+    col->Append(1);
+    col->Append(1234);
+
+    ASSERT_EQ(col->Size(), 2u);
+    ASSERT_EQ(col->At(0),  1);
+    ASSERT_EQ(col->At(1),  1234);
+
+    ASSERT_TRUE(col->CompareElementsLT(0, 1));
+    ASSERT_TRUE(col->CompareElementsGT(1, 0));
+
+    ASSERT_EQ(col->Size(), 2u);
+    ASSERT_EQ(col->At(0),  1);
+    ASSERT_EQ(col->At(1),  1234);
+}
+
+TEST(ColumnsCase, Decimal128Compare) {
+    auto col = std::make_shared<ColumnDecimal>(38, 0);
+
+    col->Append(1);
+    col->Append(1234);
+
+    ASSERT_EQ(col->Size(), 2u);
+    ASSERT_EQ(col->At(0),  1);
+    ASSERT_EQ(col->At(1),  1234);
+
+    ASSERT_TRUE(col->CompareElementsLT(0, 1));
+    ASSERT_TRUE(col->CompareElementsGT(1, 0));
+
+    ASSERT_EQ(col->Size(), 2u);
+    ASSERT_EQ(col->At(0),  1);
+    ASSERT_EQ(col->At(1),  1234);
 }
 
 TEST(ColumnsCase, EnumTest) {

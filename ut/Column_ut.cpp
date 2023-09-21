@@ -305,9 +305,9 @@ TYPED_TEST(GenericColumnTest, Clear) {
     EXPECT_EQ(0u, column->Size());
 }
 
-// Check if ColumnType is numeric
+// Check if ColumnType supports Capacity/Reserve methods
 template <typename ColumnType>
-inline bool isNumericColumnType([[maybe_unused]]const ColumnType& col) {
+inline bool supportsCapacity([[maybe_unused]]const ColumnType& col) {
     if        constexpr (std::is_same_v<ColumnType, ColumnUInt8>) {
         return true;
     } else if constexpr (std::is_same_v<ColumnType, ColumnUInt16>) {
@@ -324,9 +324,21 @@ inline bool isNumericColumnType([[maybe_unused]]const ColumnType& col) {
         return true;
     } else if constexpr (std::is_same_v<ColumnType, ColumnInt64>) {
         return true;
+    } else if constexpr (std::is_same_v<ColumnType, ColumnInt128>) {
+        return true;
     } else if constexpr (std::is_same_v<ColumnType, ColumnFloat32>) {
         return true;
     } else if constexpr (std::is_same_v<ColumnType, ColumnFloat64>) {
+        return true;
+    } else if constexpr (std::is_same_v<ColumnType, ColumnDate>) {
+        return true;
+    } else if constexpr (std::is_same_v<ColumnType, ColumnDate32>) {
+        return true;
+    } else if constexpr (std::is_same_v<ColumnType, ColumnDateTime>) {
+        return true;
+    } else if constexpr (std::is_same_v<ColumnType, ColumnDateTime64>) {
+        return true;
+    } else if constexpr (std::is_same_v<ColumnType, ColumnDecimal>) {
         return true;
     } else {
         return false;
@@ -339,7 +351,7 @@ TYPED_TEST(GenericColumnTest, Capacity) {
 
     column->Reserve(200);
 
-    if (isNumericColumnType(*column)) {
+    if (supportsCapacity(*column)) {
         EXPECT_EQ(200u, column->Capacity());
     } else {
         EXPECT_EQ(100u, column->Capacity());

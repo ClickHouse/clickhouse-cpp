@@ -45,6 +45,16 @@ void ColumnVector<T>::SwapElements(size_t pos1, size_t pos2) {
 }
 
 template <typename T>
+bool ColumnVector<T>::CompareElementsGT(size_t pos1, size_t pos2) const {
+    return data_[pos1] > data_[pos2];
+}
+
+template <typename T>
+bool ColumnVector<T>::CompareElementsLT(size_t pos1, size_t pos2) const {
+    return data_[pos1] < data_[pos2];
+}
+
+template <typename T>
 void ColumnVector<T>::Clear() {
     data_.clear();
 }

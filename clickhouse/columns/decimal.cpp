@@ -205,12 +205,50 @@ void ColumnDecimal::SaveBody(OutputStream* output) {
     data_->SaveBody(output);
 }
 
+void ColumnDecimal::SwapElements(size_t pos1, size_t pos2) {
+    if (data_->Type()->GetCode() == Type::Int32) {
+        data_->As<ColumnInt32>()->SwapElements(pos1, pos2);
+    } else if (data_->Type()->GetCode() == Type::Int64) {
+        data_->As<ColumnInt64>()->SwapElements(pos1, pos2);
+    } else {
+        data_->As<ColumnInt128>()->SwapElements(pos1, pos2);
+    }
+}
+
+bool ColumnDecimal::CompareElementsGT(size_t pos1, size_t pos2) const {
+    if (data_->Type()->GetCode() == Type::Int32) {
+        return data_->As<ColumnInt32>()->CompareElementsGT(pos1, pos2);
+    } else if (data_->Type()->GetCode() == Type::Int64) {
+        return data_->As<ColumnInt64>()->CompareElementsGT(pos1, pos2);
+    } else {
+        return data_->As<ColumnInt128>()->CompareElementsGT(pos1, pos2);
+    }
+}
+
+bool ColumnDecimal::CompareElementsLT(size_t pos1, size_t pos2) const {
+    if (data_->Type()->GetCode() == Type::Int32) {
+        return data_->As<ColumnInt32>()->CompareElementsLT(pos1, pos2);
+    } else if (data_->Type()->GetCode() == Type::Int64) {
+        return data_->As<ColumnInt64>()->CompareElementsLT(pos1, pos2);
+    } else {
+        return data_->As<ColumnInt128>()->CompareElementsLT(pos1, pos2);
+    }
+}
+
 void ColumnDecimal::Clear() {
     data_->Clear();
 }
 
 size_t ColumnDecimal::Size() const {
     return data_->Size();
+}
+
+void ColumnDecimal::Reserve(size_t new_cap) {
+    data_->Reserve(new_cap);
+}
+
+size_t ColumnDecimal::Capacity() const {
+    return data_->Capacity();
 }
 
 ColumnRef ColumnDecimal::Slice(size_t begin, size_t len) const {

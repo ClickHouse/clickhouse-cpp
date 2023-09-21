@@ -30,7 +30,16 @@ public:
 
     void Erase(size_t pos, size_t count = 1);
 
+    /// Swap two Elements/rows in the column
     void SwapElements(size_t pos1, size_t pos2);
+
+    /// Test if the value at position 1 is greater than the value at position 2
+    /// No range checking is performed for performance
+    bool CompareElementsGT(size_t pos1, size_t pos2) const;
+
+    /// Test if the value at position 1 is less than the value at position 2
+    /// No range checking is performed for performance
+    bool CompareElementsLT(size_t pos1, size_t pos2) const;
 
 public:
     /// Appends content of given column to the end of current one.
