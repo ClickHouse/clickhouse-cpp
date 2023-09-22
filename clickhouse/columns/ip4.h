@@ -19,6 +19,8 @@ public:
      */
     explicit ColumnIPv4(ColumnRef data);
 
+    explicit ColumnIPv4(std::vector<uint32_t>&& data);
+
     /// Appends one element to the column.
     void Append(const std::string& ip);
 

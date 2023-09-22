@@ -9,6 +9,12 @@ ColumnDate::ColumnDate()
 {
 }
 
+ColumnDate::ColumnDate(std::vector<uint16_t>&& data)
+    : Column(Type::CreateDate())
+    , data_(std::make_shared<ColumnUInt16>(std::move(data)))
+{
+}
+
 void ColumnDate::Append(const std::time_t& value) {
     /// The implementation is fundamentally wrong, ignores timezones, leap years and daylight saving.
     data_->Append(static_cast<uint16_t>(value / std::time_t(86400)));
@@ -75,6 +81,12 @@ ItemView ColumnDate::GetItem(size_t index) const {
 ColumnDate32::ColumnDate32()
     : Column(Type::CreateDate32())
     , data_(std::make_shared<ColumnInt32>())
+{
+}
+
+ColumnDate32::ColumnDate32(std::vector<int32_t>&& data)
+    : Column(Type::CreateDate32())
+    , data_(std::make_shared<ColumnInt32>(std::move(data)))
 {
 }
 

@@ -13,6 +13,7 @@ public:
     using ValueType = std::time_t;
 
     ColumnDate();
+    explicit ColumnDate(std::vector<uint16_t>&& data);
 
     /// Appends one element to the end of column.
     /// The implementation is fundamentally wrong, ignores timezones, leap years and daylight saving.
@@ -59,6 +60,7 @@ public:
     using ValueType = std::time_t;
 
     ColumnDate32();
+    explicit ColumnDate32(std::vector<int32_t>&& data);
 
     /// Appends one element to the end of column.
     /// The implementation is fundamentally wrong, ignores timezones, leap years and daylight saving.
