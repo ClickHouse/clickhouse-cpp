@@ -123,7 +123,7 @@ struct ClientOptions {
     * @see LowCardinalitySerializationAdaptor, CreateColumnByType
     */
     [[deprecated("Makes implementation of LC(X) harder and code uglier. Will be removed in next major release (3.0) ")]]
-    DECLARE_FIELD(backward_compatibility_lowcardinality_as_wrapped_column, bool, SetBakcwardCompatibilityFeatureLowCardinalityAsWrappedColumn, true);
+    DECLARE_FIELD(backward_compatibility_lowcardinality_as_wrapped_column, bool, SetBakcwardCompatibilityFeatureLowCardinalityAsWrappedColumn, false);
 
     /** Set max size data to compress if compression enabled.
      *
