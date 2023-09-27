@@ -164,6 +164,16 @@ ColumnDateTime::ColumnDateTime(std::string timezone)
 {
 }
 
+ColumnDateTime::ColumnDateTime(std::vector<uint32_t>&& data)
+    : Column(Type::CreateDateTime())
+    , data_(std::make_shared<ColumnUInt32>(std::move(data))) {
+}
+
+ColumnDateTime::ColumnDateTime(std::string timezone, std::vector<uint32_t>&& data)
+    : Column(Type::CreateDateTime(std::move(timezone)))
+    , data_(std::make_shared<ColumnUInt32>(std::move(data))) {
+}
+
 void ColumnDateTime::Append(const std::time_t& value) {
     data_->Append(static_cast<uint32_t>(value));
 }

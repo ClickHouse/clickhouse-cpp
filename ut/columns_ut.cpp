@@ -199,6 +199,17 @@ TEST(ColumnsCase, Date32_Int32_interface) {
     ASSERT_EQ(col1->RawAt(2), -1234);
 }
 
+TEST(ColumnsCase, DateTime_construct_from_rvalue_data) {
+    auto const expected = MakeNumbers<uint32_t>();
+
+    auto data = expected;
+    auto col1 = std::make_shared<ColumnDateTime>(std::move(data));
+
+    ASSERT_EQ(col1->Size(), expected.size());
+    for (size_t i = 0; i < expected.size(); ++i) {
+        ASSERT_EQ(col1->At(i), static_cast<std::time_t>(expected[i]));
+    }
+}
 
 TEST(ColumnsCase, DateTime64_0) {
     auto column = std::make_shared<ColumnDateTime64>(0ul);

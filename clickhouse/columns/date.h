@@ -109,7 +109,10 @@ public:
     using ValueType = std::time_t;
 
     ColumnDateTime();
+    explicit ColumnDateTime(std::vector<uint32_t>&& data);
+
     explicit ColumnDateTime(std::string timezone);
+    ColumnDateTime(std::string timezone, std::vector<uint32_t>&& data);
 
     /// Appends one element to the end of column.
     void Append(const std::time_t& value);
