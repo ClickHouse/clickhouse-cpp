@@ -200,6 +200,10 @@ std::time_t ColumnDateTime::At(size_t n) const {
     return data_->At(n);
 }
 
+void ColumnDateTime::AppendRaw(uint32_t value) {
+    data_->Append(value);
+}
+
 std::string ColumnDateTime::Timezone() const {
     return type_->As<DateTimeType>()->Timezone();
 }

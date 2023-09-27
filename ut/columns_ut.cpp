@@ -421,8 +421,8 @@ TEST(ColumnsCase, Date32Swap) {
 TEST(ColumnsCase, DateTimeSwap) {
     auto col = std::make_shared<ColumnDateTime>();
 
-    col->Append(1u);
-    col->Append(1234u);
+    col->AppendRaw(1u);
+    col->AppendRaw(1234u);
 
     ASSERT_EQ(col->Size(), 2u);
     ASSERT_EQ(col->At(0),  1u);

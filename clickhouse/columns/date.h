@@ -150,6 +150,9 @@ public:
     std::time_t At(size_t n) const;
     inline std::time_t operator [] (size_t n) const { return At(n); }
 
+    /// Append raw as UNIX epoch seconds in uint32
+    void AppendRaw(uint32_t value);
+
     /// Timezone associated with a data column.
     std::string Timezone() const;
 
