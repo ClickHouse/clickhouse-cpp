@@ -228,10 +228,7 @@ TEST(ColumnsCase, DateTime_construct_from_rvalue_data) {
     auto data = expected;
     auto col1 = std::make_shared<ColumnDateTime>(std::move(data));
 
-    ASSERT_EQ(col1->Size(), expected.size());
-    for (size_t i = 0; i < expected.size(); ++i) {
-        ASSERT_EQ(col1->At(i), static_cast<std::time_t>(expected[i]));
-    }
+    EXPECT_TRUE(CompareRecursive(*col1, expected));
 }
 
 TEST(ColumnsCase, DateTime64_0) {
@@ -576,7 +573,7 @@ TEST(ColumnsCase, ColumnIPv4_construct_from_rvalue_data) {
     };
 
     auto col = ColumnIPv4(std::move(data));
-    ASSERT_EQ(col.Size(), expected.size());
+    EXPECT_TRUE(CompareRecursive(col, expected));
 }
 
 TEST(ColumnsCase, ColumnIPv6)
