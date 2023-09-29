@@ -173,7 +173,7 @@ ColumnString::ColumnString(const std::vector<std::string>& data)
     for (const auto & s : data) {
         AppendUnsafe(s);
     }
-};
+}
 
 ColumnString::ColumnString(std::vector<std::string>&& data)
     : ColumnString()

@@ -1,16 +1,35 @@
 #include <clickhouse/client.h>
 
+#include "clickhouse/base/socket.h"
 #include "readonly_client_test.h"
 #include "connection_failed_client_test.h"
+#include "ut/utils_comparison.h"
 #include "utils.h"
+#include "ut/roundtrip_column.h"
+#include "ut/value_generators.h"
 
 #include <gtest/gtest.h>
 
+#include <memory>
 #include <optional>
+#include <string_view>
 #include <thread>
 #include <chrono>
 
 using namespace clickhouse;
+
+
+template <typename T>
+std::shared_ptr<T> createTableWithOneColumn(Client & client, const std::string & table_name, const std::string & column_name)
+{
+    auto col = std::make_shared<T>();
+    const auto type_name = col->GetType().GetName();
+
+    client.Execute("DROP TEMPORARY TABLE IF EXISTS " + table_name + ";");
+    client.Execute("CREATE TEMPORARY TABLE IF NOT EXISTS " + table_name + "( " + column_name + " " + type_name + " )");
+
+    return col;
+}
 
 // Use value-parameterized tests to run same tests with different client
 // options.
@@ -27,13 +46,9 @@ protected:
     template <typename T>
     std::shared_ptr<T> createTableWithOneColumn(Block & block)
     {
-        auto col = std::make_shared<T>();
-        const auto type_name = col->GetType().GetName();
+        auto col = ::createTableWithOneColumn<T>(*client_, table_name, column_name);
 
-        client_->Execute("DROP TEMPORARY TABLE IF EXISTS " + table_name + ";");
-        client_->Execute("CREATE TEMPORARY TABLE IF NOT EXISTS " + table_name + "( " + column_name + " " + type_name + " )");
-
-        block.AppendColumn("test_column", col);
+        block.AppendColumn(column_name, col);
 
         return col;
     }
@@ -1352,3 +1367,60 @@ INSTANTIATE_TEST_SUITE_P(ResetConnectionClientTest, ResetConnectionTestCase,
             .SetRetryTimeout(std::chrono::seconds(1))
     }
 ));
+
+struct CountingSocketFactoryAdapter : public SocketFactory {
+    struct Counters
+    {
+        size_t connect_count = 0;
+
+        void Reset() {
+            *this = Counters();
+        }
+    };
+
+    SocketFactory & socket_factory;
+    Counters& counters;
+
+    CountingSocketFactoryAdapter(SocketFactory & socket_factory, Counters& counters)
+        : socket_factory(socket_factory)
+        , counters(counters)
+    {}
+
+    std::unique_ptr<SocketBase> connect(const ClientOptions& opts, const Endpoint& endpoint) {
+        ++counters.connect_count;
+        return socket_factory.connect(opts, endpoint);
+    }
+
+    void sleepFor(const std::chrono::milliseconds& duration) {
+        return socket_factory.sleepFor(duration);
+    }
+
+};
+
+TEST(SimpleClientTest, issue_335) {
+    auto vals = MakeStrings();
+    auto col = std::make_shared<ColumnString>(vals);
+
+    CountingSocketFactoryAdapter::Counters counters;
+    std::unique_ptr<SocketFactory> wrapped_socket_factory = std::make_unique<NonSecureSocketFactory>();
+    std::unique_ptr<SocketFactory> socket_factory = std::make_unique<CountingSocketFactoryAdapter>(*wrapped_socket_factory, counters);
+
+    Client client(ClientOptions(LocalHostEndpoint)
+                      .SetSendRetries(0), // <<=== crucial for reproducing https://github.com/ClickHouse/clickhouse-cpp/issues/335
+                  std::move(socket_factory));
+
+    EXPECT_EQ(1u, counters.connect_count);
+    EXPECT_TRUE(CompareRecursive(vals, *RoundtripColumnValuesTyped(client, col)));
+
+    counters.Reset();
+
+    client.ResetConnection();
+    EXPECT_EQ(1u, counters.connect_count);
+    EXPECT_TRUE(CompareRecursive(vals, *RoundtripColumnValuesTyped(client, col)));
+
+    counters.Reset();
+
+    client.ResetConnectionEndpoint();
+    EXPECT_EQ(1u, counters.connect_count);
+    EXPECT_TRUE(CompareRecursive(vals, *RoundtripColumnValuesTyped(client, col)));
+}

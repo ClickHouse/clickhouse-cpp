@@ -385,14 +385,15 @@ void Client::Impl::ResetConnectionEndpoint() {
 }
 
 void Client::Impl::CreateConnection() {
-    for (size_t i = 0; i < options_.send_retries;)
+    // i <= 1 to try at least once
+    for (size_t i = 0; i <= 1 || i < options_.send_retries;)
     {
         try
         {
             ResetConnectionEndpoint();
             return;
         } catch (const std::system_error&) {
-            if (++i == options_.send_retries)
+            if (++i >= options_.send_retries)
             {
                 throw;
             }
