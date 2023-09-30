@@ -19,6 +19,15 @@ ColumnIPv4::ColumnIPv4(ColumnRef data)
         throw ValidationError("Expecting ColumnUInt32, got " + (data ? data->GetType().GetName() : "null"));
 }
 
+ColumnIPv4::ColumnIPv4(std::vector<uint32_t>&& data)
+    : Column(Type::CreateIPv4())
+{
+    for (auto& addr : data) {
+        addr = htonl(addr);
+    }
+    data_ = std::make_shared<ColumnUInt32>(std::move(data));
+}
+
 void ColumnIPv4::Append(const std::string& str) {
     uint32_t address;
     if (inet_pton(AF_INET, str.c_str(), &address) != 1)
