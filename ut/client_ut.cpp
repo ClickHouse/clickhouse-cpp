@@ -1369,25 +1369,20 @@ INSTANTIATE_TEST_SUITE_P(ResetConnectionClientTest, ResetConnectionTestCase,
 ));
 
 struct CountingSocketFactoryAdapter : public SocketFactory {
-    struct Counters
-    {
-        size_t connect_count = 0;
 
-        void Reset() {
-            *this = Counters();
-        }
-    };
+    using ConnectRequests = std::vector<std::pair<ClientOptions, Endpoint>>;
 
     SocketFactory & socket_factory;
-    Counters& counters;
+    ConnectRequests & connect_requests;
 
-    CountingSocketFactoryAdapter(SocketFactory & socket_factory, Counters& counters)
+    CountingSocketFactoryAdapter(SocketFactory & socket_factory, ConnectRequests& connect_requests)
         : socket_factory(socket_factory)
-        , counters(counters)
+        , connect_requests(connect_requests)
     {}
 
     std::unique_ptr<SocketBase> connect(const ClientOptions& opts, const Endpoint& endpoint) {
-        ++counters.connect_count;
+        connect_requests.emplace_back(opts, endpoint);
+
         return socket_factory.connect(opts, endpoint);
     }
 
@@ -1395,32 +1390,58 @@ struct CountingSocketFactoryAdapter : public SocketFactory {
         return socket_factory.sleepFor(duration);
     }
 
+    size_t GetConnectRequestsCount() const {
+        return connect_requests.size();
+    }
+
 };
 
 TEST(SimpleClientTest, issue_335) {
+    // Make sure Client connects to server even with ClientOptions.SetSendRetries(0)
     auto vals = MakeStrings();
     auto col = std::make_shared<ColumnString>(vals);
 
-    CountingSocketFactoryAdapter::Counters counters;
+    CountingSocketFactoryAdapter::ConnectRequests connect_requests;
     std::unique_ptr<SocketFactory> wrapped_socket_factory = std::make_unique<NonSecureSocketFactory>();
-    std::unique_ptr<SocketFactory> socket_factory = std::make_unique<CountingSocketFactoryAdapter>(*wrapped_socket_factory, counters);
+    std::unique_ptr<SocketFactory> socket_factory = std::make_unique<CountingSocketFactoryAdapter>(*wrapped_socket_factory, connect_requests);
 
     Client client(ClientOptions(LocalHostEndpoint)
                       .SetSendRetries(0), // <<=== crucial for reproducing https://github.com/ClickHouse/clickhouse-cpp/issues/335
                   std::move(socket_factory));
 
-    EXPECT_EQ(1u, counters.connect_count);
+    EXPECT_EQ(1u, connect_requests.size());
     EXPECT_TRUE(CompareRecursive(vals, *RoundtripColumnValuesTyped(client, col)));
 
-    counters.Reset();
+    connect_requests.clear();
 
     client.ResetConnection();
-    EXPECT_EQ(1u, counters.connect_count);
+    EXPECT_EQ(1u, connect_requests.size());
     EXPECT_TRUE(CompareRecursive(vals, *RoundtripColumnValuesTyped(client, col)));
 
-    counters.Reset();
+    connect_requests.clear();
 
     client.ResetConnectionEndpoint();
-    EXPECT_EQ(1u, counters.connect_count);
+    EXPECT_EQ(1u, connect_requests.size());
     EXPECT_TRUE(CompareRecursive(vals, *RoundtripColumnValuesTyped(client, col)));
+}
+
+TEST(SimpleClientTest, issue_335_reconnects_count) {
+    // Make sure that client attempts to connect to each endpoint at least once.
+    CountingSocketFactoryAdapter::ConnectRequests connect_requests;
+    std::unique_ptr<SocketFactory> wrapped_socket_factory = std::make_unique<NonSecureSocketFactory>();
+    std::unique_ptr<SocketFactory> socket_factory = std::make_unique<CountingSocketFactoryAdapter>(*wrapped_socket_factory, connect_requests);
+
+    const auto endpoints = {
+        Endpoint{"foo-invalid-hostname", 1234},
+        Endpoint{"bar-invalid-hostname", 4567},
+    };
+
+    EXPECT_ANY_THROW(
+        Client(ClientOptions()
+                          .SetEndpoints(endpoints)
+                          .SetSendRetries(0), // <<=== crucial for reproducing https://github.com/ClickHouse/clickhouse-cpp/issues/335
+                      std::move(socket_factory));
+    );
+
+    EXPECT_EQ(endpoints.size(), connect_requests.size());
 }
