@@ -12,12 +12,18 @@
 
 #include <memory>
 #include <optional>
+#include <ostream>
 #include <string_view>
 #include <thread>
 #include <chrono>
 
 using namespace clickhouse;
 
+namespace clickhouse {
+std::ostream & operator << (std::ostream & ostr, const Endpoint & endpoint) {
+    return ostr << endpoint.host << ":" << endpoint.port;
+}
+}
 
 template <typename T>
 std::shared_ptr<T> createTableWithOneColumn(Client & client, const std::string & table_name, const std::string & column_name)
@@ -1431,7 +1437,7 @@ TEST(SimpleClientTest, issue_335_reconnects_count) {
     std::unique_ptr<SocketFactory> wrapped_socket_factory = std::make_unique<NonSecureSocketFactory>();
     std::unique_ptr<SocketFactory> socket_factory = std::make_unique<CountingSocketFactoryAdapter>(*wrapped_socket_factory, connect_requests);
 
-    const auto endpoints = {
+    const std::vector<Endpoint> endpoints = {
         Endpoint{"foo-invalid-hostname", 1234},
         Endpoint{"bar-invalid-hostname", 4567},
     };
@@ -1444,4 +1450,14 @@ TEST(SimpleClientTest, issue_335_reconnects_count) {
     );
 
     EXPECT_EQ(endpoints.size(), connect_requests.size());
+    // make sure there was an attempt to connect to each endpoint at least once.
+    for (const auto & endpoint : endpoints)
+    {
+        auto p = std::find_if(connect_requests.begin(), connect_requests.end(), [&endpoint](const auto & connect_request) {
+            return connect_request.second == endpoint;
+        });
+
+        EXPECT_TRUE(connect_requests.end() != p)
+            << "\tThere was no attempt to connect to endpoint " << endpoint;
+    }
 }
