@@ -58,6 +58,7 @@ TEST(ColumnsCase, NumericSlice) {
     ASSERT_EQ(sub->At(2), 13u);
 }
 
+
 TEST(ColumnsCase, FixedStringInit) {
     const auto column_data = MakeFixedStrings(3);
     auto col = std::make_shared<ColumnFixedString>(3, column_data);
