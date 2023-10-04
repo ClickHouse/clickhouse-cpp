@@ -27,19 +27,17 @@ public:
     void AppendRaw(uint16_t value);
     uint16_t RawAt(size_t n) const;
 
-    /// Swap two Elements/rows in the column
-    void SwapElements(size_t pos1, size_t pos2);
-
-    /// Test if the value at position 1 is greater than the value at position 2
-    /// No range checking is performed for performance
-    bool CompareElementsGT(size_t pos1, size_t pos2) const;
-
-    /// Test if the value at position 1 is less than the value at position 2
-    /// No range checking is performed for performance
-    bool CompareElementsLT(size_t pos1, size_t pos2) const;
-
     /// Appends content of given column to the end of current one.
     void Append(ColumnRef column) override;
+
+    /// Get Raw Vector Contents
+    std::vector<uint16_t> & GetRawVector();
+
+    /// Increase the capacity of the column
+    void Reserve(size_t new_cap);
+
+    /// Returns the capacity of the column
+    size_t Capacity() const;
 
     /// Loads column data from input stream.
     bool LoadBody(InputStream* input, size_t rows) override;
@@ -52,12 +50,6 @@ public:
 
     /// Returns count of rows in the column.
     size_t Size() const override;
-
-    /// Increase the capacity of the column
-    void Reserve(size_t new_cap) override;
-
-    /// Returns the capacity of the column
-    size_t Capacity() const override;
 
     /// Makes slice of the current column.
     ColumnRef Slice(size_t begin, size_t len) const override;
@@ -94,16 +86,14 @@ public:
     void AppendRaw(int32_t value);
     int32_t RawAt(size_t n) const;
 
-    /// Swap two Elements/rows in the column
-    void SwapElements(size_t pos1, size_t pos2);
+    /// Get Raw Vector Contents
+    std::vector<int32_t> & GetRawVector();
 
-    /// Test if the value at position 1 is greater than the value at position 2
-    /// No range checking is performed for performance
-    bool CompareElementsGT(size_t pos1, size_t pos2) const;
+    /// Increase the capacity of the column
+    void Reserve(size_t new_cap);
 
-    /// Test if the value at position 1 is less than the value at position 2
-    /// No range checking is performed for performance
-    bool CompareElementsLT(size_t pos1, size_t pos2) const;
+    /// Returns the capacity of the column
+    size_t Capacity() const;
 
     /// Loads column data from input stream.
     bool LoadBody(InputStream* input, size_t rows) override;
@@ -116,12 +106,6 @@ public:
 
     /// Returns count of rows in the column.
     size_t Size() const override;
-
-    /// Increase the capacity of the column
-    void Reserve(size_t new_cap) override;
-
-    /// Returns the capacity of the column
-    size_t Capacity() const override;
 
     /// Makes slice of the current column.
     ColumnRef Slice(size_t begin, size_t len) const override;
@@ -156,16 +140,14 @@ public:
     /// Timezone associated with a data column.
     std::string Timezone() const;
 
-    /// Swap two Elements/rows in the column
-    void SwapElements(size_t pos1, size_t pos2);
+    /// Get Raw Vector Contents
+    std::vector<uint32_t> & GetRawVector();
 
-    /// Test if the value at position 1 is greater than the value at position 2
-    /// No range checking is performed for performance
-    bool CompareElementsGT(size_t pos1, size_t pos2) const;
+    /// Increase the capacity of the column
+    void Reserve(size_t new_cap);
 
-    /// Test if the value at position 1 is less than the value at position 2
-    /// No range checking is performed for performance
-    bool CompareElementsLT(size_t pos1, size_t pos2) const;
+    /// Returns the capacity of the column
+    size_t Capacity() const;
 
 public:
     /// Appends content of given column to the end of current one.
@@ -182,12 +164,6 @@ public:
 
     /// Returns count of rows in the column.
     size_t Size() const override;
-
-    /// Increase the capacity of the column
-    void Reserve(size_t new_cap) override;
-
-    /// Returns the capacity of the column
-    size_t Capacity() const override;
 
     /// Makes slice of the current column.
     ColumnRef Slice(size_t begin, size_t len) const override;
@@ -223,17 +199,6 @@ public:
     /// Timezone associated with a data column.
     std::string Timezone() const;
 
-    /// Swap two Elements/rows in the column
-    void SwapElements(size_t pos1, size_t pos2);
-
-    /// Test if the value at position 1 is greater than the value at position 2
-    /// No range checking is performed for performance
-    bool CompareElementsGT(size_t pos1, size_t pos2) const;
-
-    /// Test if the value at position 1 is less than the value at position 2
-    /// No range checking is performed for performance
-    bool CompareElementsLT(size_t pos1, size_t pos2) const;
-
 public:
     /// Appends content of given column to the end of current one.
     void Append(ColumnRef column) override;
@@ -249,12 +214,6 @@ public:
 
     /// Returns count of rows in the column.
     size_t Size() const override;
-
-    /// Increase the capacity of the column
-    void Reserve(size_t new_cap) override;
-
-    /// Returns the capacity of the column
-    size_t Capacity() const override;
 
     /// Makes slice of the current column.
     ColumnRef Slice(size_t begin, size_t len) const override;

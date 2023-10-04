@@ -39,19 +39,18 @@ void ColumnVector<T>::Erase(size_t pos, size_t count) {
 }
 
 template <typename T>
-void ColumnVector<T>::SwapElements(size_t pos1, size_t pos2) {
-    auto data_it = data_.begin();
-    std::iter_swap(data_it + pos1, data_it + pos2);
+std::vector<T> & ColumnVector<T>::GetRawVector() {
+    return data_;
 }
 
 template <typename T>
-bool ColumnVector<T>::CompareElementsGT(size_t pos1, size_t pos2) const {
-    return data_[pos1] > data_[pos2];
+void ColumnVector<T>::Reserve(size_t new_cap) {
+    data_.reserve(new_cap);
 }
 
 template <typename T>
-bool ColumnVector<T>::CompareElementsLT(size_t pos1, size_t pos2) const {
-    return data_[pos1] < data_[pos2];
+size_t ColumnVector<T>::Capacity() const {
+    return data_.capacity();
 }
 
 template <typename T>
@@ -86,16 +85,6 @@ void ColumnVector<T>::SaveBody(OutputStream* output) {
 template <typename T>
 size_t ColumnVector<T>::Size() const {
     return data_.size();
-}
-
-template <typename T>
-void ColumnVector<T>::Reserve(size_t new_cap) {
-    data_.reserve(new_cap);
-}
-
-template <typename T>
-size_t ColumnVector<T>::Capacity() const {
-    return data_.capacity();
 }
 
 template <typename T>

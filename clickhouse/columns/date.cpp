@@ -31,22 +31,22 @@ uint16_t ColumnDate::RawAt(size_t n) const {
     return data_->At(n);
 }
 
-void ColumnDate::SwapElements(size_t pos1, size_t pos2) {
-    data_->SwapElements(pos1, pos2);
-}
-
-bool ColumnDate::CompareElementsGT(size_t pos1, size_t pos2) const {
-    return data_->CompareElementsGT(pos1, pos2);
-}
-
-bool ColumnDate::CompareElementsLT(size_t pos1, size_t pos2) const {
-    return data_->CompareElementsLT(pos1, pos2);
-}
-
 void ColumnDate::Append(ColumnRef column) {
     if (auto col = column->As<ColumnDate>()) {
         data_->Append(col->data_);
     }
+}
+
+std::vector<uint16_t> &ColumnDate::GetRawVector() {
+    return data_->GetRawVector();
+}
+
+void ColumnDate::Reserve(size_t new_cap) {
+    data_->Reserve(new_cap);
+}
+
+size_t ColumnDate::Capacity() const {
+    return data_->Capacity();
 }
 
 bool ColumnDate::LoadBody(InputStream* input, size_t rows) {
@@ -59,14 +59,6 @@ void ColumnDate::SaveBody(OutputStream* output) {
 
 size_t ColumnDate::Size() const {
     return data_->Size();
-}
-
-void ColumnDate::Reserve(size_t new_cap) {
-    data_->Reserve(new_cap);
-}
-
-size_t ColumnDate::Capacity() const {
-    return data_->Capacity();
 }
 
 ColumnRef ColumnDate::Slice(size_t begin, size_t len) const {
@@ -118,24 +110,24 @@ void ColumnDate32::Append(ColumnRef column) {
     }
 }
 
+std::vector<int32_t> & ColumnDate32::GetRawVector() {
+    return data_->GetRawVector();
+}
+
+void ColumnDate32::Reserve(size_t new_cap) {
+    data_->Reserve(new_cap);
+}
+
+size_t ColumnDate32::Capacity() const {
+    return data_->Capacity();
+}
+
 void ColumnDate32::AppendRaw(int32_t value) {
     data_->Append(value);
 }
 
 int32_t ColumnDate32::RawAt(size_t n) const {
     return data_->At(n);
-}
-
-void ColumnDate32::SwapElements(size_t pos1, size_t pos2) {
-    data_->SwapElements(pos1, pos2);
-}
-
-bool ColumnDate32::CompareElementsGT(size_t pos1, size_t pos2) const {
-    return data_->CompareElementsGT(pos1, pos2);
-}
-
-bool ColumnDate32::CompareElementsLT(size_t pos1, size_t pos2) const {
-    return data_->CompareElementsLT(pos1, pos2);
 }
 
 bool ColumnDate32::LoadBody(InputStream* input, size_t rows) {
@@ -148,14 +140,6 @@ void ColumnDate32::SaveBody(OutputStream* output) {
 
 size_t ColumnDate32::Size() const {
     return data_->Size();
-}
-
-void ColumnDate32::Reserve(size_t new_cap) {
-    data_->Reserve(new_cap);
-}
-
-size_t ColumnDate32::Capacity() const {
-    return data_->Capacity();
 }
 
 ColumnRef ColumnDate32::Slice(size_t begin, size_t len) const {
@@ -208,22 +192,22 @@ std::string ColumnDateTime::Timezone() const {
     return type_->As<DateTimeType>()->Timezone();
 }
 
-void ColumnDateTime::SwapElements(size_t pos1, size_t pos2) {
-    data_->SwapElements(pos1, pos2);
-}
-
-bool ColumnDateTime::CompareElementsGT(size_t pos1, size_t pos2) const {
-    return data_->CompareElementsGT(pos1, pos2);
-}
-
-bool ColumnDateTime::CompareElementsLT(size_t pos1, size_t pos2) const {
-    return data_->CompareElementsLT(pos1, pos2);
-}
-
 void ColumnDateTime::Append(ColumnRef column) {
     if (auto col = column->As<ColumnDateTime>()) {
         data_->Append(col->data_);
     }
+}
+
+std::vector<uint32_t> & ColumnDateTime::GetRawVector() {
+    return data_->GetRawVector();
+}
+
+void ColumnDateTime::Reserve(size_t new_cap) {
+    data_->Reserve(new_cap);
+}
+
+size_t ColumnDateTime::Capacity() const {
+    return data_->Capacity();
 }
 
 bool ColumnDateTime::LoadBody(InputStream* input, size_t rows) {
@@ -236,14 +220,6 @@ void ColumnDateTime::SaveBody(OutputStream* output) {
 
 size_t ColumnDateTime::Size() const {
     return data_->Size();
-}
-
-void ColumnDateTime::Reserve(size_t new_cap) {
-    data_->Reserve(new_cap);
-}
-
-size_t ColumnDateTime::Capacity() const {
-    return data_->Capacity();
 }
 
 void ColumnDateTime::Clear() {
@@ -301,18 +277,6 @@ Int64 ColumnDateTime64::At(size_t n) const {
     return static_cast<Int64>(data_->At(n));
 }
 
-void ColumnDateTime64::SwapElements(size_t pos1, size_t pos2) {
-    data_->SwapElements(pos1, pos2);
-}
-
-bool ColumnDateTime64::CompareElementsGT(size_t pos1, size_t pos2) const {
-    return data_->CompareElementsGT(pos1, pos2);
-}
-
-bool ColumnDateTime64::CompareElementsLT(size_t pos1, size_t pos2) const {
-    return data_->CompareElementsLT(pos1, pos2);
-}
-
 std::string ColumnDateTime64::Timezone() const {
     return type_->As<DateTime64Type>()->Timezone();
 }
@@ -337,14 +301,6 @@ void ColumnDateTime64::Clear() {
 
 size_t ColumnDateTime64::Size() const {
     return data_->Size();
-}
-
-void ColumnDateTime64::Reserve(size_t new_cap) {
-    data_->Reserve(new_cap);
-}
-
-size_t ColumnDateTime64::Capacity() const {
-    return data_->Capacity();
 }
 
 ItemView ColumnDateTime64::GetItem(size_t index) const {

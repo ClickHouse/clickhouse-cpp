@@ -58,35 +58,6 @@ TEST(ColumnsCase, NumericSlice) {
     ASSERT_EQ(sub->At(2), 13u);
 }
 
-TEST(ColumnsCase, NumericSwap) {
-    auto col = std::make_shared<ColumnUInt32>(MakeNumbers());
-
-    ASSERT_EQ(col->Size(), 11u);
-    ASSERT_EQ(col->At(3),   7u);
-    ASSERT_EQ(col->At(10), 31u);
-
-    col->SwapElements(3, 10);
-
-    ASSERT_EQ(col->Size(), 11u);
-    ASSERT_EQ(col->At(3),  31u);
-    ASSERT_EQ(col->At(10),  7u);
-}
-
-TEST(ColumnsCase, NumericCompare) {
-    auto col = std::make_shared<ColumnUInt32>(MakeNumbers());
-
-    ASSERT_EQ(col->Size(), 11u);
-    ASSERT_EQ(col->At(3),   7u);
-    ASSERT_EQ(col->At(10), 31u);
-
-    ASSERT_TRUE(col->CompareElementsLT( 3, 10));
-    ASSERT_TRUE(col->CompareElementsGT(10,  3));
-
-    ASSERT_EQ(col->Size(), 11u);
-    ASSERT_EQ(col->At(3),   7u);
-    ASSERT_EQ(col->At(10), 31u);
-}
-
 TEST(ColumnsCase, FixedStringInit) {
     const auto column_data = MakeFixedStrings(3);
     auto col = std::make_shared<ColumnFixedString>(3, column_data);
@@ -382,251 +353,6 @@ TEST(ColumnsCase, Date2038) {
 
     ASSERT_EQ(col1->Size(), 1u);
     ASSERT_EQ(largeDate, col1->At(0));
-}
-
-TEST(ColumnsCase, DateSwap) {
-    auto col = std::make_shared<ColumnDate>();
-
-    col->AppendRaw(1u);
-    col->AppendRaw(1234u);
-
-    ASSERT_EQ(col->Size(),   2u);
-    ASSERT_EQ(col->RawAt(0), 1u);
-    ASSERT_EQ(col->RawAt(1), 1234u);
-
-    col->SwapElements(0, 1);
-
-    ASSERT_EQ(col->Size(),   2u);
-    ASSERT_EQ(col->RawAt(0), 1234u);
-    ASSERT_EQ(col->RawAt(1), 1u);
-}
-
-TEST(ColumnsCase, Date32Swap) {
-    auto col = std::make_shared<ColumnDate32>();
-
-    col->AppendRaw(1);
-    col->AppendRaw(1234);
-
-    ASSERT_EQ(col->Size(),   2u);
-    ASSERT_EQ(col->RawAt(0), 1);
-    ASSERT_EQ(col->RawAt(1), 1234);
-
-    col->SwapElements(0, 1);
-
-    ASSERT_EQ(col->Size(),   2u);
-    ASSERT_EQ(col->RawAt(0), 1234);
-    ASSERT_EQ(col->RawAt(1), 1);
-}
-
-TEST(ColumnsCase, DateTimeSwap) {
-    auto col = std::make_shared<ColumnDateTime>();
-
-    col->AppendRaw(1u);
-    col->AppendRaw(1234u);
-
-    ASSERT_EQ(col->Size(), 2u);
-    ASSERT_EQ(col->At(0),  1u);
-    ASSERT_EQ(col->At(1),  1234u);
-
-    col->SwapElements(0, 1);
-
-    ASSERT_EQ(col->Size(), 2u);
-    ASSERT_EQ(col->At(0),  1234u);
-    ASSERT_EQ(col->At(1),  1u);
-}
-
-TEST(ColumnsCase, DateTime64Swap) {
-    auto col = std::make_shared<ColumnDateTime64>(6ul);
-
-    col->Append(1u);
-    col->Append(1234u);
-
-    ASSERT_EQ(col->Size(), 2u);
-    ASSERT_EQ(col->At(0),  1u);
-    ASSERT_EQ(col->At(1),  1234u);
-
-    col->SwapElements(0, 1);
-
-    ASSERT_EQ(col->Size(), 2u);
-    ASSERT_EQ(col->At(0),  1234u);
-    ASSERT_EQ(col->At(1),  1u);
-}
-
-TEST(ColumnsCase, Decimal32Swap) {
-    auto col = std::make_shared<ColumnDecimal>(9, 0);
-
-    col->Append(1);
-    col->Append(1234);
-
-    ASSERT_EQ(col->Size(), 2u);
-    ASSERT_EQ(col->At(0),  1);
-    ASSERT_EQ(col->At(1),  1234);
-
-    col->SwapElements(0, 1);
-
-    ASSERT_EQ(col->Size(), 2u);
-    ASSERT_EQ(col->At(0),  1234);
-    ASSERT_EQ(col->At(1),  1);
-}
-
-TEST(ColumnsCase, Decimal64Swap) {
-    auto col = std::make_shared<ColumnDecimal>(18, 0);
-
-    col->Append(1);
-    col->Append(1234);
-
-    ASSERT_EQ(col->Size(), 2u);
-    ASSERT_EQ(col->At(0),  1);
-    ASSERT_EQ(col->At(1),  1234);
-
-    col->SwapElements(0, 1);
-
-    ASSERT_EQ(col->Size(), 2u);
-    ASSERT_EQ(col->At(0),  1234);
-    ASSERT_EQ(col->At(1),  1);
-}
-
-TEST(ColumnsCase, Decimal128Swap) {
-    auto col = std::make_shared<ColumnDecimal>(38, 0);
-
-    col->Append(1);
-    col->Append(1234);
-
-    ASSERT_EQ(col->Size(), 2u);
-    ASSERT_EQ(col->At(0),  1);
-    ASSERT_EQ(col->At(1),  1234);
-
-    col->SwapElements(0, 1);
-
-    ASSERT_EQ(col->Size(), 2u);
-    ASSERT_EQ(col->At(0),  1234);
-    ASSERT_EQ(col->At(1),  1);
-}
-
-TEST(ColumnsCase, DateCompare) {
-    auto col = std::make_shared<ColumnDate>();
-
-    col->AppendRaw(1u);
-    col->AppendRaw(1234u);
-
-    ASSERT_EQ(col->Size(),   2u);
-    ASSERT_EQ(col->RawAt(0), 1u);
-    ASSERT_EQ(col->RawAt(1), 1234u);
-
-    ASSERT_TRUE(col->CompareElementsLT(0, 1));
-    ASSERT_TRUE(col->CompareElementsGT(1, 0));
-
-    ASSERT_EQ(col->Size(),   2u);
-    ASSERT_EQ(col->RawAt(0), 1u);
-    ASSERT_EQ(col->RawAt(1), 1234u);
-}
-
-TEST(ColumnsCase, Date32Compare) {
-    auto col = std::make_shared<ColumnDate32>();
-
-    col->AppendRaw(1);
-    col->AppendRaw(1234);
-
-    ASSERT_EQ(col->Size(),   2u);
-    ASSERT_EQ(col->RawAt(0), 1);
-    ASSERT_EQ(col->RawAt(1), 1234);
-
-    ASSERT_TRUE(col->CompareElementsLT(0, 1));
-    ASSERT_TRUE(col->CompareElementsGT(1, 0));
-
-    ASSERT_EQ(col->Size(),   2u);
-    ASSERT_EQ(col->RawAt(0), 1);
-    ASSERT_EQ(col->RawAt(1), 1234);
-}
-
-TEST(ColumnsCase, DateTimeCompare) {
-    auto col = std::make_shared<ColumnDateTime>();
-
-    col->Append(1u);
-    col->Append(1234u);
-
-    ASSERT_EQ(col->Size(), 2u);
-    ASSERT_EQ(col->At(0),  1u);
-    ASSERT_EQ(col->At(1),  1234u);
-
-    ASSERT_TRUE(col->CompareElementsLT(0, 1));
-    ASSERT_TRUE(col->CompareElementsGT(1, 0));
-
-    ASSERT_EQ(col->Size(), 2u);
-    ASSERT_EQ(col->At(0),  1u);
-    ASSERT_EQ(col->At(1),  1234u);
-}
-
-TEST(ColumnsCase, DateTime64Compare) {
-    auto col = std::make_shared<ColumnDateTime64>(6ul);
-
-    col->Append(1u);
-    col->Append(1234u);
-
-    ASSERT_EQ(col->Size(), 2u);
-    ASSERT_EQ(col->At(0),  1u);
-    ASSERT_EQ(col->At(1),  1234u);
-
-    ASSERT_TRUE(col->CompareElementsLT(0, 1));
-    ASSERT_TRUE(col->CompareElementsGT(1, 0));
-
-    ASSERT_EQ(col->Size(), 2u);
-    ASSERT_EQ(col->At(0),  1u);
-    ASSERT_EQ(col->At(1),  1234u);
-}
-
-TEST(ColumnsCase, Decimal32Compare) {
-    auto col = std::make_shared<ColumnDecimal>(9, 0);
-
-    col->Append(1);
-    col->Append(1234);
-
-    ASSERT_EQ(col->Size(), 2u);
-    ASSERT_EQ(col->At(0),  1);
-    ASSERT_EQ(col->At(1),  1234);
-
-    ASSERT_TRUE(col->CompareElementsLT(0, 1));
-    ASSERT_TRUE(col->CompareElementsGT(1, 0));
-
-    ASSERT_EQ(col->Size(), 2u);
-    ASSERT_EQ(col->At(0),  1);
-    ASSERT_EQ(col->At(1),  1234);
-}
-
-TEST(ColumnsCase, Decimal64Compare) {
-    auto col = std::make_shared<ColumnDecimal>(18, 0);
-
-    col->Append(1);
-    col->Append(1234);
-
-    ASSERT_EQ(col->Size(), 2u);
-    ASSERT_EQ(col->At(0),  1);
-    ASSERT_EQ(col->At(1),  1234);
-
-    ASSERT_TRUE(col->CompareElementsLT(0, 1));
-    ASSERT_TRUE(col->CompareElementsGT(1, 0));
-
-    ASSERT_EQ(col->Size(), 2u);
-    ASSERT_EQ(col->At(0),  1);
-    ASSERT_EQ(col->At(1),  1234);
-}
-
-TEST(ColumnsCase, Decimal128Compare) {
-    auto col = std::make_shared<ColumnDecimal>(38, 0);
-
-    col->Append(1);
-    col->Append(1234);
-
-    ASSERT_EQ(col->Size(), 2u);
-    ASSERT_EQ(col->At(0),  1);
-    ASSERT_EQ(col->At(1),  1234);
-
-    ASSERT_TRUE(col->CompareElementsLT(0, 1));
-    ASSERT_TRUE(col->CompareElementsGT(1, 0));
-
-    ASSERT_EQ(col->Size(), 2u);
-    ASSERT_EQ(col->At(0),  1);
-    ASSERT_EQ(col->At(1),  1234);
 }
 
 TEST(ColumnsCase, EnumTest) {
@@ -1188,4 +914,94 @@ TEST(ColumnsCase, ColumnMapT_Wrap) {
     EXPECT_THROW(map_view.At(0), ValidationError);
     EXPECT_EQ("123", map_view.At(1));
     EXPECT_EQ("abc", map_view.At(2));
+}
+
+TEST(ColumnsCase, ReservedAndCapacity) {
+    std::vector<std::shared_ptr<Column>> columns;
+
+    #define RaC_TEST_CASE(test_id_in, column_type) \
+        case test_id_in: { \
+            columns.push_back(std::make_shared<column_type>()); \
+            auto column = std::static_pointer_cast<column_type>(columns[test_id_in]); \
+            column->Reserve(100u); \
+            ASSERT_EQ(column->Capacity(), 100u); \
+            ASSERT_EQ(columns[test_id_in]->Size(), 0u); \
+            break; \
+        }
+
+    for (uint rac_test_id = 0; rac_test_id < 14; ++rac_test_id) {
+        switch (rac_test_id) {
+            RaC_TEST_CASE( 0, ColumnUInt8);
+            RaC_TEST_CASE( 1, ColumnUInt16);
+            RaC_TEST_CASE( 2, ColumnUInt32);
+            RaC_TEST_CASE( 3, ColumnUInt64);
+            RaC_TEST_CASE( 4, ColumnInt8);
+            RaC_TEST_CASE( 5, ColumnInt16);
+            RaC_TEST_CASE( 6, ColumnInt32);
+            RaC_TEST_CASE( 7, ColumnInt64);
+            RaC_TEST_CASE( 8, ColumnInt128);
+            RaC_TEST_CASE( 9, ColumnFloat32);
+            RaC_TEST_CASE(10, ColumnFloat64);
+            RaC_TEST_CASE(11, ColumnDate);
+            RaC_TEST_CASE(12, ColumnDate32);
+            RaC_TEST_CASE(13, ColumnDateTime);
+            default: {
+                EXPECT_NE(0, 0);
+                break;
+            }
+        }
+    }
+}
+
+TEST(ColumnsCase, RawVector) {
+    std::vector<std::shared_ptr<Column>> columns;
+
+    #define RV_TEST_CASE(test_id_in, column_type) \
+        case test_id_in: { \
+            columns.push_back(std::make_shared<column_type>()); \
+            auto column = std::static_pointer_cast<column_type>(columns[test_id_in]); \
+            column->Append(10u); \
+            column->Append(20u); \
+            ASSERT_EQ(columns[test_id_in]->Size(), 2u); \
+            auto column_v = column->GetRawVector(); \
+            ASSERT_EQ(static_cast<uint>(column_v[0]), 10u); \
+            ASSERT_EQ(static_cast<uint>(column_v[1]), 20u); \
+            break; \
+        }
+
+    #define RV_TEST_CASE_D(test_id_in, column_type) \
+        case test_id_in: { \
+            columns.push_back(std::make_shared<column_type>()); \
+            auto column = std::static_pointer_cast<column_type>(columns[test_id_in]); \
+            column->AppendRaw(10u); \
+            column->AppendRaw(20u); \
+            ASSERT_EQ(columns[test_id_in]->Size(), 2u); \
+            auto column_v = column->GetRawVector(); \
+            ASSERT_EQ(static_cast<uint>(column_v[0]), 10u); \
+            ASSERT_EQ(static_cast<uint>(column_v[1]), 20u); \
+            break; \
+        }
+
+    for (uint rv_test_id = 0; rv_test_id < 14; ++rv_test_id) {
+        switch (rv_test_id) {
+            RV_TEST_CASE(    0, ColumnUInt8);
+            RV_TEST_CASE(    1, ColumnUInt16);
+            RV_TEST_CASE(    2, ColumnUInt32);
+            RV_TEST_CASE(    3, ColumnUInt64);
+            RV_TEST_CASE(    4, ColumnInt8);
+            RV_TEST_CASE(    5, ColumnInt16);
+            RV_TEST_CASE(    6, ColumnInt32);
+            RV_TEST_CASE(    7, ColumnInt64);
+            RV_TEST_CASE(    8, ColumnInt128);
+            RV_TEST_CASE(    9, ColumnFloat32);
+            RV_TEST_CASE(   10, ColumnFloat64);
+            RV_TEST_CASE_D( 11, ColumnDate);
+            RV_TEST_CASE_D( 12, ColumnDate32);
+            RV_TEST_CASE_D( 13, ColumnDateTime);
+            default: {
+                EXPECT_NE(0, 0);
+                break;
+            }
+        }
+    }
 }
