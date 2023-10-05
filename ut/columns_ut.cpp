@@ -965,8 +965,8 @@ TEST(ColumnsCase, RawVector) {
             column->Append(20u); \
             ASSERT_EQ(columns[test_id_in]->Size(), 2u); \
             auto column_v = column->GetRawVector(); \
-            ASSERT_EQ(static_cast<uint>(column_v[0]), 10u); \
-            ASSERT_EQ(static_cast<uint>(column_v[1]), 20u); \
+            ASSERT_EQ(static_cast<uint32_t>(column_v[0]), 10u); \
+            ASSERT_EQ(static_cast<uint32_t>(column_v[1]), 20u); \
             break; \
         }
 
@@ -978,8 +978,8 @@ TEST(ColumnsCase, RawVector) {
             column->AppendRaw(20u); \
             ASSERT_EQ(columns[test_id_in]->Size(), 2u); \
             auto column_v = column->GetRawVector(); \
-            ASSERT_EQ(static_cast<uint>(column_v[0]), 10u); \
-            ASSERT_EQ(static_cast<uint>(column_v[1]), 20u); \
+            ASSERT_EQ(static_cast<uint32_t>(column_v[0]), 10u); \
+            ASSERT_EQ(static_cast<uint32_t>(column_v[1]), 20u); \
             break; \
         }
 
