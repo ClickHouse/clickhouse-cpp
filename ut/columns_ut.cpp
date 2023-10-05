@@ -930,7 +930,7 @@ TEST(ColumnsCase, ReservedAndCapacity) {
             break; \
         }
 
-    for (uint rac_test_id = 0; rac_test_id < 14; ++rac_test_id) {
+    for (uint8_t rac_test_id = 0; rac_test_id < 14; ++rac_test_id) {
         switch (rac_test_id) {
             RaC_TEST_CASE( 0, ColumnUInt8);
             RaC_TEST_CASE( 1, ColumnUInt16);
@@ -983,7 +983,7 @@ TEST(ColumnsCase, RawVector) {
             break; \
         }
 
-    for (uint rv_test_id = 0; rv_test_id < 14; ++rv_test_id) {
+    for (uint8_t rv_test_id = 0; rv_test_id < 14; ++rv_test_id) {
         switch (rv_test_id) {
             RV_TEST_CASE(    0, ColumnUInt8);
             RV_TEST_CASE(    1, ColumnUInt16);
