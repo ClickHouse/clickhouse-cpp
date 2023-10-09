@@ -31,6 +31,15 @@ public:
     /// Appends content of given column to the end of current one.
     void Append(ColumnRef column) override;
 
+    /// Get Raw Vector Contents
+    std::vector<uint16_t> & GetRawVector();
+
+    /// Increase the capacity of the column
+    void Reserve(size_t new_cap);
+
+    /// Returns the capacity of the column
+    size_t Capacity() const;
+
     /// Loads column data from input stream.
     bool LoadBody(InputStream* input, size_t rows) override;
 
@@ -79,6 +88,15 @@ public:
     void AppendRaw(int32_t value);
     int32_t RawAt(size_t n) const;
 
+    /// Get Raw Vector Contents
+    std::vector<int32_t> & GetRawVector();
+
+    /// Increase the capacity of the column
+    void Reserve(size_t new_cap);
+
+    /// Returns the capacity of the column
+    size_t Capacity() const;
+
     /// Loads column data from input stream.
     bool LoadBody(InputStream* input, size_t rows) override;
 
@@ -121,8 +139,20 @@ public:
     std::time_t At(size_t n) const;
     inline std::time_t operator [] (size_t n) const { return At(n); }
 
+    /// Append raw as UNIX epoch seconds in uint32
+    void AppendRaw(uint32_t value);
+
     /// Timezone associated with a data column.
     std::string Timezone() const;
+
+    /// Get Raw Vector Contents
+    std::vector<uint32_t> & GetRawVector();
+
+    /// Increase the capacity of the column
+    void Reserve(size_t new_cap);
+
+    /// Returns the capacity of the column
+    size_t Capacity() const;
 
 public:
     /// Appends content of given column to the end of current one.

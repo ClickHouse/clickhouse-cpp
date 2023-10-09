@@ -43,6 +43,18 @@ void ColumnDate::Append(ColumnRef column) {
     }
 }
 
+std::vector<uint16_t> &ColumnDate::GetRawVector() {
+    return data_->GetRawVector();
+}
+
+void ColumnDate::Reserve(size_t new_cap) {
+    data_->Reserve(new_cap);
+}
+
+size_t ColumnDate::Capacity() const {
+    return data_->Capacity();
+}
+
 bool ColumnDate::LoadBody(InputStream* input, size_t rows) {
     return data_->LoadBody(input, rows);
 }
@@ -108,6 +120,18 @@ void ColumnDate32::Append(ColumnRef column) {
     if (auto col = column->As<ColumnDate32>()) {
         data_->Append(col->data_);
     }
+}
+
+std::vector<int32_t> & ColumnDate32::GetRawVector() {
+    return data_->GetRawVector();
+}
+
+void ColumnDate32::Reserve(size_t new_cap) {
+    data_->Reserve(new_cap);
+}
+
+size_t ColumnDate32::Capacity() const {
+    return data_->Capacity();
 }
 
 void ColumnDate32::AppendRaw(int32_t value) {
@@ -182,6 +206,10 @@ std::time_t ColumnDateTime::At(size_t n) const {
     return data_->At(n);
 }
 
+void ColumnDateTime::AppendRaw(uint32_t value) {
+    data_->Append(value);
+}
+
 std::string ColumnDateTime::Timezone() const {
     return type_->As<DateTimeType>()->Timezone();
 }
@@ -190,6 +218,18 @@ void ColumnDateTime::Append(ColumnRef column) {
     if (auto col = column->As<ColumnDateTime>()) {
         data_->Append(col->data_);
     }
+}
+
+std::vector<uint32_t> & ColumnDateTime::GetRawVector() {
+    return data_->GetRawVector();
+}
+
+void ColumnDateTime::Reserve(size_t new_cap) {
+    data_->Reserve(new_cap);
+}
+
+size_t ColumnDateTime::Capacity() const {
+    return data_->Capacity();
 }
 
 bool ColumnDateTime::LoadBody(InputStream* input, size_t rows) {

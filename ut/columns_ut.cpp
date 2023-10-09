@@ -965,3 +965,93 @@ TEST(ColumnsCase, ColumnMapT_Wrap) {
     EXPECT_EQ("123", map_view.At(1));
     EXPECT_EQ("abc", map_view.At(2));
 }
+
+TEST(ColumnsCase, ReservedAndCapacity) {
+    std::vector<std::shared_ptr<Column>> columns;
+
+    #define RaC_TEST_CASE(test_id_in, column_type) \
+        case test_id_in: { \
+            columns.push_back(std::make_shared<column_type>()); \
+            auto column = std::static_pointer_cast<column_type>(columns[test_id_in]); \
+            column->Reserve(100u); \
+            ASSERT_EQ(column->Capacity(), 100u); \
+            ASSERT_EQ(columns[test_id_in]->Size(), 0u); \
+            break; \
+        }
+
+    for (uint8_t rac_test_id = 0; rac_test_id < 14; ++rac_test_id) {
+        switch (rac_test_id) {
+            RaC_TEST_CASE( 0, ColumnUInt8);
+            RaC_TEST_CASE( 1, ColumnUInt16);
+            RaC_TEST_CASE( 2, ColumnUInt32);
+            RaC_TEST_CASE( 3, ColumnUInt64);
+            RaC_TEST_CASE( 4, ColumnInt8);
+            RaC_TEST_CASE( 5, ColumnInt16);
+            RaC_TEST_CASE( 6, ColumnInt32);
+            RaC_TEST_CASE( 7, ColumnInt64);
+            RaC_TEST_CASE( 8, ColumnInt128);
+            RaC_TEST_CASE( 9, ColumnFloat32);
+            RaC_TEST_CASE(10, ColumnFloat64);
+            RaC_TEST_CASE(11, ColumnDate);
+            RaC_TEST_CASE(12, ColumnDate32);
+            RaC_TEST_CASE(13, ColumnDateTime);
+            default: {
+                EXPECT_NE(0, 0);
+                break;
+            }
+        }
+    }
+}
+
+TEST(ColumnsCase, RawVector) {
+    std::vector<std::shared_ptr<Column>> columns;
+
+    #define RV_TEST_CASE(test_id_in, column_type) \
+        case test_id_in: { \
+            columns.push_back(std::make_shared<column_type>()); \
+            auto column = std::static_pointer_cast<column_type>(columns[test_id_in]); \
+            column->Append(10u); \
+            column->Append(20u); \
+            ASSERT_EQ(columns[test_id_in]->Size(), 2u); \
+            auto column_v = column->GetRawVector(); \
+            ASSERT_EQ(static_cast<uint32_t>(column_v[0]), 10u); \
+            ASSERT_EQ(static_cast<uint32_t>(column_v[1]), 20u); \
+            break; \
+        }
+
+    #define RV_TEST_CASE_D(test_id_in, column_type) \
+        case test_id_in: { \
+            columns.push_back(std::make_shared<column_type>()); \
+            auto column = std::static_pointer_cast<column_type>(columns[test_id_in]); \
+            column->AppendRaw(10u); \
+            column->AppendRaw(20u); \
+            ASSERT_EQ(columns[test_id_in]->Size(), 2u); \
+            auto column_v = column->GetRawVector(); \
+            ASSERT_EQ(static_cast<uint32_t>(column_v[0]), 10u); \
+            ASSERT_EQ(static_cast<uint32_t>(column_v[1]), 20u); \
+            break; \
+        }
+
+    for (uint8_t rv_test_id = 0; rv_test_id < 14; ++rv_test_id) {
+        switch (rv_test_id) {
+            RV_TEST_CASE(    0, ColumnUInt8);
+            RV_TEST_CASE(    1, ColumnUInt16);
+            RV_TEST_CASE(    2, ColumnUInt32);
+            RV_TEST_CASE(    3, ColumnUInt64);
+            RV_TEST_CASE(    4, ColumnInt8);
+            RV_TEST_CASE(    5, ColumnInt16);
+            RV_TEST_CASE(    6, ColumnInt32);
+            RV_TEST_CASE(    7, ColumnInt64);
+            RV_TEST_CASE(    8, ColumnInt128);
+            RV_TEST_CASE(    9, ColumnFloat32);
+            RV_TEST_CASE(   10, ColumnFloat64);
+            RV_TEST_CASE_D( 11, ColumnDate);
+            RV_TEST_CASE_D( 12, ColumnDate32);
+            RV_TEST_CASE_D( 13, ColumnDateTime);
+            default: {
+                EXPECT_NE(0, 0);
+                break;
+            }
+        }
+    }
+}

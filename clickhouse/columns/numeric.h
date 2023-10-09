@@ -30,6 +30,15 @@ public:
 
     void Erase(size_t pos, size_t count = 1);
 
+    /// Get Raw Vector Contents
+    std::vector<T> & GetRawVector();
+
+    /// Increase the capacity of the column
+    void Reserve(size_t new_cap);
+
+    /// Returns the capacity of the column
+    size_t Capacity() const;
+
 public:
     /// Appends content of given column to the end of current one.
     void Append(ColumnRef column) override;
