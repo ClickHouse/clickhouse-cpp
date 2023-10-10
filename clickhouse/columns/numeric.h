@@ -31,7 +31,7 @@ public:
     void Erase(size_t pos, size_t count = 1);
 
     /// Get Raw Vector Contents
-    std::vector<T> & GetRawVector();
+    std::vector<T>& GetWritableData();
 
     /// Increase the capacity of the column
     void Reserve(size_t new_cap);

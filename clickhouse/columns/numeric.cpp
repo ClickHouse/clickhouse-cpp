@@ -39,7 +39,7 @@ void ColumnVector<T>::Erase(size_t pos, size_t count) {
 }
 
 template <typename T>
-std::vector<T> & ColumnVector<T>::GetRawVector() {
+std::vector<T>& ColumnVector<T>::GetWritableData() {
     return data_;
 }
 
