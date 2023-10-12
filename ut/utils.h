@@ -7,6 +7,7 @@
 #include "utils_meta.h"
 #include "utils_comparison.h"
 
+#include <iterator>
 #include <optional>
 #include <ostream>
 #include <ratio>
@@ -181,7 +182,7 @@ std::ostream& operator<<(std::ostream & ostr, const PrintContainer<T>& print_con
         }
     }
 
-    return ostr << "]";
+    return ostr << "] (" << std::size(container) << " items)";
 }
 
 inline uint64_t versionNumber(

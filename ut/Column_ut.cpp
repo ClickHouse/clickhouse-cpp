@@ -16,10 +16,14 @@
 #include <clickhouse/client.h>
 
 #include <gtest/gtest.h>
+#include <algorithm>
 #include <initializer_list>
 #include <memory>
 #include <type_traits>
 
+#include "gtest/internal/gtest-internal.h"
+#include "ut/utils_comparison.h"
+#include "ut/utils_meta.h"
 #include "utils.h"
 #include "roundtrip_column.h"
 #include "value_generators.h"
@@ -363,6 +367,82 @@ TYPED_TEST(GenericColumnTest, Swap) {
     EXPECT_EQ(0u, column_A->Size());
     EXPECT_TRUE(CompareRecursive(values, *column_B));
 }
+
+// GTEST_SKIP for debug builds to draw attention of developer
+#if !defined(NDEBUG)
+#define COLUMN_DOESNT_IMPLEMENT(comment) GTEST_SKIP() << this->MakeColumn()->GetType().GetName() << " doesn't implement " << comment;
+#else
+#define COLUMN_DOESNT_IMPLEMENT(comment) GTEST_SUCCEED() << this->MakeColumn()->GetType().GetName() << " doesn't implement " << comment;
+#endif
+
+TYPED_TEST(GenericColumnTest, ReserveAndCapacity) {
+    if constexpr (
+        // TODO(venemkov): test that ColumnType has Reserve() and Capacity() methods
+        is_one_of_v<typename TestFixture::ColumnType,
+            // Only types that support Reserve() and Capacity() methods
+            ColumnUInt8,
+            ColumnUInt16,
+            ColumnUInt32,
+            ColumnUInt64,
+            ColumnInt8,
+            ColumnInt16,
+            ColumnInt32,
+            ColumnInt64,
+            ColumnInt128,
+            ColumnFloat32,
+            ColumnFloat64,
+            ColumnDate,
+            ColumnDate32,
+            ColumnDateTime>) {
+
+        auto column = this->MakeColumn();
+        EXPECT_EQ(0u, column->Capacity());
+        EXPECT_NO_THROW(column->Reserve(100u));
+        EXPECT_EQ(100u, column->Capacity());
+        EXPECT_EQ(0u, column->Size());
+    }
+    else {
+        COLUMN_DOESNT_IMPLEMENT("method Reserve() and Capacity()");
+    }
+}
+
+
+TYPED_TEST(GenericColumnTest, GetWritableData) {
+    if constexpr (
+        // TODO(venemkov): test that ColumnType has GetWritableData() method
+        is_one_of_v<typename TestFixture::ColumnType,
+        // Only types that support GetWritableData() method
+                    ColumnUInt8,
+                    ColumnUInt16,
+                    ColumnUInt32,
+                    ColumnUInt64,
+                    ColumnInt8,
+                    ColumnInt16,
+                    ColumnInt32,
+                    ColumnInt64,
+                    ColumnInt128,
+                    ColumnFloat32,
+                    ColumnFloat64,
+                    ColumnDate,
+                    ColumnDate32,
+                    ColumnDateTime>) {
+        auto [column, values] = this->MakeColumnWithValues(111);
+        // Do conversion from time_t to internal representation, similar to what ColumnDate and ColumnDate32 do
+        if constexpr (is_one_of_v<typename TestFixture::ColumnType,
+                    ColumnDate,
+                    ColumnDate32>) {
+            std::for_each(values.begin(), values.end(), [](auto & value) {
+                value /= 86400;
+            });
+        }
+
+        EXPECT_TRUE(CompareRecursive(values, column->GetWritableData()));
+    }
+    else {
+        COLUMN_DOESNT_IMPLEMENT("method GetWritableData()");
+    }
+}
+
 
 TYPED_TEST(GenericColumnTest, LoadAndSave) {
     auto [column_A, values] = this->MakeColumnWithValues(100);

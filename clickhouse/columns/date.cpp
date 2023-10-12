@@ -43,8 +43,8 @@ void ColumnDate::Append(ColumnRef column) {
     }
 }
 
-std::vector<uint16_t> &ColumnDate::GetRawVector() {
-    return data_->GetRawVector();
+std::vector<uint16_t>& ColumnDate::GetWritableData() {
+    return data_->GetWritableData();
 }
 
 void ColumnDate::Reserve(size_t new_cap) {
@@ -122,8 +122,8 @@ void ColumnDate32::Append(ColumnRef column) {
     }
 }
 
-std::vector<int32_t> & ColumnDate32::GetRawVector() {
-    return data_->GetRawVector();
+std::vector<int32_t>& ColumnDate32::GetWritableData() {
+    return data_->GetWritableData();
 }
 
 void ColumnDate32::Reserve(size_t new_cap) {
@@ -220,8 +220,8 @@ void ColumnDateTime::Append(ColumnRef column) {
     }
 }
 
-std::vector<uint32_t> & ColumnDateTime::GetRawVector() {
-    return data_->GetRawVector();
+std::vector<uint32_t>& ColumnDateTime::GetWritableData() {
+    return data_->GetWritableData();
 }
 
 void ColumnDateTime::Reserve(size_t new_cap) {

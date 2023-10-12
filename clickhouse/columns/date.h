@@ -32,7 +32,7 @@ public:
     void Append(ColumnRef column) override;
 
     /// Get Raw Vector Contents
-    std::vector<uint16_t> & GetRawVector();
+    std::vector<uint16_t>& GetWritableData();
 
     /// Increase the capacity of the column
     void Reserve(size_t new_cap);
@@ -89,7 +89,7 @@ public:
     int32_t RawAt(size_t n) const;
 
     /// Get Raw Vector Contents
-    std::vector<int32_t> & GetRawVector();
+    std::vector<int32_t>& GetWritableData();
 
     /// Increase the capacity of the column
     void Reserve(size_t new_cap);
@@ -146,7 +146,7 @@ public:
     std::string Timezone() const;
 
     /// Get Raw Vector Contents
-    std::vector<uint32_t> & GetRawVector();
+    std::vector<uint32_t>& GetWritableData();
 
     /// Increase the capacity of the column
     void Reserve(size_t new_cap);

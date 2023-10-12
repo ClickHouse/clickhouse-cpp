@@ -51,3 +51,18 @@ struct is_instantiation_of< Template, Template<Args...> > : std::true_type {};
 
 template <typename T>
 inline constexpr bool is_string_v = std::is_same_v<std::string, std::decay_t<T>> || std::is_same_v<std::string_view, std::decay_t<T>>;
+
+// https://stackoverflow.com/a/34111095
+template <typename...>
+struct is_one_of {
+    static constexpr bool value = false;
+};
+
+template <typename F, typename S, typename... T>
+struct is_one_of<F, S, T...> {
+    static constexpr bool value =
+        std::is_same<F, S>::value || is_one_of<F, T...>::value;
+};
+
+template <typename F, typename S, typename... T>
+inline constexpr bool is_one_of_v = is_one_of<F, S, T...>::value;
