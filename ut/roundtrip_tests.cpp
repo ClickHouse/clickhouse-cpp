@@ -154,6 +154,7 @@ TEST_P(RoundtripCase, Ring) {
         std::vector<ColumnPoint::ValueType> ring{{0.1, 0.2}, {0.3, 0.4}};
         col->Append(ring);
     }
+
     auto result_typed = RoundtripColumnValues(*client_, col)->AsStrict<ColumnRing>();
     EXPECT_TRUE(CompareRecursive(*col, *result_typed));
 }
@@ -174,6 +175,7 @@ TEST_P(RoundtripCase, Polygon) {
             {{{0.1, 0.2}, {0.3, 0.4}}, {{0.5, 0.6}, {0.7, 0.8}}};
         col->Append(polygon);
     }
+
     auto result_typed = RoundtripColumnValues(*client_, col)->AsStrict<ColumnPolygon>();
     EXPECT_TRUE(CompareRecursive(*col, *result_typed));
 }
@@ -196,6 +198,7 @@ TEST_P(RoundtripCase, MultiPolygon) {
              {{{1.1, 1.2}, {1.3, 1.4}}, {{1.5, 1.6}, {1.7, 1.8}}}};
         col->Append(multi_polygon);
     }
+
     auto result_typed = RoundtripColumnValues(*client_, col)->AsStrict<ColumnMultiPolygon>();
     EXPECT_TRUE(CompareRecursive(*col, *result_typed));
 }
@@ -203,11 +206,13 @@ TEST_P(RoundtripCase, MultiPolygon) {
 TEST_P(RoundtripCase, LowCardinalityTString) {
     using TestColumn = ColumnLowCardinalityT<ColumnString>;
     auto col = std::make_shared<TestColumn>();
+
     col->Append("abc");
     col->Append("def");
     col->Append("abc");
     col->Append("abc");
-    auto result_typed = WrapColumn<TestColumn>(RoundtripColumnValues(*client_, col));
+
+    auto result_typed = RoundtripColumnValues(*client_, col)->As<TestColumn>();
     EXPECT_TRUE(CompareRecursive(*col, *result_typed));
 }
 
@@ -224,25 +229,29 @@ TEST_P(RoundtripCase, LowCardinalityTNullableString) {
     col->Append(std::nullopt);
     col->Append("foobar");
 
-    auto result_typed = WrapColumn<TestColumn>(RoundtripColumnValues(*client_, col));
+    auto result_typed = RoundtripColumnValues(*client_, col)->As<TestColumn>();
     EXPECT_TRUE(CompareRecursive(*col, *result_typed));
 }
 
 TEST_P(RoundtripCase, ArrayTNullableString) {
     using TestColumn = ColumnArrayT<ColumnNullableT<ColumnString>>;
     auto col = std::make_shared<TestColumn>();
+
     col->Append({std::nullopt, std::nullopt, std::nullopt});
     col->Append(std::vector<std::optional<std::string>>{"abc", std::nullopt});
-    auto result_typed = WrapColumn<TestColumn>(RoundtripColumnValues(*client_, col));
+
+    auto result_typed = RoundtripColumnValues(*client_, col)->As<TestColumn>();
     EXPECT_TRUE(CompareRecursive(*col, *result_typed));
 }
 
 TEST_P(RoundtripCase, TupleTNullableString) {
     using TestColumn = ColumnTupleT<ColumnNullableT<ColumnString>>;
     auto col = std::make_shared<TestColumn>(std::make_tuple(std::make_shared<ColumnNullableT<ColumnString>>()));
+
     col->Append(std::make_tuple(std::nullopt));
     col->Append(std::make_tuple("abc"));
-    auto result_typed = WrapColumn<TestColumn>(RoundtripColumnValues(*client_, col));
+
+    auto result_typed = RoundtripColumnValues(*client_, col)->As<TestColumn>();
     EXPECT_TRUE(CompareRecursive(*col, *result_typed));
 }
 
@@ -253,17 +262,17 @@ TEST_P(RoundtripCase, Map_TString_TNullableString) {
     auto col = std::make_shared<TestColumn>(std::make_shared<Key>(), std::make_shared<Value>());
     {
         std::map<std::string, std::optional<std::string>> value;
-        value["1"]= "one";
-        value["2"]= std::nullopt;
+        value["1"] = "one";
+        value["2"] = std::nullopt;
         col->Append(value);
     }
     {
         std::map<std::string, std::optional<std::string>> value;
-        value["4"]= "one";
-        value["2"]= std::nullopt;
+        value["4"] = "one";
+        value["2"] = std::nullopt;
         col->Append(value);
     }
-    auto result_typed = WrapColumn<TestColumn>(RoundtripColumnValues(*client_, col));
+    auto result_typed = RoundtripColumnValues(*client_, col)->As<TestColumn>();
     EXPECT_TRUE(CompareRecursive(*col, *result_typed));
 }
 
@@ -271,30 +280,36 @@ TEST_P(RoundtripCase, Map_LowCardinalityTString_LowCardinalityTNullableString) {
     using Key =  ColumnLowCardinalityT<ColumnString>;
     using Value = ColumnLowCardinalityT<ColumnNullableT<ColumnString>>;
     using TestColumn = ColumnMapT<Key, Value>;
+
     auto col = std::make_shared<TestColumn>(std::make_shared<Key>(), std::make_shared<Value>());
     {
         std::map<std::string, std::optional<std::string>> value;
-        value["1"]= "one";
-        value["2"]= std::nullopt;
+
+        value["1"] = "one";
+        value["2"] = std::nullopt;
+
         col->Append(value);
     }
     {
         std::map<std::string, std::optional<std::string>> value;
-        value["4"]= "one";
-        value["2"]= std::nullopt;
+
+        value["4"] = "one";
+        value["2"] = std::nullopt;
+
         col->Append(value);
     }
-    auto result_typed = WrapColumn<TestColumn>(RoundtripColumnValues(*client_, col));
+    auto result_typed = RoundtripColumnValues(*client_, col)->As<TestColumn>();
     EXPECT_TRUE(CompareRecursive(*col, *result_typed));
 }
 
 TEST_P(RoundtripCase, RoundtripArrayLowCardinalityTString) {
     using TestColumn = ColumnArrayT<ColumnLowCardinalityT<ColumnString>>;
     auto array = std::make_shared<TestColumn>();
+
     array->Append(std::vector<std::string>{});
     array->Append(std::vector<std::string>{});
 
-    auto result_typed = WrapColumn<TestColumn>(RoundtripColumnValues(*client_, array));
+    auto result_typed = RoundtripColumnValues(*client_, array)->As<TestColumn>();
     EXPECT_TRUE(CompareRecursive(*array, *result_typed));
 }
 
@@ -311,6 +326,7 @@ INSTANTIATE_TEST_SUITE_P(
         ClientOptions(LocalHostEndpoint)
             .SetPingBeforeQuery(true)
             .SetBakcwardCompatibilityFeatureLowCardinalityAsWrappedColumn(false),
+
         ClientOptions(LocalHostEndpoint)
             .SetPingBeforeQuery(false)
             .SetCompressionMethod(CompressionMethod::LZ4)
