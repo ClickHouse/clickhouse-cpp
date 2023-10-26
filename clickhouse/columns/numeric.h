@@ -9,7 +9,7 @@ namespace clickhouse {
  * Represents various numeric columns.
  */
 template <typename T>
-class ColumnVector : public Column {
+class ColumnVector final : public Column {
 public:
     using DataType = T;
     using ValueType = T;

@@ -24,7 +24,7 @@ class CodedInputStream;
 template <typename AdaptedColumnType>
 class
 [[deprecated("Makes implementation of LC(X) harder and code uglier. Will be removed in next major release (3.0) ")]]
-LowCardinalitySerializationAdaptor : public AdaptedColumnType
+LowCardinalitySerializationAdaptor final : public AdaptedColumnType
 {
 public:
     using AdaptedColumnType::AdaptedColumnType;

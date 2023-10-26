@@ -49,7 +49,7 @@ protected:
 /**
  * A ZeroCopyOutput stream backed by an in-memory array of bytes.
  */
-class ArrayOutput : public ZeroCopyOutput {
+class ArrayOutput final : public ZeroCopyOutput {
 public:
      ArrayOutput(void* buf, size_t len);
     ~ArrayOutput() override;
@@ -96,7 +96,7 @@ private:
  *
  * Doesn't Flush() in destructor, client must ensure to do it manually at some point.
  */
-class BufferOutput : public ZeroCopyOutput {
+class BufferOutput final : public ZeroCopyOutput {
 public:
      BufferOutput(Buffer* buf);
     ~BufferOutput() override;
@@ -116,7 +116,7 @@ private:
  *
  * Doesn't Flush() in destructor, client must ensure to do it manually at some point.
  */
-class BufferedOutput : public ZeroCopyOutput {
+class BufferedOutput final : public ZeroCopyOutput {
 public:
     explicit BufferedOutput(std::unique_ptr<OutputStream> destination, size_t buflen = 8192);
     ~BufferedOutput() override;

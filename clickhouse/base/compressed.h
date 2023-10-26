@@ -6,7 +6,7 @@
 
 namespace clickhouse {
 
-class CompressedInput : public ZeroCopyInput {
+class CompressedInput final : public ZeroCopyInput {
 public:
     explicit CompressedInput(InputStream* input);
     ~CompressedInput() override;
@@ -23,7 +23,7 @@ private:
     ArrayInput mem_;
 };
 
-class CompressedOutput : public OutputStream {
+class CompressedOutput final : public OutputStream {
 public:
     explicit CompressedOutput(OutputStream * destination, size_t max_compressed_chunk_size = 0);
     ~CompressedOutput() override;

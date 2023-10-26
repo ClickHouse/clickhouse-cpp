@@ -48,7 +48,7 @@ protected:
 /**
  * A ZeroCopyInput stream backed by an in-memory array of bytes.
  */
-class ArrayInput : public ZeroCopyInput {
+class ArrayInput final : public ZeroCopyInput {
 public:
      ArrayInput() noexcept;
      ArrayInput(const void* buf, size_t len) noexcept;
@@ -83,7 +83,7 @@ private:
 };
 
 
-class BufferedInput : public ZeroCopyInput {
+class BufferedInput final : public ZeroCopyInput {
 public:
     BufferedInput(std::unique_ptr<InputStream> source, size_t buflen = 8192);
     ~BufferedInput() override;

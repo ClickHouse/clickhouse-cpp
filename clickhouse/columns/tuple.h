@@ -57,7 +57,7 @@ private:
 };
 
 template <typename... Columns>
-class ColumnTupleT : public ColumnTuple {
+class ColumnTupleT final : public ColumnTuple {
 public:
     using TupleOfColumns = std::tuple<std::shared_ptr<Columns>...>;
 

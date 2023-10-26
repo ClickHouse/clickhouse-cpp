@@ -7,7 +7,7 @@ struct in6_addr;
 
 namespace clickhouse {
 
-class ColumnIPv6 : public Column {
+class ColumnIPv6 final : public Column {
 public:
     using DataType = in6_addr;
     using ValueType = in6_addr;

@@ -92,7 +92,7 @@ private:
 };
 
 template <typename ColumnType>
-class ColumnArrayT : public ColumnArray {
+class ColumnArrayT final : public ColumnArray {
 public:
     class ArrayValueView;
     using ValueType = ArrayValueView;
