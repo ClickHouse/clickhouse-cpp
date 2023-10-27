@@ -52,6 +52,9 @@ public:
     /// Appends content of given column to the end of current one.
     virtual void Append(ColumnRef column) = 0;
 
+    /// Increase the capacity of the column for large block insertion.
+    virtual void Reserve(size_t new_cap) = 0;
+
     /// Template method to load column data from input stream. It'll call LoadPrefix and LoadBody.
     /// Should be called only once from the client. Derived classes should not call it.
     bool Load(InputStream* input, size_t rows);

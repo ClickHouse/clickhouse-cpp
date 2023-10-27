@@ -190,6 +190,13 @@ ColumnString::ColumnString(std::vector<std::string>&& data)
 ColumnString::~ColumnString()
 {}
 
+void ColumnString::Reserve(size_t new_cap)
+{
+    items_.reserve(new_cap);
+    // 16 is arbitrary number, assumption that string values are about ~256 bytes long.
+    blocks_.reserve(std::max<size_t>(1, new_cap / 16));
+}
+
 void ColumnString::Append(std::string_view str) {
     if (blocks_.size() == 0 || blocks_.back().GetAvailable() < str.length()) {
         blocks_.emplace_back(std::max(DEFAULT_BLOCK_SIZE, str.size()));
