@@ -43,4 +43,5 @@ TARGET_LINK_LIBRARIES (clickhouse-cpp-ut
 
 IF (MSVC)
     TARGET_COMPILE_OPTIONS(clickhouse-cpp-ut PRIVATE /bigobj)
+    TARGET_LINK_LIBRARIES (clickhouse-cpp-ut Crypt32)
 ENDIF()
