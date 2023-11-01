@@ -191,8 +191,7 @@ Int128 ColumnDecimal::At(size_t i) const {
     }
 }
 
-void ColumnDecimal::Reserve(size_t new_cap)
-{
+void ColumnDecimal::Reserve(size_t new_cap) {
     data_->Reserve(new_cap);
 }
 

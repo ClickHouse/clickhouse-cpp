@@ -33,8 +33,7 @@ ColumnMap::ColumnMap(ColumnRef data)
     : Column(GetMapType(data->GetType())), data_(data->As<ColumnArray>()) {
 }
 
-void ColumnMap::Reserve(size_t new_cap)
-{
+void ColumnMap::Reserve(size_t new_cap) {
     data_->Reserve(new_cap);
 }
 

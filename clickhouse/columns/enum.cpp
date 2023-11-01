@@ -69,8 +69,7 @@ void ColumnEnum<T>::SetNameAt(size_t n, const std::string& name) {
 }
 
 template<typename T>
-void ColumnEnum<T>::Reserve(size_t new_cap)
-{
+void ColumnEnum<T>::Reserve(size_t new_cap) {
     data_.reserve(new_cap);
 }
 

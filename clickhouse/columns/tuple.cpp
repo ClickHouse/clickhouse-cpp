@@ -20,9 +20,10 @@ size_t ColumnTuple::TupleSize() const {
     return columns_.size();
 }
 
-void ColumnTuple::Reserve(size_t new_cap)
-{
-    columns_.reserve(new_cap);
+void ColumnTuple::Reserve(size_t new_cap) {
+    for (auto& column : columns_) {
+        column->Reserve(new_cap);
+    }  
 }
 
 void ColumnTuple::Append(ColumnRef column) {

@@ -55,8 +55,7 @@ const typename ColumnGeo<NestedColumnType, type_code>::ValueType ColumnGeo<Neste
 }
 
 template<typename NestedColumnType, Type::Code type_code>
-void ColumnGeo<NestedColumnType, type_code>::Reserve(size_t new_cap)
-{
+void ColumnGeo<NestedColumnType, type_code>::Reserve(size_t new_cap) {
     data_->Reserve(new_cap);
 }
 

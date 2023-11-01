@@ -28,7 +28,7 @@ public:
     }
 
     /// Increase the capacity of the column for large block insertion.
-    void Reserve(size_t) override {};
+    void Reserve(size_t) override;
 
     /// Appends one element to the column.
     void Append(std::string_view str);

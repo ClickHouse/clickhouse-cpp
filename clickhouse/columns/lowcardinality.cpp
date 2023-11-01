@@ -174,8 +174,7 @@ ColumnLowCardinality::ColumnLowCardinality(std::shared_ptr<ColumnNullable> dicti
 ColumnLowCardinality::~ColumnLowCardinality()
 {}
 
-void ColumnLowCardinality::Reserve(size_t new_cap)
-{
+void ColumnLowCardinality::Reserve(size_t new_cap) {
     dictionary_column_->Reserve(new_cap);
     index_column_->Reserve(new_cap);
 }
