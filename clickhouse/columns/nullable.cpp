@@ -34,6 +34,11 @@ ColumnRef ColumnNullable::Nulls() const
        return nulls_;
 }
 
+void ColumnNullable::Reserve(size_t new_cap) {
+    nested_->Reserve(new_cap);
+    nulls_->Reserve(new_cap);
+}
+
 void ColumnNullable::Append(ColumnRef column) {
     if (auto col = column->As<ColumnNullable>()) {
         if (!col->nested_->Type()->IsEqual(nested_->Type())) {

@@ -34,8 +34,8 @@ public:
     /// Get Raw Vector Contents
     std::vector<uint16_t>& GetWritableData();
 
-    /// Increase the capacity of the column
-    void Reserve(size_t new_cap);
+    /// Increase the capacity of the column for large block insertion.
+    void Reserve(size_t new_cap) override;
 
     /// Returns the capacity of the column
     size_t Capacity() const;
@@ -79,9 +79,6 @@ public:
     /// The implementation is fundamentally wrong, ignores timezones, leap years and daylight saving.
     std::time_t At(size_t n) const;
 
-    /// Appends content of given column to the end of current one.
-    void Append(ColumnRef column) override;
-
     inline std::time_t operator [] (size_t n) const { return At(n); }
 
     /// Do append data as is -- number of day in Unix epoch (32bit signed), no conversions performed.
@@ -91,11 +88,15 @@ public:
     /// Get Raw Vector Contents
     std::vector<int32_t>& GetWritableData();
 
-    /// Increase the capacity of the column
-    void Reserve(size_t new_cap);
-
     /// Returns the capacity of the column
     size_t Capacity() const;
+
+public:
+    /// Increase the capacity of the column for large block insertion.
+    void Reserve(size_t new_cap) override;
+
+    /// Appends content of given column to the end of current one.
+    void Append(ColumnRef column) override;
 
     /// Loads column data from input stream.
     bool LoadBody(InputStream* input, size_t rows) override;
@@ -148,13 +149,13 @@ public:
     /// Get Raw Vector Contents
     std::vector<uint32_t>& GetWritableData();
 
-    /// Increase the capacity of the column
-    void Reserve(size_t new_cap);
-
     /// Returns the capacity of the column
     size_t Capacity() const;
 
 public:
+    /// Increase the capacity of the column for large block insertion.
+    void Reserve(size_t new_cap) override;
+
     /// Appends content of given column to the end of current one.
     void Append(ColumnRef column) override;
 
@@ -205,6 +206,9 @@ public:
     std::string Timezone() const;
 
 public:
+    /// Increase the capacity of the column for large block insertion.
+    void Reserve(size_t new_cap) override;
+
     /// Appends content of given column to the end of current one.
     void Append(ColumnRef column) override;
 

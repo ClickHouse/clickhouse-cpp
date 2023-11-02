@@ -30,6 +30,10 @@ ColumnFixedString::ColumnFixedString(size_t n)
 {
 }
 
+void ColumnFixedString::Reserve(size_t new_cap) {
+    data_.reserve(string_size_ * new_cap);
+}
+
 void ColumnFixedString::Append(std::string_view str) {
     if (str.size() > string_size_) {
         throw ValidationError("Expected string of length not greater than "
@@ -45,8 +49,10 @@ void ColumnFixedString::Append(std::string_view str) {
 
     data_.insert(data_.size(), str);
     // Pad up to string_size_ with zeroes.
-    const auto padding_size = string_size_ - str.size();
-    data_.resize(data_.size() + padding_size, char(0));
+    if (str.size() < string_size_) {
+        const auto padding_size = string_size_ - str.size();
+        data_.resize(data_.size() + padding_size, char(0));
+    }
 }
 
 void ColumnFixedString::Clear() {
@@ -160,8 +166,8 @@ ColumnString::ColumnString(size_t element_count)
     : Column(Type::CreateString())
 {
     items_.reserve(element_count);
-    // 100 is arbitrary number, assumption that string values are about ~40 bytes long.
-    blocks_.reserve(std::max<size_t>(1, element_count / 100));
+    // 16 is arbitrary number, assumption that string values are about ~256 bytes long.
+    blocks_.reserve(std::max<size_t>(1, element_count / 16));
 }
 
 ColumnString::ColumnString(const std::vector<std::string>& data)
@@ -189,6 +195,12 @@ ColumnString::ColumnString(std::vector<std::string>&& data)
 
 ColumnString::~ColumnString()
 {}
+
+void ColumnString::Reserve(size_t new_cap) {
+    items_.reserve(new_cap);
+    // 16 is arbitrary number, assumption that string values are about ~256 bytes long.
+    blocks_.reserve(std::max<size_t>(1, new_cap / 16));
+}
 
 void ColumnString::Append(std::string_view str) {
     if (blocks_.size() == 0 || blocks_.back().GetAvailable() < str.length()) {

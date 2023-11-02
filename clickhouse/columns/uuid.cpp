@@ -34,6 +34,10 @@ const UUID ColumnUUID::At(size_t n) const {
     return UUID(data_->At(n * 2), data_->At(n * 2 + 1));
 }
 
+void ColumnUUID::Reserve(size_t new_cap) {
+    data_->Reserve(new_cap);
+}
+
 void ColumnUUID::Append(ColumnRef column) {
     if (auto col = column->As<ColumnUUID>()) {
         data_->Append(col->data_);

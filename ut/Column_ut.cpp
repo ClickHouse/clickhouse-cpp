@@ -376,25 +376,18 @@ TYPED_TEST(GenericColumnTest, Swap) {
 #endif
 
 TYPED_TEST(GenericColumnTest, ReserveAndCapacity) {
-    if constexpr (
-        // TODO(venemkov): test that ColumnType has Reserve() and Capacity() methods
-        is_one_of_v<typename TestFixture::ColumnType,
-            // Only types that support Reserve() and Capacity() methods
-            ColumnUInt8,
-            ColumnUInt16,
-            ColumnUInt32,
-            ColumnUInt64,
-            ColumnInt8,
-            ColumnInt16,
-            ColumnInt32,
-            ColumnInt64,
-            ColumnInt128,
-            ColumnFloat32,
-            ColumnFloat64,
-            ColumnDate,
-            ColumnDate32,
-            ColumnDateTime>) {
+    using column_type = typename TestFixture::ColumnType;
+    auto [column0, values] = this->MakeColumnWithValues(2);
+    auto values_copy = values;
+    EXPECT_NO_THROW(column0->Reserve(0u));
+    EXPECT_EQ(2u, column0->Size());
+    EXPECT_TRUE(CompareRecursive(values, values_copy));
 
+    auto column1 = this->MakeColumn();
+    column1->Reserve(10u);
+    EXPECT_EQ(0u, column1->Size());
+
+    if constexpr (has_method_Reserve_v<column_type> && has_method_Capacity_v<column_type>) {
         auto column = this->MakeColumn();
         EXPECT_EQ(0u, column->Capacity());
         EXPECT_NO_THROW(column->Reserve(100u));
@@ -408,24 +401,7 @@ TYPED_TEST(GenericColumnTest, ReserveAndCapacity) {
 
 
 TYPED_TEST(GenericColumnTest, GetWritableData) {
-    if constexpr (
-        // TODO(venemkov): test that ColumnType has GetWritableData() method
-        is_one_of_v<typename TestFixture::ColumnType,
-        // Only types that support GetWritableData() method
-                    ColumnUInt8,
-                    ColumnUInt16,
-                    ColumnUInt32,
-                    ColumnUInt64,
-                    ColumnInt8,
-                    ColumnInt16,
-                    ColumnInt32,
-                    ColumnInt64,
-                    ColumnInt128,
-                    ColumnFloat32,
-                    ColumnFloat64,
-                    ColumnDate,
-                    ColumnDate32,
-                    ColumnDateTime>) {
+    if constexpr (has_method_GetWritableData_v<typename TestFixture::ColumnType>) {
         auto [column, values] = this->MakeColumnWithValues(111);
         // Do conversion from time_t to internal representation, similar to what ColumnDate and ColumnDate32 do
         if constexpr (is_one_of_v<typename TestFixture::ColumnType,

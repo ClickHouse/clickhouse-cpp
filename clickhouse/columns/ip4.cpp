@@ -74,6 +74,10 @@ std::string ColumnIPv4::AsString(size_t n) const {
     return ip_str;
 }
 
+void ColumnIPv4::Reserve(size_t new_cap) {
+    data_->Reserve(new_cap);
+}
+
 void ColumnIPv4::Append(ColumnRef column) {
     if (auto col = column->As<ColumnIPv4>()) {
         data_->Append(col->data_);

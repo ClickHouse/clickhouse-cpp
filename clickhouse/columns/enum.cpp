@@ -68,6 +68,11 @@ void ColumnEnum<T>::SetNameAt(size_t n, const std::string& name) {
     data_.at(n) = static_cast<T>(type_->As<EnumType>()->GetEnumValue(name));
 }
 
+template<typename T>
+void ColumnEnum<T>::Reserve(size_t new_cap) {
+    data_.reserve(new_cap);
+}
+
 template <typename T>
 void ColumnEnum<T>::Append(ColumnRef column) {
     if (auto col = column->As<ColumnEnum<T>>()) {
