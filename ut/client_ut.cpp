@@ -915,6 +915,30 @@ TEST_P(ClientCase, Query_ID) {
     EXPECT_EQ(5u, total_count);
 }
 
+TEST_P(ClientCase, parameterized_syntax) {
+    const std::string table_name = "test_clickhouse_cpp_parameterized_syntax";
+    client_->Execute(Query("CREATE TEMPORARY TABLE IF NOT EXISTS " + table_name + " (a Int64)"));
+
+    {
+        Block b;
+        b.AppendColumn("a", std::make_shared<ColumnInt64>(std::vector<int64_t>{1, 2, 3}));
+        client_->Insert(table_name, b);
+    }
+
+    size_t total_count = 0;
+    client_->Select("SELECT a FROM " + table_name + " WHERE a = ?",
+        [&total_count](const Block& block) {
+            total_count += block.GetRowCount();
+    }, 4);
+    EXPECT_EQ(0u, total_count);
+
+    client_->Select("SELECT a FROM " + table_name + " WHERE a > ?",
+        [&total_count](const Block& block) {
+            total_count += block.GetRowCount();
+    }, 1);
+    EXPECT_EQ(2u, total_count);
+}
+
 // Spontaneosly fails on INSERTint data.
 TEST_P(ClientCase, DISABLED_ArrayArrayUInt64) {
     // Based on https://github.com/ClickHouse/clickhouse-cpp/issues/43

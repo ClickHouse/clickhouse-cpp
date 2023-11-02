@@ -88,6 +88,7 @@ public:
      Query();
      Query(const char* query, const char* query_id = nullptr);
      Query(const std::string& query, const std::string& query_id = default_query_id);
+     Query(std::string&& query, std::string&& query_id = std::string(default_query_id));
     ~Query() override;
 
     ///

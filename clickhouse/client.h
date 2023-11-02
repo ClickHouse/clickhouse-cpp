@@ -237,14 +237,43 @@ public:
 
     /// Intends for execute select queries.  Data will be returned with
     /// one or more call of \p cb.
-    void Select(const std::string& query, SelectCallback cb);
-    void Select(const std::string& query, const std::string& query_id, SelectCallback cb);
+    /// Now it supports parameterized syntax, the placeholder should be ?
+    /// It is just syntax-sugar, all replacing happens on the client side
+    template<typename... Parameterized>
+    void Select(const std::string& query, SelectCallback cb, Parameterized&&... params) {
+        this->ExecuteInner(query, [this, &cb](auto&& new_query) {
+            Execute(Query(std::move(new_query)).OnData(std::move(cb)));
+        }, std::forward<Parameterized>(params)...);
+    }
+
+    template<typename... Parameterized>
+    void Select(const std::string& query,
+        const std::string& query_id, SelectCallback cb, Parameterized&&... params) {
+        this->ExecuteInner(query, [this, &cb, queryid = query_id](auto&& new_query) {
+            Execute(Query(std::move(new_query), std::move(queryid)).OnData(std::move(cb)));
+        }, std::forward<Parameterized>(params)...);
+    }
 
     /// Executes a select query which can be canceled by returning false from
     /// the data handler function \p cb.
-    void SelectCancelable(const std::string& query, SelectCancelableCallback cb);
-    void SelectCancelable(const std::string& query, const std::string& query_id, SelectCancelableCallback cb);
+    /// Now it supports parameterized syntax, the placeholder should be ?
+    /// It is just syntax-sugar, all replacing happens on the client side
+    template<typename... Parameterized>
+    void SelectCancelable(const std::string& query,
+        SelectCancelableCallback cb, Parameterized&&... params) {
+        this->ExecuteInner(query, [this, &cb](auto&& new_query) {
+            Execute(Query(std::move(new_query)).OnDataCancelable(std::move(cb)));
+        }, std::forward<Parameterized>(params)...);
+    }
 
+    template<typename... Parameterized>
+    void SelectCancelable(const std::string& query,
+        const std::string& query_id, SelectCancelableCallback cb, Parameterized&&... params) {
+        this->ExecuteInner(query, [this, &cb, queryid = query_id](auto&& new_query) {
+            Execute(Query(std::move(new_query), std::move(queryid)).OnDataCancelable(std::move(cb)));
+        }, std::forward<Parameterized>(params)...);
+    }
+    
     /// Alias for Execute.
     void Select(const Query& query);
 
@@ -266,6 +295,64 @@ public:
 
     // Try to connect to different endpoints one by one only one time. If it doesn't work, throw an exception.
     void ResetConnectionEndpoint();
+private:
+    template<typename Executor, typename... Parameterized>
+    void ExecuteInner(const std::string& query, Executor&& executor, Parameterized&&... params) {
+        constexpr auto params_count = sizeof...(params);
+        if constexpr (params_count == 0) {
+            executor(query);
+        }
+        else {
+            auto params_tup = std::forward_as_tuple(std::forward<Parameterized>(params)...);
+            auto new_query = this->RecombineQuery<params_count>(query, params_tup);
+            executor(new_query);
+        }
+    }
+
+    template<typename F, std::size_t ... Index>
+    static constexpr void ForEachTuple(F&& f, std::index_sequence<Index...>) {
+        (std::forward<F>(f)(std::integral_constant<std::size_t, Index>()), ...);
+    }
+
+    template<size_t ParamsCount, typename ParamsTup>
+    std::string RecombineQuery(std::string_view query, ParamsTup&& tup) {
+        //Compute placeholder pos, 'find_first_of' for locating quickly 
+        std::vector<size_t> placeholder;
+        auto pos = query.find_first_of('?');
+        if (pos == std::string_view::npos) {
+            throw ValidationError(std::string("params_count mismath placeholder"));
+        }
+
+        placeholder.emplace_back(pos);
+        for (auto i = pos + 1; i < query.length(); ++i) {
+            if (query[i] == '?') {
+                placeholder.emplace_back(i);
+            }
+        }
+        //check placeholder and parameterized count
+        if (ParamsCount != placeholder.size()) {
+            throw ValidationError(std::string("params_count mismath placeholder"));
+        }
+
+        //replace '?' with value
+        std::string new_query;
+        new_query.reserve(query.size() + ParamsCount * 16);
+        new_query.append(query);
+        this->ForEachTuple([&new_query, &tup, &placeholder](auto index) {
+            auto element = std::get<index>(tup);
+            using type = std::remove_const_t<std::remove_reference_t<decltype(element)>>;
+            if constexpr (
+                std::is_convertible_v<type, std::string> ||
+                std::is_same_v<type, std::string_view>) {
+                new_query = new_query.replace(placeholder[index], 1, element);
+            }
+            else {
+                new_query = new_query.replace(placeholder[index], 1, std::to_string(element));
+            }
+        }, std::make_index_sequence<ParamsCount>());
+        return new_query;
+    }
+
 private:
     const ClientOptions options_;
 
