@@ -30,6 +30,9 @@ public:
     void SetNameAt(size_t n, const std::string& name);
 
 public:
+    /// Increase the capacity of the column for large block insertion.
+    void Reserve(size_t new_cap) override;
+
     /// Appends content of given column to the end of current one.
     void Append(ColumnRef column) override;
 

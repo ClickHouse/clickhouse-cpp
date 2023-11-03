@@ -65,6 +65,9 @@ public:
 
     ~ColumnLowCardinality();
 
+    /// Increase the capacity of the column for large block insertion.
+    void Reserve(size_t new_cap) override;
+
     /// Appends another LowCardinality column to the end of this one, updating dictionary.
     void Append(ColumnRef /*column*/) override;
 

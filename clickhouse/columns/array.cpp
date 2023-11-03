@@ -52,6 +52,11 @@ ColumnRef ColumnArray::CloneEmpty() const {
     return std::make_shared<ColumnArray>(data_->CloneEmpty());
 }
 
+void ColumnArray::Reserve(size_t new_cap) {
+    data_->Reserve(new_cap);
+    offsets_->Reserve(new_cap);
+}
+
 void ColumnArray::Append(ColumnRef column) {
     if (auto col = column->As<ColumnArray>()) {
         for (size_t i = 0; i < col->Size(); ++i) {

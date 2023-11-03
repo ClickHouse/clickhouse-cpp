@@ -27,6 +27,9 @@ public:
             Append(v);
     }
 
+    /// Increase the capacity of the column for large block insertion.
+    void Reserve(size_t) override;
+
     /// Appends one element to the column.
     void Append(std::string_view str);
 
@@ -83,6 +86,9 @@ public:
     explicit ColumnString(std::vector<std::string>&& data);
     ColumnString& operator=(const ColumnString&) = delete;
     ColumnString(const ColumnString&) = delete;
+
+    /// Increase the capacity of the column for large block insertion.
+    void Reserve(size_t new_cap) override;
 
     /// Appends one element to the column.
     void Append(std::string_view str);

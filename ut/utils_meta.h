@@ -66,3 +66,17 @@ struct is_one_of<F, S, T...> {
 
 template <typename F, typename S, typename... T>
 inline constexpr bool is_one_of_v = is_one_of<F, S, T...>::value;
+
+
+#define HAS_METHOD(FUN)															            \
+template <typename T, class U = void>														\
+struct has_method_##FUN : std::false_type {};										        \
+template <typename T>																		\
+struct has_method_##FUN<T, std::enable_if_t<std::is_member_function_pointer_v<decltype(&T::FUN)>>> \
+: std::true_type {};																		\
+template <class T>																			\
+constexpr bool has_method_##FUN##_v = has_method_##FUN<T>::value;
+
+HAS_METHOD(Reserve);
+HAS_METHOD(Capacity);
+HAS_METHOD(GetWritableData);

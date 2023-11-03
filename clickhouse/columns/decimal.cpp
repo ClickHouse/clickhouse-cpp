@@ -191,6 +191,10 @@ Int128 ColumnDecimal::At(size_t i) const {
     }
 }
 
+void ColumnDecimal::Reserve(size_t new_cap) {
+    data_->Reserve(new_cap);
+}
+
 void ColumnDecimal::Append(ColumnRef column) {
     if (auto col = column->As<ColumnDecimal>()) {
         data_->Append(col->data_);

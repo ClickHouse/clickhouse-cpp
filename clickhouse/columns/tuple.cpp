@@ -20,6 +20,12 @@ size_t ColumnTuple::TupleSize() const {
     return columns_.size();
 }
 
+void ColumnTuple::Reserve(size_t new_cap) {
+    for (auto& column : columns_) {
+        column->Reserve(new_cap);
+    }  
+}
+
 void ColumnTuple::Append(ColumnRef column) {
     if (!this->Type()->IsEqual(column->Type())) {
         throw ValidationError(

@@ -26,6 +26,9 @@ public:
     {
     }
 
+    /// Increase the capacity of the column for large block insertion.
+    void Reserve(size_t) override {};
+
     /// Appends one element to the column.
     void Append(std::unique_ptr<void*>) { ++size_; }
 

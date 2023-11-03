@@ -65,6 +65,10 @@ in6_addr ColumnIPv6::operator [] (size_t n) const {
     return *reinterpret_cast<const in6_addr*>(data_->At(n).data());
 }
 
+void ColumnIPv6::Reserve(size_t new_cap) {
+    data_->Reserve(new_cap);
+}
+
 void ColumnIPv6::Append(ColumnRef column) {
     if (auto col = column->As<ColumnIPv6>()) {
         data_->Append(col->data_);
