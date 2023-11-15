@@ -249,7 +249,7 @@ public:
         if (index >= Size())
             throw ValidationError("ColumnArray row index out of bounds: "
                     + std::to_string(index) + ", max is " + std::to_string(Size()));
-It is actually not, b
+
         return ArrayValueView{typed_nested_data_, GetOffset(index), GetSize(index)};
     }
 
