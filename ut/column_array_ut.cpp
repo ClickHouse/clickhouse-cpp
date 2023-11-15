@@ -355,7 +355,6 @@ TEST(ColumnArrayT, right_value_move) {
         { value0, value1, value2},
         { value0, value1, value2}
     };
-    size_t origin_size = 3;
     auto array = std::make_shared<clickhouse::ColumnArrayT<clickhouse::ColumnArrayT<ColumnString>>>();
     array->Append(std::move(all_values));
     EXPECT_EQ(3u, (*array)[0][0].size());
@@ -366,7 +365,7 @@ TEST(ColumnArrayT, right_value_move) {
     EXPECT_EQ(value1, (*array)[0][1][1]);
     EXPECT_EQ(value2, (*array)[0][2][2]);
 
-    EXPECT_EQ(0, all_values.size());
+    EXPECT_EQ(0u, all_values.size());
 }
 
 TEST(ColumnArrayT, const_right_value_no_move) {
