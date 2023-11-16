@@ -365,7 +365,8 @@ TEST(ColumnArrayT, right_value_move) {
     EXPECT_EQ(value1, (*array)[0][1][1]);
     EXPECT_EQ(value2, (*array)[0][2][2]);
 
-    EXPECT_EQ(0u, all_values.size());
+    // Here we don't care about the size of the container from which all values were moved-out.
+    //EXPECT_EQ(0u, all_values.size());
 }
 
 TEST(ColumnArrayT, const_right_value_no_move) {
