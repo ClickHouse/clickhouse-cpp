@@ -110,6 +110,10 @@ size_t ColumnArray::Size() const {
     return offsets_->Size();
 }
 
+size_t ColumnArray::MemoryUsage() const {
+    return offsets_->MemoryUsage() + data_->MemoryUsage();
+}
+
 void ColumnArray::Swap(Column& other) {
     auto & col = dynamic_cast<ColumnArray &>(other);
     data_.swap(col.data_);

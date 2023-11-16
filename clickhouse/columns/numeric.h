@@ -57,6 +57,7 @@ public:
 
     /// Makes slice of the current column.
     ColumnRef Slice(size_t begin, size_t len) const override;
+    size_t MemoryUsage() const override;
     ColumnRef CloneEmpty() const override;
     void Swap(Column& other) override;
 

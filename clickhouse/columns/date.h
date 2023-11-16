@@ -51,6 +51,7 @@ public:
 
     /// Returns count of rows in the column.
     size_t Size() const override;
+    size_t MemoryUsage() const override;
 
     /// Makes slice of the current column.
     ColumnRef Slice(size_t begin, size_t len) const override;
@@ -109,6 +110,7 @@ public:
 
     /// Returns count of rows in the column.
     size_t Size() const override;
+    size_t MemoryUsage() const override;
 
     /// Makes slice of the current column.
     ColumnRef Slice(size_t begin, size_t len) const override;
@@ -170,6 +172,7 @@ public:
 
     /// Returns count of rows in the column.
     size_t Size() const override;
+    size_t MemoryUsage() const override;
 
     /// Makes slice of the current column.
     ColumnRef Slice(size_t begin, size_t len) const override;
@@ -223,6 +226,7 @@ public:
 
     /// Returns count of rows in the column.
     size_t Size() const override;
+    size_t MemoryUsage() const override;
 
     /// Makes slice of the current column.
     ColumnRef Slice(size_t begin, size_t len) const override;

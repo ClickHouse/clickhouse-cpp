@@ -96,6 +96,10 @@ size_t ColumnIPv4::Size() const {
     return data_->Size();
 }
 
+size_t ColumnIPv4::MemoryUsage() const {
+    return data_->MemoryUsage();
+}
+
 ColumnRef ColumnIPv4::Slice(size_t begin, size_t len) const {
     return std::make_shared<ColumnIPv4>(data_->Slice(begin, len));
 }

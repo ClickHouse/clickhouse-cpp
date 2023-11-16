@@ -82,6 +82,10 @@ size_t ColumnNullable::Size() const {
     return nulls_->Size();
 }
 
+size_t ColumnNullable::MemoryUsage() const {
+    return nested_->MemoryUsage() + nulls_->MemoryUsage();
+}
+
 ColumnRef ColumnNullable::Slice(size_t begin, size_t len) const {
     return std::make_shared<ColumnNullable>(nested_->Slice(begin, len), nulls_->Slice(begin, len));
 }

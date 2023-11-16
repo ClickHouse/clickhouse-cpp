@@ -75,6 +75,8 @@ public:
     /// Returns count of rows in the column.
     size_t Size() const override { return size_; }
 
+    size_t MemoryUsage() const override { return 0; }
+
     void Swap(Column& other) override {
         auto & col = dynamic_cast<ColumnNothing &>(other);
         std::swap(size_, col.size_);

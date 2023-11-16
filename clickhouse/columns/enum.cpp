@@ -97,6 +97,11 @@ size_t ColumnEnum<T>::Size() const {
 }
 
 template <typename T>
+size_t ColumnEnum<T>::MemoryUsage() const {
+    return data_.capacity() * sizeof(*data_.begin());
+}
+
+template <typename T>
 ColumnRef ColumnEnum<T>::Slice(size_t begin, size_t len) const {
     return std::make_shared<ColumnEnum<T>>(type_, SliceVector(data_, begin, len));
 }

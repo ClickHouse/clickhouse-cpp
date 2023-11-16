@@ -67,6 +67,10 @@ size_t ColumnMap::Size() const {
     return data_->Size();
 }
 
+size_t ColumnMap::MemoryUsage() const {
+    return data_->MemoryUsage();
+}
+
 ColumnRef ColumnMap::Slice(size_t begin, size_t len) const {
     return std::make_shared<ColumnMap>(data_->Slice(begin, len));
 }

@@ -76,9 +76,15 @@ void ColumnGeo<NestedColumnType, type_code>::SaveBody(OutputStream* output) {
     data_->SaveBody(output);
 }
 
+
 template <typename NestedColumnType, Type::Code type_code>
 size_t ColumnGeo<NestedColumnType, type_code>::Size() const {
     return data_->Size();
+}
+
+template <typename NestedColumnType, Type::Code type_code>
+size_t ColumnGeo<NestedColumnType, type_code>::MemoryUsage() const {
+    return data_->MemoryUsage();
 }
 
 template <typename NestedColumnType, Type::Code type_code>

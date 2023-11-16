@@ -88,6 +88,11 @@ size_t ColumnVector<T>::Size() const {
 }
 
 template <typename T>
+size_t ColumnVector<T>::MemoryUsage() const {
+    return data_.capacity() * sizeof(data_[0]);
+}
+
+template <typename T>
 ColumnRef ColumnVector<T>::Slice(size_t begin, size_t len) const {
     return std::make_shared<ColumnVector<T>>(SliceVector(data_, begin, len));
 }

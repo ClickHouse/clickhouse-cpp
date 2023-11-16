@@ -41,6 +41,14 @@ size_t ColumnTuple::Size() const {
     return columns_.empty() ? 0 : columns_[0]->Size();
 }
 
+size_t ColumnTuple::MemoryUsage() const {
+    size_t result = sizeof(columns_[0]) * columns_.capacity();
+    for (const auto & c : columns_)
+        result += c->MemoryUsage();
+
+    return result;
+}
+
 ColumnRef ColumnTuple::Slice(size_t begin, size_t len) const {
     std::vector<ColumnRef> sliced_columns;
     sliced_columns.reserve(columns_.size());

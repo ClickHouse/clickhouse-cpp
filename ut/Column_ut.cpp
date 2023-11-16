@@ -17,10 +17,13 @@
 
 #include <gtest/gtest.h>
 #include <algorithm>
+#include <cstdint>
 #include <initializer_list>
 #include <memory>
+#include <numeric>
 #include <type_traits>
 
+#include "clickhouse/columns/column.h"
 #include "gtest/internal/gtest-internal.h"
 #include "ut/utils_comparison.h"
 #include "ut/utils_meta.h"
@@ -74,6 +77,7 @@ struct GenericColumnTestCase
 template <typename T>
 class GenericColumnTest : public testing::Test {
 public:
+    using TestCase = T;
     using ColumnType = typename T::ColumnType;
 
     static auto MakeColumn()
@@ -356,6 +360,50 @@ TYPED_TEST(GenericColumnTest, Clear) {
 
     column->Clear();
     EXPECT_EQ(0u, column->Size());
+}
+
+TYPED_TEST(GenericColumnTest, MemoryUsage) {
+    auto column = this->MakeColumn();
+    const auto values = this->GenerateValues(10'000);
+
+    auto max_memory_usage = sizeof(values.front()) * values.size();
+    if (column->GetType().GetCode() == Type::Code::LowCardinality) {
+        // Low cardinality has a different memory usage profile:
+        // only unique values take space in the dictionary,
+        // rest are just indicies to said dictionary.
+
+        const auto unique_values = TestFixture::TestCase::generateValues();
+        max_memory_usage = sizeof(unique_values.begin()) * unique_values.size()
+                + sizeof(int32_t) * values.size() // indices
+                + sizeof(uint64_t) * values.size() * 2; // hashes for uniques checks
+    }
+
+    if constexpr (std::is_same_v<std::string, std::decay_t<decltype(values[0])>>) {
+        const auto unique_values = TestFixture::TestCase::generateValues();
+        const size_t total_size = std::accumulate(unique_values.begin(), unique_values.end(), 0, [](auto accumulator, auto i) {
+            return accumulator + i.size();
+        });
+        max_memory_usage = total_size / unique_values.size() * values.size();
+
+        if constexpr (std::is_same_v<typename TypeParam::ColumnType, ColumnString>) {
+            column->SetEstimatedValueSize(ColumnString::EstimatedValueSize(total_size / unique_values.size()));
+            // There is some over-allocation for ColumnString
+            max_memory_usage *= 1.2;
+        }
+    }
+
+    // Empty column should have low memory usage from the start,
+    // from 0 bytes to 1% of max estimated memory usage due to some pre-reservations.
+    EXPECT_NEAR(max_memory_usage * 0.01, column->MemoryUsage(), max_memory_usage * 0.01)
+        << "On empty column";
+
+    column->Reserve(values.size());
+    EXPECT_GE(max_memory_usage, column->MemoryUsage())
+        << "After reserve";
+
+    TestFixture::AppendValues(column, values);
+    EXPECT_GE(max_memory_usage, column->MemoryUsage())
+        << " After appending " << values.size() << " items";
 }
 
 TYPED_TEST(GenericColumnTest, Swap) {

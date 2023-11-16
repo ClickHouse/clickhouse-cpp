@@ -16,9 +16,12 @@
 #include <clickhouse/base/socket.h> // for ipv4-ipv6 platform-specific stuff
 
 #include <gtest/gtest.h>
+#include "clickhouse/exceptions.h"
+#include "gtest/gtest-message.h"
 #include "utils.h"
 #include "value_generators.h"
 
+#include <limits>
 #include <string_view>
 #include <sstream>
 #include <vector>
@@ -709,6 +712,142 @@ TEST(ColumnsCase, ColumnDecimal128_from_string_overflow) {
 #endif
 }
 
+//TEST(ColumnString, DefaultSizeEstimation) {
+//    auto values = MakeStrings();
+
+//    const ColumnString::EstimatedValueSize value_size_estimations[] = {
+//        ColumnString::EstimatedValueSize::TINY,
+//        ColumnString::EstimatedValueSize::SMALL,
+//        ColumnString::EstimatedValueSize::MEDIUM,
+//        ColumnString::EstimatedValueSize::LARGE,
+//        ColumnString::EstimatedValueSize::HUGE,
+//    };
+
+//    for (auto estimation : value_size_estimations) {
+//        SCOPED_TRACE(::testing::Message("with estimation: ") << estimation);
+
+//        auto col = std::make_shared<ColumnString>(estimation);
+
+//        col->Reserve(values.size());
+
+//        size_t i = 0;
+//        for (const auto & v : values) {
+//            col->Append(v);
+
+//            EXPECT_EQ(i + 1, col->Size());
+//            EXPECT_EQ(v, col->At(i));
+
+//            ++i;
+//        }
+//    }
+//}
+
+namespace
+{
+
+std::ostream & dumpMemoryUsage(const char * prefix, const ColumnRef col) {
+    return std::cerr << prefix << " " << col->GetType().GetName() << " : " << col->MemoryUsage() << " bytes" << std::endl;
+}
+
+}
+
+TEST(ColumnString, WithSizeEstimation) {
+    const ColumnString::EstimatedValueSize value_size_estimations[] = {
+        ColumnString::EstimatedValueSize::TINY,
+        ColumnString::EstimatedValueSize::SMALL,
+        ColumnString::EstimatedValueSize::MEDIUM,
+        ColumnString::EstimatedValueSize::LARGE,
+        ColumnString::EstimatedValueSize::HUGE,
+
+        ColumnString::EstimatedValueSize(0),
+        ColumnString::EstimatedValueSize(1),
+        ColumnString::EstimatedValueSize(300),
+        ColumnString::EstimatedValueSize(10'000),
+    };
+
+    auto values = MakeStrings();
+    std::cerr << "Number of values: " << values.size() << std::endl;
+
+    for (ColumnString::EstimatedValueSize estimation : value_size_estimations) {
+        SCOPED_TRACE(::testing::Message("with estimation: ") << estimation);
+        std::cerr << "\nEstimation " << estimation << std::endl;
+
+        auto col = std::make_shared<ColumnString>(estimation);
+
+        dumpMemoryUsage("After constructing with estimation", col);
+
+        col->Reserve(values.size());
+        dumpMemoryUsage("After Reserve()", col);
+
+        size_t i = 0;
+        for (const auto & v : values) {
+            col->Append(v);
+
+            EXPECT_EQ(i + 1, col->Size());
+            EXPECT_EQ(v, col->At(i));
+
+            ++i;
+        }
+
+        dumpMemoryUsage("After appending all values", col);
+    }
+}
+
+TEST(ColumnString, InvalidSizeEstimation) {
+    EXPECT_THROW(std::make_shared<ColumnString>(ColumnString::EstimatedValueSize(-1)), ValidationError);
+    EXPECT_THROW(std::make_shared<ColumnString>(ColumnString::EstimatedValueSize(static_cast<size_t>(std::numeric_limits<int>::max()) + 1)), ValidationError);
+    EXPECT_THROW(std::make_shared<ColumnString>(ColumnString::EstimatedValueSize(std::numeric_limits<size_t>::max())), ValidationError);
+}
+
+TEST(ColumnLowCardinalityString, WithSizeEstimation) {
+    const ColumnString::EstimatedValueSize value_size_estimations[] = {
+        ColumnString::EstimatedValueSize::TINY,
+        ColumnString::EstimatedValueSize::SMALL,
+        ColumnString::EstimatedValueSize::MEDIUM,
+        ColumnString::EstimatedValueSize::LARGE,
+        ColumnString::EstimatedValueSize::HUGE,
+
+        ColumnString::EstimatedValueSize(0),
+        ColumnString::EstimatedValueSize(1),
+        ColumnString::EstimatedValueSize(300),
+        ColumnString::EstimatedValueSize(10'000),
+    };
+
+    auto values = MakeStrings();
+
+    // How many times to append items from values to column.
+    for (size_t count = 512; count <= 1024; count *= 2)
+    {
+        std::cerr << "\nNumber of values: " << values.size() * count << std::endl;
+        for (ColumnString::EstimatedValueSize estimation : value_size_estimations) {
+            SCOPED_TRACE(::testing::Message("with estimation: ") << estimation);
+            std::cerr << "Estimation " << estimation << std::endl;
+
+            auto col = std::make_shared<ColumnLowCardinalityT<ColumnString>>(estimation);
+
+            dumpMemoryUsage("After constructing with estimation", col);
+
+            col->Reserve(values.size() * count);
+            dumpMemoryUsage("After Reserve()", col);
+
+            size_t i = 0;
+            for (size_t j = 0; j < count; ++j)
+            {
+                for (const auto & v : values) {
+                    col->Append(v);
+
+                    EXPECT_EQ(i + 1, col->Size());
+                    EXPECT_EQ(v, col->At(i));
+
+                    ++i;
+                }
+            }
+
+            dumpMemoryUsage("After appending all values", col) << std::endl;
+        }
+    }
+}
+
 TEST(ColumnsCase, ColumnLowCardinalityString_Append_and_Read) {
     const size_t items_count = 11;
     ColumnLowCardinalityT<ColumnString> col;
@@ -865,7 +1004,6 @@ TEST(ColumnsCase, ColumnLowCardinalityString_WithEmptyString_3) {
         EXPECT_EQ(values[i], col.At(i)) << " at pos: " << i;
     }
 }
-
 
 TEST(ColumnsCase, ColumnTupleT) {
     using TestTuple = ColumnTupleT<ColumnUInt64, ColumnString, ColumnFixedString>;

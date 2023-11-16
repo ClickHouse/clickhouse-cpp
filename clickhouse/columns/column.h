@@ -90,6 +90,9 @@ public:
 
     virtual void Swap(Column&) = 0;
 
+    /// Estimated RAM usage by the column in bytes.
+    virtual size_t MemoryUsage() const = 0;
+
     /// Get a view on raw item data if it is supported by column, will throw an exception if index is out of range.
     /// Please note that view is invalidated once column items are added or deleted, column is loaded from strean or destroyed.
     virtual ItemView GetItem(size_t) const {

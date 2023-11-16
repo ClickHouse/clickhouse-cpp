@@ -67,6 +67,10 @@ size_t ColumnDate::Size() const {
     return data_->Size();
 }
 
+size_t ColumnDate::MemoryUsage() const {
+    return data_->MemoryUsage();
+}
+
 ColumnRef ColumnDate::Slice(size_t begin, size_t len) const {
     auto col = data_->Slice(begin, len)->As<ColumnUInt16>();
     auto result = std::make_shared<ColumnDate>();
@@ -152,6 +156,10 @@ void ColumnDate32::SaveBody(OutputStream* output) {
 
 size_t ColumnDate32::Size() const {
     return data_->Size();
+}
+
+size_t ColumnDate32::MemoryUsage() const {
+    return data_->MemoryUsage();
 }
 
 ColumnRef ColumnDate32::Slice(size_t begin, size_t len) const {
@@ -244,6 +252,10 @@ size_t ColumnDateTime::Size() const {
     return data_->Size();
 }
 
+size_t ColumnDateTime::MemoryUsage() const {
+    return data_->MemoryUsage();
+}
+
 void ColumnDateTime::Clear() {
     data_->Clear();
 }
@@ -328,6 +340,10 @@ void ColumnDateTime64::Clear() {
 
 size_t ColumnDateTime64::Size() const {
     return data_->Size();
+}
+
+size_t ColumnDateTime64::MemoryUsage() const {
+    return data_->MemoryUsage();
 }
 
 ItemView ColumnDateTime64::GetItem(size_t index) const {

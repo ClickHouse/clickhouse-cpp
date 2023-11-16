@@ -56,6 +56,10 @@ size_t ColumnUUID::Size() const {
     return data_->Size() / 2;
 }
 
+size_t ColumnUUID::MemoryUsage() const {
+    return data_->MemoryUsage();
+}
+
 ColumnRef ColumnUUID::Slice(size_t begin, size_t len) const {
     return std::make_shared<ColumnUUID>(data_->Slice(begin * 2, len * 2));
 }

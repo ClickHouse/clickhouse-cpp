@@ -87,6 +87,7 @@ public:
 
     /// Returns count of rows in the column.
     size_t Size() const override;
+    size_t MemoryUsage() const override;
 
     /// Makes slice of current column, with compacted dictionary
     ColumnRef Slice(size_t begin, size_t len) const override;
