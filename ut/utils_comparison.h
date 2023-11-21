@@ -142,44 +142,44 @@ template <typename Container>
 struct PrintContainer;
 
 template <typename Left, typename Right>
-::testing::AssertionResult CompareRecursive(const Left & left, const Right & right) {
+::testing::AssertionResult CompareRecursive(const Left & expected, const Right & actual) {
     if constexpr (!is_string_v<Left> && !is_string_v<Right>
             && (is_container_v<Left> || std::is_base_of_v<clickhouse::Column, std::decay_t<Left>>)
             && (is_container_v<Right> || std::is_base_of_v<clickhouse::Column, std::decay_t<Right>>) ) {
 
-        const auto & l = maybeWrapColumnAsContainer(left);
-        const auto & r = maybeWrapColumnAsContainer(right);
+        const auto & e = maybeWrapColumnAsContainer(expected);
+        const auto & a = maybeWrapColumnAsContainer(actual);
 
-        if (auto result = CompareCotainersRecursive(l, r))
+        if (auto result = CompareCotainersRecursive(e, a))
             return result;
         else
-            return result << "\nExpected container: " << PrintContainer{l}
-                          << "\nActual container  : " << PrintContainer{r};
+            return result << "\nExpected container: " << PrintContainer{e}
+                          << "\nActual container  : " << PrintContainer{a};
     } else {
-        if (left != right) {
+        if (expected != actual) {
 
             // Handle std::optional<float>(nan)
-            // I'm too lazy to code comparison against std::nullopt, but this shpudn't be a problem in real life.
+            // I'm too lazy to code comparison against std::nullopt, but this shoudn't be a problem in real life.
             // RN comparing against std::nullopt, you'll receive an compilation error.
             if constexpr (is_instantiation_of<std::optional, Left>::value && is_instantiation_of<std::optional, Right>::value)
             {
-                if (left.has_value() && right.has_value())
-                    return CompareRecursive(*left, *right);
+                if (expected.has_value() && actual.has_value())
+                    return CompareRecursive(*expected, *actual);
             }
             else if constexpr (is_instantiation_of<std::optional, Left>::value) {
-                if (left)
-                    return CompareRecursive(*left, right);
+                if (expected)
+                    return CompareRecursive(*expected, actual);
             } else if constexpr (is_instantiation_of<std::optional, Right>::value) {
-                if (right)
-                    return CompareRecursive(left, *right);
+                if (actual)
+                    return CompareRecursive(expected, *actual);
             } else if constexpr (std::is_floating_point_v<Left> && std::is_floating_point_v<Right>) {
-                if (std::isnan(left) && std::isnan(right))
+                if (std::isnan(expected) && std::isnan(actual))
                     return ::testing::AssertionSuccess();
             }
 
             return ::testing::AssertionFailure()
-                    << "\nExpected value: " << left
-                    << "\nActual value  : " << right;
+                    << "\nExpected value: " << expected
+                    << "\nActual value  : " << actual;
         }
 
         return ::testing::AssertionSuccess();

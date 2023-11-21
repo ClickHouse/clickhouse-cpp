@@ -348,3 +348,7 @@ std::string ToString(const clickhouse::UUID& v) {
     }
     return result;
 }
+
+std::ostream & dumpMemoryUsage(const char * prefix, const clickhouse::ColumnRef col) {
+    return std::cerr << prefix << " " << col->GetType().GetName() << " : " << col->MemoryUsage() << " bytes" << std::endl;
+}

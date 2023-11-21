@@ -88,17 +88,18 @@ public:
     // int32_t to be able to validate againts (unintentional) negative values in ColumnString c-tor.
     // Otherwise those just silently underflow unsigned type,
     // resulting in attempt to allocate enormous amount of memory at run time.
-    enum EstimatedValueSize : int32_t {
+    enum class EstimatedValueSize : int32_t {
         TINY = 8,
         SMALL = 32,
         MEDIUM = 128,
         LARGE = 512,
-        HUGE = 2048,
     };
-    static constexpr auto DEFAULT_ESTIMATION = EstimatedValueSize::MEDIUM;
 
-    explicit ColumnString(EstimatedValueSize value_size_estimation = DEFAULT_ESTIMATION);
-    explicit ColumnString(size_t element_count, EstimatedValueSize value_size_estimation = DEFAULT_ESTIMATION);
+    // Memory for item storage is not pre-allocated on Reserve(), same as old behaviour.
+    static constexpr auto NO_PREALLOCATE = EstimatedValueSize(0);
+
+    explicit ColumnString(EstimatedValueSize value_size_estimation = NO_PREALLOCATE);
+    explicit ColumnString(size_t element_count, EstimatedValueSize value_size_estimation = NO_PREALLOCATE);
     explicit ColumnString(const std::vector<std::string> & data);
     explicit ColumnString(std::vector<std::string>&& data);
 
@@ -157,16 +158,19 @@ public:
     ItemView GetItem(size_t) const override;
 
 private:
+    struct Block;
+
     void AppendUnsafe(std::string_view);
+    Block & PrepareBlockWithSpaceForAtLeast(size_t minimum_required_bytes);
 
 private:
-    struct Block;
 
     std::vector<std::string_view> items_;
     std::vector<Block> blocks_;
     std::deque<std::string> append_data_;
-    uint32_t value_size_estimation_ = DEFAULT_ESTIMATION;
-    size_t next_block_size_;
+
+    uint32_t value_size_estimation_ = 0;
+    size_t next_block_size_ = 0;
 };
 
 }
