@@ -1,6 +1,7 @@
 #include <clickhouse/client.h>
 
 #include "clickhouse/base/socket.h"
+#include "clickhouse/version.h"
 #include "readonly_client_test.h"
 #include "connection_failed_client_test.h"
 #include "ut/utils_comparison.h"
@@ -92,6 +93,23 @@ protected:
     const std::string table_name = "test_clickhouse_cpp_test_ut_table";
     const std::string column_name = "test_column";
 };
+
+TEST_P(ClientCase, Version) {
+    auto version = client_->GetVersion();
+    EXPECT_NE(0, CLICKHOUSE_CPP_VERSION);
+
+    EXPECT_GE(2, CLICKHOUSE_CPP_VERSION_MAJOR);
+    EXPECT_LE(0, CLICKHOUSE_CPP_VERSION_MINOR);
+    EXPECT_LE(0, CLICKHOUSE_CPP_VERSION_PATCH);
+
+    EXPECT_EQ(CLICKHOUSE_CPP_VERSION_MAJOR, version.major);
+    EXPECT_EQ(CLICKHOUSE_CPP_VERSION_MINOR, version.minor);
+    EXPECT_EQ(CLICKHOUSE_CPP_VERSION_PATCH, version.patch);
+    EXPECT_EQ(CLICKHOUSE_CPP_VERSION_BUILD, version.build);
+    EXPECT_EQ(CLICKHOUSE_CPP_VERSION_PATCH, version.patch);
+
+    // EXPECT_EQ(CLICKHOUSE_CPP_VERSION, versionNumber(version.major, version.minor, version.patch, version.build));
+}
 
 TEST_P(ClientCase, Array) {
     Block b;
