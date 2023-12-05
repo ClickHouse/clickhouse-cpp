@@ -8,6 +8,11 @@ on:
   pull_request:
     branches: [ master ]
 
+  release:
+    types:
+      - published
+      - prereleased
+
 env:
   BUILD_TYPE: Release
   CLICKHOUSE_USER: clickhouse_cpp_cicd
@@ -49,44 +54,48 @@ jobs:
         shell: msys2 {0}
 
     steps:
-    - uses: actions/checkout@v2
-    - uses: msys2/setup-msys2@v2
-      with:
-        msystem: ${{ matrix.sys }}
-        update: true
-        install: >-
-          mingw-w64-${{matrix.env}}-cmake
-          mingw-w64-${{matrix.env}}-make
-          mingw-w64-${{matrix.env}}-gcc
-          mingw-w64-${{matrix.env}}-openssl
-          mingw-w64-${{matrix.env}}-ninja
-          mingw-w64-${{matrix.env}}-wget
-          mingw-w64-${{matrix.env}}-ca-certificates
-          tar
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 100
+          fetch-tags: true
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: ${{ matrix.sys }}
+          update: true
+          install: >-
+            mingw-w64-${{matrix.env}}-cmake
+            mingw-w64-${{matrix.env}}-make
+            mingw-w64-${{matrix.env}}-gcc
+            mingw-w64-${{matrix.env}}-openssl
+            mingw-w64-${{matrix.env}}-ninja
+            mingw-w64-${{matrix.env}}-wget
+            mingw-w64-${{matrix.env}}-ca-certificates
+            tar
 
-    - name: Configure CMake
-      run: cmake -B build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DBUILD_TESTS=ON
-      # -DWITH_OPENSSL=ON was not able to make it work (some strange issues with CA paths, need debug)
+      - name: Configure CMake
+        run: cmake -B build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DBUILD_TESTS=ON -DCHECK_VERSION=OFF
+        # -DWITH_OPENSSL=ON was not able to make it work (some strange issues with CA paths, need debug)
+        # -DCHECK_VERSION=OFF since it requires git, which can't be found from within cmake for some reason.
 
-    - name: Build
-      run: cmake --build build --config ${{env.BUILD_TYPE}} --target all
+      - name: Build
+        run: cmake --build build --config ${{env.BUILD_TYPE}} --target all
 
-    - name: Start tls offoader proxy
-      # that mimics non-secure clickhouse running on localhost
-      # by tunneling queries to remote tls server
-      # (needed because we can't start real clickhouse instance on windows)
-      run: |
-            wget https://github.com/filimonov/go-tlsoffloader/releases/download/v0.1.2/go-tlsoffloader_0.1.2_Windows_x86_64.tar.gz
-            tar -xvzf go-tlsoffloader_0.1.2_Windows_x86_64.tar.gz
-            ./go-tlsoffloader.exe -l localhost:9000 -b github.demo.trial.altinity.cloud:9440 &
+      - name: Start tls offoader proxy
+        # that mimics non-secure clickhouse running on localhost
+        # by tunneling queries to remote tls server
+        # (needed because we can't start real clickhouse instance on windows)
+        run: |
+              wget https://github.com/filimonov/go-tlsoffloader/releases/download/v0.1.2/go-tlsoffloader_0.1.2_Windows_x86_64.tar.gz
+              tar -xvzf go-tlsoffloader_0.1.2_Windows_x86_64.tar.gz
+              ./go-tlsoffloader.exe -l localhost:9000 -b github.demo.trial.altinity.cloud:9440 &
 
-    - name: Test
-      env:
-        # It is impossible to start CH server in docker on Windows due to github actions limitations,
-        # so we use remote server to execute tests, some do not allow some features for anonymoust/free users:
-        # - system.query_log used by 'Client/ClientCase.Query_ID'
-        GTEST_FILTER: "-Client/ClientCase.Query_ID*:Client/ClientCase.TracingContext/*"
-      run: ./build/ut/clickhouse-cpp-ut.exe ${GTEST_FILTER}
+      - name: Test
+        env:
+          # It is impossible to start CH server in docker on Windows due to github actions limitations,
+          # so we use remote server to execute tests, some do not allow some features for anonymoust/free users:
+          # - system.query_log used by 'Client/ClientCase.Query_ID'
+          GTEST_FILTER: "-Client/ClientCase.Query_ID*:Client/ClientCase.TracingContext/*"
+        run: ./build/ut/clickhouse-cpp-ut.exe ${GTEST_FILTER}
 
-    - name: Test (simple)
-      run: ./build/tests/simple/simple-test.exe
+      - name: Test (simple)
+        run: ./build/tests/simple/simple-test.exe
