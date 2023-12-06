@@ -18,12 +18,11 @@ function (regex_extract_matching_groups INPUT REGEX_STR)
     endforeach ()
 endfunction ()
 
-regex_extract_matching_groups("ttest" "FAILED TO SERCH" RESULT)
 
 function(clickhouse_cpp_get_version)
     # Extract all components of the version from the clickhouse/version.h
 
-    file(READ ${CMAKE_SOURCE_DIR}/clickhouse/version.h VERSION_FILE_DATA)
+    file(READ ${CMAKE_CURRENT_SOURCE_DIR}/clickhouse/version.h VERSION_FILE_DATA)
 
     foreach (VERSION_COMPONENT
             IN ITEMS

@@ -107,8 +107,6 @@ TEST_P(ClientCase, Version) {
     EXPECT_EQ(CLICKHOUSE_CPP_VERSION_PATCH, version.patch);
     EXPECT_EQ(CLICKHOUSE_CPP_VERSION_BUILD, version.build);
     EXPECT_EQ(CLICKHOUSE_CPP_VERSION_PATCH, version.patch);
-
-    // EXPECT_EQ(CLICKHOUSE_CPP_VERSION, versionNumber(version.major, version.minor, version.patch, version.build));
 }
 
 TEST_P(ClientCase, Array) {
