@@ -251,6 +251,8 @@ public:
 
     std::string GetName() const { return std::string("FixedString(") + std::to_string(size_) + ")"; }
 
+    inline size_t GetSize() const { return size_; }
+
 private:
     size_t size_;
 };
