@@ -877,8 +877,8 @@ TEST(ColumnsCase, ColumnLowCardinalityString_WithEmptyString_3) {
 }
 
 TEST(ColumnsCase, ColumnLowCardinalityFixedString_Type_Size_Eq) {
-    const auto fixed_size = 10;
-    const auto col        = std::make_shared<ColumnLowCardinalityT<ColumnFixedString>>(fixed_size);
+    const size_t fixed_size = 10;
+    const auto col          = std::make_shared<ColumnLowCardinalityT<ColumnFixedString>>(fixed_size);
     
     ASSERT_EQ(fixed_size, col->GetNestedType()->As<FixedStringType>()->GetSize());
 }
