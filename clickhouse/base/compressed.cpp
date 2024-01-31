@@ -5,6 +5,7 @@
 
 #include <city.h>
 #include <lz4.h>
+#include <exception>
 #include <stdexcept>
 #include <system_error>
 
