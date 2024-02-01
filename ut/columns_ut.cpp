@@ -104,6 +104,16 @@ TEST(ColumnsCase, FixedString_Append_LargeString) {
     EXPECT_ANY_THROW(col->Append("this is a long string"));
 }
 
+TEST(ColumnsCase, FixedString_Type_Size_Eq0) {
+    const auto col = std::make_shared<ColumnFixedString>(0);
+    ASSERT_EQ(col->FixedSize(), col->Type()->As<FixedStringType>()->GetSize());
+}
+
+TEST(ColumnsCase, FixedString_Type_Size_Eq10) {
+    const auto col = std::make_shared<ColumnFixedString>(10);
+    ASSERT_EQ(col->FixedSize(), col->Type()->As<FixedStringType>()->GetSize());
+}
+
 TEST(ColumnsCase, StringInit) {
     auto values = MakeStrings();
     auto col = std::make_shared<ColumnString>(values);
@@ -866,6 +876,12 @@ TEST(ColumnsCase, ColumnLowCardinalityString_WithEmptyString_3) {
     }
 }
 
+TEST(ColumnsCase, ColumnLowCardinalityFixedString_Type_Size_Eq) {
+    const size_t fixed_size = 10;
+    const auto col          = std::make_shared<ColumnLowCardinalityT<ColumnFixedString>>(fixed_size);
+    
+    ASSERT_EQ(fixed_size, col->GetNestedType()->As<FixedStringType>()->GetSize());
+}
 
 TEST(ColumnsCase, ColumnTupleT) {
     using TestTuple = ColumnTupleT<ColumnUInt64, ColumnString, ColumnFixedString>;
