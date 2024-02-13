@@ -99,7 +99,7 @@ jobs:
             -D CMAKE_C_COMPILER=${{matrix.C_COMPILER}} \
             -D CMAKE_CXX_COMPILER=${{matrix.CXX_COMPILER}} \
             -D CMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
-            -D BUILD_TESTS=ON \
+            -D CLICKHOUSE_CPP_BUILD_TESTS=ON \
             ${{matrix.SSL_CMAKE_OPTION}} \
             ${{matrix.DEPENDENCIES_CMAKE_OPTIONS}} \
             -S ${{github.workspace}} \
