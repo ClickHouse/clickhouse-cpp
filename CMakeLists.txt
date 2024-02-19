@@ -14,6 +14,7 @@ OPTION (WITH_OPENSSL "Use OpenSSL for TLS connections" OFF)
 OPTION (WITH_SYSTEM_ABSEIL "Use system ABSEIL" OFF)
 OPTION (WITH_SYSTEM_LZ4 "Use system LZ4" OFF)
 OPTION (WITH_SYSTEM_CITYHASH "Use system cityhash" OFF)
+OPTION (WITH_SYSTEM_ZSTD "Use system ZSTD" OFF)
 OPTION (DEBUG_DEPENDENCIES "Print debug info about dependencies duting build" ON)
 OPTION (CHECK_VERSION "Check that version number corresponds to git tag, usefull in CI/CD to validate that new version published on GitHub has same version in sources" OFF)
 
@@ -93,6 +94,13 @@ ELSE ()
     SUBDIRS (contrib/cityhash/cityhash)
 ENDIF ()
 
+IF (WITH_SYSTEM_ZSTD)
+    FIND_PACKAGE(zstd REQUIRED)
+ELSE ()
+    INCLUDE_DIRECTORIES (contrib/zstd/zstd)
+    SUBDIRS (contrib/zstd/zstd)
+ENDIF ()
+
 SUBDIRS (
     clickhouse
 )
@@ -141,4 +149,5 @@ if(DEBUG_DEPENDENCIES)
     print_target_debug_info(absl::int128)
     print_target_debug_info(cityhash::cityhash)
     print_target_debug_info(lz4::lz4)
+    print_target_debug_info(zstd::zstd)
 endif()

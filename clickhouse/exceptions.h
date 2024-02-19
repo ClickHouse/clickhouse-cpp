@@ -33,7 +33,7 @@ class OpenSSLError : public Error {
     using Error::Error;
 };
 
-class LZ4Error : public Error {
+class CompressionError : public Error {
     using Error::Error;
 };
 
