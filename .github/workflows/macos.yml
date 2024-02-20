@@ -47,7 +47,7 @@ jobs:
         run: |
           cmake \
             -D CMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
-            -D BUILD_TESTS=ON \
+            -D CLICKHOUSE_CPP_BUILD_TESTS=ON \
             ${{matrix.SSL_CMAKE_OPTION}} \
             -S ${{github.workspace}} \
             -B ${{github.workspace}}/build

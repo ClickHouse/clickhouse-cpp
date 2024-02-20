@@ -73,9 +73,9 @@ jobs:
             tar
 
       - name: Configure CMake
-        run: cmake -B build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DBUILD_TESTS=ON -DCHECK_VERSION=OFF
-        # -DWITH_OPENSSL=ON was not able to make it work (some strange issues with CA paths, need debug)
-        # -DCHECK_VERSION=OFF since it requires git, which can't be found from within cmake for some reason.
+        run: cmake -B build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCLICKHOUSE_CPP_BUILD_TESTS=ON -DCLICKHOUSE_CPP_CHECK_VERSION=OFF
+        # -DCLICKHOUSE_CPP_WITH_OPENSSL=ON was not able to make it work (some strange issues with CA paths, need debug)
+        # -DCLICKHOUSE_CPP_CHECK_VERSION=OFF since it requires git, which can't be found from within cmake for some reason.
 
       - name: Build
         run: cmake --build build --config ${{env.BUILD_TYPE}} --target all
