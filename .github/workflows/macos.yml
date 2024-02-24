@@ -4,9 +4,17 @@ on:
   schedule:
     - cron: '0 0 * * 1'
   push:
-    branches: [ master, '[1-9].*' ]
+    branches:
+      - master
+      - '[1-9].*'
   pull_request:
-    branches: [ master, '[1-9].*' ]
+    types:
+      - synchronize
+      - reopened
+      - opened
+    branches:
+      - master
+      - '[1-9].*'
 
   release:
     types:
