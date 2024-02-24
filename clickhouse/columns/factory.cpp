@@ -131,17 +131,17 @@ static ColumnRef CreateTerminalColumn(const TypeAst& ast) {
     }
 }
 
-static ColumnRef CreateColumnFromAst(const TypeAst& ast, CreateColumnByTypeSettings settings) {
+static ColumnRef CreateColumnFromAst(const TypeAst& ast) {
     switch (ast.meta) {
         case TypeAst::Array: {
             return std::make_shared<ColumnArray>(
-                CreateColumnFromAst(GetASTChildElement(ast, 0), settings)
+                CreateColumnFromAst(GetASTChildElement(ast, 0))
             );
         }
 
         case TypeAst::Nullable: {
             return std::make_shared<ColumnNullable>(
-                CreateColumnFromAst(GetASTChildElement(ast, 0), settings),
+                CreateColumnFromAst(GetASTChildElement(ast, 0)),
                 std::make_shared<ColumnUInt8>()
             );
         }
@@ -155,7 +155,7 @@ static ColumnRef CreateColumnFromAst(const TypeAst& ast, CreateColumnByTypeSetti
 
             columns.reserve(ast.elements.size());
             for (const auto& elem : ast.elements) {
-                if (auto col = CreateColumnFromAst(elem, settings)) {
+                if (auto col = CreateColumnFromAst(elem)) {
                     columns.push_back(col);
                 } else {
                     return nullptr;
@@ -201,7 +201,7 @@ static ColumnRef CreateColumnFromAst(const TypeAst& ast, CreateColumnByTypeSetti
                 case Type::Nullable:
                     return std::make_shared<ColumnLowCardinality>(
                         std::make_shared<ColumnNullable>(
-                            CreateColumnFromAst(GetASTChildElement(nested, 0), settings),
+                            CreateColumnFromAst(GetASTChildElement(nested, 0)),
                             std::make_shared<ColumnUInt8>()
                         )
                     );
@@ -222,7 +222,7 @@ static ColumnRef CreateColumnFromAst(const TypeAst& ast, CreateColumnByTypeSetti
 
             columns.reserve(ast.elements.size());
             for (const auto& elem : ast.elements) {
-                if (auto col = CreateColumnFromAst(elem, settings)) {
+                if (auto col = CreateColumnFromAst(elem)) {
                     columns.push_back(col);
                 } else {
                     return nullptr;
@@ -246,14 +246,12 @@ static ColumnRef CreateColumnFromAst(const TypeAst& ast, CreateColumnByTypeSetti
 
 } // namespace
 
-
-ColumnRef CreateColumnByType(const std::string& type_name, CreateColumnByTypeSettings settings) {
+ColumnRef CreateColumnByType(const std::string& type_name) {
     auto ast = ParseTypeName(type_name);
     if (ast != nullptr) {
-        return CreateColumnFromAst(*ast, settings);
+        return CreateColumnFromAst(*ast);
     }
 
     return nullptr;
 }
-
 }

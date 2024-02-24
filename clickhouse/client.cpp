@@ -605,8 +605,6 @@ bool Client::Impl::ReadBlock(InputStream& input, Block* block) {
         return false;
     }
 
-    CreateColumnByTypeSettings create_column_settings;
-
     for (size_t i = 0; i < num_columns; ++i) {
         std::string name;
         std::string type;
@@ -617,7 +615,7 @@ bool Client::Impl::ReadBlock(InputStream& input, Block* block) {
             return false;
         }
 
-        if (ColumnRef col = CreateColumnByType(type, create_column_settings)) {
+        if (ColumnRef col = CreateColumnByType(type)) {
             if (num_rows && !col->Load(&input, num_rows)) {
                 throw ProtocolError("can't load column '" + name + "' of type " + type);
             }

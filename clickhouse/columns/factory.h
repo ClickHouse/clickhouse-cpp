@@ -4,10 +4,6 @@
 
 namespace clickhouse {
 
-struct CreateColumnByTypeSettings
-{
-};
-
-ColumnRef CreateColumnByType(const std::string& type_name, CreateColumnByTypeSettings settings = {});
+ColumnRef CreateColumnByType(const std::string& type_name);
 
 }
