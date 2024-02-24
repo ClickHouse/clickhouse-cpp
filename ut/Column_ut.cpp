@@ -242,6 +242,8 @@ TYPED_TEST_SUITE(GenericColumnTest, TestCases);
 TYPED_TEST(GenericColumnTest, Construct) {
     auto column = this->MakeColumn();
     ASSERT_EQ(0u, column->Size());
+
+    dumpMemoryUsage("Newly constructed column", column);
 }
 
 TYPED_TEST(GenericColumnTest, EmptyColumn) {
@@ -279,6 +281,7 @@ TYPED_TEST(GenericColumnTest, Append) {
     }
 
     EXPECT_TRUE(CompareRecursive(values, *column));
+    dumpMemoryUsage("After appending 10000 items ", column);
 }
 
 // To make some value types compatitable with Column::GetItem()
@@ -339,6 +342,7 @@ TYPED_TEST(GenericColumnTest, Slice) {
 
     EXPECT_TRUE(CompareRecursive(values, *slice));
 
+    dumpMemoryUsage("Memory usage of slice ", slice);
     // TODO: slices of different sizes
 }
 
@@ -352,14 +356,18 @@ TYPED_TEST(GenericColumnTest, CloneEmpty) {
     EXPECT_EQ(0u, clone->Size());
 
     EXPECT_EQ(column->GetType(), clone->GetType());
+
+    dumpMemoryUsage("Memory usage of empty clone ", clone);
 }
 
 TYPED_TEST(GenericColumnTest, Clear) {
     auto [column, values] = this->MakeColumnWithValues(10'000);
     EXPECT_EQ(values.size(), column->Size());
+    dumpMemoryUsage("Memory usage before clear ", column);
 
     column->Clear();
     EXPECT_EQ(0u, column->Size());
+    dumpMemoryUsage("Memory usage after clear  ", column);
 }
 
 TYPED_TEST(GenericColumnTest, MemoryUsage) {
@@ -441,6 +449,8 @@ TYPED_TEST(GenericColumnTest, ReserveAndCapacity) {
         EXPECT_NO_THROW(column->Reserve(100u));
         EXPECT_EQ(100u, column->Capacity());
         EXPECT_EQ(0u, column->Size());
+
+        dumpMemoryUsage("After Reserving space for 100 items ", column);
     }
     else {
         COLUMN_DOESNT_IMPLEMENT("method Reserve() and Capacity()");
