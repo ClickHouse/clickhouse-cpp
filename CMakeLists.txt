@@ -15,7 +15,7 @@ OPTION (WITH_SYSTEM_ABSEIL "Use system ABSEIL" OFF)
 OPTION (WITH_SYSTEM_LZ4 "Use system LZ4" OFF)
 OPTION (WITH_SYSTEM_CITYHASH "Use system cityhash" OFF)
 OPTION (DEBUG_DEPENDENCIES "Print debug info about dependencies duting build" ON)
-OPTION (CHECK_VERSION "Check that version number corresponds to git tag, usefull in CI/CD to validate that new version published on GitHub has same version in sources" ON)
+OPTION (CHECK_VERSION "Check that version number corresponds to git tag, usefull in CI/CD to validate that new version published on GitHub has same version in sources" OFF)
 
 PROJECT (CLICKHOUSE-CLIENT
     VERSION "${CLICKHOUSE_CPP_VERSION}"
