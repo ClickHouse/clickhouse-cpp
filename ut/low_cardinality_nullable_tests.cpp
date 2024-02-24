@@ -57,7 +57,6 @@ TEST(LowCardinalityOfNullable, InsertAndQuery) {
     block.AppendColumn("words", column);
 
     Client client(ClientOptions(localHostEndpoint)
-                             .SetBakcwardCompatibilityFeatureLowCardinalityAsWrappedColumn(false)
                              .SetPingBeforeQuery(true));
 
     createTable(client);
@@ -93,7 +92,6 @@ TEST(LowCardinalityOfNullable, InsertAndQueryOneRow) {
     block.AppendColumn("words", column);
 
     Client client(ClientOptions(localHostEndpoint)
-                             .SetBakcwardCompatibilityFeatureLowCardinalityAsWrappedColumn(false)
                              .SetPingBeforeQuery(true));
 
     createTable(client);
@@ -122,7 +120,6 @@ TEST(LowCardinalityOfNullable, InsertAndQueryEmpty) {
     block.AppendColumn("words", column);
 
     Client client(ClientOptions(localHostEndpoint)
-            .SetBakcwardCompatibilityFeatureLowCardinalityAsWrappedColumn(false)
             .SetPingBeforeQuery(true));
 
     createTable(client);
@@ -141,8 +138,7 @@ TEST(LowCardinalityOfNullable, ThrowOnBackwardsCompatibleLCColumn) {
     block.AppendColumn("words", column);
 
     Client client(ClientOptions(localHostEndpoint)
-            .SetPingBeforeQuery(true)
-            .SetBakcwardCompatibilityFeatureLowCardinalityAsWrappedColumn(true));
+            .SetPingBeforeQuery(true));
 
     createTable(client);
 

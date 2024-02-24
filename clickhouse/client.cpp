@@ -606,7 +606,6 @@ bool Client::Impl::ReadBlock(InputStream& input, Block* block) {
     }
 
     CreateColumnByTypeSettings create_column_settings;
-    create_column_settings.low_cardinality_as_wrapped_column = options_.backward_compatibility_lowcardinality_as_wrapped_column;
 
     for (size_t i = 0; i < num_columns; ++i) {
         std::string name;

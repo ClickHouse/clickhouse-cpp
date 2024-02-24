@@ -8,7 +8,6 @@
 #include "ip4.h"
 #include "ip6.h"
 #include "lowcardinality.h"
-#include "lowcardinalityadaptor.h"
 #include "map.h"
 #include "nothing.h"
 #include "nullable.h"
@@ -194,36 +193,20 @@ static ColumnRef CreateColumnFromAst(const TypeAst& ast, CreateColumnByTypeSetti
         }
         case TypeAst::LowCardinality: {
             const auto nested = GetASTChildElement(ast, 0);
-            if (settings.low_cardinality_as_wrapped_column) {
-                switch (nested.code) {
-                    // TODO (nemkov): update this to maximize code reuse.
-                    case Type::String:
-                        return std::make_shared<LowCardinalitySerializationAdaptor<ColumnString>>();
-                    case Type::FixedString:
-                        return std::make_shared<LowCardinalitySerializationAdaptor<ColumnFixedString>>(GetASTChildElement(nested, 0).value);
-                    case Type::Nullable:
-                        throw UnimplementedError("LowCardinality(" + nested.name + ") is not supported with LowCardinalityAsWrappedColumn on");
-                    default:
-                        throw UnimplementedError("LowCardinality(" + nested.name + ") is not supported");
-                }
-            }
-            else {
-                switch (nested.code) {
-                    // TODO (nemkov): update this to maximize code reuse.
-                    case Type::String:
-                        return std::make_shared<ColumnLowCardinalityT<ColumnString>>();
-                    case Type::FixedString:
-                        return std::make_shared<ColumnLowCardinalityT<ColumnFixedString>>(GetASTChildElement(nested, 0).value);
-                    case Type::Nullable:
-                        return std::make_shared<ColumnLowCardinality>(
-                            std::make_shared<ColumnNullable>(
-                                CreateColumnFromAst(GetASTChildElement(nested, 0), settings),
-                                std::make_shared<ColumnUInt8>()
-                            )
-                        );
-                    default:
-                        throw UnimplementedError("LowCardinality(" + nested.name + ") is not supported");
-                }
+            switch (nested.code) {
+                case Type::String:
+                    return std::make_shared<ColumnLowCardinalityT<ColumnString>>();
+                case Type::FixedString:
+                    return std::make_shared<ColumnLowCardinalityT<ColumnFixedString>>(GetASTChildElement(nested, 0).value);
+                case Type::Nullable:
+                    return std::make_shared<ColumnLowCardinality>(
+                        std::make_shared<ColumnNullable>(
+                            CreateColumnFromAst(GetASTChildElement(nested, 0), settings),
+                            std::make_shared<ColumnUInt8>()
+                        )
+                    );
+                default:
+                    throw UnimplementedError("LowCardinality(" + nested.name + ") is not supported");
             }
         }
         case TypeAst::SimpleAggregateFunction: {
