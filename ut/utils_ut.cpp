@@ -158,7 +158,7 @@ TEST_F(OutputTest, PrettyPrintByteSize)
                 {3.25, "3.25"},
                 {13.75, "13.75"},
                 {135.5, "135.5"},
-                {135.125, "135.125"},
+                {135.125, "135.12"},
                 {10, "10"},
                 {100, "100"},
                 {1000, "1000"},
@@ -166,7 +166,8 @@ TEST_F(OutputTest, PrettyPrintByteSize)
         {
             const auto bytes_value = static_cast<size_t>(base * value);
             const auto expected_str = std::string(value_str) + " " + base_name;
-            EXPECT_EQ(expected_str, ToString(PrettyPrintByteSize{bytes_value}))
+
+            EXPECT_EQ(expected_str, ToString(PrettyPrintByteSize{bytes_value, 2}))
                 << "\n\tbase:      " << base
                 << "\n\tbase_name: " << base_name
                 << "\n\tvalue:     " << value

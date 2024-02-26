@@ -47,7 +47,7 @@ size_t EstimateColumnStringMemoryUsage(
             ? COLUMN_STRING_DEFAULT_BLOCK_SIZE % static_cast<size_t>(static_cast<size_t>(item_estimated_size) * value_to_estimation_average_size_ratio)
             : COLUMN_STRING_DEFAULT_BLOCK_SIZE / 10);
 
-    const auto max_estimation_error_factor = item_estimated_size == ColumnString::NO_PREALLOCATE ? 2.5 : 2;
+    const auto max_estimation_error_factor = item_estimated_size == ColumnString::NO_PREALLOCATE ? 2 : 1.2;
 
     return (number_of_items * sizeof(std::string_view)
         + estimated_total_item_size
