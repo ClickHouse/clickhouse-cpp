@@ -144,7 +144,7 @@ struct PrettyPrintBlock {
 // Print byte size in either in bytes, KiB, MiB, or GiB.
 struct PrettyPrintByteSize {
     size_t bytes;
-    size_t max_decimal_points = 3;
+    size_t max_decimal_points = 2;
 };
 
 namespace clickhouse {
