@@ -8,6 +8,7 @@
 #include "utils.h"
 #include "value_generators.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <initializer_list>
 #include <ios>
@@ -38,13 +39,25 @@ size_t EstimateColumnStringMemoryUsage(
     if (item_estimated_size == ColumnString::EstimatedValueSize{0} && total_items_size && number_of_items)
         item_estimated_size = ColumnString::EstimatedValueSize(static_cast<double>(*total_items_size) / number_of_items);
 
-    return number_of_items * sizeof(std::string_view)
-        + number_of_items * static_cast<size_t>(item_estimated_size) * value_to_estimation_average_size_ratio
+    const size_t estimated_total_item_size = number_of_items * static_cast<size_t>(item_estimated_size) * value_to_estimation_average_size_ratio;
+    const auto estimated_number_of_blocks = std::max<size_t>(1, estimated_total_item_size ? COLUMN_STRING_DEFAULT_BLOCK_SIZE / estimated_total_item_size : 1);
+
+    // space wasted in block since not all items can be fit perfectly, and there is some unused space at the end of the block.
+    const auto estimate_lost_space_in_block = (static_cast<size_t>(item_estimated_size) != 0
+            ? COLUMN_STRING_DEFAULT_BLOCK_SIZE % static_cast<size_t>(static_cast<size_t>(item_estimated_size) * value_to_estimation_average_size_ratio)
+            : COLUMN_STRING_DEFAULT_BLOCK_SIZE / 10);
+
+    const auto max_estimation_error_factor = item_estimated_size == ColumnString::NO_PREALLOCATE ? 2.5 : 2;
+
+    return (number_of_items * sizeof(std::string_view)
+        + estimated_total_item_size
+        + estimate_lost_space_in_block * estimated_number_of_blocks
         + COLUMN_STRING_DEFAULT_BLOCK_SIZE
         // It is hard to compute overhead added by vector<ColumnString::Block>
         // (mostly because we don't know number of ColumnString::Block instances from outside, and this number depends on many factors),
         // so we just make a guess.
-        + COLUMN_STRING_MAX_EXPECTED_MEMORY_OVERHEAD;
+            + COLUMN_STRING_MAX_EXPECTED_MEMORY_OVERHEAD)
+        * max_estimation_error_factor;
 }
 
 std::string ScaleString(std::string str, size_t required_size) {
@@ -289,8 +302,15 @@ struct ColumnStringEstimatedValueSizeTest : public ::testing::TestWithParam<std:
         // Adjust number of items so the test doesn't use too much memory
         if (static_cast<size_t>(single_value_size_estimation) != 0
             // *2 since we store both reference values and values in column itself.
-                && EstimateColumnStringMemoryUsage(expected_number_of_items, single_value_size_estimation, size_ratio.average) * 2 > MAX_MEMORY_USAGE) {
+                && EstimateColumnStringMemoryUsage(expected_number_of_items, single_value_size_estimation, size_ratio.average) > MAX_MEMORY_USAGE) {
+            const auto old_expected_number_of_items = expected_number_of_items;
             expected_number_of_items = MAX_MEMORY_USAGE / (static_cast<size_t>(single_value_size_estimation) * 2 * size_ratio.average);
+
+            std::cerr << "To avoid using too much memory, reduced number of items in test"
+                      << " from " << old_expected_number_of_items
+                      << " to " << expected_number_of_items
+                      << ", expected item size is " << single_value_size_estimation
+                      << std::endl;
         }
     }
 
@@ -318,9 +338,9 @@ struct ColumnStringEstimatedValueSizeTest : public ::testing::TestWithParam<std:
         ASSERT_TRUE(CompareRecursive(values, column));
     }
 
-    size_t EstimateMemoryUsage(size_t total_values_size) {
+    size_t EstimateMemoryUsage(size_t total_values_size, float expected_number_of_items_multiplier = 1.0) {
         const auto & [single_value_size_estimation, size_ratio] = GetParam();
-        return EstimateColumnStringMemoryUsage(expected_number_of_items, single_value_size_estimation, size_ratio.average, total_values_size);
+        return EstimateColumnStringMemoryUsage(expected_number_of_items * expected_number_of_items_multiplier, single_value_size_estimation, size_ratio.average, total_values_size);
     }
 };
 
@@ -363,8 +383,10 @@ TEST_P(ColumnStringEstimatedValueSizeTest, AppendNoReserve)
 
     EXPECT_NO_FATAL_FAILURE(AppendStrings(col, total_values_size));
 
-    // since there was no Reserve call prior, there could be more some overallocations, hence *2
-    EXPECT_LT(col.MemoryUsage(), EstimateMemoryUsage(total_values_size) * 2);
+    const auto max_estimation_error_factor = single_value_size_estimation == ColumnString::NO_PREALLOCATE ? 2.5 : 2;
+
+    // since there was no Reserve call prior, there could be more some overallocations, hence some estimation error
+    EXPECT_LT(col.MemoryUsage(), EstimateMemoryUsage(total_values_size) * max_estimation_error_factor);
 }
 
 TEST_P(ColumnStringEstimatedValueSizeTest, ReserveExactAndAppend)
@@ -377,8 +399,10 @@ TEST_P(ColumnStringEstimatedValueSizeTest, ReserveExactAndAppend)
     EXPECT_NO_THROW(col.Reserve(expected_number_of_items));
     EXPECT_NO_FATAL_FAILURE(AppendStrings(col, total_values_size));
 
+    const auto max_estimation_error_factor = single_value_size_estimation == ColumnString::NO_PREALLOCATE ? 2.5 : 2;
+
     // Allow minor overallocations, hence * 1.2
-    EXPECT_LT(col.MemoryUsage(), EstimateMemoryUsage(total_values_size) * 2);
+    EXPECT_LT(col.MemoryUsage(), EstimateMemoryUsage(total_values_size) * max_estimation_error_factor);
 }
 
 TEST_P(ColumnStringEstimatedValueSizeTest, ReserveLessAndAppend)
@@ -391,8 +415,10 @@ TEST_P(ColumnStringEstimatedValueSizeTest, ReserveLessAndAppend)
     EXPECT_NO_THROW(col.Reserve(expected_number_of_items * .8));
     EXPECT_NO_FATAL_FAILURE(AppendStrings(col, total_values_size));
 
+    const auto max_estimation_error_factor = single_value_size_estimation == ColumnString::NO_PREALLOCATE ? 2.5 : 2;
+
     // Allow minor overallocations, hence * 1.2
-    EXPECT_LT(col.MemoryUsage(), EstimateMemoryUsage(total_values_size) * 2);
+    EXPECT_LT(col.MemoryUsage(), EstimateMemoryUsage(total_values_size) * max_estimation_error_factor);
 }
 
 TEST_P(ColumnStringEstimatedValueSizeTest, ReserveMoreAndAppend)
@@ -405,8 +431,10 @@ TEST_P(ColumnStringEstimatedValueSizeTest, ReserveMoreAndAppend)
     EXPECT_NO_THROW(col.Reserve(expected_number_of_items * 1.2));
     EXPECT_NO_FATAL_FAILURE(AppendStrings(col, total_values_size));
 
+    const auto max_estimation_error_factor = single_value_size_estimation == ColumnString::NO_PREALLOCATE ? 2.5 : 2;
+
     // Allow minor overallocations, hence * 1.2
-    EXPECT_LT(col.MemoryUsage(), EstimateColumnStringMemoryUsage(expected_number_of_items * 1.2, single_value_size_estimation, size_ratio.average, total_values_size) * 2);
+    EXPECT_LT(col.MemoryUsage(), EstimateMemoryUsage(total_values_size, 1.2) * max_estimation_error_factor);
 }
 
 /** TODO more tests

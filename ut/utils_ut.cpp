@@ -2,6 +2,7 @@
 #include "ut/value_generators.h"
 #include "utils.h"
 
+#include <initializer_list>
 #include <limits>
 #include <optional>
 #include <vector>
@@ -119,4 +120,57 @@ TEST(CompareRecursive, OptionalNan) {
 TEST(Generators, MakeArrays) {
     auto arrays = MakeArrays<std::string, MakeStrings>();
     ASSERT_LT(0u, arrays.size());
+}
+
+class OutputTest : public ::testing::Test {
+public:
+    template <typename T>
+    static std::string ToString(const T & t) {
+        std::stringstream sstr;
+        sstr << t;
+
+        return sstr.str();
+    }
+};
+
+TEST_F(OutputTest, PrettyPrintByteSize)
+{
+    EXPECT_EQ("3 bytes", ToString(PrettyPrintByteSize{3}));
+
+    EXPECT_EQ("30 bytes", ToString(PrettyPrintByteSize{30}));
+    EXPECT_EQ("300 bytes", ToString(PrettyPrintByteSize{300}));
+
+    EXPECT_EQ("123 bytes", ToString(PrettyPrintByteSize{123}));
+
+    for (const auto & [base, base_name] : std::initializer_list<std::pair<size_t, const char*>>{
+            // {1,               "bytes"},
+            {1024,            "KiB"},
+            {1024*1024,       "MiB"},
+            {1024*1024*1024,  "GiB"},
+         } )
+    {
+        for (const auto & [value, value_str] : std::initializer_list<std::pair<float, const char*>>{
+                {1, "1"},
+                {1.01, "1.01"},
+                {1.10, "1.1"},
+                {1.5, "1.5"},
+                {3, "3"},
+                {3.25, "3.25"},
+                {13.75, "13.75"},
+                {135.5, "135.5"},
+                {135.125, "135.125"},
+                {10, "10"},
+                {100, "100"},
+                {1000, "1000"},
+             })
+        {
+            const auto bytes_value = static_cast<size_t>(base * value);
+            const auto expected_str = std::string(value_str) + " " + base_name;
+            EXPECT_EQ(expected_str, ToString(PrettyPrintByteSize{bytes_value}))
+                << "\n\tbase:      " << base
+                << "\n\tbase_name: " << base_name
+                << "\n\tvalue:     " << value
+                << "\n\tvalue_str: " << value_str;
+        }
+    }
 }

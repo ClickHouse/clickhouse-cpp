@@ -141,19 +141,25 @@ struct PrettyPrintBlock {
     const clickhouse::Block & block;
 };
 
+// Print byte size in either in bytes, KiB, MiB, or GiB.
+struct PrettyPrintByteSize {
+    size_t bytes;
+    size_t max_decimal_points = 3;
+};
+
 namespace clickhouse {
 std::ostream& operator<<(std::ostream & ostr, const Block & block);
 std::ostream& operator<<(std::ostream & ostr, const Type & type);
 std::ostream & operator<<(std::ostream & ostr, const ServerInfo & server_info);
 std::ostream & operator<<(std::ostream & ostr, const Profile & profile);
 std::ostream & operator<<(std::ostream & ostr, const Progress & progress);
-inline std::ostream & operator<<(std::ostream & ostr, const ColumnString::EstimatedValueSize & estimation) {
-    return ostr << "ColumnString::EstimatedValueSize{ " << static_cast<std::underlying_type_t<ColumnString::EstimatedValueSize>>(estimation) << " }";
-}
+std::ostream & operator<<(std::ostream & ostr, const ColumnString::EstimatedValueSize & estimation);
 
 }
 
 std::ostream& operator<<(std::ostream & ostr, const PrettyPrintBlock & block);
+std::ostream& operator<<(std::ostream & ostr, const PrettyPrintByteSize & block);
+
 std::ostream& operator<<(std::ostream& ostr, const in_addr& addr);
 std::ostream& operator<<(std::ostream& ostr, const in6_addr& addr);
 
