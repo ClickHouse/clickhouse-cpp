@@ -34,6 +34,12 @@ size_t EstimateColumnStringMemoryUsage(
     ) {
     static const size_t COLUMN_STRING_DEFAULT_BLOCK_SIZE = 4096;
     static const size_t COLUMN_STRING_MAX_EXPECTED_MEMORY_OVERHEAD = 4096;
+    const float max_estimation_error_factor = item_estimated_size == ColumnString::NO_PREALLOCATE ? 2.5 : 2;
+
+    // space wasted in block since not all items can be fit perfectly, and there is some unused space at the end of the block.
+    const auto estimate_lost_space_in_block = (static_cast<size_t>(item_estimated_size) != 0
+            ? COLUMN_STRING_DEFAULT_BLOCK_SIZE % static_cast<size_t>(static_cast<size_t>(item_estimated_size) * std::max(1.0f, value_to_estimation_average_size_ratio))
+            : COLUMN_STRING_DEFAULT_BLOCK_SIZE / 10);
 
     // if no estimation provided, use factual total size of all items
     if (item_estimated_size == ColumnString::EstimatedValueSize{0} && total_items_size && number_of_items)
@@ -41,13 +47,6 @@ size_t EstimateColumnStringMemoryUsage(
 
     const size_t estimated_total_item_size = number_of_items * static_cast<size_t>(item_estimated_size) * value_to_estimation_average_size_ratio;
     const auto estimated_number_of_blocks = std::max<size_t>(1, estimated_total_item_size ? COLUMN_STRING_DEFAULT_BLOCK_SIZE / estimated_total_item_size : 1);
-
-    // space wasted in block since not all items can be fit perfectly, and there is some unused space at the end of the block.
-    const auto estimate_lost_space_in_block = (static_cast<size_t>(item_estimated_size) != 0
-            ? COLUMN_STRING_DEFAULT_BLOCK_SIZE % static_cast<size_t>(static_cast<size_t>(item_estimated_size) * value_to_estimation_average_size_ratio)
-            : COLUMN_STRING_DEFAULT_BLOCK_SIZE / 10);
-
-    const auto max_estimation_error_factor = item_estimated_size == ColumnString::NO_PREALLOCATE ? 2 : 1.2;
 
     return (number_of_items * sizeof(std::string_view)
         + estimated_total_item_size
@@ -213,49 +212,6 @@ TEST(ColumnString, InvalidSizeEstimation) {
     EXPECT_THROW(col.SetEstimatedValueSize(ColumnString::EstimatedValueSize(std::numeric_limits<size_t>::max())), ValidationError);
 }
 
-TEST(ColumnString, WithSizeEstimation) {
-    const ColumnString::EstimatedValueSize value_size_estimations[] = {
-        ColumnString::EstimatedValueSize::TINY,
-        ColumnString::EstimatedValueSize::SMALL,
-        ColumnString::EstimatedValueSize::MEDIUM,
-        ColumnString::EstimatedValueSize::LARGE,
-
-        //        ColumnString::EstimatedValueSize(0),
-        ColumnString::EstimatedValueSize(1),
-        ColumnString::EstimatedValueSize(300),
-        ColumnString::EstimatedValueSize(10'000),
-    };
-
-    auto values = MakeStrings();
-    std::cerr << "Number of values: " << values.size() << std::endl;
-
-    for (ColumnString::EstimatedValueSize estimation : value_size_estimations) {
-        SCOPED_TRACE(::testing::Message("with estimation: ") << estimation);
-        std::cerr << "\nEstimation " << estimation << std::endl;
-
-        auto col = std::make_shared<ColumnString>(estimation);
-
-        dumpMemoryUsage("After constructing with estimation", col);
-
-        col->Reserve(values.size());
-        dumpMemoryUsage("After Reserve()", col);
-
-        size_t i = 0;
-        for (const auto & v : values) {
-            col->Append(v);
-
-            EXPECT_EQ(i + 1, col->Size());
-            EXPECT_EQ(v, col->At(i));
-
-            ++i;
-        }
-
-        dumpMemoryUsage("After appending all values", col);
-    }
-}
-
-
-
 struct SizeRatio {
     std::vector<float> ratios;
     float average;
@@ -275,19 +231,6 @@ struct SizeRatio {
 std::ostream & operator<<(std::ostream& ostr, const SizeRatio & r) {
     return ostr << "SizeRatio{ average: " << std::fixed << r.average << " } ";
 }
-
-//std::vector<SizeRatio> ratios{
-//                              // estimation is about right
-//                              SizeRatio({0.9, 0.95, 1.0, 1.05, 1.1}),
-//                              // estimation is a bit high, real values are about 0.8 of estimated size
-//                              SizeRatio({0.75, 0.8, 0.85}),
-//                              // estimation is a bit low, real values are about 1.2 of estimated size
-//                              SizeRatio({1.25, 1.2, 1.25}),
-//                              // estimation is to high, real values are about 2.0 of estimated size
-//                              SizeRatio({1.9, 2, 2.1}),
-//                              // estimation is to low, real values are about 0.5 of estimated size
-//                              SizeRatio({0.4, 0.5, 0.6}),
-//                              };
 
 /** Make sure that setting value size estimates with ColumnString::EstimatedValueSize either via contructor or via SetEstimatedValueSize
  *  doesn't break ColumnString functionality and well-behaves with Reserve() and Append().
@@ -340,7 +283,10 @@ struct ColumnStringEstimatedValueSizeTest : public ::testing::TestWithParam<std:
 
     size_t EstimateMemoryUsage(size_t total_values_size, float expected_number_of_items_multiplier = 1.0) {
         const auto & [single_value_size_estimation, size_ratio] = GetParam();
-        return EstimateColumnStringMemoryUsage(expected_number_of_items * expected_number_of_items_multiplier, single_value_size_estimation, size_ratio.average, total_values_size);
+        return EstimateColumnStringMemoryUsage(expected_number_of_items * expected_number_of_items_multiplier,
+                single_value_size_estimation,
+                size_ratio.average,
+                total_values_size);
     }
 };
 
@@ -383,10 +329,8 @@ TEST_P(ColumnStringEstimatedValueSizeTest, AppendNoReserve)
 
     EXPECT_NO_FATAL_FAILURE(AppendStrings(col, total_values_size));
 
-    const auto max_estimation_error_factor = single_value_size_estimation == ColumnString::NO_PREALLOCATE ? 2.5 : 2;
-
     // since there was no Reserve call prior, there could be more some overallocations, hence some estimation error
-    EXPECT_LT(col.MemoryUsage(), EstimateMemoryUsage(total_values_size) * max_estimation_error_factor);
+    EXPECT_LT(col.MemoryUsage(), EstimateMemoryUsage(total_values_size));
 }
 
 TEST_P(ColumnStringEstimatedValueSizeTest, ReserveExactAndAppend)
@@ -399,10 +343,7 @@ TEST_P(ColumnStringEstimatedValueSizeTest, ReserveExactAndAppend)
     EXPECT_NO_THROW(col.Reserve(expected_number_of_items));
     EXPECT_NO_FATAL_FAILURE(AppendStrings(col, total_values_size));
 
-    const auto max_estimation_error_factor = single_value_size_estimation == ColumnString::NO_PREALLOCATE ? 2.5 : 2;
-
-    // Allow minor overallocations, hence * 1.2
-    EXPECT_LT(col.MemoryUsage(), EstimateMemoryUsage(total_values_size) * max_estimation_error_factor);
+    EXPECT_LT(col.MemoryUsage(), EstimateMemoryUsage(total_values_size));
 }
 
 TEST_P(ColumnStringEstimatedValueSizeTest, ReserveLessAndAppend)
@@ -415,10 +356,7 @@ TEST_P(ColumnStringEstimatedValueSizeTest, ReserveLessAndAppend)
     EXPECT_NO_THROW(col.Reserve(expected_number_of_items * .8));
     EXPECT_NO_FATAL_FAILURE(AppendStrings(col, total_values_size));
 
-    const auto max_estimation_error_factor = single_value_size_estimation == ColumnString::NO_PREALLOCATE ? 2.5 : 2;
-
-    // Allow minor overallocations, hence * 1.2
-    EXPECT_LT(col.MemoryUsage(), EstimateMemoryUsage(total_values_size) * max_estimation_error_factor);
+    EXPECT_LT(col.MemoryUsage(), EstimateMemoryUsage(total_values_size));
 }
 
 TEST_P(ColumnStringEstimatedValueSizeTest, ReserveMoreAndAppend)
@@ -431,10 +369,7 @@ TEST_P(ColumnStringEstimatedValueSizeTest, ReserveMoreAndAppend)
     EXPECT_NO_THROW(col.Reserve(expected_number_of_items * 1.2));
     EXPECT_NO_FATAL_FAILURE(AppendStrings(col, total_values_size));
 
-    const auto max_estimation_error_factor = single_value_size_estimation == ColumnString::NO_PREALLOCATE ? 2.5 : 2;
-
-    // Allow minor overallocations, hence * 1.2
-    EXPECT_LT(col.MemoryUsage(), EstimateMemoryUsage(total_values_size, 1.2) * max_estimation_error_factor);
+    EXPECT_LT(col.MemoryUsage(), EstimateMemoryUsage(total_values_size, 1.2));
 }
 
 /** TODO more tests
