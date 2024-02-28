@@ -13,7 +13,7 @@
 #include <vector>
 #include <sstream>
 
-#if defined(WITH_OPENSSL)
+#if defined(CLICKHOUSE_CPP_WITH_OPENSSL)
 #include "base/sslsocket.h"
 #endif
 
@@ -87,7 +87,7 @@ std::ostream& operator<<(std::ostream& os, const ClientOptions& opt) {
        << " retry_timeout:" << opt.retry_timeout.count()
        << " compression_method:"
        << (opt.compression_method == CompressionMethod::LZ4 ? "LZ4" : "None");
-#if defined(WITH_OPENSSL)
+#if defined(CLICKHOUSE_CPP_WITH_OPENSSL)
     if (opt.ssl_options) {
         const auto & ssl_options = *opt.ssl_options;
         os << " SSL ("
@@ -107,7 +107,7 @@ std::ostream& operator<<(std::ostream& os, const ClientOptions& opt) {
 
 ClientOptions& ClientOptions::SetSSLOptions(ClientOptions::SSLOptions options)
 {
-#ifdef WITH_OPENSSL
+#ifdef CLICKHOUSE_CPP_WITH_OPENSSL
     ssl_options = options;
     return *this;
 #else
@@ -120,7 +120,7 @@ namespace {
 
 std::unique_ptr<SocketFactory> GetSocketFactory(const ClientOptions& opts) {
     (void)opts;
-#if defined(WITH_OPENSSL)
+#if defined(CLICKHOUSE_CPP_WITH_OPENSSL)
     if (opts.ssl_options)
         return std::make_unique<SSLSocketFactory>(opts);
     else

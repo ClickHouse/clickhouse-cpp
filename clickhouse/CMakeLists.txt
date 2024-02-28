@@ -98,7 +98,7 @@ else()
     endif()
 endif()
 
-IF (WITH_OPENSSL)
+IF (CLICKHOUSE_CPP_WITH_OPENSSL)
     LIST(APPEND clickhouse-cpp-lib-src base/sslsocket.cpp)
 ENDIF ()
 
@@ -118,7 +118,7 @@ TARGET_INCLUDE_DIRECTORIES (clickhouse-cpp-lib
     PUBLIC ${PROJECT_SOURCE_DIR}
 )
 
-IF (NOT BUILD_SHARED_LIBS)
+IF (NOT CLICKHOUSE_CPP_BUILD_SHARED_LIBS)
     ADD_LIBRARY (clickhouse-cpp-lib-static ALIAS clickhouse-cpp-lib)
 ELSE ()
     SET_TARGET_PROPERTIES (clickhouse-cpp-lib
@@ -206,7 +206,7 @@ INSTALL(FILES columns/uuid.h DESTINATION include/clickhouse/columns/)
 INSTALL(FILES types/type_parser.h DESTINATION include/clickhouse/types/)
 INSTALL(FILES types/types.h DESTINATION include/clickhouse/types/)
 
-IF (WITH_OPENSSL)
+IF (CLICKHOUSE_CPP_WITH_OPENSSL)
     TARGET_LINK_LIBRARIES (clickhouse-cpp-lib OpenSSL::SSL)
 ENDIF ()
 

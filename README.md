@@ -40,7 +40,7 @@ Optional dependencies:
 ```sh
 $ mkdir build .
 $ cd build
-$ cmake .. [-DBUILD_TESTS=ON]
+$ cmake .. [-DCLICKHOUSE_CPP_BUILD_TESTS=ON]
 $ make
 ```
 

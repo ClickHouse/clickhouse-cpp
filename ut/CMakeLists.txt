@@ -28,7 +28,7 @@ SET ( clickhouse-cpp-ut-src
     low_cardinality_nullable_tests.cpp
 )
 
-IF (WITH_OPENSSL)
+IF (CLICKHOUSE_CPP_WITH_OPENSSL)
     LIST (APPEND clickhouse-cpp-ut-src ssl_ut.cpp)
 ENDIF ()
 

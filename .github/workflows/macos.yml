@@ -4,9 +4,18 @@ on:
   schedule:
     - cron: '0 0 * * 1'
   push:
-    branches: [ master ]
+    branches:
+      - master
+      - '[1-9].*'
   pull_request:
-    branches: [ master ]
+    types:
+      - synchronize
+      - reopened
+      - opened
+    branches:
+      - master
+      - '[1-9].*'
+
   release:
     types:
       - published
@@ -47,7 +56,7 @@ jobs:
         run: |
           cmake \
             -D CMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
-            -D BUILD_TESTS=ON \
+            -D CLICKHOUSE_CPP_BUILD_TESTS=ON \
             ${{matrix.SSL_CMAKE_OPTION}} \
             -S ${{github.workspace}} \
             -B ${{github.workspace}}/build
