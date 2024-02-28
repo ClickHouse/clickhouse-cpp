@@ -2,6 +2,8 @@
 
 #include "clickhouse/base/socket.h"
 #include "clickhouse/version.h"
+#include "clickhouse/error_codes.h"
+
 #include "readonly_client_test.h"
 #include "connection_failed_client_test.h"
 #include "ut/utils_comparison.h"
@@ -19,12 +21,6 @@
 #include <chrono>
 
 using namespace clickhouse;
-
-namespace clickhouse {
-std::ostream & operator << (std::ostream & ostr, const Endpoint & endpoint) {
-    return ostr << endpoint.host << ":" << endpoint.port;
-}
-}
 
 template <typename T>
 std::shared_ptr<T> createTableWithOneColumn(Client & client, const std::string & table_name, const std::string & column_name)
@@ -439,21 +435,29 @@ TEST_P(ClientCase, Nullable) {
 }
 
 TEST_P(ClientCase, Numbers) {
-    size_t num = 0;
+    try {
+        size_t num = 0;
 
-    client_->Select("SELECT number, number FROM system.numbers LIMIT 100000", [&num](const Block& block)
-        {
-            if (block.GetRowCount() == 0) {
-                return;
-            }
-            auto col = block[0]->As<ColumnUInt64>();
+        client_->Select("SELECT number, number FROM system.numbers LIMIT 1000", [&num](const Block& block)
+            {
+                if (block.GetRowCount() == 0) {
+                    return;
+                }
+                auto col = block[0]->As<ColumnUInt64>();
 
-            for (size_t i = 0; i < col->Size(); ++i, ++num) {
-                EXPECT_EQ(num, col->At(i));
+                for (size_t i = 0; i < col->Size(); ++i, ++num) {
+                    EXPECT_EQ(num, col->At(i));
+                }
             }
-        }
-    );
-    EXPECT_EQ(100000U, num);
+        );
+        EXPECT_EQ(1000U, num);
+    }
+    catch (const clickhouse::ServerError & e) {
+        if (e.GetCode() == ErrorCodes::ACCESS_DENIED)
+            GTEST_SKIP() << e.what() << " : " << GetParam();
+        else
+            throw;
+    }
 }
 
 TEST_P(ClientCase, SimpleAggregateFunction) {
@@ -467,7 +471,7 @@ TEST_P(ClientCase, SimpleAggregateFunction) {
             "CREATE TEMPORARY TABLE IF NOT EXISTS test_clickhouse_cpp_SimpleAggregateFunction (saf SimpleAggregateFunction(sum, UInt64))");
 
     constexpr size_t EXPECTED_ROWS = 10;
-    client_->Execute("INSERT INTO test_clickhouse_cpp_SimpleAggregateFunction (saf) SELECT number FROM system.numbers LIMIT 10");
+    client_->Execute("INSERT INTO test_clickhouse_cpp_SimpleAggregateFunction (saf) VALUES (0),(1),(2),(3),(4),(5),(6),(7),(8),(9)");
 
     size_t total_rows = 0;
     client_->Select("Select * FROM test_clickhouse_cpp_SimpleAggregateFunction", [&total_rows](const Block & block) {

@@ -220,6 +220,7 @@ struct ClientOptions {
 };
 
 std::ostream& operator<<(std::ostream& os, const ClientOptions& options);
+std::ostream& operator<<(std::ostream& os, const Endpoint& options);
 
 class SocketFactory;
 
