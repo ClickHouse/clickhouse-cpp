@@ -1159,24 +1159,31 @@ TEST_P(ClientCase, OnProfileEvents) {
 }
 
 TEST_P(ClientCase, OnProfile) {
-    Query query("SELECT * FROM system.numbers LIMIT 10;");
+    try {
+        Query query("SELECT * FROM system.numbers LIMIT 10;");
 
-    std::optional<Profile> profile;
-    query.OnProfile([&profile](const Profile & new_profile) {
-        profile = new_profile;
-    });
+        std::optional<Profile> profile;
+        query.OnProfile([&profile](const Profile & new_profile) {
+            profile = new_profile;
+        });
 
-    client_->Execute(query);
+        client_->Execute(query);
 
-    // Make sure that profile event came through
-    ASSERT_NE(profile, std::nullopt);
+        // Make sure that profile event came through
+        ASSERT_NE(profile, std::nullopt);
 
-    EXPECT_GE(profile->rows, 10u);
-    EXPECT_GE(profile->blocks, 1u);
-    EXPECT_GT(profile->bytes, 1u);
-    EXPECT_GE(profile->rows_before_limit, 10u);
-    EXPECT_EQ(profile->applied_limit, true);
-    EXPECT_EQ(profile->calculated_rows_before_limit, true);
+        EXPECT_GE(profile->rows, 10u);
+        EXPECT_GE(profile->blocks, 1u);
+        EXPECT_GT(profile->bytes, 1u);
+        EXPECT_GE(profile->rows_before_limit, 10u);
+        EXPECT_EQ(profile->applied_limit, true);
+        EXPECT_EQ(profile->calculated_rows_before_limit, true);
+    } catch (const clickhouse::ServerError & e) {
+        if (e.GetCode() == ErrorCodes::ACCESS_DENIED)
+            GTEST_SKIP() << e.what() << " : " << GetParam();
+        else
+            throw;
+    }
 }
 
 TEST_P(ClientCase, SelectAggregateFunction) {
