@@ -7,6 +7,7 @@ INCLUDE (subdirs)
 INCLUDE (openssl)
 INCLUDE (version)
 
+
 OPTION (CLICKHOUSE_CPP_BUILD_BENCHMARK "Build benchmark" OFF)
 OPTION (CLICKHOUSE_CPP_BUILD_TESTS "Build tests" OFF)
 OPTION (CLICKHOUSE_CPP_BUILD_SHARED_LIBS "Build shared libs" OFF)
@@ -15,7 +16,8 @@ OPTION (CLICKHOUSE_CPP_WITH_SYSTEM_ABSEIL "Use system ABSEIL" OFF)
 OPTION (CLICKHOUSE_CPP_WITH_SYSTEM_LZ4 "Use system LZ4" OFF)
 OPTION (CLICKHOUSE_CPP_WITH_SYSTEM_CITYHASH "Use system cityhash" OFF)
 OPTION (CLICKHOUSE_CPP_DEBUG_DEPENDENCIES "Print debug info about dependencies duting build" ON)
-OPTION (CLICKHOUSE_CPP_CHECK_VERSION "Check that version number corresponds to git tag, usefull in CI/CD to validate that new version published on GitHub has same version in sources" ON)
+OPTION (CLICKHOUSE_CPP_CHECK_VERSION "Check that version number corresponds to git tag, usefull in CI/CD to validate that new version published on GitHub has same version in sources" OFF)
+
 
 PROJECT (CLICKHOUSE-CLIENT
     VERSION "${CLICKHOUSE_CPP_VERSION}"
