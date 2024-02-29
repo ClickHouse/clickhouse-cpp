@@ -308,7 +308,6 @@ void ColumnString::Clear() {
     items_.clear();
     blocks_.clear();
     append_data_.clear();
-    append_data_.shrink_to_fit();
 }
 
 std::string_view ColumnString::At(size_t n) const {

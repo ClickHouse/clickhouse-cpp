@@ -161,9 +161,9 @@ uint64_t Type::GetTypeUniqueId() const {
             //   1. going to be the same
             //   2. going to be stored atomically
 
-            if (type_unique_id_.load(std::memory_order::memory_order_relaxed) == 0) {
+            if (type_unique_id_.load(std::memory_order_relaxed) == 0) {
                 const auto name = GetName();
-                type_unique_id_.store(CityHash64WithSeed(name.c_str(), name.size(), code_), std::memory_order::memory_order_relaxed);
+                type_unique_id_.store(CityHash64WithSeed(name.c_str(), name.size(), code_), std::memory_order_relaxed);
             }
 
             return type_unique_id_;

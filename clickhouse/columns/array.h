@@ -262,8 +262,16 @@ public:
     using ColumnArray::Append;
 
     template <typename Container>
-    inline void Append(const Container& container) {
-        Append(std::begin(container), std::end(container));
+    inline void Append(Container&& container) {
+        using container_type = decltype(container);
+        if constexpr (std::is_lvalue_reference_v<container_type> || 
+            std::is_const_v<std::remove_reference_t<container_type>>) {
+            Append(std::begin(container), std::end(container));
+        }
+        else {
+            Append(std::make_move_iterator(std::begin(container)),
+                std::make_move_iterator(std::end(container)));
+        }
     }
 
     template <typename ValueType>
@@ -272,12 +280,12 @@ public:
     }
 
     template <typename Begin, typename End>
-    inline void Append(Begin begin, const End & end) {
+    inline void Append(Begin begin, End end) {
         auto & nested_data = *typed_nested_data_;
         size_t counter = 0;
 
         while (begin != end) {
-            nested_data.Append(std::move(*begin));
+            nested_data.Append(*begin);
             ++begin;
             ++counter;
         }

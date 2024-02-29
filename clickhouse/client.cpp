@@ -1,4 +1,5 @@
 #include "client.h"
+#include "clickhouse/version.h"
 #include "protocol.h"
 
 #include "base/compressed.h"
@@ -8,20 +9,15 @@
 #include "columns/factory.h"
 
 #include <assert.h>
-#include <atomic>
 #include <system_error>
-#include <thread>
 #include <vector>
 #include <sstream>
-#include <stdexcept>
 
 #if defined(WITH_OPENSSL)
 #include "base/sslsocket.h"
 #endif
 
 #define DBMS_NAME                                       "ClickHouse"
-#define DBMS_VERSION_MAJOR                              2
-#define DBMS_VERSION_MINOR                              1
 
 #define DBMS_MIN_REVISION_WITH_TEMPORARY_TABLES         50264
 #define DBMS_MIN_REVISION_WITH_TOTAL_ROWS_IN_PROGRESS   51554
@@ -43,7 +39,7 @@
 #define DBMS_MIN_REVISION_WITH_INITIAL_QUERY_START_TIME 54449
 #define DBMS_MIN_REVISION_WITH_INCREMENTAL_PROFILE_EVENTS 54451
 
-#define REVISION  DBMS_MIN_REVISION_WITH_INCREMENTAL_PROFILE_EVENTS
+#define DMBS_PROTOCOL_REVISION  DBMS_MIN_REVISION_WITH_INCREMENTAL_PROFILE_EVENTS
 
 namespace clickhouse {
 
@@ -63,14 +59,30 @@ struct ClientInfo {
     uint32_t client_revision = 0;
 };
 
-std::ostream& operator<<(std::ostream& os, const ClientOptions& opt) {
-    os << "Client(" << opt.user << '@' << opt.host << ":" << opt.port
-       << "Endpoints :";
-    for (size_t i = 0; i < opt.endpoints.size(); i++)
-        os << opt.user << '@' << opt.endpoints[i].host << ":" << opt.endpoints[i].port
-           << ((i == opt.endpoints.size() - 1) ? "" : ", ");
+std::ostream& operator<<(std::ostream& os, const Endpoint& endpoint) {
+    return os << endpoint.host << ":" << endpoint.port;
+}
 
-    os << " ping_before_query:" << opt.ping_before_query
+std::ostream& operator<<(std::ostream& os, const ClientOptions& opt) {
+    os << "Client("
+       << " Endpoints : [";
+    size_t extra_endpoints = 0;
+
+    if (!opt.host.empty()) {
+        extra_endpoints = 1;
+        os << opt.user << '@' << Endpoint{opt.host, opt.port};
+
+        if (opt.endpoints.size())
+            os << ", ";
+    }
+
+    for (size_t i = 0; i < opt.endpoints.size(); i++) {
+        os << opt.user << '@' << opt.endpoints[i]
+           << ((i == opt.endpoints.size() - 1) ? "" : ", ");
+    }
+
+    os << "] (" << opt.endpoints.size() + extra_endpoints << " items )"
+       << " ping_before_query:" << opt.ping_before_query
        << " send_retries:" << opt.send_retries
        << " retry_timeout:" << opt.retry_timeout.count()
        << " compression_method:"
@@ -483,12 +495,12 @@ bool Client::Impl::ReceivePacket(uint64_t* server_packet) {
         if (!WireFormat::ReadUInt64(*input_, &info.bytes)) {
             return false;
         }
-        if constexpr(REVISION >= DBMS_MIN_REVISION_WITH_TOTAL_ROWS_IN_PROGRESS) {
+        if constexpr(DMBS_PROTOCOL_REVISION >= DBMS_MIN_REVISION_WITH_TOTAL_ROWS_IN_PROGRESS) {
             if (!WireFormat::ReadUInt64(*input_, &info.total_rows)) {
                 return false;
             }
         }
-        if constexpr (REVISION >= DBMS_MIN_REVISION_WITH_CLIENT_WRITE_INFO)
+        if constexpr (DMBS_PROTOCOL_REVISION >= DBMS_MIN_REVISION_WITH_CLIENT_WRITE_INFO)
         {
             if (!WireFormat::ReadUInt64(*input_, &info.written_rows)) {
                 return false;
@@ -575,7 +587,7 @@ bool Client::Impl::ReceivePacket(uint64_t* server_packet) {
 
 bool Client::Impl::ReadBlock(InputStream& input, Block* block) {
     // Additional information about block.
-    if constexpr (REVISION >= DBMS_MIN_REVISION_WITH_BLOCK_INFO) {
+    if constexpr (DMBS_PROTOCOL_REVISION >= DBMS_MIN_REVISION_WITH_BLOCK_INFO) {
         uint64_t num;
         BlockInfo info;
 
@@ -639,7 +651,7 @@ bool Client::Impl::ReadBlock(InputStream& input, Block* block) {
 bool Client::Impl::ReceiveData() {
     Block block;
 
-    if constexpr (REVISION >= DBMS_MIN_REVISION_WITH_TEMPORARY_TABLES) {
+    if constexpr (DMBS_PROTOCOL_REVISION >= DBMS_MIN_REVISION_WITH_TEMPORARY_TABLES) {
         if (!WireFormat::SkipString(*input_)) {
             return false;
         }
@@ -729,9 +741,10 @@ void Client::Impl::SendQuery(const Query& query) {
 
         info.query_kind = 1;
         info.client_name = "ClickHouse client";
-        info.client_version_major = DBMS_VERSION_MAJOR;
-        info.client_version_minor = DBMS_VERSION_MINOR;
-        info.client_revision = REVISION;
+        info.client_version_major = CLICKHOUSE_CPP_VERSION_MAJOR;
+        info.client_version_minor = CLICKHOUSE_CPP_VERSION_MINOR;
+        info.client_version_patch = CLICKHOUSE_CPP_VERSION_PATCH;
+        info.client_revision = DMBS_PROTOCOL_REVISION;
 
 
         WireFormat::WriteFixed(*output_, info.query_kind);
@@ -870,9 +883,9 @@ void Client::Impl::InitializeStreams(std::unique_ptr<SocketBase>&& socket) {
 bool Client::Impl::SendHello() {
     WireFormat::WriteUInt64(*output_, ClientCodes::Hello);
     WireFormat::WriteString(*output_, std::string(DBMS_NAME) + " client");
-    WireFormat::WriteUInt64(*output_, DBMS_VERSION_MAJOR);
-    WireFormat::WriteUInt64(*output_, DBMS_VERSION_MINOR);
-    WireFormat::WriteUInt64(*output_, REVISION);
+    WireFormat::WriteUInt64(*output_, CLICKHOUSE_CPP_VERSION_MAJOR);
+    WireFormat::WriteUInt64(*output_, CLICKHOUSE_CPP_VERSION_MINOR);
+    WireFormat::WriteUInt64(*output_, DMBS_PROTOCOL_REVISION);
     WireFormat::WriteString(*output_, options_.default_database);
     WireFormat::WriteString(*output_, options_.user);
     WireFormat::WriteString(*output_, options_.password);
@@ -1042,6 +1055,16 @@ const std::optional<Endpoint>& Client::GetCurrentEndpoint() const {
 
 const ServerInfo& Client::GetServerInfo() const {
     return impl_->GetServerInfo();
+}
+
+Client::Version Client::GetVersion() {
+    return Version {
+        CLICKHOUSE_CPP_VERSION_MAJOR,
+        CLICKHOUSE_CPP_VERSION_MINOR,
+        CLICKHOUSE_CPP_VERSION_PATCH,
+        CLICKHOUSE_CPP_VERSION_BUILD,
+        ""
+    };
 }
 
 }

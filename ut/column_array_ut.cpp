@@ -313,3 +313,90 @@ TEST(ColumnArrayT, Wrap_UInt64_2D) {
 
     EXPECT_TRUE(CompareRecursive(values, array));
 }
+
+TEST(ColumnArrayT, left_value_no_move) {
+    std::string value0 = "000000000000000000";
+    std::string value1 = "111111111111111111";
+    std::string value2 = "222222222222222222";
+    std::vector<std::vector<std::string>> all_values{ 
+        { value0, value1, value2},
+        { value0, value1, value2},
+        { value0, value1, value2}
+    };
+    size_t origin_size = 3;
+    auto array = std::make_shared<clickhouse::ColumnArrayT<clickhouse::ColumnArrayT<ColumnString>>>();
+    array->Append(all_values);
+    EXPECT_EQ(3u, (*array)[0][0].size());
+    EXPECT_EQ(3u, (*array)[0][1].size());
+    EXPECT_EQ(3u, (*array)[0][2].size());
+
+    EXPECT_EQ(value0, (*array)[0][0][0]);
+    EXPECT_EQ(value1, (*array)[0][1][1]);
+    EXPECT_EQ(value2, (*array)[0][2][2]);
+
+    for (const auto& values : all_values) {
+        EXPECT_EQ(origin_size, values.size());
+    }
+
+    EXPECT_EQ(origin_size, all_values.size());
+    for (const auto& values : all_values) {
+        EXPECT_EQ(values[0], value0);
+        EXPECT_EQ(values[1], value1);
+        EXPECT_EQ(values[2], value2);
+    }
+}
+
+TEST(ColumnArrayT, right_value_move) {
+    std::string value0 = "000000000000000000";
+    std::string value1 = "111111111111111111";
+    std::string value2 = "222222222222222222";
+    std::vector<std::vector<std::string>> all_values{
+        { value0, value1, value2},
+        { value0, value1, value2},
+        { value0, value1, value2}
+    };
+    auto array = std::make_shared<clickhouse::ColumnArrayT<clickhouse::ColumnArrayT<ColumnString>>>();
+    array->Append(std::move(all_values));
+    EXPECT_EQ(3u, (*array)[0][0].size());
+    EXPECT_EQ(3u, (*array)[0][1].size());
+    EXPECT_EQ(3u, (*array)[0][2].size());
+
+    EXPECT_EQ(value0, (*array)[0][0][0]);
+    EXPECT_EQ(value1, (*array)[0][1][1]);
+    EXPECT_EQ(value2, (*array)[0][2][2]);
+
+    // Here we don't care about the size of the container from which all values were moved-out.
+    //EXPECT_EQ(0u, all_values.size());
+}
+
+TEST(ColumnArrayT, const_right_value_no_move) {
+    std::string value0 = "000000000000000000";
+    std::string value1 = "111111111111111111";
+    std::string value2 = "222222222222222222";
+    const std::vector<std::vector<std::string>> all_values{
+        { value0, value1, value2},
+        { value0, value1, value2},
+        { value0, value1, value2}
+    };
+    size_t origin_size = 3;
+    auto array = std::make_shared<clickhouse::ColumnArrayT<clickhouse::ColumnArrayT<ColumnString>>>();
+    array->Append(std::move(all_values));
+    EXPECT_EQ(3u, (*array)[0][0].size());
+    EXPECT_EQ(3u, (*array)[0][1].size());
+    EXPECT_EQ(3u, (*array)[0][2].size());
+
+    EXPECT_EQ(value0, (*array)[0][0][0]);
+    EXPECT_EQ(value1, (*array)[0][1][1]);
+    EXPECT_EQ(value2, (*array)[0][2][2]);
+
+    for (const auto& values : all_values) {
+        EXPECT_EQ(origin_size, values.size());
+    }
+
+    EXPECT_EQ(origin_size, all_values.size());
+    for (const auto& values : all_values) {
+        EXPECT_EQ(values[0], value0);
+        EXPECT_EQ(values[1], value1);
+        EXPECT_EQ(values[2], value2);
+    }
+}
