@@ -117,15 +117,6 @@ struct ClientOptions {
     DECLARE_FIELD(connection_recv_timeout, std::chrono::milliseconds, SetConnectionRecvTimeout, std::chrono::milliseconds(0));
     DECLARE_FIELD(connection_send_timeout, std::chrono::milliseconds, SetConnectionSendTimeout, std::chrono::milliseconds(0));
 
-    /** It helps to ease migration of the old codebases, which can't afford to switch
-    * to using ColumnLowCardinalityT or ColumnLowCardinality directly,
-    * but still want to benefit from smaller on-wire LowCardinality bandwidth footprint.
-    *
-    * @see LowCardinalitySerializationAdaptor, CreateColumnByType
-    */
-    [[deprecated("Makes implementation of LC(X) harder and code uglier. Will be removed in next major release (3.0) ")]]
-    DECLARE_FIELD(backward_compatibility_lowcardinality_as_wrapped_column, bool, SetBakcwardCompatibilityFeatureLowCardinalityAsWrappedColumn, false);
-
     /** Set max size data to compress if compression enabled.
      *
      *  Allows choosing tradeoff between RAM\CPU:

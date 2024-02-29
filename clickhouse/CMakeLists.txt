@@ -45,8 +45,8 @@ SET ( clickhouse-cpp-lib-src
     base/singleton.h
     base/socket.h
     base/sslsocket.h
-    base/string_utils.h
-    base/string_view.h
+
+
     base/uuid.h
     base/wire_format.h
 
@@ -61,7 +61,7 @@ SET ( clickhouse-cpp-lib-src
     columns/ip6.h
     columns/itemview.h
     columns/lowcardinality.h
-    columns/lowcardinalityadaptor.h
+
     columns/map.h
     columns/nothing.h
     columns/nullable.h
