@@ -209,6 +209,12 @@ void ColumnLowCardinality::Reserve(size_t new_cap) {
     dictionary_column_->Reserve(EstimateDictionaryCapacity(new_cap));
 }
 
+size_t ColumnLowCardinality::Capacity() const {
+    return VisitIndexColumn([](auto & index_column) {
+        return index_column.Capacity();
+    }, *index_column_);
+}
+
 void ColumnLowCardinality::Setup(ColumnRef dictionary_column) {
     AppendDefaultItem();
 

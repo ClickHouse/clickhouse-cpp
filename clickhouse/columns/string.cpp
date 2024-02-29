@@ -70,6 +70,11 @@ void ColumnFixedString::Reserve(size_t new_cap) {
     data_.reserve(string_size_ * new_cap);
 }
 
+size_t ColumnFixedString::Capacity() const {
+    const auto data_cap = data_.capacity();
+    return (data_cap - data_.size()) / string_size_;
+}
+
 void ColumnFixedString::Append(std::string_view str) {
     if (str.size() > string_size_) {
         throw ValidationError("Expected string of length not greater than "
@@ -253,6 +258,10 @@ void ColumnString::Reserve(size_t new_cap) {
         const size_t estimated_items_in_next_block = value_size_estimation_ ? new_cap - blocks_.back().GetAvailable() / value_size_estimation_ : new_cap;
         next_block_size_ = std::max(DEFAULT_BLOCK_SIZE, estimated_items_in_next_block * value_size_estimation_);
     }
+}
+
+size_t ColumnString::Capacity() const {
+    return items_.capacity();
 }
 
 void ColumnString::SetEstimatedValueSize(EstimatedValueSize value_size_estimation) {

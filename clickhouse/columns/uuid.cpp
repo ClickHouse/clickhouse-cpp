@@ -38,6 +38,10 @@ void ColumnUUID::Reserve(size_t new_cap) {
     data_->Reserve(new_cap);
 }
 
+size_t ColumnUUID::Capacity() const {
+    return data_->Capacity();
+}
+
 void ColumnUUID::Append(ColumnRef column) {
     if (auto col = column->As<ColumnUUID>()) {
         data_->Append(col->data_);

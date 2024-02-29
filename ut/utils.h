@@ -221,4 +221,4 @@ uint64_t versionNumber(const clickhouse::ServerInfo & server_info);
 
 std::string ToString(const clickhouse::UUID& v);
 
-std::ostream & dumpMemoryUsage(const char * prefix, const clickhouse::ColumnRef col);
+void dumpMemoryUsage(const char * prefix, const clickhouse::ColumnRef col);

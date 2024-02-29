@@ -44,6 +44,13 @@ std::vector<T>& ColumnVector<T>::GetWritableData() {
 }
 
 template <typename T>
+void ColumnVector<T>::Append(ColumnRef column) {
+    if (auto col = column->As<ColumnVector<T>>()) {
+        data_.insert(data_.end(), col->data_.begin(), col->data_.end());
+    }
+}
+
+template <typename T>
 void ColumnVector<T>::Reserve(size_t new_cap) {
     data_.reserve(new_cap);
 }
@@ -61,13 +68,6 @@ void ColumnVector<T>::Clear() {
 template <typename T>
 const T& ColumnVector<T>::At(size_t n) const {
     return data_.at(n);
-}
-
-template <typename T>
-void ColumnVector<T>::Append(ColumnRef column) {
-    if (auto col = column->As<ColumnVector<T>>()) {
-        data_.insert(data_.end(), col->data_.begin(), col->data_.end());
-    }
 }
 
 template <typename T>

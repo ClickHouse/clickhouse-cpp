@@ -22,8 +22,9 @@ public:
 
 public:
     /// Increase the capacity of the column for large block insertion.
-    void Reserve(size_t new_cap) override;
     void Append(ColumnRef column) override;
+    void Reserve(size_t new_cap) override;
+    size_t Capacity() const override;
     bool LoadBody(InputStream* input, size_t rows) override;
     void SaveBody(OutputStream* output) override;
     void Clear() override;

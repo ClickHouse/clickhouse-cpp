@@ -229,7 +229,7 @@ TEST(ColumnLowCardinalityString, WithSizeEstimation) {
                 }
             }
 
-            dumpMemoryUsage("After appending all values", col) << std::endl;
+            dumpMemoryUsage("After appending all values", col);
         }
     }
 }

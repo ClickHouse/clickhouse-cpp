@@ -445,8 +445,11 @@ TYPED_TEST(GenericColumnTest, ReserveAndCapacity) {
 
     if constexpr (has_method_Reserve_v<column_type> && has_method_Capacity_v<column_type>) {
         auto column = this->MakeColumn();
-        EXPECT_EQ(0u, column->Capacity());
+
+        EXPECT_GT(16u, column->Capacity());        // Column might have some non-zero capacity initially
+
         EXPECT_NO_THROW(column->Reserve(100u));
+
         EXPECT_EQ(100u, column->Capacity());
         EXPECT_EQ(0u, column->Size());
 

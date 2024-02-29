@@ -27,9 +27,6 @@ public:
             Append(v);
     }
 
-    /// Increase the capacity of the column for large block insertion.
-    void Reserve(size_t) override;
-
     /// Appends one element to the column.
     void Append(std::string_view str);
 
@@ -45,6 +42,9 @@ public:
 public:
     /// Appends content of given column to the end of current one.
     void Append(ColumnRef column) override;
+    /// Increase the capacity of the column for large block insertion.
+    void Reserve(size_t) override;
+    size_t Capacity() const override;
 
     /// Loads column data from input stream.
     bool LoadBody(InputStream* input, size_t rows) override;
@@ -136,6 +136,9 @@ public:
 
     /// Increase the capacity of the column for large block insertion.
     void Reserve(size_t new_cap) override;
+
+    /// Returns the capacity of the column
+    size_t Capacity() const override;
 
     /// Loads column data from input stream.
     bool LoadBody(InputStream* input, size_t rows) override;

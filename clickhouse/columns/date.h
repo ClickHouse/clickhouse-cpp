@@ -27,18 +27,18 @@ public:
     /// Do append data as is -- number of day in Unix epoch, no conversions performed.
     void AppendRaw(uint16_t value);
     uint16_t RawAt(size_t n) const;
-
-    /// Appends content of given column to the end of current one.
-    void Append(ColumnRef column) override;
-
     /// Get Raw Vector Contents
     std::vector<uint16_t>& GetWritableData();
+
+public:
+    /// Appends content of given column to the end of current one.
+    void Append(ColumnRef column) override;
 
     /// Increase the capacity of the column for large block insertion.
     void Reserve(size_t new_cap) override;
 
     /// Returns the capacity of the column
-    size_t Capacity() const;
+    size_t Capacity() const override;
 
     /// Loads column data from input stream.
     bool LoadBody(InputStream* input, size_t rows) override;
@@ -89,15 +89,13 @@ public:
     /// Get Raw Vector Contents
     std::vector<int32_t>& GetWritableData();
 
-    /// Returns the capacity of the column
-    size_t Capacity() const;
-
 public:
-    /// Increase the capacity of the column for large block insertion.
-    void Reserve(size_t new_cap) override;
-
     /// Appends content of given column to the end of current one.
     void Append(ColumnRef column) override;
+    /// Increase the capacity of the column for large block insertion.
+    void Reserve(size_t new_cap) override;
+    /// Returns the capacity of the column
+    size_t Capacity() const override;
 
     /// Loads column data from input stream.
     bool LoadBody(InputStream* input, size_t rows) override;
@@ -151,15 +149,13 @@ public:
     /// Get Raw Vector Contents
     std::vector<uint32_t>& GetWritableData();
 
-    /// Returns the capacity of the column
-    size_t Capacity() const;
-
 public:
-    /// Increase the capacity of the column for large block insertion.
-    void Reserve(size_t new_cap) override;
-
     /// Appends content of given column to the end of current one.
     void Append(ColumnRef column) override;
+    /// Increase the capacity of the column for large block insertion.
+    void Reserve(size_t new_cap) override;
+    /// Returns the capacity of the column
+    size_t Capacity() const override;
 
     /// Loads column data from input stream.
     bool LoadBody(InputStream* input, size_t rows) override;
@@ -209,11 +205,11 @@ public:
     std::string Timezone() const;
 
 public:
-    /// Increase the capacity of the column for large block insertion.
-    void Reserve(size_t new_cap) override;
-
     /// Appends content of given column to the end of current one.
     void Append(ColumnRef column) override;
+    /// Increase the capacity of the column for large block insertion.
+    void Reserve(size_t new_cap) override;
+    size_t Capacity() const override;
 
     /// Loads column data from input stream.
     bool LoadBody(InputStream* input, size_t rows) override;

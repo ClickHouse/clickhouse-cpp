@@ -26,11 +26,11 @@ public:
     {
     }
 
-    /// Increase the capacity of the column for large block insertion.
-    void Reserve(size_t) override {};
-
     /// Appends one element to the column.
     void Append(std::unique_ptr<void*>) { ++size_; }
+    /// Increase the capacity of the column for large block insertion.
+    void Reserve(size_t) override {};
+    size_t Capacity() const override {return 0;}
 
     /// Returns element at given row number.
     std::nullptr_t At(size_t) const { return nullptr; };

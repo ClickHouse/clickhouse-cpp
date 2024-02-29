@@ -415,6 +415,10 @@ std::string ToString(const clickhouse::UUID& v) {
     return result;
 }
 
-std::ostream & dumpMemoryUsage(const char * prefix, const clickhouse::ColumnRef col) {
-    return std::cerr << prefix << " " << col->GetType().GetName() << " : " << PrettyPrintByteSize{col->MemoryUsage()} << std::endl;
+void dumpMemoryUsage(const char * prefix, const clickhouse::ColumnRef col) {
+#if defined(_NDEBUG)
+    return;
+#else
+    std::cerr << prefix << " " << col->GetType().GetName() << " : " << PrettyPrintByteSize{col->MemoryUsage()} << std::endl;
+#endif
 }

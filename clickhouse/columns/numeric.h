@@ -19,9 +19,6 @@ public:
     explicit ColumnVector(const std::vector<T>& data);
     explicit ColumnVector(std::vector<T> && data);
 
-    /// Increase the capacity of the column for large block insertion.
-    void Reserve(size_t new_cap) override;
-
     /// Appends one element to the end of column.
     void Append(const T& value);
 
@@ -36,12 +33,13 @@ public:
     /// Get Raw Vector Contents
     std::vector<T>& GetWritableData();
 
-    /// Returns the capacity of the column
-    size_t Capacity() const;
-
 public:
     /// Appends content of given column to the end of current one.
     void Append(ColumnRef column) override;
+    /// Increase the capacity of the column for large block insertion.
+    void Reserve(size_t new_cap) override;
+    /// Returns the capacity of the column
+    size_t Capacity() const override;
 
     /// Loads column data from input stream.
     bool LoadBody(InputStream* input, size_t rows) override;

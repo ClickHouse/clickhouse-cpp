@@ -20,12 +20,6 @@ size_t ColumnTuple::TupleSize() const {
     return columns_.size();
 }
 
-void ColumnTuple::Reserve(size_t new_cap) {
-    for (auto& column : columns_) {
-        column->Reserve(new_cap);
-    }  
-}
-
 void ColumnTuple::Append(ColumnRef column) {
     if (!this->Type()->IsEqual(column->Type())) {
         throw ValidationError(
@@ -37,6 +31,17 @@ void ColumnTuple::Append(ColumnRef column) {
         columns_[ci]->Append((*source_tuple_column)[ci]);
     }
 }
+
+void ColumnTuple::Reserve(size_t new_cap) {
+    for (auto& column : columns_) {
+        column->Reserve(new_cap);
+    }  
+}
+
+size_t ColumnTuple::Capacity() const {
+    return columns_.size() ? columns_[0]->Capacity() : 0;
+}
+
 size_t ColumnTuple::Size() const {
     return columns_.empty() ? 0 : columns_[0]->Size();
 }
