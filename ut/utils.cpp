@@ -1,4 +1,4 @@
-#include "utils.h"
+#include <ut/utils.h>
 
 #include <clickhouse/block.h>
 #include <clickhouse/client.h>
@@ -20,7 +20,9 @@
 
 #include <cinttypes>
 #include <iomanip>
+#include <ios>
 #include <sstream>
+#include <string_view>
 #include <type_traits>
 
 
@@ -256,6 +258,48 @@ std::ostream& operator<<(std::ostream & ostr, const PrettyPrintBlock & pretty_pr
     return ostr;
 }
 
+std::ostream& operator<<(std::ostream & ostr, const PrettyPrintByteSize & byte_size) {
+    static const std::pair<size_t, const char *> FACTORS[] = {
+        { 1,              "bytes" },
+        { 1024,           "KiB"   },
+        { 1024*1024,      "MiB"   },
+        { 1024*1024*1024, "GiB"   },
+    };
+
+    auto p = std::find_if(std::begin(FACTORS), std::end(FACTORS), [&byte_size](const auto v) {
+        return byte_size.bytes < v.first;
+    });
+
+    if (p != std::begin(FACTORS)) {
+        --p;
+    }
+
+    const float resulting_size = byte_size.bytes / static_cast<float>(p->first);
+
+    // Trim trailing zeroes after decimal point, if present.
+    {
+        std::stringstream sstr;
+        sstr << std::fixed << std::setprecision(byte_size.max_decimal_points) << resulting_size;
+
+        auto s = sstr.str();
+
+        // here we completely ignore locales and just assume that '.' is used as decimal point
+        const auto decimal_point_position = s.find_last_of('.');
+        const auto last_non_zero_decimal_number_pos = s.find_last_not_of('0');
+
+        if (decimal_point_position != s.npos && last_non_zero_decimal_number_pos != s.npos) {
+            if (decimal_point_position == last_non_zero_decimal_number_pos)
+                s.erase(decimal_point_position);
+            else
+                s.erase(std::max(decimal_point_position, last_non_zero_decimal_number_pos + 1));
+        }
+
+        ostr << s;
+    }
+
+    return ostr << " " << p->second;
+}
+
 std::ostream& operator<<(std::ostream& ostr, const in_addr& addr) {
     char buf[INET_ADDRSTRLEN];
     const char* ip_str = inet_ntop(AF_INET, &addr, buf, sizeof(buf));
@@ -332,6 +376,28 @@ std::ostream & operator<<(std::ostream & ostr, const Progress & progress) {
         << " written_bytes : " << progress.written_bytes;
 }
 
+std::ostream & operator<<(std::ostream & ostr, const ColumnString::EstimatedValueSize & estimation) {
+    static const std::pair<ColumnString::EstimatedValueSize, const char *> NAMES_OF_DEFAULT_VALUES[] = {
+        { ColumnString::NO_PREALLOCATE,              "DO NOT PREALLOCATE" },
+        { ColumnString::EstimatedValueSize::TINY,    "TINY (8 bytes)"     },
+        { ColumnString::EstimatedValueSize::SMALL,   "SMALL (32 bytes)"   },
+        { ColumnString::EstimatedValueSize::MEDIUM,  "MEDIUM (128 bytes)" },
+        { ColumnString::EstimatedValueSize::LARGE,   "LARGE (512 bytes)"  }
+    };
+
+    const auto p = std::find_if(std::begin(NAMES_OF_DEFAULT_VALUES), std::end(NAMES_OF_DEFAULT_VALUES), [&estimation](const auto v) {
+        return v.first == estimation;
+    });
+
+    ostr << "ColumnString::EstimatedValueSize{ ";
+    if (p != std::end(NAMES_OF_DEFAULT_VALUES))
+        ostr << p->second;
+    else
+        ostr << PrettyPrintByteSize{static_cast<size_t>(estimation)};
+
+    return ostr << " }";
+}
+
 }
 
 uint64_t versionNumber(const ServerInfo & server_info) {
@@ -347,4 +413,12 @@ std::string ToString(const clickhouse::UUID& v) {
         throw std::runtime_error("Error while converting UUID to string");
     }
     return result;
+}
+
+void dumpMemoryUsage(const char * prefix, const clickhouse::ColumnRef col) {
+#if defined(_NDEBUG)
+    return;
+#else
+    std::cerr << prefix << " " << col->GetType().GetName() << " : " << PrettyPrintByteSize{col->MemoryUsage()} << std::endl;
+#endif
 }

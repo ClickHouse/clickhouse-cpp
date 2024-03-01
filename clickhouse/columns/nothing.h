@@ -26,11 +26,11 @@ public:
     {
     }
 
-    /// Increase the capacity of the column for large block insertion.
-    void Reserve(size_t) override {};
-
     /// Appends one element to the column.
     void Append(std::unique_ptr<void*>) { ++size_; }
+    /// Increase the capacity of the column for large block insertion.
+    void Reserve(size_t) override {};
+    size_t Capacity() const override {return 0;}
 
     /// Returns element at given row number.
     std::nullptr_t At(size_t) const { return nullptr; };
@@ -74,6 +74,8 @@ public:
 
     /// Returns count of rows in the column.
     size_t Size() const override { return size_; }
+
+    size_t MemoryUsage() const override { return 0; }
 
     void Swap(Column& other) override {
         auto & col = dynamic_cast<ColumnNothing &>(other);

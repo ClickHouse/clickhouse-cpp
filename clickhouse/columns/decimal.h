@@ -22,12 +22,14 @@ public:
 
 public:
     /// Increase the capacity of the column for large block insertion.
-    void Reserve(size_t new_cap) override;
     void Append(ColumnRef column) override;
+    void Reserve(size_t new_cap) override;
+    size_t Capacity() const override;
     bool LoadBody(InputStream* input, size_t rows) override;
     void SaveBody(OutputStream* output) override;
     void Clear() override;
     size_t Size() const override;
+    size_t MemoryUsage() const override;
     ColumnRef Slice(size_t begin, size_t len) const override;
     ColumnRef CloneEmpty() const override;
     void Swap(Column& other) override;
