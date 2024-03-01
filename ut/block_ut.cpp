@@ -1,9 +1,19 @@
-#include <clickhouse/client.h>
-#include "readonly_client_test.h"
-#include "connection_failed_client_test.h"
-#include "utils.h"
+#include <clickhouse/block.h>
+#include <clickhouse/columns/column.h>
+#include <clickhouse/columns/numeric.h>
+#include <clickhouse/columns/string.h>
+
+#include <ut/readonly_client_test.h>
+#include <ut/connection_failed_client_test.h>
+#include <ut/utils.h>
 
 #include <gtest/gtest.h>
+
+#include <memory>
+#include <string>
+#include <vector>
+#include <utility>
+#include <stdint.h>
 
 namespace {
 using namespace clickhouse;

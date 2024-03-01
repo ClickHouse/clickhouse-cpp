@@ -15,21 +15,20 @@
 
 #include <clickhouse/client.h>
 
+#include <ut/utils_comparison.h>
+#include <ut/utils_meta.h>
+#include <ut/utils.h>
+#include <ut/roundtrip_column.h>
+#include <ut/value_generators.h>
+
 #include <gtest/gtest.h>
+
 #include <algorithm>
 #include <cstdint>
 #include <initializer_list>
 #include <memory>
 #include <numeric>
 #include <type_traits>
-
-#include "clickhouse/columns/column.h"
-#include "gtest/internal/gtest-internal.h"
-#include "ut/utils_comparison.h"
-#include "ut/utils_meta.h"
-#include "utils.h"
-#include "roundtrip_column.h"
-#include "value_generators.h"
 
 namespace {
 using namespace clickhouse;
