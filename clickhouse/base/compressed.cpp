@@ -117,6 +117,11 @@ bool CompressedInput::Decompress() {
         }
         return true;
     }
+
+    case static_cast<uint8_t>(CompressionMethodByte::NONE): {
+
+        throw CompressionError("compression method not defined" + std::to_string((method)));
+    }
     }
 
     return true;
@@ -206,6 +211,10 @@ void CompressedOutput::Compress(const void * data, size_t len) {
         WireFormat::WriteBytes(*destination_, compressed_buffer_.data(), compressed_size + HEADER_SIZE);
         break;
     }
+
+    case clickhouse::CompressionMethod::None: {
+        throw CompressionError("no compression defined");
+    }
     }
 
     destination_->Flush();
@@ -228,6 +237,11 @@ void CompressedOutput::PreallocateCompressBuffer(size_t input_size) {
             throw CompressionError("Failed to estimate compressed buffer size, ZSTD error: " + std::string(ZSTD_getErrorName(estimated_compressed_buffer_size)));
 
         compressed_buffer_.resize(estimated_compressed_buffer_size + HEADER_SIZE + EXTRA_COMPRESS_BUFFER_SIZE);
+        break;
+    }
+
+    case clickhouse::CompressionMethod::None: {
+        /// do nothing
         break;
     }
     }
