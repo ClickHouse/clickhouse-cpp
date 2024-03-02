@@ -330,5 +330,10 @@ INSTANTIATE_TEST_SUITE_P(
         ClientOptions(LocalHostEndpoint)
             .SetPingBeforeQuery(false)
             .SetCompressionMethod(CompressionMethod::LZ4)
+            .SetBakcwardCompatibilityFeatureLowCardinalityAsWrappedColumn(false),
+
+        ClientOptions(LocalHostEndpoint)
+            .SetPingBeforeQuery(false)
+            .SetCompressionMethod(CompressionMethod::ZSTD)
             .SetBakcwardCompatibilityFeatureLowCardinalityAsWrappedColumn(false)
     ));
