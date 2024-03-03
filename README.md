@@ -34,6 +34,7 @@ Optional dependencies:
 - openssl
 - liblz4
 - libabsl
+- libzstd
 
 ## Building
 

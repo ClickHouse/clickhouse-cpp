@@ -452,7 +452,8 @@ const auto LocalHostEndpoint = ClientOptions()
 
 const auto AllCompressionMethods = {
     clickhouse::CompressionMethod::None,
-    clickhouse::CompressionMethod::LZ4
+    clickhouse::CompressionMethod::LZ4,
+    clickhouse::CompressionMethod::ZSTD
 };
 
 TYPED_TEST(GenericColumnTest, RoundTrip) {

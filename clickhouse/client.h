@@ -3,6 +3,8 @@
 #include "query.h"
 #include "exceptions.h"
 
+#include "base/compressed.h"
+
 #include "columns/array.h"
 #include "columns/date.h"
 #include "columns/decimal.h"
@@ -37,12 +39,6 @@ struct ServerInfo {
     uint64_t    version_minor;
     uint64_t    version_patch;
     uint64_t    revision;
-};
-
-/// Methods of block compression.
-enum class CompressionMethod {
-    None    = -1,
-    LZ4     =  1,
 };
 
 struct Endpoint {
