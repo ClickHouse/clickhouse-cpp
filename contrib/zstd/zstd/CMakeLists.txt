@@ -1,3 +1,5 @@
+enable_language(ASM)
+
 SET(Sources
         common/debug.c
         common/entropy_common.c
