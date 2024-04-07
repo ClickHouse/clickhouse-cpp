@@ -4,21 +4,9 @@
 #include "output.h"
 #include "buffer.h"
 
+#include "clickhouse/client.h"
+
 namespace clickhouse {
-
-/// Methods of block compression.
-enum class CompressionMethod : int8_t {
-    None = -1,
-    LZ4  = 1,
-    ZSTD = 2,
-};
-
-// see DB::CompressionMethodByte from src/Compression/CompressionInfo.h of ClickHouse project
-enum class CompressionMethodByte : uint8_t {
-    NONE = 0x02,
-    LZ4  = 0x82,
-    ZSTD = 0x90,
-};
 
 class CompressedInput : public ZeroCopyInput {
 public:

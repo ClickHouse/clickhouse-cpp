@@ -1,7 +1,7 @@
 #include "compressed.h"
 #include "wire_format.h"
 #include "output.h"
-#include "../exceptions.h"
+#include "clickhouse/exceptions.h"
 
 #include <city.h>
 #include <lz4.h>
@@ -12,6 +12,14 @@
 
 namespace {
 constexpr size_t HEADER_SIZE = 9;
+
+// see DB::CompressionMethodByte from src/Compression/CompressionInfo.h of ClickHouse project
+enum class CompressionMethodByte : uint8_t {
+    NONE = 0x02,
+    LZ4  = 0x82,
+    ZSTD = 0x90,
+};
+
 // Documentation says that compression is faster when output buffer is larger than LZ4_compressBound/ZSTD_compressBound estimation.
 constexpr size_t EXTRA_COMPRESS_BUFFER_SIZE = 4096;
 constexpr size_t DBMS_MAX_COMPRESSED_SIZE = 0x40000000ULL;   // 1GB
@@ -97,7 +105,6 @@ bool CompressedInput::Decompress() {
 
     switch (method) {
     case static_cast<uint8_t>(CompressionMethodByte::LZ4): {
-
         if (LZ4_decompress_safe((const char*)tmp.data() + HEADER_SIZE, (char*)data_.data(), static_cast<int>(compressed - HEADER_SIZE), original) < 0) {
             throw CompressionError("can't decompress LZ4-encoded data");
         } else {
@@ -107,7 +114,6 @@ bool CompressedInput::Decompress() {
     }
 
     case static_cast<uint8_t>(CompressionMethodByte::ZSTD): {
-
         size_t res = ZSTD_decompress((char*)data_.data(), original, (const char*)tmp.data() + HEADER_SIZE, static_cast<int>(compressed - HEADER_SIZE));
 
         if (ZSTD_isError(res)) {
@@ -119,8 +125,10 @@ bool CompressedInput::Decompress() {
     }
 
     case static_cast<uint8_t>(CompressionMethodByte::NONE): {
-
         throw CompressionError("compression method not defined" + std::to_string((method)));
+    }
+    default: {
+        throw CompressionError("Unknown or unsupported compression method " + std::to_string((method)));
     }
     }
 
