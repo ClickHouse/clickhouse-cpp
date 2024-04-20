@@ -325,10 +325,7 @@ INSTANTIATE_TEST_SUITE_P(
     ::testing::Values(
         ClientOptions(LocalHostEndpoint)
             .SetPingBeforeQuery(true)
-            .SetBakcwardCompatibilityFeatureLowCardinalityAsWrappedColumn(false),
-
-        ClientOptions(LocalHostEndpoint)
-            .SetPingBeforeQuery(false)
+        ,
+        ClientOptions(LocalHostEndpoint) .SetPingBeforeQuery(false)
             .SetCompressionMethod(CompressionMethod::LZ4)
-            .SetBakcwardCompatibilityFeatureLowCardinalityAsWrappedColumn(false)
     ));
