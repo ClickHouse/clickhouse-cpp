@@ -173,7 +173,7 @@ bool TypeParser::Parse(TypeAst* type) {
                 break;
             case Token::Number:
                 type_->meta = TypeAst::Number;
-                type_->value = std::strtoul(token.value.data(), nullptr, 10);
+                type_->value = std::strtoll(token.value.data(), nullptr, 10);
                 break;
             case Token::String:
                 type_->meta = TypeAst::String;
@@ -244,7 +244,8 @@ TypeParser::Token TypeParser::NextToken() {
                     if (end_quote == std::string_view{cur_, end_quote_length}) {
                         cur_ += end_quote_length;
 
-                        return Token{Token::QuotedString, std::string_view{start, cur_}};
+                        return Token{ Token::QuotedString,
+                            std::string_view{start, static_cast<size_t>(cur_ - start)} };
                     }
                 }
                 return Token{Token::QuotedString, std::string_view(cur_++, 1)};
@@ -270,7 +271,7 @@ TypeParser::Token TypeParser::NextToken() {
                         }
                     }
 
-                    return Token{Token::Name, std::string_view(st, cur_)};
+                    return Token{ Token::Name, std::string_view(st, static_cast<size_t>(cur_ - st)) };
                 }
 
                 if (isdigit(*cur_) || *cur_ == '-') {
@@ -280,7 +281,7 @@ TypeParser::Token TypeParser::NextToken() {
                         }
                     }
 
-                    return Token{Token::Number, std::string_view(st, cur_)};
+                    return Token{ Token::Number, std::string_view(st, static_cast<size_t>(cur_ - st)) };
                 }
 
                 return Token{Token::Invalid, EMPTY};
