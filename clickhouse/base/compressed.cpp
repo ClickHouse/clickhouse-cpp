@@ -27,11 +27,7 @@ CompressedInput::CompressedInput(InputStream* input)
 
 CompressedInput::~CompressedInput() {
     if (!mem_.Exhausted()) {
-#if __cplusplus < 201703L
-        if (!std::uncaught_exception()) {
-#else
         if (!std::uncaught_exceptions()) {
-#endif
             throw LZ4Error("some data was not read");
         }
     }

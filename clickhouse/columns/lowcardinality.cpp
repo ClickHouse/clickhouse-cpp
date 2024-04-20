@@ -346,7 +346,8 @@ void ColumnLowCardinality::SavePrefix(OutputStream* output) {
 }
 
 void ColumnLowCardinality::SaveBody(OutputStream* output) {
-    const uint64_t index_serialization_type = indexTypeFromIndexColumn(*index_column_) | IndexFlag::HasAdditionalKeysBit;
+    const uint64_t index_serialization_type = static_cast<uint64_t>(indexTypeFromIndexColumn(*index_column_))
+        | static_cast<uint64_t>(IndexFlag::HasAdditionalKeysBit);
     WireFormat::WriteFixed(*output, index_serialization_type);
 
     const uint64_t number_of_keys = dictionary_column_->Size();
