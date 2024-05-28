@@ -4,6 +4,8 @@
 #include "output.h"
 #include "buffer.h"
 
+#include "clickhouse/client.h"
+
 namespace clickhouse {
 
 class CompressedInput : public ZeroCopyInput {
@@ -25,7 +27,7 @@ private:
 
 class CompressedOutput : public OutputStream {
 public:
-    explicit CompressedOutput(OutputStream * destination, size_t max_compressed_chunk_size = 0);
+    explicit CompressedOutput(OutputStream* destination, size_t max_compressed_chunk_size = 0, CompressionMethod method = CompressionMethod::LZ4);
     ~CompressedOutput() override;
 
 protected:
@@ -40,6 +42,7 @@ private:
     OutputStream * destination_;
     const size_t max_compressed_chunk_size_;
     Buffer compressed_buffer_;
+    CompressionMethod method_;
 };
 
 }

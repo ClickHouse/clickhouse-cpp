@@ -86,7 +86,9 @@ std::ostream& operator<<(std::ostream& os, const ClientOptions& opt) {
        << " send_retries:" << opt.send_retries
        << " retry_timeout:" << opt.retry_timeout.count()
        << " compression_method:"
-       << (opt.compression_method == CompressionMethod::LZ4 ? "LZ4" : "None");
+       << (opt.compression_method == CompressionMethod::LZ4    ? "LZ4"
+           : opt.compression_method == CompressionMethod::ZSTD ? "ZSTD"
+                                                               : "None");
 #if defined(WITH_OPENSSL)
     if (opt.ssl_options) {
         const auto & ssl_options = *opt.ssl_options;
@@ -858,9 +860,8 @@ void Client::Impl::SendData(const Block& block) {
     }
 
     if (compression_ == CompressionState::Enable) {
-        assert(options_.compression_method == CompressionMethod::LZ4);
 
-        std::unique_ptr<OutputStream> compressed_output = std::make_unique<CompressedOutput>(output_.get(), options_.max_compression_chunk_size);
+        std::unique_ptr<OutputStream> compressed_output = std::make_unique<CompressedOutput>(output_.get(), options_.max_compression_chunk_size, options_.compression_method);
         BufferedOutput buffered(std::move(compressed_output), options_.max_compression_chunk_size);
 
         WriteBlock(block, buffered);
