@@ -27,9 +27,6 @@ public:
             Append(v);
     }
 
-    /// Increase the capacity of the column for large block insertion.
-    void Reserve(size_t) override;
-
     /// Appends one element to the column.
     void Append(std::string_view str);
 
@@ -45,6 +42,9 @@ public:
 public:
     /// Appends content of given column to the end of current one.
     void Append(ColumnRef column) override;
+    /// Increase the capacity of the column for large block insertion.
+    void Reserve(size_t) override;
+    size_t Capacity() const override;
 
     /// Loads column data from input stream.
     bool LoadBody(InputStream* input, size_t rows) override;
@@ -60,6 +60,8 @@ public:
 
     /// Makes slice of the current column.
     ColumnRef Slice(size_t begin, size_t len) const override;
+    size_t MemoryUsage() const override;
+
     ColumnRef CloneEmpty() const override;
     void Swap(Column& other) override;
 
@@ -78,17 +80,36 @@ public:
     // Type this column takes as argument of Append and returns with At() and operator[]
     using ValueType = std::string_view;
 
-    ColumnString();
-    ~ColumnString();
+    // Estimation on average size of the value in column,
+    // helps to reduce used memory and number of re-allocation.
+    // Choosing a bad estimation woudn't crash the program,
+    // but may cause more frequent smaller memory allocations,
+    // reducing overall performance.
+    // int32_t to be able to validate againts (unintentional) negative values in ColumnString c-tor.
+    // Otherwise those just silently underflow unsigned type,
+    // resulting in attempt to allocate enormous amount of memory at run time.
+    enum class EstimatedValueSize : int32_t {
+        TINY = 8,
+        SMALL = 32,
+        MEDIUM = 128,
+        LARGE = 512,
+    };
 
-    explicit ColumnString(size_t element_count);
+    // Memory for item storage is not pre-allocated on Reserve(), same as old behaviour.
+    static constexpr auto NO_PREALLOCATE = EstimatedValueSize(0);
+
+    explicit ColumnString(EstimatedValueSize value_size_estimation = NO_PREALLOCATE);
+    explicit ColumnString(size_t element_count, EstimatedValueSize value_size_estimation = NO_PREALLOCATE);
     explicit ColumnString(const std::vector<std::string> & data);
     explicit ColumnString(std::vector<std::string>&& data);
+
+    ~ColumnString();
+
     ColumnString& operator=(const ColumnString&) = delete;
     ColumnString(const ColumnString&) = delete;
 
-    /// Increase the capacity of the column for large block insertion.
-    void Reserve(size_t new_cap) override;
+    /// Change how memory is allocated for future Reserve() or Append() calls. Doesn't affect items that are already added to the column.
+    void SetEstimatedValueSize(EstimatedValueSize value_size_estimation);
 
     /// Appends one element to the column.
     void Append(std::string_view str);
@@ -113,6 +134,12 @@ public:
     /// Appends content of given column to the end of current one.
     void Append(ColumnRef column) override;
 
+    /// Increase the capacity of the column for large block insertion.
+    void Reserve(size_t new_cap) override;
+
+    /// Returns the capacity of the column
+    size_t Capacity() const override;
+
     /// Loads column data from input stream.
     bool LoadBody(InputStream* input, size_t rows) override;
 
@@ -125,6 +152,8 @@ public:
     /// Returns count of rows in the column.
     size_t Size() const override;
 
+    size_t MemoryUsage() const override;
+
     /// Makes slice of the current column.
     ColumnRef Slice(size_t begin, size_t len) const override;
     ColumnRef CloneEmpty() const override;
@@ -132,14 +161,19 @@ public:
     ItemView GetItem(size_t) const override;
 
 private:
+    struct Block;
+
     void AppendUnsafe(std::string_view);
+    Block & PrepareBlockWithSpaceForAtLeast(size_t minimum_required_bytes);
 
 private:
-    struct Block;
 
     std::vector<std::string_view> items_;
     std::vector<Block> blocks_;
     std::deque<std::string> append_data_;
+
+    uint32_t value_size_estimation_ = 0;
+    size_t next_block_size_ = 0;
 };
 
 }

@@ -174,9 +174,45 @@ ColumnLowCardinality::ColumnLowCardinality(std::shared_ptr<ColumnNullable> dicti
 ColumnLowCardinality::~ColumnLowCardinality()
 {}
 
+namespace
+{
+    size_t EstimateDictionaryCapacity(size_t new_cap)
+    {
+        // Estimate capacity of the LC dictionary column.
+        // For small columns we assume there are higher relative number of unique items
+        //  hence the capacity of the dictionary column must be the same as capacity of index_column.
+        // For large columns we assume that there are at least 80% of duplicates,
+        //  hence the capacity of the dictionary column is 0.20 of the index_column.
+        // Medium-sized columns have dictionary capacity somewhere in-between.
+
+        const float max_ratio = 1.0;
+        const float min_ratio = 0.20;
+        const float min_ratio_at = 512;
+        const float max_ratio_at = 128;
+
+        if (new_cap < max_ratio_at)
+            return new_cap;
+
+        if (new_cap >= min_ratio_at)
+            return new_cap * min_ratio;
+
+        // Ratio of the dict capacity to the index column capacity,
+        // linearly falls down from `max_ratio` at `max_ratio_at` down to `min_ratio` at min_ratio_at;
+        const float ratio = max_ratio + (max_ratio_at - static_cast<int>(new_cap)) * (max_ratio - min_ratio) / (min_ratio_at - max_ratio_at);
+        return new_cap * ratio;
+    }
+}
+
 void ColumnLowCardinality::Reserve(size_t new_cap) {
-    dictionary_column_->Reserve(new_cap);
     index_column_->Reserve(new_cap);
+
+    dictionary_column_->Reserve(EstimateDictionaryCapacity(new_cap));
+}
+
+size_t ColumnLowCardinality::Capacity() const {
+    return VisitIndexColumn([](auto & index_column) {
+        return index_column.Capacity();
+    }, *index_column_);
 }
 
 void ColumnLowCardinality::Setup(ColumnRef dictionary_column) {
@@ -379,6 +415,13 @@ size_t ColumnLowCardinality::Size() const {
     return index_column_->Size();
 }
 
+size_t ColumnLowCardinality::MemoryUsage() const {
+    return unique_items_map_.bucket_count() * unique_items_map_.max_load_factor()
+            * (sizeof(unique_items_map_.begin()->first) + sizeof(unique_items_map_.begin()->second))
+            + index_column_->MemoryUsage()
+            + dictionary_column_->MemoryUsage();
+}
+
 ColumnRef ColumnLowCardinality::Slice(size_t begin, size_t len) const {
     begin = std::min(begin, Size());
     len = std::min(len, Size() - begin);
@@ -451,15 +494,13 @@ void ColumnLowCardinality::AppendUnsafe(const ItemView & value) {
     }
 }
 
-void ColumnLowCardinality::AppendNullItem()
-{
+void ColumnLowCardinality::AppendNullItem() {
     const auto null_item = GetNullItemForDictionary(dictionary_column_);
     AppendToDictionary(*dictionary_column_, null_item);
     unique_items_map_.emplace(computeHashKey(null_item), 0);
 }
 
-void ColumnLowCardinality::AppendDefaultItem()
-{
+void ColumnLowCardinality::AppendDefaultItem() {
     const auto defaultItem = GetDefaultItemForDictionary(dictionary_column_);
     unique_items_map_.emplace(computeHashKey(defaultItem), dictionary_column_->Size());
     AppendToDictionary(*dictionary_column_, defaultItem);

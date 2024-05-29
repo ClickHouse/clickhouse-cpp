@@ -1,11 +1,13 @@
-#include <gtest/gtest.h>
 #include <clickhouse/columns/string.h>
-#include "clickhouse/columns/nullable.h"
-#include "clickhouse/columns/lowcardinality.h"
-#include "clickhouse/client.h"
-#include "utils.h"
-#include "clickhouse/base/wire_format.h"
+#include <clickhouse/columns/nullable.h>
+#include <clickhouse/columns/lowcardinality.h>
+#include <clickhouse/client.h>
+#include <clickhouse/base/wire_format.h>
 #include <clickhouse/base/output.h>
+
+#include <ut/utils.h>
+
+#include <gtest/gtest.h>
 
 namespace
 {
@@ -13,11 +15,11 @@ using namespace clickhouse;
 }
 
 static const auto localHostEndpoint = ClientOptions()
-                                   .SetHost(           getEnvOrDefault("CLICKHOUSE_HOST",     "localhost"))
-                                   .SetPort(   getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "9000"))
-                                   .SetUser(           getEnvOrDefault("CLICKHOUSE_USER",     "default"))
-                                   .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", ""))
-                                   .SetDefaultDatabase(getEnvOrDefault("CLICKHOUSE_DB",       "default"));
+        .SetHost(           getEnvOrDefault("CLICKHOUSE_HOST",     "localhost"))
+        .SetPort(   getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "9000"))
+        .SetUser(           getEnvOrDefault("CLICKHOUSE_USER",     "default"))
+        .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", ""))
+        .SetDefaultDatabase(getEnvOrDefault("CLICKHOUSE_DB",       "default"));
 
 
 ColumnRef buildTestColumn(const std::vector<std::string>& rowsData, const std::vector<uint8_t>& nulls) {
