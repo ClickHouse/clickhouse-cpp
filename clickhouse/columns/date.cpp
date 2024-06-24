@@ -210,6 +210,10 @@ void ColumnDateTime::AppendRaw(uint32_t value) {
     data_->Append(value);
 }
 
+uint32_t ColumnDateTime::RawAt(size_t n) const {
+	return data_->At(n);
+}
+
 std::string ColumnDateTime::Timezone() const {
     return type_->As<DateTimeType>()->Timezone();
 }
