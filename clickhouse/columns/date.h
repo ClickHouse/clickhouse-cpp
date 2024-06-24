@@ -142,6 +142,7 @@ public:
 
     /// Append raw as UNIX epoch seconds in uint32
     void AppendRaw(uint32_t value);
+    uint32_t RawAt(size_t n) const;
 
     /// Timezone associated with a data column.
     std::string Timezone() const;
