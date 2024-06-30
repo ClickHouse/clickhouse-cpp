@@ -95,12 +95,13 @@ public:
     }
 
     inline void Append(ValueType value) {
-        ColumnNullable::Append(!value.has_value());
         if (value.has_value()) {
             typed_nested_data_->Append(std::move(*value));
         } else {
             typed_nested_data_->Append(typename ValueType::value_type{});
         }
+        // Must be called after Append to nested column because it might fail
+        ColumnNullable::Append(!value.has_value());
     }
 
     /** Create a ColumnNullableT from a ColumnNullable, without copying data and offsets, but by
