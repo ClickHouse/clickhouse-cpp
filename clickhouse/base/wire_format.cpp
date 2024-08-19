@@ -1,3 +1,4 @@
+#include <assert.h>
 #include "wire_format.h"
 
 #include "input.h"
@@ -99,4 +100,76 @@ bool WireFormat::SkipString(InputStream& input) {
     return false;
 }
 
+const char quoted_chars[] = {'\0', '\b', '\t', '\n', '\'', '\\'};
+
+inline const char* find_quoted_chars(const char* start, const char* end) {
+    while (start < end) {
+        char c = *start;
+        for (unsigned i = 0; i < sizeof(quoted_chars); i++) {
+            if (quoted_chars[i] == c) return start;
+        }
+        start++;
+    }
+    return nullptr;
+}
+
+void WireFormat::WriteQuotedString(OutputStream& output, std::string_view value) {
+    auto size               = value.size();
+    const char* start       = value.data();
+    const char* end         = start + size;
+    const char* quoted_char = find_quoted_chars(start, end);
+    if (quoted_char == nullptr) {
+        WriteVarint64(output, size + 2);
+        WriteAll(output, "'", 1);
+        WriteAll(output, start, size);
+        WriteAll(output, "'", 1);
+        return;
+    }
+
+    // calculate quoted chars count
+    int quoted_count             = 1;
+    const char* next_quoted_char = quoted_char + 1;
+    while ((next_quoted_char = find_quoted_chars(next_quoted_char, end))) {
+        quoted_count++;
+        next_quoted_char++;
+    }
+    WriteVarint64(output, size + 2 + 3 * quoted_count);  // length
+
+    WriteAll(output, "'", 1);
+
+    do {
+        auto write_size = quoted_char - start;
+        WriteAll(output, start, write_size);
+        WriteAll(output, "\\", 1);
+        char c = quoted_char[0];
+        switch (c) {
+            case '\0':
+                WriteAll(output, "x00", 3);
+                break;
+            case '\b':
+                WriteAll(output, "x08", 3);
+                break;
+            case '\t':
+                WriteAll(output, "\\\\t", 3);
+                break;
+            case '\n':
+                WriteAll(output, "\\\\\n", 3);
+                break;
+            case '\'':
+                WriteAll(output, "x27", 3);
+                break;
+            case '\\':
+                WriteAll(output, "\\\\\\", 3);
+                break;
+            default:
+                assert(false);
+                WriteAll(output, "x3F", 3); // out ?
+        }
+        start       = quoted_char + 1;
+        quoted_char = find_quoted_chars(start, end);
+    } while (quoted_char);
+
+    WriteAll(output, start, end - start);
+    WriteAll(output, "'", 1);
+}
 }

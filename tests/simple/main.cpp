@@ -234,6 +234,50 @@ inline void GenericExample(Client& client) {
     client.Execute("DROP TEMPORARY TABLE test_client");
 }
 
+inline void ParamExample(Client& client) {
+    /// Create a table.
+    client.Execute("CREATE TEMPORARY TABLE IF NOT EXISTS test_client (id UInt64, name String)");
+
+    {
+        Query query("insert into test_client values ({id: UInt64}, {name: String})");
+
+        query.SetParam("id", "1").SetParam("name", "NAME");
+        client.Execute(query);       
+
+        query.SetParam("id", "123").SetParam("name", "FromParam");
+        client.Execute(query);       
+
+        query.SetParam("id", "333")
+            .SetParam("name",
+                     std::string("A\000A\001A\002A\003A\004A\005A\006A\007A\010A\011A\012A\013A\014A\015A\016A\017A\020A\021A\022A\023A\024A\025A\026A\027A\030A\031A\032A\033A\034"
+                      "A\035A\036A\037A", 65));
+        client.Execute(query);
+
+        unsigned char big_string[128 - 32];
+        for (unsigned int i = 0; i < sizeof(big_string); i++) big_string[i] = i + 32;
+        query.SetParam("id", "444")
+            .SetParam("name",
+                     std::string((char*)big_string, sizeof(big_string)));
+        client.Execute(query);
+
+        query.SetParam("id", "555")
+            .SetParam("name", "utf8Русский");
+        client.Execute(query);
+    }
+
+    /// Select values inserted in the previous step.
+    Query query ("SELECT id, name, length(name) FROM test_client where id > {a: Int32}");
+    query.SetParam("a", "4");
+    SelectCallback cb([](const Block& block)
+        {
+            std::cout << PrettyPrintBlock{block} << std::endl;
+        });
+    query.OnData(cb);
+    client.Select(query);
+    /// Delete table.
+    client.Execute("DROP TEMPORARY TABLE test_client");
+}
+
 inline void NullableExample(Client& client) {
     /// Create a table.
     client.Execute("CREATE TEMPORARY TABLE IF NOT EXISTS test_client (id Nullable(UInt64), date Nullable(Date))");
@@ -478,6 +522,7 @@ inline void IPExample(Client &client) {
 }
 
 static void RunTests(Client& client) {
+    ParamExample(client);
     ArrayExample(client);
     CancelableExample(client);
     DateExample(client);
