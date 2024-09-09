@@ -7,7 +7,8 @@ INCLUDE (subdirs)
 INCLUDE (openssl)
 INCLUDE (version)
 
-IF (NOT CHCPP_EMBEDDED_BUILD)
+# use global flags only for standalone build
+IF (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
     OPTION (BUILD_BENCHMARK "Build benchmark" OFF)
     OPTION (BUILD_TESTS "Build tests" OFF)
     OPTION (BUILD_SHARED_LIBS "Build shared libs" OFF)
