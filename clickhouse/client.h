@@ -252,8 +252,8 @@ public:
     void Select(const Query& query);
 
     /// Intends for insert block of data into a table \p table_name.
-    void Insert(const std::string& table_name, const Block& block);
-    void Insert(const std::string& table_name, const std::string& query_id, const Block& block);
+    void Insert(const std::string& table_name, const Block& block, std::string clause = "");
+    void Insert(const std::string& table_name, const std::string& query_id, const Block& block, std::string clause = "");
 
     /// Ping server for aliveness.
     void Ping();

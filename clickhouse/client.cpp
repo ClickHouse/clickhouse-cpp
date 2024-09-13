@@ -152,7 +152,7 @@ public:
 
     void SendCancel();
 
-    void Insert(const std::string& table_name, const std::string& query_id, const Block& block);
+    void Insert(const std::string& table_name, const std::string& query_id, const Block& block, std::string clause = "");
 
     void Ping();
 
@@ -305,7 +305,7 @@ std::string NameToQueryString(const std::string &input)
     return output;
 }
 
-void Client::Impl::Insert(const std::string& table_name, const std::string& query_id, const Block& block) {
+void Client::Impl::Insert(const std::string& table_name, const std::string& query_id, const Block& block, std::string clause) {
     if (options_.ping_before_query) {
         RetryGuard([this]() { Ping(); });
     }
@@ -321,7 +321,7 @@ void Client::Impl::Insert(const std::string& table_name, const std::string& quer
         }
     }
 
-    Query query("INSERT INTO " + table_name + " ( " + fields_section.str() + " ) VALUES", query_id);
+    Query query("INSERT INTO " + table_name + " ( " + fields_section.str() + " ) " + std::move(clause) + " VALUES", query_id);
     SendQuery(query);
 
     uint64_t server_packet;
@@ -1030,12 +1030,12 @@ void Client::Select(const Query& query) {
     Execute(query);
 }
 
-void Client::Insert(const std::string& table_name, const Block& block) {
-    impl_->Insert(table_name, Query::default_query_id, block);
+void Client::Insert(const std::string& table_name, const Block& block, std::string clause) {
+    impl_->Insert(table_name, Query::default_query_id, block, std::move(clause));
 }
 
-void Client::Insert(const std::string& table_name, const std::string& query_id, const Block& block) {
-    impl_->Insert(table_name, query_id, block);
+void Client::Insert(const std::string& table_name, const std::string& query_id, const Block& block, std::string clause) {
+    impl_->Insert(table_name, query_id, block, std::move(clause));
 }
 
 void Client::Ping() {
