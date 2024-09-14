@@ -139,3 +139,54 @@ If you wish to implement some retry logic atop of `clickhouse::Client` there are
 - For `clickhouse::Client::Insert()` you can reuse a block from previous try, no need to rebuild it from scratch.
 
 See https://github.com/ClickHouse/clickhouse-cpp/issues/184 for details.
+
+## Asynchronous inserts
+See https://clickhouse.com/docs/en/cloud/bestpractices/asynchronous-inserts for details.
+
+⚠ The asynchronous setting is different according to the clickhouse-server version. The below example with clickhouse-server version 24.8.4.13. ⚠
+
+> Our strong recommendation is to use async_insert=1,wait_for_async_insert=1 if using asynchronous inserts. Using wait_for_async_insert=0 is very risky because your INSERT client may not be aware if there are errors, and also can cause potential overload if your client continues to write quickly in a situation where the ClickHouse server needs to slow down the writes and create some backpressure in order to ensure reliability of the service.
+
+- Only use the SDK, do not need to change the clickhouse-server config. Asynchronous inserts only work if the data is sent as SQL text format. Here is the example.
+```cpp
+// You can specify the asynchronous insert settings by using the SETTINGS clause of insert queries
+clickhouse::Query query("INSERT INTO default.test SETTINGS async_insert=1,wait_for_async_insert=1,async_insert_busy_timeout_ms=5000,async_insert_use_adaptive_busy_timeout=0,async_insert_max_data_size=104857600 VALUES(10,10)");
+client.Execute(query);
+
+// Or by SetSetting
+clickhouse::Query query("INSERT INTO default.test VALUES(10,10)");
+query.SetSetting("async_insert", clickhouse::QuerySettingsField{ "1", 1 });
+query.SetSetting("wait_for_async_insert", clickhouse::QuerySettingsField{ "1", 1 }); // strong recommendation
+query.SetSetting("async_insert_busy_timeout_ms", clickhouse::QuerySettingsField{ "5000", 1 });
+query.SetSetting("async_insert_max_data_size", clickhouse::QuerySettingsField{ "104857600", 1 });
+query.SetSetting("async_insert_use_adaptive_busy_timeout", clickhouse::QuerySettingsField{ "0", 1 });
+client.Execute(query);
+
+// Not available case. The Insert interface actually use the native data format
+clickhouse::Block block;
+client.Insert("default.test", block);
+```
+- Change the clickhouse-server users.xml, enable asynchronous inserts (available for the native data format). Here is the example.
+```xml
+<profiles>
+        <!-- Default settings. -->
+        <default>
+            <async_insert>1</async_insert>
+            <wait_for_async_insert>1</wait_for_async_insert>
+            <async_insert_use_adaptive_busy_timeout>0</async_insert_use_adaptive_busy_timeout>
+            <async_insert_busy_timeout_ms>5000</async_insert_busy_timeout_ms>
+            <async_insert_max_data_size>104857600</async_insert_max_data_size>
+        </default>
+
+        <!-- Profile that allows only read queries. -->
+        <readonly>
+            <readonly>1</readonly>
+        </readonly>
+    </profiles>
+```
+- Enabling asynchronous inserts at the user level. Ensure your login accout has the privileges about ALTER USER. Then you can use insert_account for asynchronous inserts.
+```sql
+ALTER USER insert_account SETTINGS async_insert=1,wait_for_async_insert=1,async_insert_use_adaptive_busy_timeout=0,async_insert_busy_timeout_ms=5000,async_insert_max_data_size=104857600
+```
+
+
