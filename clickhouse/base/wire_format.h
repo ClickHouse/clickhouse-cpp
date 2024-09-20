@@ -2,6 +2,7 @@
 
 #include <string>
 #include <cstdint>
+#include <optional>
 
 namespace clickhouse {
 
@@ -22,7 +23,7 @@ public:
     static void WriteFixed(OutputStream& output, const T& value);
     static void WriteBytes(OutputStream& output, const void* buf, size_t len);
     static void WriteString(OutputStream& output, std::string_view value);
-    static void WriteQuotedString(OutputStream& output, std::string_view value);
+    static void WriteQuotedString(OutputStream& output, std::optional<std::string_view> value);
     static void WriteUInt64(OutputStream& output, const uint64_t value);
     static void WriteVarint64(OutputStream& output, uint64_t value);
 

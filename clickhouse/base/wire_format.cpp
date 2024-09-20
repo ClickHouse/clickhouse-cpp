@@ -113,7 +113,14 @@ inline const char* find_quoted_chars(const char* start, const char* end) {
     return nullptr;
 }
 
-void WireFormat::WriteQuotedString(OutputStream& output, std::string_view value) {
+void WireFormat::WriteQuotedString(OutputStream& output, std::optional<std::string_view> opt) {
+    if (!opt) //NULL
+    {
+        WriteVarint64(output, 5);
+        WriteAll(output, "'\\\\N'", 5);
+        return;
+    }
+    std::string_view value = *opt;
     auto size               = value.size();
     const char* start       = value.data();
     const char* end         = start + size;

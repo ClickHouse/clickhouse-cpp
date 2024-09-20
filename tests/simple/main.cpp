@@ -278,6 +278,33 @@ inline void ParamExample(Client& client) {
     client.Execute("DROP TEMPORARY TABLE test_client");
 }
 
+inline void ParamNullExample(Client& client) {
+    client.Execute("CREATE TEMPORARY TABLE IF NOT EXISTS test_client (id UInt64, name Nullable(String))");
+
+    Query query("insert into test_client values ({id: UInt64}, {name: Nullable(String)})");
+
+    query.SetParam("id", "123").SetParam("name", QueryParamValue());
+    client.Execute(query);
+
+    query.SetParam("id", "456").SetParam("name", "String Value");
+    client.Execute(query);
+
+    client.Select("SELECT id, name FROM test_client", [](const Block& block) {
+        for (size_t c = 0; c < block.GetRowCount(); ++c) {
+            std::cerr << block[0]->As<ColumnUInt64>()->At(c) << " ";
+
+            auto col_string = block[1]->As<ColumnNullable>();
+            if (col_string->IsNull(c)) {
+                std::cerr << "\\N\n";
+            } else {
+                std::cerr << col_string->Nested()->As<ColumnString>()->At(c) << "\n";
+            }
+        }
+    });
+
+    client.Execute("DROP TEMPORARY TABLE test_client");
+}
+
 inline void NullableExample(Client& client) {
     /// Create a table.
     client.Execute("CREATE TEMPORARY TABLE IF NOT EXISTS test_client (id Nullable(UInt64), date Nullable(Date))");
@@ -523,6 +550,7 @@ inline void IPExample(Client &client) {
 
 static void RunTests(Client& client) {
     ParamExample(client);
+    ParamNullExample(client);
     ArrayExample(client);
     CancelableExample(client);
     DateExample(client);
