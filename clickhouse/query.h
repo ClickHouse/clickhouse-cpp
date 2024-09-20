@@ -26,7 +26,8 @@ struct QuerySettingsField {
 };
 
 using QuerySettings = std::unordered_map<std::string, QuerySettingsField>;
-using QueryParams = std::unordered_map<std::string, std::string>;
+using QueryParamValue = std::optional<std::string>;
+using QueryParams = std::unordered_map<std::string, QueryParamValue>;
 
 struct Profile {
     uint64_t rows = 0;
@@ -123,7 +124,7 @@ public:
         return *this;
     }
 
-    inline Query& SetParam(const std::string& name, const std::string& value) {
+    inline Query& SetParam(const std::string& name, const QueryParamValue& value) {
         query_params_[name] = value;
         return *this;
     }
