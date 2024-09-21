@@ -143,7 +143,7 @@ See https://github.com/ClickHouse/clickhouse-cpp/issues/184 for details.
 ## Asynchronous inserts
 See https://clickhouse.com/docs/en/cloud/bestpractices/asynchronous-inserts for details.
 
-⚠ The asynchronous setting is different according to the clickhouse-server version. The below example with clickhouse-server version 24.8.4.13. ⚠
+⚠ The asynchronous setting is different according to the clickhouse-server version. The under example with clickhouse-server version 24.8.4.13. ⚠
 
 > Our strong recommendation is to use async_insert=1,wait_for_async_insert=1 if using asynchronous inserts. Using wait_for_async_insert=0 is very risky because your INSERT client may not be aware if there are errors, and also can cause potential overload if your client continues to write quickly in a situation where the ClickHouse server needs to slow down the writes and create some backpressure in order to ensure reliability of the service.
 
