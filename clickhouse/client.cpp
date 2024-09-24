@@ -38,8 +38,13 @@
 #define DBMS_MIN_REVISION_WITH_DISTRIBUTED_DEPTH        54448
 #define DBMS_MIN_REVISION_WITH_INITIAL_QUERY_START_TIME 54449
 #define DBMS_MIN_REVISION_WITH_INCREMENTAL_PROFILE_EVENTS 54451
+#define DBMS_MIN_REVISION_WITH_PARALLEL_REPLICAS 54453
+#define DBMS_MIN_REVISION_WITH_CUSTOM_SERIALIZATION  54454 // Client can get some fields in JSon format
+#define DBMS_MIN_PROTOCOL_VERSION_WITH_ADDENDUM 54458 // send quota key after handshake
+#define DBMS_MIN_PROTOCOL_REVISION_WITH_QUOTA_KEY 54458 // the same
+#define DBMS_MIN_PROTOCOL_VERSION_WITH_PARAMETERS 54459
 
-#define DMBS_PROTOCOL_REVISION  DBMS_MIN_REVISION_WITH_INCREMENTAL_PROFILE_EVENTS
+#define DMBS_PROTOCOL_REVISION  DBMS_MIN_PROTOCOL_VERSION_WITH_PARAMETERS
 
 namespace clickhouse {
 
@@ -433,6 +438,11 @@ bool Client::Impl::Handshake() {
     if (!ReceiveHello()) {
         return false;
     }
+
+    if (server_info_.revision >= DBMS_MIN_PROTOCOL_VERSION_WITH_ADDENDUM) {
+        WireFormat::WriteString(*output_, std::string());
+    }
+
     return true;
 }
 
@@ -502,7 +512,7 @@ bool Client::Impl::ReceivePacket(uint64_t* server_packet) {
                 return false;
             }
         }
-        if constexpr (DMBS_PROTOCOL_REVISION >= DBMS_MIN_REVISION_WITH_CLIENT_WRITE_INFO)
+        if (server_info_.revision >= DBMS_MIN_REVISION_WITH_CLIENT_WRITE_INFO)
         {
             if (!WireFormat::ReadUInt64(*input_, &info.written_rows)) {
                 return false;
@@ -589,7 +599,7 @@ bool Client::Impl::ReceivePacket(uint64_t* server_packet) {
 
 bool Client::Impl::ReadBlock(InputStream& input, Block* block) {
     // Additional information about block.
-    if constexpr (DMBS_PROTOCOL_REVISION >= DBMS_MIN_REVISION_WITH_BLOCK_INFO) {
+    if (server_info_.revision >= DBMS_MIN_REVISION_WITH_BLOCK_INFO) {
         uint64_t num;
         BlockInfo info;
 
@@ -635,6 +645,16 @@ bool Client::Impl::ReadBlock(InputStream& input, Block* block) {
         if (!WireFormat::ReadString(input, &type)) {
             return false;
         }
+    
+        if (server_info_.revision >= DBMS_MIN_REVISION_WITH_CUSTOM_SERIALIZATION) {
+            uint8_t custom_format_len;
+            if (!WireFormat::ReadFixed(input, &custom_format_len)) {
+                return false;
+            }
+            if (custom_format_len > 0) {
+                throw UnimplementedError(std::string("unsupported custom serialization"));
+            }
+        }  
 
         if (ColumnRef col = CreateColumnByType(type, create_column_settings)) {
             if (num_rows && !col->Load(&input, num_rows)) {
@@ -653,7 +673,7 @@ bool Client::Impl::ReadBlock(InputStream& input, Block* block) {
 bool Client::Impl::ReceiveData() {
     Block block;
 
-    if constexpr (DMBS_PROTOCOL_REVISION >= DBMS_MIN_REVISION_WITH_TEMPORARY_TABLES) {
+    if (server_info_.revision >= DBMS_MIN_REVISION_WITH_TEMPORARY_TABLES) {
         if (!WireFormat::SkipString(*input_)) {
             return false;
         }
@@ -793,6 +813,11 @@ void Client::Impl::SendQuery(const Query& query) {
                 throw UnimplementedError(std::string("Can't send open telemetry tracing context to a server, server version is too old"));
             }
         }
+        if (server_info_.revision >= DBMS_MIN_REVISION_WITH_PARALLEL_REPLICAS) {
+            WireFormat::WriteUInt64(*output_, 0);
+            WireFormat::WriteUInt64(*output_, 0);
+            WireFormat::WriteUInt64(*output_, 0);
+        }
     }
 
     /// Per query settings
@@ -817,6 +842,18 @@ void Client::Impl::SendQuery(const Query& query) {
     WireFormat::WriteUInt64(*output_, Stages::Complete);
     WireFormat::WriteUInt64(*output_, compression_);
     WireFormat::WriteString(*output_, query.GetText());
+
+    //Send params after query text
+    if (server_info_.revision >= DBMS_MIN_PROTOCOL_VERSION_WITH_PARAMETERS) {
+        for(const auto& [name, value] : query.GetParams()) {
+            // params is like query settings
+            WireFormat::WriteString(*output_, name);
+            WireFormat::WriteVarint64(*output_, 2); // Custom
+            WireFormat::WriteQuotedString(*output_, value);
+        }
+        WireFormat::WriteString(*output_, std::string()); // empty string after last param
+    }
+
     // Send empty block as marker of
     // end of data
     SendData(Block());
@@ -841,6 +878,11 @@ void Client::Impl::WriteBlock(const Block& block, OutputStream& output) {
     for (Block::Iterator bi(block); bi.IsValid(); bi.Next()) {
         WireFormat::WriteString(output, bi.Name());
         WireFormat::WriteString(output, bi.Type()->GetName());
+
+        if (server_info_.revision >= DBMS_MIN_REVISION_WITH_CUSTOM_SERIALIZATION) {
+            // TODO: custom serialization
+            WireFormat::WriteFixed<uint8_t>(output, 0);
+        }
 
         // Empty columns are not serialized and occupy exactly 0 bytes.
         // ref https://github.com/ClickHouse/ClickHouse/blob/39b37a3240f74f4871c8c1679910e065af6bea19/src/Formats/NativeWriter.cpp#L163

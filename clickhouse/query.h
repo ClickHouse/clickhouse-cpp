@@ -26,6 +26,8 @@ struct QuerySettingsField {
 };
 
 using QuerySettings = std::unordered_map<std::string, QuerySettingsField>;
+using QueryParamValue = std::optional<std::string>;
+using QueryParams = std::unordered_map<std::string, QueryParamValue>;
 
 struct Profile {
     uint64_t rows = 0;
@@ -112,6 +114,18 @@ public:
     /// Set per query setting
     inline Query& SetSetting(const std::string& key, const QuerySettingsField& value) {
         query_settings_[key] = value;
+        return *this;
+    }
+
+    inline const QueryParams& GetParams() const { return query_params_; }
+
+    inline Query& SetParams(QueryParams query_params) {
+        query_params_ = std::move(query_params);
+        return *this;
+    }
+
+    inline Query& SetParam(const std::string& name, const QueryParamValue& value) {
+        query_params_[name] = value;
         return *this;
     }
 
@@ -219,6 +233,7 @@ private:
     const std::string query_id_;
     std::optional<open_telemetry::TracingContext> tracing_context_;
     QuerySettings query_settings_;
+    QueryParams query_params_;
     ExceptionCallback exception_cb_;
     ProgressCallback progress_cb_;
     SelectCallback select_cb_;
