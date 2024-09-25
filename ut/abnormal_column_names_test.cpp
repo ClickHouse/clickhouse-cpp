@@ -1,13 +1,11 @@
 
 #include <clickhouse/columns/column.h>
 #include <clickhouse/block.h>
+#include <clickhouse/client.h>
 
-#include "utils.h"
+#include <ut/utils.h>
 
 #include <gtest/gtest.h>
-
-#include <unordered_set>
-#include <iostream>
 
 namespace {
 using namespace clickhouse;

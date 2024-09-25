@@ -3,6 +3,7 @@
 #include <clickhouse/base/platform.h>
 #include <clickhouse/base/uuid.h>
 
+#include "clickhouse/columns/string.h"
 #include "clickhouse/query.h"
 #include "utils_meta.h"
 #include "utils_comparison.h"
@@ -29,6 +30,8 @@ namespace clickhouse {
     struct Profile;
     struct QuerySettingsField;
     struct Progress;
+
+    using ColumnRef = std::shared_ptr<class Column>;
 }
 
 template <typename ResultType = std::string>
@@ -138,15 +141,25 @@ struct PrettyPrintBlock {
     const clickhouse::Block & block;
 };
 
+// Print byte size in either in bytes, KiB, MiB, or GiB.
+struct PrettyPrintByteSize {
+    size_t bytes;
+    size_t max_decimal_points = 2;
+};
+
 namespace clickhouse {
 std::ostream& operator<<(std::ostream & ostr, const Block & block);
 std::ostream& operator<<(std::ostream & ostr, const Type & type);
 std::ostream & operator<<(std::ostream & ostr, const ServerInfo & server_info);
 std::ostream & operator<<(std::ostream & ostr, const Profile & profile);
 std::ostream & operator<<(std::ostream & ostr, const Progress & progress);
+std::ostream & operator<<(std::ostream & ostr, const ColumnString::EstimatedValueSize & estimation);
+
 }
 
 std::ostream& operator<<(std::ostream & ostr, const PrettyPrintBlock & block);
+std::ostream& operator<<(std::ostream & ostr, const PrettyPrintByteSize & block);
+
 std::ostream& operator<<(std::ostream& ostr, const in_addr& addr);
 std::ostream& operator<<(std::ostream& ostr, const in6_addr& addr);
 
@@ -207,3 +220,5 @@ inline uint64_t versionNumber(
 uint64_t versionNumber(const clickhouse::ServerInfo & server_info);
 
 std::string ToString(const clickhouse::UUID& v);
+
+void dumpMemoryUsage(const char * prefix, const clickhouse::ColumnRef col);

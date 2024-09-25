@@ -1,4 +1,6 @@
 #include "string.h"
+#include <memory>
+#include "clickhouse/exceptions.h"
 #include "utils.h"
 
 #include "../base/wire_format.h"
@@ -20,6 +22,40 @@ size_t ComputeTotalSize(const Container & strings, size_t begin = 0, size_t len 
     return result;
 }
 
+// based on https://stackoverflow.com/a/9194117
+size_t RoundUp(size_t numToRound, size_t multiple) {
+    return ((numToRound + (multiple - 1)) / multiple) * multiple;
+}
+
+size_t ComputeValueSizeEstimation(size_t total_size, size_t number_of_items) {
+    number_of_items = number_of_items ? number_of_items : 1; // just to avoid divide by zero
+    size_t estimation = std::ceil(static_cast<double>(total_size) / number_of_items);
+
+    return estimation == 0;
+}
+
+size_t EstimateBlockSize(size_t value_size_estimation) {
+    size_t estimated_number_of_items_per_block = 32; // just arbitrary value
+
+    // do not pre-allocate too big blocks when expected values are big to minimize waste or when user explicitly requested not to
+    if (value_size_estimation > DEFAULT_BLOCK_SIZE || value_size_estimation == static_cast<size_t>(clickhouse::ColumnString::NO_PREALLOCATE)) {
+        // for really big items do not pre-allocate blocks, and allowing later code to put 1 item per block
+        return 0;
+    } else if (value_size_estimation > static_cast<size_t>(clickhouse::ColumnString::EstimatedValueSize::MEDIUM)) {
+        // for not so big items, create blocks that fit smaller number of items, reducing produced block size.
+        estimated_number_of_items_per_block = ceil(DEFAULT_BLOCK_SIZE / static_cast<double>(value_size_estimation));
+    }
+
+    return std::max<size_t>(DEFAULT_BLOCK_SIZE, RoundUp(value_size_estimation * estimated_number_of_items_per_block, DEFAULT_BLOCK_SIZE));
+}
+
+inline auto Validate(clickhouse::ColumnString::EstimatedValueSize value_size_estimation) {
+    if (static_cast<int>(value_size_estimation) < 0)
+        throw clickhouse::ValidationError("ColumnString received negative number as value size estimation");
+
+    return value_size_estimation;
+}
+
 }
 
 namespace clickhouse {
@@ -32,6 +68,11 @@ ColumnFixedString::ColumnFixedString(size_t n)
 
 void ColumnFixedString::Reserve(size_t new_cap) {
     data_.reserve(string_size_ * new_cap);
+}
+
+size_t ColumnFixedString::Capacity() const {
+    const auto data_cap = data_.capacity();
+    return (data_cap - data_.size()) / string_size_;
 }
 
 void ColumnFixedString::Append(std::string_view str) {
@@ -105,6 +146,10 @@ ColumnRef ColumnFixedString::Slice(size_t begin, size_t len) const {
     return result;
 }
 
+size_t ColumnFixedString::MemoryUsage() const {
+    return data_.capacity();
+}
+
 ColumnRef ColumnFixedString::CloneEmpty() const {
     return std::make_shared<ColumnFixedString>(string_size_);
 }
@@ -157,28 +202,32 @@ struct ColumnString::Block
     std::unique_ptr<CharT[]> data_;
 };
 
-ColumnString::ColumnString()
+ColumnString::ColumnString(EstimatedValueSize value_size_estimation)
     : Column(Type::CreateString())
+    , value_size_estimation_(static_cast<size_t>(Validate(value_size_estimation)))
+    , next_block_size_(DEFAULT_BLOCK_SIZE)
 {
 }
 
-ColumnString::ColumnString(size_t element_count)
-    : Column(Type::CreateString())
+ColumnString::ColumnString(size_t element_count, EstimatedValueSize value_size_estimation)
+    : ColumnString(value_size_estimation)
 {
     items_.reserve(element_count);
-    // 16 is arbitrary number, assumption that string values are about ~256 bytes long.
-    blocks_.reserve(std::max<size_t>(1, element_count / 16));
+    blocks_.emplace_back(std::max(DEFAULT_BLOCK_SIZE, RoundUp(element_count * value_size_estimation_, DEFAULT_BLOCK_SIZE)));
 }
 
 ColumnString::ColumnString(const std::vector<std::string>& data)
     : ColumnString()
 {
+    const auto total_size = ComputeTotalSize(data);
     items_.reserve(data.size());
-    blocks_.emplace_back(ComputeTotalSize(data));
+    blocks_.emplace_back(total_size);
 
     for (const auto & s : data) {
         AppendUnsafe(s);
     }
+
+    value_size_estimation_ = ComputeValueSizeEstimation(total_size, data.size());
 }
 
 ColumnString::ColumnString(std::vector<std::string>&& data)
@@ -191,6 +240,8 @@ ColumnString::ColumnString(std::vector<std::string>&& data)
         auto& last_data = append_data_.back();
         items_.emplace_back(std::string_view{ last_data.data(),last_data.length() });
     }
+
+    value_size_estimation_ = ComputeValueSizeEstimation(ComputeTotalSize(items_), items_.size());
 }
 
 ColumnString::~ColumnString()
@@ -198,16 +249,29 @@ ColumnString::~ColumnString()
 
 void ColumnString::Reserve(size_t new_cap) {
     items_.reserve(new_cap);
-    // 16 is arbitrary number, assumption that string values are about ~256 bytes long.
-    blocks_.reserve(std::max<size_t>(1, new_cap / 16));
+
+    if (blocks_.empty() || blocks_.back().GetAvailable() < value_size_estimation_) {
+        if (value_size_estimation_ != static_cast<size_t>(NO_PREALLOCATE))
+            blocks_.emplace_back(new_cap * value_size_estimation_);
+    } else {
+        // Estimate space required for items that woudn't fit into current Block.
+        const size_t estimated_items_in_next_block = value_size_estimation_ ? new_cap - blocks_.back().GetAvailable() / value_size_estimation_ : new_cap;
+        next_block_size_ = std::max(DEFAULT_BLOCK_SIZE, estimated_items_in_next_block * value_size_estimation_);
+    }
+}
+
+size_t ColumnString::Capacity() const {
+    return items_.capacity();
+}
+
+void ColumnString::SetEstimatedValueSize(EstimatedValueSize value_size_estimation) {
+    value_size_estimation_ = static_cast<size_t>(Validate(value_size_estimation));
 }
 
 void ColumnString::Append(std::string_view str) {
-    if (blocks_.size() == 0 || blocks_.back().GetAvailable() < str.length()) {
-        blocks_.emplace_back(std::max(DEFAULT_BLOCK_SIZE, str.size()));
-    }
+    auto & block = PrepareBlockWithSpaceForAtLeast(str.length());
 
-    items_.emplace_back(blocks_.back().AppendUnsafe(str));
+    items_.emplace_back(block.AppendUnsafe(str));
 }
 
 void ColumnString::Append(const char* str) {
@@ -228,6 +292,18 @@ void ColumnString::AppendUnsafe(std::string_view str) {
     items_.emplace_back(blocks_.back().AppendUnsafe(str));
 }
 
+ColumnString::Block & ColumnString::PrepareBlockWithSpaceForAtLeast(size_t minimum_required_bytes) {
+    if (blocks_.empty() || blocks_.back().GetAvailable() < minimum_required_bytes) {
+        if (next_block_size_ == 0)
+            next_block_size_ = DEFAULT_BLOCK_SIZE;
+
+        blocks_.emplace_back(std::max(next_block_size_, minimum_required_bytes));
+        next_block_size_ = EstimateBlockSize(value_size_estimation_);
+    }
+
+    return blocks_.back();
+}
+
 void ColumnString::Clear() {
     items_.clear();
     blocks_.clear();
@@ -243,8 +319,7 @@ void ColumnString::Append(ColumnRef column) {
         const auto total_size = ComputeTotalSize(col->items_);
 
         // TODO: fill up existing block with some items and then add a new one for the rest of items
-        if (blocks_.size() == 0 || blocks_.back().GetAvailable() < total_size)
-            blocks_.emplace_back(std::max(DEFAULT_BLOCK_SIZE, total_size));
+        PrepareBlockWithSpaceForAtLeast(total_size);
 
         // Intentionally not doing items_.reserve() since that cripples performance.
         for (size_t i = 0; i < column->Size(); ++i) {
@@ -267,6 +342,8 @@ bool ColumnString::LoadBody(InputStream* input, size_t rows) {
     new_items.reserve(rows);
 
     // Suboptimzal if the first row string is >DEFAULT_BLOCK_SIZE, but that must be a very rare case.
+    // Not using next_block_size_ here since it set in Reserve() which doesn't know
+    // about number of items and estimated item size in InputStream.
     Block * block = &new_blocks.emplace_back(DEFAULT_BLOCK_SIZE);
 
     for (size_t i = 0; i < rows; ++i) {
@@ -299,24 +376,42 @@ size_t ColumnString::Size() const {
     return items_.size();
 }
 
+size_t ColumnString::MemoryUsage() const {
+    auto vector_used_bytes = [](const auto & v) {
+        return sizeof(v[0]) * v.capacity();
+    };
+
+    size_t result = ComputeTotalSize(append_data_) + sizeof(append_data_[0]) * append_data_.size();
+    result += vector_used_bytes(items_);
+    result += vector_used_bytes(blocks_);
+
+    for (const auto & b : blocks_)
+        result += b.capacity;
+
+    return result;
+}
+
 ColumnRef ColumnString::Slice(size_t begin, size_t len) const {
-    auto result = std::make_shared<ColumnString>();
+    if (begin >= items_.size()) {
+        return this->CloneEmpty();
+    }
 
-    if (begin < items_.size()) {
-        len = std::min(len, items_.size() - begin);
-        result->items_.reserve(len);
+    len = std::min(len, items_.size() - begin);
 
-        result->blocks_.emplace_back(ComputeTotalSize(items_, begin, len));
-        for (size_t i = begin; i < begin + len; ++i) {
-            result->Append(items_[i]);
-        }
+    auto result = std::make_shared<ColumnString>(EstimatedValueSize(value_size_estimation_));
+
+    result->items_.reserve(len);
+    result->PrepareBlockWithSpaceForAtLeast(ComputeTotalSize(items_, begin, len));
+
+    for (size_t i = begin; i < begin + len; ++i) {
+        result->AppendUnsafe(items_[i]);
     }
 
     return result;
 }
 
 ColumnRef ColumnString::CloneEmpty() const {
-    return std::make_shared<ColumnString>();
+    return std::make_shared<ColumnString>(EstimatedValueSize(value_size_estimation_));
 }
 
 void ColumnString::Swap(Column& other) {
