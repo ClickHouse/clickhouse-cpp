@@ -100,12 +100,12 @@ bool WireFormat::SkipString(InputStream& input) {
     return false;
 }
 
-const char quoted_chars[] = {'\0', '\b', '\t', '\n', '\'', '\\'};
+const std::vector<char> quoted_chars = {'\0', '\b', '\t', '\n', '\'', '\\'};
 
 inline const char* find_quoted_chars(const char* start, const char* end) {
     while (start < end) {
         char c = *start;
-        for (unsigned i = 0; i < sizeof(quoted_chars); i++) {
+        for (unsigned i = 0; i < quoted_chars.size(); i++) {
             if (quoted_chars[i] == c) return start;
         }
         start++;
@@ -113,14 +113,7 @@ inline const char* find_quoted_chars(const char* start, const char* end) {
     return nullptr;
 }
 
-void WireFormat::WriteQuotedString(OutputStream& output, std::optional<std::string_view> opt) {
-    if (!opt) //NULL
-    {
-        WriteVarint64(output, 5);
-        WriteAll(output, "'\\\\N'", 5);
-        return;
-    }
-    std::string_view value = *opt;
+void WireFormat::WriteQuotedString(OutputStream& output, std::string_view value) {
     auto size               = value.size();
     const char* start       = value.data();
     const char* end         = start + size;
@@ -157,20 +150,19 @@ void WireFormat::WriteQuotedString(OutputStream& output, std::optional<std::stri
                 WriteAll(output, "x08", 3);
                 break;
             case '\t':
-                WriteAll(output, "\\\\t", 3);
+                WriteAll(output, R"(\\t)", 3);
                 break;
             case '\n':
-                WriteAll(output, "\\\\\n", 3);
+                WriteAll(output, R"(\\n)", 3);
                 break;
             case '\'':
                 WriteAll(output, "x27", 3);
                 break;
             case '\\':
-                WriteAll(output, "\\\\\\", 3);
+                WriteAll(output, R"(\\\)", 3);
                 break;
             default:
-                assert(false);
-                WriteAll(output, "x3F", 3); // out ?
+                break;
         }
         start       = quoted_char + 1;
         quoted_char = find_quoted_chars(start, end);
@@ -179,4 +171,11 @@ void WireFormat::WriteQuotedString(OutputStream& output, std::optional<std::stri
     WriteAll(output, start, end - start);
     WriteAll(output, "'", 1);
 }
+
+void WireFormat::WriteParamNullRepresentation(OutputStream& output) {
+    const std::string NULL_REPRESENTATION("'\\\\N'");
+    WriteVarint64(output, NULL_REPRESENTATION.size());
+    WriteAll(output, NULL_REPRESENTATION.data(), NULL_REPRESENTATION.size());
 }
+
+}  // namespace clickhouse

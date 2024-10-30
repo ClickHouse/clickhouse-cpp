@@ -1501,15 +1501,20 @@ TEST_P(ClientCase, QueryParameters) {
         query.SetParam("id", "123").SetParam("name", "FromParam");
         client_->Execute(query);
 
-        query.SetParam("id", "333")
-            .SetParam("name", std::string("A\000A\001A\002A\003A\004A\005A\006A\007A\010A\011A\012A\013A\014A\015A\016A\017A\020A\021A\022A"
-                                          "\023A\024A\025A\026A\027A\030A\031A\032A\033A\034"
-                                          "A\035A\036A\037A",
-                                          65));
+        const char FirstPrintable = ' ';
+        char test_str1[FirstPrintable * 2 + 1];
+        for (unsigned int i = 0; i < FirstPrintable; i++) {
+            test_str1[i * 2]     = 'A';
+            test_str1[i * 2 + 1] = i;
+        }
+        test_str1[int(FirstPrintable * 2)] = 'A';
+
+        query.SetParam("id", "333").SetParam("name", std::string(test_str1, FirstPrintable * 2 + 1));
         client_->Execute(query);
 
-        unsigned char big_string[128 - 32];
-        for (unsigned int i = 0; i < sizeof(big_string); i++) big_string[i] = i + 32;
+        const char LastPrintable = 127;
+        unsigned char big_string[LastPrintable - FirstPrintable];
+        for (unsigned int i = 0; i < sizeof(big_string); i++) big_string[i] = i + FirstPrintable;
         query.SetParam("id", "444").SetParam("name", std::string((char*)big_string, sizeof(big_string)));
         client_->Execute(query);
 

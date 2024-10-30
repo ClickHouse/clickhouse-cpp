@@ -814,6 +814,7 @@ void Client::Impl::SendQuery(const Query& query) {
             }
         }
         if (server_info_.revision >= DBMS_MIN_REVISION_WITH_PARALLEL_REPLICAS) {
+            // replica dont supported by client
             WireFormat::WriteUInt64(*output_, 0);
             WireFormat::WriteUInt64(*output_, 0);
             WireFormat::WriteUInt64(*output_, 0);
@@ -848,8 +849,12 @@ void Client::Impl::SendQuery(const Query& query) {
         for(const auto& [name, value] : query.GetParams()) {
             // params is like query settings
             WireFormat::WriteString(*output_, name);
-            WireFormat::WriteVarint64(*output_, 2); // Custom
-            WireFormat::WriteQuotedString(*output_, value);
+            const uint64_t Custom = 2;
+            WireFormat::WriteVarint64(*output_, Custom);
+            if (value)
+                WireFormat::WriteQuotedString(*output_, *value);
+            else
+                WireFormat::WriteParamNullRepresentation(*output_);
         }
         WireFormat::WriteString(*output_, std::string()); // empty string after last param
     }
