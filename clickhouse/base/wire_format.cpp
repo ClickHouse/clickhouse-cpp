@@ -173,7 +173,7 @@ void WireFormat::WriteQuotedString(OutputStream& output, std::string_view value)
 }
 
 void WireFormat::WriteParamNullRepresentation(OutputStream& output) {
-    const std::string NULL_REPRESENTATION("'\\\\N'");
+    const std::string NULL_REPRESENTATION(R"('\\N')");
     WriteVarint64(output, NULL_REPRESENTATION.size());
     WriteAll(output, NULL_REPRESENTATION.data(), NULL_REPRESENTATION.size());
 }
