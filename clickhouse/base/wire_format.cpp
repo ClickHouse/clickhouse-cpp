@@ -100,12 +100,11 @@ bool WireFormat::SkipString(InputStream& input) {
     return false;
 }
 
-const std::vector<char> quoted_chars = {'\0', '\b', '\t', '\n', '\'', '\\'};
-
 inline const char* find_quoted_chars(const char* start, const char* end) {
+    static const char quoted_chars[] = {'\0', '\b', '\t', '\n', '\'', '\\'};
     while (start < end) {
         char c = *start;
-        for (unsigned i = 0; i < quoted_chars.size(); i++) {
+        for (unsigned i = 0; i < sizeof(quoted_chars); i++) {
             if (quoted_chars[i] == c) return start;
         }
         start++;
