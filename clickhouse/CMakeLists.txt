@@ -89,7 +89,7 @@ if (MSVC)
     # remove in 3.0
     add_compile_options(/wd4996)
 else()
-    set(cxx_extra_wall "-Wempty-body -Wconversion -Wreturn-type -Wparentheses -Wuninitialized -Wunreachable-code -Wunused-function -Wunused-value -Wunused-variable")   
+    set(cxx_extra_wall "-Wempty-body -Wconversion -Wreturn-type -Wparentheses -Wuninitialized -Wunreachable-code -Wunused-function -Wunused-value -Wunused-variable")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${cxx_extra_wall}")
 
     if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
@@ -130,7 +130,7 @@ ELSE ()
 ENDIF ()
 
 
-IF (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+IF (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND NOT DISABLE_CLANG_LIBC_WORKAROUND)
     INCLUDE (CheckCXXSourceCompiles)
 
     CHECK_CXX_SOURCE_COMPILES("#include <bits/c++config.h>\nint main() { return __GLIBCXX__ != 0; }"
