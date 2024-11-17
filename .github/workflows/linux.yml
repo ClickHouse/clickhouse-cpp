@@ -26,7 +26,7 @@ jobs:
         compiler: [clang-6, clang-10-libc++, gcc-7, gcc-8, gcc-9]
         ssl: [ssl_ON, ssl_OFF]
         dependencies: [dependencies_BUILT_IN]
-        clickhouse_server_image: ["clickhouse/clickhouse-server:22.3", "clickhouse/clickhouse-server:24.3"]
+        clickhouse_server: [CH22.3, CH24.3]
 
         include:
         - compiler: clang-6
@@ -67,6 +67,12 @@ jobs:
           DEPENDENCIES_CMAKE_OPTIONS: >-
             -D WITH_SYSTEM_LZ4=ON
             -D WITH_SYSTEM_ABSEIL=ON
+
+        - clickhouse_server: CH22.3
+          clickhouse_server_image: "clickhouse-server:22.3"
+
+        - clickhouse_server: CH24.3
+          clickhouse_server_image: "clickhouse-server:24.3"
 
     runs-on: ${{matrix.os}}
 
