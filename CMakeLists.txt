@@ -20,6 +20,7 @@ OPTION (WITH_SYSTEM_CITYHASH "Use system cityhash" OFF)
 OPTION (WITH_SYSTEM_ZSTD "Use system ZSTD" OFF)
 OPTION (DEBUG_DEPENDENCIES "Print debug info about dependencies duting build" ON)
 OPTION (CHECK_VERSION "Check that version number corresponds to git tag, usefull in CI/CD to validate that new version published on GitHub has same version in sources" OFF)
+OPTION (DISABLE_CLANG_LIBC_WORKAROUND "Disable linking compiler-rt & gcc_s if using clang & libstdc++" OFF)
 
 PROJECT (CLICKHOUSE-CLIENT
     VERSION "${CLICKHOUSE_CPP_VERSION}"
