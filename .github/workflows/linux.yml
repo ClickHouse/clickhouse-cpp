@@ -15,7 +15,7 @@ on:
 
 env:
   BUILD_TYPE: Release
-  CLICKHOUSE_SERVER_IMAGE: "clickhouse/clickhouse-server:22.3"
+  
 
 jobs:
   build:
@@ -26,6 +26,7 @@ jobs:
         compiler: [clang-6, clang-10-libc++, gcc-7, gcc-8, gcc-9]
         ssl: [ssl_ON, ssl_OFF]
         dependencies: [dependencies_BUILT_IN]
+        clickhouse_server_image: ["clickhouse/clickhouse-server:22.3", "clickhouse/clickhouse-server:24.3"]
 
         include:
         - compiler: clang-6
@@ -114,8 +115,8 @@ jobs:
 
       - name: Test - Start ClickHouse server in background
         run: |
-          docker pull ${CLICKHOUSE_SERVER_IMAGE}
-          docker run -d --name clickhouse -p 9000:9000 ${CLICKHOUSE_SERVER_IMAGE}
+          docker pull ${{matrix.clickhouse_server_image}}
+          docker run -d --name clickhouse -p 9000:9000 ${{matrix.clickhouse_server_image}}
           docker ps -a
           docker stats -a --no-stream
           ## Check and wait until CH is ready to accept connections
