@@ -69,10 +69,10 @@ jobs:
             -D WITH_SYSTEM_ABSEIL=ON
 
         - clickhouse_server: CH22.3
-          clickhouse_server_image: "clickhouse-server:22.3"
+          clickhouse_server_image: "clickhouse/clickhouse-server:22.3"
 
         - clickhouse_server: CH24.3
-          clickhouse_server_image: "clickhouse-server:24.3"
+          clickhouse_server_image: "clickhouse/clickhouse-server:24.3"
 
     runs-on: ${{matrix.os}}
 
