@@ -26,6 +26,9 @@ SET ( clickhouse-cpp-ut-src
     utils.cpp
     value_generators.cpp
     low_cardinality_nullable_tests.cpp
+
+    ColumnString_ut.cpp
+    ColumnLowCardinalityT_ut.cpp
 )
 
 IF (WITH_OPENSSL)
