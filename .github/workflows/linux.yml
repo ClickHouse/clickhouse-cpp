@@ -39,6 +39,11 @@ jobs:
           C_COMPILER: clang-10
           CXX_COMPILER: clang++-10
 
+        - compiler: clang-18
+          COMPILER_INSTALL: clang-18 libc++-dev
+          C_COMPILER: clang-18
+          CXX_COMPILER: clang++-18
+
         - compiler: gcc-7
           COMPILER_INSTALL: gcc-7 g++-7
           C_COMPILER: gcc-7
@@ -53,6 +58,11 @@ jobs:
           COMPILER_INSTALL: gcc-9 g++-9
           C_COMPILER: gcc-9
           CXX_COMPILER: g++-9
+
+        - compiler: gcc-13
+          COMPILER_INSTALL: gcc-13 g++-13
+          C_COMPILER: gcc-13
+          CXX_COMPILER: g++-13
 
         - ssl: ssl_ON
           SSL_CMAKE_OPTION: -D WITH_OPENSSL=ON
