@@ -22,8 +22,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-20.04]
-        compiler: [clang-6, clang-10-libc++, gcc-7, gcc-8, gcc-9]
+        os: [ubuntu-20.04, ubuntu-22.04, ubuntu-24.04]
+        compiler: [clang-6, clang-10-libc++, clang-18, gcc-7, gcc-8, gcc-9, gcc-13]
         ssl: [ssl_ON, ssl_OFF]
         dependencies: [dependencies_BUILT_IN, dependencies_SYSTEM]
         clickhouse_server: [CH22.3, CH24.3]
