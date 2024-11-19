@@ -57,6 +57,12 @@ jobs:
         - ssl: ssl_ON
           SSL_CMAKE_OPTION: -D WITH_OPENSSL=ON
 
+        - clickhouse_server: CH22.3
+          clickhouse_server_image: "clickhouse/clickhouse-server:22.3"
+
+        - clickhouse_server: CH24.3
+          clickhouse_server_image: "clickhouse/clickhouse-server:24.3"
+
         - dependencies: dependencies_SYSTEM
           compiler: compiler_SYSTEM
           os: ubuntu-22.04
@@ -67,11 +73,6 @@ jobs:
           DEPENDENCIES_CMAKE_OPTIONS: >-
             -D WITH_SYSTEM_LZ4=ON
             -D WITH_SYSTEM_ABSEIL=ON
-
-        - clickhouse_server: CH22.3
-          clickhouse_server_image: "clickhouse/clickhouse-server:22.3"
-
-        - clickhouse_server: CH24.3
           clickhouse_server_image: "clickhouse/clickhouse-server:24.3"
 
     runs-on: ${{matrix.os}}
