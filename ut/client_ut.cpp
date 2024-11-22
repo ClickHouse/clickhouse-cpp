@@ -1490,6 +1490,10 @@ TEST(SimpleClientTest, issue_335_reconnects_count) {
 }
 
 TEST_P(ClientCase, QueryParameters) {
+    const auto & server_info = client_->GetServerInfo();
+    if (versionNumber(server_info) < versionNumber(24, 7)) {
+        GTEST_SKIP() << "Test is skipped since server '" << server_info << "' does not support query parameters" << std::endl;
+    }
     const std::string table_name = "test_clickhouse_cpp_query_parameter";
     client_->Execute("CREATE TEMPORARY TABLE IF NOT EXISTS " + table_name + " (id UInt64, name String)");
     {
