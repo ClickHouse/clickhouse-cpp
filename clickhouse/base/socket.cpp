@@ -457,11 +457,12 @@ size_t SocketOutput::DoWrite(const void* data, size_t len) {
     static const int flags = 0;
 #endif
 
-    if (::send(s_, (const char*)data, (int)len, flags) != (int)len) {
+    const ssize_t ret = ::send(s_, (const char*)data, (int)len, flags);
+    if (ret < 0) {
         throw std::system_error(getSocketErrorCode(), getErrorCategory(), "fail to send " + std::to_string(len) + " bytes of data");
     }
 
-    return len;
+    return (size_t)ret;
 }
 
 
