@@ -81,7 +81,14 @@ void BufferedOutput::Reset() {
 
 void BufferedOutput::DoFlush() {
     if (array_output_.Data() != buffer_.data()) {
-        destination_->Write(buffer_.data(), array_output_.Data() - buffer_.data());
+        size_t len = array_output_.Data() - buffer_.data();
+        const uint8_t* buf = buffer_.data();
+        while (len > 0) {
+            const size_t written = destination_->Write(buf, len);
+            buf += written;
+            len -= written;
+        }
+
         destination_->Flush();
 
         array_output_.Reset(buffer_.data(), buffer_.size());
