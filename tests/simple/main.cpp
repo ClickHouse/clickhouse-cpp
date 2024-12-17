@@ -234,6 +234,81 @@ inline void GenericExample(Client& client) {
     client.Execute("DROP TEMPORARY TABLE test_client");
 }
 
+inline void ParamExample(Client& client) {
+    /// Create a table.
+    client.Execute("CREATE TEMPORARY TABLE IF NOT EXISTS test_client (id UInt64, name String)");
+
+    {
+        Query query("insert into test_client values ({id: UInt64}, {name: String})");
+
+        query.SetParam("id", "1").SetParam("name", "NAME");
+        client.Execute(query);       
+
+        query.SetParam("id", "123").SetParam("name", "FromParam");
+        client.Execute(query);
+
+        const char FirstPrintable = ' ';
+        char test_str1[FirstPrintable * 2 + 1];
+        for (unsigned int i = 0; i < FirstPrintable; i++) {
+            test_str1[i * 2]     = 'A';
+            test_str1[i * 2 + 1] = i;
+        }
+        test_str1[int(FirstPrintable * 2)] = 'A';
+
+        query.SetParam("id", "333").SetParam("name", std::string(test_str1, FirstPrintable * 2 + 1));
+        client.Execute(query);
+
+        const char LastPrintable = 127;
+        unsigned char big_string[LastPrintable - FirstPrintable];
+        for (unsigned int i = 0; i < sizeof(big_string); i++) big_string[i] = i + FirstPrintable;
+        query.SetParam("id", "444").SetParam("name", std::string((char*)big_string, sizeof(big_string)));
+        client.Execute(query);
+
+        query.SetParam("id", "555")
+            .SetParam("name", "utf8Русский");
+        client.Execute(query);
+    }
+
+    /// Select values inserted in the previous step.
+    Query query ("SELECT id, name, length(name) FROM test_client where id > {a: Int32}");
+    query.SetParam("a", "4");
+    SelectCallback cb([](const Block& block)
+        {
+            std::cout << PrettyPrintBlock{block} << std::endl;
+        });
+    query.OnData(cb);
+    client.Select(query);
+    /// Delete table.
+    client.Execute("DROP TEMPORARY TABLE test_client");
+}
+
+inline void ParamNullExample(Client& client) {
+    client.Execute("CREATE TEMPORARY TABLE IF NOT EXISTS test_client (id UInt64, name Nullable(String))");
+
+    Query query("insert into test_client values ({id: UInt64}, {name: Nullable(String)})");
+
+    query.SetParam("id", "123").SetParam("name", QueryParamValue());
+    client.Execute(query);
+
+    query.SetParam("id", "456").SetParam("name", "String Value");
+    client.Execute(query);
+
+    client.Select("SELECT id, name FROM test_client", [](const Block& block) {
+        for (size_t c = 0; c < block.GetRowCount(); ++c) {
+            std::cerr << block[0]->As<ColumnUInt64>()->At(c) << " ";
+
+            auto col_string = block[1]->As<ColumnNullable>();
+            if (col_string->IsNull(c)) {
+                std::cerr << "\\N\n";
+            } else {
+                std::cerr << col_string->Nested()->As<ColumnString>()->At(c) << "\n";
+            }
+        }
+    });
+
+    client.Execute("DROP TEMPORARY TABLE test_client");
+}
+
 inline void NullableExample(Client& client) {
     /// Create a table.
     client.Execute("CREATE TEMPORARY TABLE IF NOT EXISTS test_client (id Nullable(UInt64), date Nullable(Date))");
@@ -478,6 +553,8 @@ inline void IPExample(Client &client) {
 }
 
 static void RunTests(Client& client) {
+    ParamExample(client);
+    ParamNullExample(client);
     ArrayExample(client);
     CancelableExample(client);
     DateExample(client);
