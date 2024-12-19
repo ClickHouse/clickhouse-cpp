@@ -15,17 +15,18 @@ on:
 
 env:
   BUILD_TYPE: Release
-  CLICKHOUSE_SERVER_IMAGE: "clickhouse/clickhouse-server:22.3"
+  
 
 jobs:
   build:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-20.04]
-        compiler: [clang-6, clang-10-libc++, gcc-7, gcc-8, gcc-9]
+        os: [ubuntu-20.04, ubuntu-22.04, ubuntu-24.04]
+        compiler: [clang-6, clang-10-libc++, clang-18, gcc-7, gcc-8, gcc-9, gcc-13]
         ssl: [ssl_ON, ssl_OFF]
-        dependencies: [dependencies_BUILT_IN]
+        dependencies: [dependencies_BUILT_IN, dependencies_SYSTEM]
+        clickhouse_server: [CH22.3, CH24.3]
 
         include:
         - compiler: clang-6
@@ -37,6 +38,11 @@ jobs:
           COMPILER_INSTALL: clang-10 libc++-dev
           C_COMPILER: clang-10
           CXX_COMPILER: clang++-10
+
+        - compiler: clang-18
+          COMPILER_INSTALL: clang-18 libc++-dev
+          C_COMPILER: clang-18
+          CXX_COMPILER: clang++-18
 
         - compiler: gcc-7
           COMPILER_INSTALL: gcc-7 g++-7
@@ -53,8 +59,19 @@ jobs:
           C_COMPILER: gcc-9
           CXX_COMPILER: g++-9
 
+        - compiler: gcc-13
+          COMPILER_INSTALL: gcc-13 g++-13
+          C_COMPILER: gcc-13
+          CXX_COMPILER: g++-13
+
         - ssl: ssl_ON
           SSL_CMAKE_OPTION: -D WITH_OPENSSL=ON
+
+        - clickhouse_server: CH22.3
+          clickhouse_server_image: "clickhouse/clickhouse-server:22.3"
+
+        - clickhouse_server: CH24.3
+          clickhouse_server_image: "clickhouse/clickhouse-server:24.3"
 
         - dependencies: dependencies_SYSTEM
           compiler: compiler_SYSTEM
@@ -66,6 +83,7 @@ jobs:
           DEPENDENCIES_CMAKE_OPTIONS: >-
             -D WITH_SYSTEM_LZ4=ON
             -D WITH_SYSTEM_ABSEIL=ON
+          clickhouse_server_image: "clickhouse/clickhouse-server:24.3"
 
     runs-on: ${{matrix.os}}
 
@@ -114,8 +132,8 @@ jobs:
 
       - name: Test - Start ClickHouse server in background
         run: |
-          docker pull ${CLICKHOUSE_SERVER_IMAGE}
-          docker run -d --name clickhouse -p 9000:9000 ${CLICKHOUSE_SERVER_IMAGE}
+          docker pull ${{matrix.clickhouse_server_image}}
+          docker run -d --name clickhouse -p 9000:9000 ${{matrix.clickhouse_server_image}}
           docker ps -a
           docker stats -a --no-stream
           ## Check and wait until CH is ready to accept connections
