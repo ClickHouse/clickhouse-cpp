@@ -7,6 +7,7 @@
 #include "../exceptions.h"
 
 #include <stdexcept>
+#include <algorithm>
 
 namespace {
 constexpr int MAX_VARINT_BYTES = 10;
@@ -100,16 +101,11 @@ bool WireFormat::SkipString(InputStream& input) {
     return false;
 }
 
-inline const char* find_quoted_chars(const char* start, const char* end) {
-    static const char quoted_chars[] = {'\0', '\b', '\t', '\n', '\'', '\\'};
-    while (start < end) {
-        char c = *start;
-        for (unsigned i = 0; i < sizeof(quoted_chars); i++) {
-            if (quoted_chars[i] == c) return start;
-        }
-        start++;
-    }
-    return nullptr;
+inline const char* find_quoted_chars(const char* start, const char* end)
+{
+    static constexpr std::array quoted_chars {'\0', '\b', '\t', '\n', '\'', '\\'};
+    const auto first  = std::find_first_of(start, end, quoted_chars.begin(), quoted_chars.end());
+    return (first == end) ? nullptr : first;
 }
 
 void WireFormat::WriteQuotedString(OutputStream& output, std::string_view value) {
