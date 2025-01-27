@@ -156,6 +156,32 @@ INSTALL (TARGETS clickhouse-cpp-lib
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
 )
+IF (NOT BUILD_SHARED_LIBS)
+    IF (NOT WITH_SYSTEM_CITYHASH)
+        INSTALL (TARGETS cityhash
+            ARCHIVE DESTINATION lib
+            LIBRARY DESTINATION lib
+        )
+    ENDIF()
+    IF (NOT WITH_SYSTEM_LZ4)
+        INSTALL (TARGETS lz4
+            ARCHIVE DESTINATION lib
+            LIBRARY DESTINATION lib
+        )
+    ENDIF()
+    IF (NOT WITH_SYSTEM_ZSTD)
+        INSTALL (TARGETS zstdstatic
+            ARCHIVE DESTINATION lib
+            LIBRARY DESTINATION lib
+        )
+    ENDIF()
+    IF (NOT WITH_SYSTEM_ABSEIL)
+        INSTALL (TARGETS absl_int128
+            ARCHIVE DESTINATION lib
+            LIBRARY DESTINATION lib
+        )
+    ENDIF()
+ENDIF()
 
 # general
 INSTALL(FILES block.h DESTINATION include/clickhouse/)
