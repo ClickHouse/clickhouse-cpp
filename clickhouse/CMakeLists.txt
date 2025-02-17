@@ -116,7 +116,9 @@ TARGET_LINK_LIBRARIES (clickhouse-cpp-lib
     zstd::zstd
 )
 TARGET_INCLUDE_DIRECTORIES (clickhouse-cpp-lib
-    PUBLIC ${PROJECT_SOURCE_DIR}
+    PUBLIC
+         $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}>
+         $<INSTALL_INTERFACE:include/clickhouse>
 )
 
 IF (NOT BUILD_SHARED_LIBS)
@@ -153,9 +155,28 @@ ENDIF ()
 
 
 INSTALL (TARGETS clickhouse-cpp-lib
+    EXPORT clickhouse-cpp-config
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
 )
+
+include(CMakePackageConfigHelpers)
+configure_package_config_file(
+    ../cmake/clickhouse-cpp-config.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/lib/cmake/clickhouse-cpp-config.cmake
+    INSTALL_DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/cmake/clickhouse-cpp
+)
+
+INSTALL(EXPORT clickhouse-cpp-config
+    FILE clickhouse-cpp-targets.cmake
+    DESTINATION lib/cmake/clickhouse-cpp
+)
+
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/lib/cmake/clickhouse-cpp-config.cmake DESTINATION lib/cmake/clickhouse-cpp)
+
+install(FILES ../cmake/Findcityhash.cmake DESTINATION lib/cmake/clickhouse-cpp)
+install(FILES ../cmake/Findlz4.cmake DESTINATION lib/cmake/clickhouse-cpp)
+install(FILES ../cmake/Findzstd.cmake DESTINATION lib/cmake/clickhouse-cpp)
 
 # general
 INSTALL(FILES block.h DESTINATION include/clickhouse/)
