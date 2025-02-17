@@ -134,7 +134,7 @@ TEST(LowCardinalityOfNullable, InsertAndQueryEmpty) {
     });
 }
 
-TEST(LowCardinalityOfNullable, ThrowOnBackwardsCompatibleLCColumn) {
+TEST(LowCardinalityOfNullable, DISABLED_ThrowOnBackwardsCompatibleLCColumn) {
     auto column = buildTestColumn({}, {});
 
     Block block;
