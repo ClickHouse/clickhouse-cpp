@@ -103,8 +103,9 @@ bool WireFormat::SkipString(InputStream& input) {
 
 inline const char* find_quoted_chars(const char* start, const char* end)
 {
-    static constexpr std::array quoted_chars {'\0', '\b', '\t', '\n', '\'', '\\'};
-    const auto first  = std::find_first_of(start, end, quoted_chars.begin(), quoted_chars.end());
+    static constexpr char quoted_chars[] = {'\0', '\b', '\t', '\n', '\'', '\\'};
+    const auto first  = std::find_first_of(start, end, std::begin(quoted_chars), std::end(quoted_chars));
+
     return (first == end) ? nullptr : first;
 }
 
