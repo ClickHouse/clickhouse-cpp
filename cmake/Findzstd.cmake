@@ -1,10 +1,14 @@
 find_path(zstd_INCLUDE_DIR
   NAMES zstd.h
-  DOC "zstd include directory")
+  DOC "zstd include directory"
+  REQUIRED
+)
 mark_as_advanced(zstd_INCLUDE_DIR)
 find_library(zstd_LIBRARY
   NAMES zstd libzstd
-  DOC "zstd library")
+  DOC "zstd library"
+  REQUIRED
+)
 mark_as_advanced(zstd_LIBRARY)
 
 if (zstd_INCLUDE_DIR)

@@ -1,10 +1,14 @@
 find_path(lz4_INCLUDE_DIR
   NAMES lz4.h
-  DOC "lz4 include directory")
+  DOC "lz4 include directory"
+  REQUIRED
+)
 mark_as_advanced(lz4_INCLUDE_DIR)
 find_library(lz4_LIBRARY
   NAMES lz4 liblz4
-  DOC "lz4 library")
+  DOC "lz4 library"
+  REQUIRED
+)
 mark_as_advanced(lz4_LIBRARY)
 
 if (lz4_INCLUDE_DIR)

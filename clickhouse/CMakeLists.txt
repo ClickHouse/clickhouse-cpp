@@ -153,30 +153,40 @@ IF (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND NOT DISABLE_CLANG_LIBC_WORKAROUND
     ENDIF ()
 ENDIF ()
 
+#special case for all system dependencies
+IF (WITH_SYSTEM_ABSEIL AND WITH_SYSTEM_CITYHASH AND WITH_SYSTEM_LZ4 AND WITH_SYSTEM_ZSTD)
+    INSTALL (TARGETS clickhouse-cpp-lib
+        EXPORT clickhouse-cpp-config
+        ARCHIVE DESTINATION lib
+        LIBRARY DESTINATION lib
+    )
 
-INSTALL (TARGETS clickhouse-cpp-lib
-    EXPORT clickhouse-cpp-config
-    ARCHIVE DESTINATION lib
-    LIBRARY DESTINATION lib
-)
+    include(CMakePackageConfigHelpers)
+    configure_package_config_file(
+        ../cmake/clickhouse-cpp-config.cmake.in
+        ${CMAKE_CURRENT_BINARY_DIR}/lib/cmake/clickhouse-cpp-config.cmake
+        INSTALL_DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/cmake/clickhouse-cpp
+    )
 
-include(CMakePackageConfigHelpers)
-configure_package_config_file(
-    ../cmake/clickhouse-cpp-config.cmake.in
-    ${CMAKE_CURRENT_BINARY_DIR}/lib/cmake/clickhouse-cpp-config.cmake
-    INSTALL_DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/cmake/clickhouse-cpp
-)
+    INSTALL(EXPORT clickhouse-cpp-config
+        FILE clickhouse-cpp-targets.cmake
+        DESTINATION lib/cmake/clickhouse-cpp
+    )
 
-INSTALL(EXPORT clickhouse-cpp-config
-    FILE clickhouse-cpp-targets.cmake
-    DESTINATION lib/cmake/clickhouse-cpp
-)
+    INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/lib/cmake/clickhouse-cpp-config.cmake
+        DESTINATION lib/cmake/clickhouse-cpp
+    )
 
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/lib/cmake/clickhouse-cpp-config.cmake DESTINATION lib/cmake/clickhouse-cpp)
-
-install(FILES ../cmake/Findcityhash.cmake DESTINATION lib/cmake/clickhouse-cpp)
-install(FILES ../cmake/Findlz4.cmake DESTINATION lib/cmake/clickhouse-cpp)
-install(FILES ../cmake/Findzstd.cmake DESTINATION lib/cmake/clickhouse-cpp)
+    install(FILES ../cmake/Findabsl.cmake DESTINATION lib/cmake/clickhouse-cpp)
+    install(FILES ../cmake/Findcityhash.cmake DESTINATION lib/cmake/clickhouse-cpp)
+    install(FILES ../cmake/Findlz4.cmake DESTINATION lib/cmake/clickhouse-cpp)
+    install(FILES ../cmake/Findzstd.cmake DESTINATION lib/cmake/clickhouse-cpp)
+ELSE ()
+    INSTALL (TARGETS clickhouse-cpp-lib
+        ARCHIVE DESTINATION lib
+        LIBRARY DESTINATION lib
+    )
+ENDIF ()
 
 # general
 INSTALL(FILES block.h DESTINATION include/clickhouse/)

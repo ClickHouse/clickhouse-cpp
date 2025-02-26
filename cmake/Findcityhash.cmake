@@ -1,10 +1,14 @@
 find_path(cityhash_INCLUDE_DIR
   NAMES city.h
-  DOC "cityhash include directory")
+  DOC "cityhash include directory"
+  REQUIRED
+)
 mark_as_advanced(cityhash_INCLUDE_DIR)
 find_library(cityhash_LIBRARY
   NAMES cityhash libcityhash
-  DOC "cityhash library")
+  DOC "cityhash library"
+  REQUIRED
+)
 mark_as_advanced(cityhash_LIBRARY)
 
 # Unlike lz4, cityhash's version information does not seem to be available.
