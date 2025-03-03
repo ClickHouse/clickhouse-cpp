@@ -40,9 +40,9 @@ class CompressionError : public Error {
 // Exception received from server.
 class ServerException : public Error {
 public:
-    ServerException(std::unique_ptr<Exception> e)
+    ServerException(std::shared_ptr<Exception> e)
         : Error(std::string())
-        , exception_(std::move(e))
+        , exception_(e)
     {
     }
 
@@ -59,7 +59,7 @@ public:
     }
 
 private:
-    std::unique_ptr<Exception> exception_;
+    std::shared_ptr<Exception> exception_;
 };
 using ServerError = ServerException;
 

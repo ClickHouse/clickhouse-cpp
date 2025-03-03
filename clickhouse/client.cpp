@@ -701,7 +701,7 @@ bool Client::Impl::ReceiveData() {
 }
 
 bool Client::Impl::ReceiveException(bool rethrow) {
-    std::unique_ptr<Exception> e(new Exception);
+    std::shared_ptr<Exception> e(new Exception);
     Exception* current = e.get();
 
     bool exception_received = true;
@@ -742,7 +742,7 @@ bool Client::Impl::ReceiveException(bool rethrow) {
     }
 
     if (rethrow || options_.rethrow_exceptions) {
-        throw ServerError(std::move(e));
+        throw ServerError(e);
     }
 
     return exception_received;
