@@ -61,9 +61,10 @@ in_addr ColumnIPv4::operator [] (size_t n) const {
 
 std::string ColumnIPv4::AsString(size_t n) const {
     const auto& addr = this->At(n);
+    auto tmp_addr = addr;
 
     char buf[INET_ADDRSTRLEN];
-    const char* ip_str = inet_ntop(AF_INET, &addr, buf, INET_ADDRSTRLEN);
+    const char* ip_str = inet_ntop(AF_INET, &tmp_addr, buf, INET_ADDRSTRLEN);
 
     if (ip_str == nullptr) {
         throw std::system_error(
