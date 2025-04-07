@@ -191,13 +191,26 @@ Int128 ColumnDecimal::At(size_t i) const {
     }
 }
 
+void ColumnDecimal::Append(ColumnRef column) {
+    if (auto col = column->As<ColumnDecimal>()) {
+        data_->Append(col->data_);
+    }
+}
+
 void ColumnDecimal::Reserve(size_t new_cap) {
     data_->Reserve(new_cap);
 }
 
-void ColumnDecimal::Append(ColumnRef column) {
-    if (auto col = column->As<ColumnDecimal>()) {
-        data_->Append(col->data_);
+size_t ColumnDecimal::Capacity() const {
+    switch (data_->Type()->GetCode()) {
+        case Type::Int32:
+            return data_->As<ColumnInt32>()->Capacity();
+        case Type::Int64:
+            return data_->As<ColumnInt64>()->Capacity();
+        case Type::Int128:
+            return data_->As<ColumnInt128>()->Capacity();
+        default:
+            throw ValidationError("Invalid data_ column type in ColumnDecimal");
     }
 }
 
@@ -215,6 +228,10 @@ void ColumnDecimal::Clear() {
 
 size_t ColumnDecimal::Size() const {
     return data_->Size();
+}
+
+size_t ColumnDecimal::MemoryUsage() const {
+    return data_->MemoryUsage();
 }
 
 ColumnRef ColumnDecimal::Slice(size_t begin, size_t len) const {

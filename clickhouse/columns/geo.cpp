@@ -54,16 +54,20 @@ const typename ColumnGeo<NestedColumnType, type_code>::ValueType ColumnGeo<Neste
     return data_->At(n);
 }
 
-template<typename NestedColumnType, Type::Code type_code>
-void ColumnGeo<NestedColumnType, type_code>::Reserve(size_t new_cap) {
-    data_->Reserve(new_cap);
-}
-
 template <typename NestedColumnType, Type::Code type_code>
 void ColumnGeo<NestedColumnType, type_code>::Append(ColumnRef column) {
     if (auto col = column->template As<ColumnGeo>()) {
         data_->Append(col->data_->template As<Column>());
     }
+}
+
+template<typename NestedColumnType, Type::Code type_code>
+void ColumnGeo<NestedColumnType, type_code>::Reserve(size_t new_cap) {
+    data_->Reserve(new_cap);
+}
+template<typename NestedColumnType, Type::Code type_code>
+size_t ColumnGeo<NestedColumnType, type_code>::Capacity() const {
+    return data_->Capacity();
 }
 
 template <typename NestedColumnType, Type::Code type_code>
@@ -76,9 +80,15 @@ void ColumnGeo<NestedColumnType, type_code>::SaveBody(OutputStream* output) {
     data_->SaveBody(output);
 }
 
+
 template <typename NestedColumnType, Type::Code type_code>
 size_t ColumnGeo<NestedColumnType, type_code>::Size() const {
     return data_->Size();
+}
+
+template <typename NestedColumnType, Type::Code type_code>
+size_t ColumnGeo<NestedColumnType, type_code>::MemoryUsage() const {
+    return data_->MemoryUsage();
 }
 
 template <typename NestedColumnType, Type::Code type_code>
