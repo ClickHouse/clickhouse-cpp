@@ -119,6 +119,13 @@ TARGET_INCLUDE_DIRECTORIES (clickhouse-cpp-lib
     PUBLIC ${PROJECT_SOURCE_DIR}
 )
 
+IF (BUILD_SHARED_LIBS)
+    SET_TARGET_PROPERTIES (clickhouse-cpp-lib PROPERTIES
+        VERSION ${PROJECT_VERSION}
+        SOVERSION ${PROJECT_VERSION_MAJOR}
+    )
+ENDIF()
+
 IF (NOT BUILD_SHARED_LIBS)
     ADD_LIBRARY (clickhouse-cpp-lib-static ALIAS clickhouse-cpp-lib)
 ELSE ()
