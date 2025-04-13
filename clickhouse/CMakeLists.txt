@@ -168,7 +168,7 @@ IF (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND NOT DISABLE_CLANG_LIBC_WORKAROUND
 ENDIF ()
 
 
-INSTALL (TARGETS clickhouse-cpp-lib
+INSTALL (TARGETS clickhouse-cpp-lib EXPORT clickhouse-cpp
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
@@ -256,3 +256,9 @@ ENDIF ()
 IF (WIN32 OR MINGW)
     TARGET_LINK_LIBRARIES (clickhouse-cpp-lib wsock32 ws2_32)
 ENDIF ()
+
+# export installed library
+INSTALL (EXPORT clickhouse-cpp
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/clickhouse-cpp
+    FILE clickhouse-cpp-config.cmake
+)
