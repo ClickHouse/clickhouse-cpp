@@ -225,6 +225,13 @@ std::ostream& operator<<(std::ostream& os, const Endpoint& options);
 
 class SocketFactory;
 
+struct ExternalTable {
+  const std::string& name;
+  const Block& data;
+};
+
+using ExternalTables = std::vector<ExternalTable>;
+
 /**
  *
  */
@@ -247,6 +254,16 @@ public:
     /// the data handler function \p cb.
     void SelectCancelable(const std::string& query, SelectCancelableCallback cb);
     void SelectCancelable(const std::string& query, const std::string& query_id, SelectCancelableCallback cb);
+
+    // The same as Select but with an external data
+    // required for the query, see https://clickhouse.com/docs/engines/table-engines/special/external-data
+    void SelectWithExternalData(const std::string& query, const ExternalTables& external_tables, SelectCallback cb);
+    void SelectWithExternalData(const std::string& query, const std::string& query_id, const ExternalTables& external_tables, SelectCallback cb);
+
+    // The same as SelectWithExternalData but can be canceled by returning false from
+    // the data handler function \p cb.
+    void SelectWithExternalDataCancelable(const std::string& query, const ExternalTables& external_tables, SelectCancelableCallback cb);
+    void SelectWithExternalDataCancelable(const std::string& query, const std::string& query_id, const ExternalTables& external_tables, SelectCancelableCallback cb);
 
     /// Alias for Execute.
     void Select(const Query& query);

@@ -103,6 +103,33 @@ int main()
         }
     );
 
+    /// Select values inserted in the previous step using external data feature
+    /// See https://clickhouse.com/docs/engines/table-engines/special/external-data
+    {
+        Block block1, block2;
+        auto id = std::make_shared<ColumnUInt64>();
+        id->Append(1);
+        block1.AppendColumn("id"  , id);
+
+        auto name = std::make_shared<ColumnString>();
+        name->Append("seven");
+        block2.AppendColumn("name", name);
+
+        const std::string _1 = "_1";
+        const std::string _2 = "_2";
+
+        const ExternalTables external = {{_1, block1}, {_2, block2}};
+        client.SelectWithExternalData("SELECT id, name FROM default.numbers where id in (_1) or name in (_2)",
+                                      external, [] (const Block& block)
+            {
+                for (size_t i = 0; i < block.GetRowCount(); ++i) {
+                    std::cout << block[0]->As<ColumnUInt64>()->At(i) << " "
+                              << block[1]->As<ColumnString>()->At(i) << "\n";
+                }
+            }
+        );
+    }
+
     /// Delete table.
     client.Execute("DROP TABLE default.numbers");
 
