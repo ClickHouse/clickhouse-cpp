@@ -226,7 +226,7 @@ std::ostream& operator<<(std::ostream& os, const Endpoint& options);
 class SocketFactory;
 
 struct ExternalTable {
-  const std::string& name;
+  const std::string_view name;
   const Block& data;
 };
 
