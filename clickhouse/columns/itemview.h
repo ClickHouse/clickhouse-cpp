@@ -28,7 +28,7 @@ private:
     inline auto ConvertToStorageValue(const T& t) {
         if constexpr (std::is_same_v<std::string_view, T> || std::is_same_v<std::string, T>) {
             return std::string_view{t};
-        } else if constexpr (std::is_fundamental_v<T> || std::is_same_v<Int128, std::decay_t<T>>) {
+        } else if constexpr (std::is_fundamental_v<T> || std::is_same_v<Int128, std::decay_t<T>> || std::is_same_v<UInt128, std::decay_t<T>>) {
             return std::string_view{reinterpret_cast<const char*>(&t), sizeof(T)};
         } else {
             static_assert(!std::is_same_v<T, T>, "Unknown type, which can't be stored in ItemView");

@@ -207,6 +207,7 @@ using TestCases = ::testing::Types<
     GenericColumnTestCase<ColumnIPv6, &makeColumn<ColumnIPv6>, in6_addr, &MakeIPv6s>,
 
     GenericColumnTestCase<ColumnInt128, &makeColumn<ColumnInt128>, clickhouse::Int128, &MakeInt128s>,
+    GenericColumnTestCase<ColumnUInt128, &makeColumn<ColumnUInt128>, clickhouse::UInt128, &MakeUInt128s>,
     GenericColumnTestCase<ColumnUUID, &makeColumn<ColumnUUID>, clickhouse::UUID, &MakeUUIDs>,
 
     DecimalColumnTestCase<ColumnDecimal, 18, 0>,
@@ -286,7 +287,7 @@ inline auto convertValueForGetItem(const ColumnType& col, ValueType&& t) {
         // Since ColumnDecimal can hold 32, 64, 128-bit wide data and there is no way telling at run-time.
         const ItemView item = col.GetItem(0);
         return std::string_view(reinterpret_cast<const char*>(&t), item.data.size());
-    } else if constexpr (std::is_same_v<T, clickhouse::UInt128>
+    } else if constexpr (std::is_same_v<T, clickhouse::UInt128> || std::is_same_v<T, clickhouse::UUID>
             || std::is_same_v<T, clickhouse::Int128>) {
         return std::string_view{reinterpret_cast<const char*>(&t), sizeof(T)};
     } else if constexpr (std::is_same_v<T, in_addr>) {
