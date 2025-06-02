@@ -483,6 +483,28 @@ TEST(ColumnsCase, Int128) {
     EXPECT_EQ(0, col->At(4));
 }
 
+TEST(ColumnsCase, UInt128) {
+    auto col = std::make_shared<ColumnUInt128>(std::vector<UInt128>{
+            absl::MakeUint128(0xffffffffffffffffll, 0xffffffffffffffffll), // 2^128 - 1
+            absl::MakeUint128(0, 0xffffffffffffffffll),  // 2^64 - 1
+            absl::MakeUint128(0xffffffffffffffffll, 0),  // 2^128 - 2^64
+            absl::MakeUint128(0x8000000000000000ll, 0),
+            UInt128(0)
+    });
+
+    EXPECT_EQ(absl::MakeUint128(0xffffffffffffffffll, 0xffffffffffffffffll), col->At(0));
+
+    EXPECT_EQ(absl::MakeUint128(0, 0xffffffffffffffffll), col->At(1));
+    EXPECT_EQ(0ull,                  absl::Uint128High64(col->At(1)));
+    EXPECT_EQ(0xffffffffffffffffull, absl::Uint128Low64(col->At(1)));
+
+    EXPECT_EQ(absl::MakeUint128(0xffffffffffffffffll, 0), col->At(2));
+    EXPECT_EQ(static_cast<uint64_t>(0xffffffffffffffffull),  absl::Uint128High64(col->At(2)));
+    EXPECT_EQ(0ull,                  absl::Uint128Low64(col->At(2)));
+
+    EXPECT_EQ(0, col->At(4));
+}
+
 TEST(ColumnsCase, ColumnIPv4)
 {
     // TODO: split into proper method-level unit-tests

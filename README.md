@@ -19,7 +19,7 @@ C++ client for [ClickHouse](https://clickhouse.com/).
 * LowCardinality(String) or LowCardinality(FixedString(N))
 * Tuple
 * UInt8, UInt16, UInt32, UInt64, Int8, Int16, Int32, Int64
-* Int128
+* UInt128, Int128
 * UUID
 * Map
 * Point, Ring, Polygon, MultiPolygon

@@ -76,7 +76,7 @@ INSTANTIATE_TEST_SUITE_P(Basic, CreateColumnByTypeWithName, ::testing::Values(
     "Int8", "Int16", "Int32", "Int64",
     "UInt8", "UInt16", "UInt32", "UInt64",
     "String", "Date", "DateTime",
-    "UUID", "Int128"
+    "UUID", "Int128", "UInt128"
 ));
 
 INSTANTIATE_TEST_SUITE_P(Parametrized, CreateColumnByTypeWithName, ::testing::Values(

@@ -104,10 +104,20 @@ std::vector<clickhouse::Int64> MakeDateTimes() {
 std::vector<clickhouse::Int128> MakeInt128s() {
     return {
         absl::MakeInt128(0xffffffffffffffffll, 0xffffffffffffffffll), // -1
-        absl::MakeInt128(0, 0xffffffffffffffffll),  // 2^64
+        absl::MakeInt128(0, 0xffffffffffffffffll),  // 2^64 - 1
         absl::MakeInt128(0xffffffffffffffffll, 0),
         absl::MakeInt128(0x8000000000000000ll, 0),
         Int128(0)
+    };
+}
+
+std::vector<clickhouse::UInt128> MakeUInt128s() {
+    return {
+        absl::MakeUint128(0xffffffffffffffffll, 0xffffffffffffffffll), // 2^128 - 1
+        absl::MakeUint128(0, 0xffffffffffffffffll),  // 2^64 - 1
+        absl::MakeUint128(0xffffffffffffffffll, 0),  // 2^128 - 2^64
+        absl::MakeUint128(0x8000000000000000ll, 0),
+        UInt128(0)
     };
 }
 
