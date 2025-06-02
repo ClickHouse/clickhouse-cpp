@@ -155,6 +155,8 @@ public:
 
     void ExecuteQuery(Query query);
 
+    void SelectWithExternalData(Query query, const ExternalTables& external_tables);
+
     void SendCancel();
 
     void Insert(const std::string& table_name, const std::string& query_id, const Block& block);
@@ -174,9 +176,13 @@ private:
 
     bool ReceivePacket(uint64_t* server_packet = nullptr);
 
-    void SendQuery(const Query& query);
+    void SendQuery(const Query& query, bool finalize = true);
+    void FinalizeQuery();
 
     void SendData(const Block& block);
+
+    void SendBlockData(const Block& block);
+    void SendExternalData(const ExternalTables& external_tables);
 
     bool SendHello();
 
@@ -290,6 +296,51 @@ void Client::Impl::ExecuteQuery(Query query) {
         ;
     }
 }
+
+
+void Client::Impl::SelectWithExternalData(Query query, const ExternalTables& external_tables) {
+    if (server_info_.revision < DBMS_MIN_REVISION_WITH_TEMPORARY_TABLES) {
+       throw UnimplementedError("This version of ClickHouse server doesn't support temporary tables");
+    }
+
+    EnsureNull en(static_cast<QueryEvents*>(&query), &events_);
+
+    if (options_.ping_before_query) {
+        RetryGuard([this]() { Ping(); });
+    }
+
+    SendQuery(query, false);
+    SendExternalData(external_tables);
+    FinalizeQuery();
+
+    while (ReceivePacket()) {
+        ;
+    }
+}
+
+void Client::Impl::SendBlockData(const Block& block) {
+    if (compression_ == CompressionState::Enable) {
+        std::unique_ptr<OutputStream> compressed_output = std::make_unique<CompressedOutput>(output_.get(), options_.max_compression_chunk_size, options_.compression_method);
+        BufferedOutput buffered(std::move(compressed_output), options_.max_compression_chunk_size);
+    
+        WriteBlock(block, buffered);
+    } else {
+        WriteBlock(block, *output_);
+    }
+}
+
+void Client::Impl::SendExternalData(const ExternalTables& external_tables) {
+    for (const auto& table: external_tables) {
+        if (!table.data.GetRowCount()) {
+           // skip empty blocks to keep the connection in the consistent state as the current request would be marked as finished by such an empty block
+           continue;
+        }
+        WireFormat::WriteFixed<uint8_t>(*output_, ClientCodes::Data);
+        WireFormat::WriteString(*output_, table.name);
+        SendBlockData(table.data);
+    }
+}
+
 
 std::string NameToQueryString(const std::string &input)
 {
@@ -753,7 +804,7 @@ void Client::Impl::SendCancel() {
     output_->Flush();
 }
 
-void Client::Impl::SendQuery(const Query& query) {
+void Client::Impl::SendQuery(const Query& query, bool finalize) {
     WireFormat::WriteUInt64(*output_, ClientCodes::Query);
     WireFormat::WriteString(*output_, query.GetQueryID());
 
@@ -858,7 +909,13 @@ void Client::Impl::SendQuery(const Query& query) {
         }
         WireFormat::WriteString(*output_, std::string()); // empty string after last param
     }
+ 
+    if (finalize) {
+        FinalizeQuery();
+    }
+}
 
+void Client::Impl::FinalizeQuery() {
     // Send empty block as marker of
     // end of data
     SendData(Block());
@@ -905,16 +962,7 @@ void Client::Impl::SendData(const Block& block) {
     if (server_info_.revision >= DBMS_MIN_REVISION_WITH_TEMPORARY_TABLES) {
         WireFormat::WriteString(*output_, std::string());
     }
-
-    if (compression_ == CompressionState::Enable) {
-
-        std::unique_ptr<OutputStream> compressed_output = std::make_unique<CompressedOutput>(output_.get(), options_.max_compression_chunk_size, options_.compression_method);
-        BufferedOutput buffered(std::move(compressed_output), options_.max_compression_chunk_size);
-
-        WriteBlock(block, buffered);
-    } else {
-        WriteBlock(block, *output_);
-    }
+    SendBlockData(block);
 
     output_->Flush();
 }
@@ -1075,6 +1123,22 @@ void Client::SelectCancelable(const std::string& query, const std::string& query
 
 void Client::Select(const Query& query) {
     Execute(query);
+}
+
+void Client::SelectWithExternalData(const std::string& query, const ExternalTables& external_tables, SelectCallback cb) {
+    impl_->SelectWithExternalData(Query(query).OnData(std::move(cb)), external_tables);
+}
+
+void Client::SelectWithExternalData(const std::string& query, const std::string& query_id, const ExternalTables& external_tables, SelectCallback cb) {
+    impl_->SelectWithExternalData(Query(query, query_id).OnData(std::move(cb)), external_tables);
+}
+
+void Client::SelectWithExternalDataCancelable(const std::string& query, const ExternalTables& external_tables, SelectCancelableCallback cb) {
+    impl_->SelectWithExternalData(Query(query).OnDataCancelable(std::move(cb)), external_tables);
+}
+
+void Client::SelectWithExternalDataCancelable(const std::string& query, const std::string& query_id, const ExternalTables& external_tables, SelectCancelableCallback cb) {
+    impl_->SelectWithExternalData(Query(query, query_id).OnDataCancelable(std::move(cb)), external_tables);
 }
 
 void Client::Insert(const std::string& table_name, const Block& block) {
