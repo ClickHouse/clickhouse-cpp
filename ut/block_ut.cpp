@@ -123,7 +123,6 @@ TEST(BlockTest, Clear) {
             << c.ColumnIndex() << " : " << c.Name();
 
         ++i;
-        EXPECT_FALSE(true);
     }
 }
 
