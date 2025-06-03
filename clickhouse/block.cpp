@@ -81,8 +81,7 @@ size_t Block::GetRowCount() const {
     return rows_;
 }
 
-size_t Block::RefreshRowCount()
-{
+size_t Block::RefreshRowCount() {
     size_t rows = 0UL;
 
     for (size_t idx = 0UL; idx < columns_.size(); ++idx)
@@ -99,6 +98,15 @@ size_t Block::RefreshRowCount()
     rows_ = rows;
     return rows_;
 }
+
+void Block::Clear() {
+    for (auto & c : columns_) {
+        c.column->Clear();
+    }
+
+    RefreshRowCount();
+}
+
 
 ColumnRef Block::operator [] (size_t idx) const {
     if (idx < columns_.size()) {

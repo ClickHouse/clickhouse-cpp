@@ -85,6 +85,9 @@ public:
         return columns_.at(idx).name;
     }
 
+    /// Convinience method to wipe out all rows from all columns
+    void Clear();
+
     /// Reference to column by index in the block.
     ColumnRef operator [] (size_t idx) const;
 

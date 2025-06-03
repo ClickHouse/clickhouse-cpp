@@ -1,4 +1,9 @@
 #include <clickhouse/client.h>
+#include <clickhouse/columns/tuple.h>
+#include <clickhouse/types/types.h>
+
+#include "clickhouse/columns/column.h"
+#include "gtest/gtest-message.h"
 #include "readonly_client_test.h"
 #include "connection_failed_client_test.h"
 #include "utils.h"
@@ -82,4 +87,44 @@ TEST(BlockTest, Iterators) {
     ASSERT_NE(block.begin(), block.end());
     ASSERT_NE(block.cbegin(), block.cend());
 }
+
+TEST(BlockTest, Clear) {
+    // Test that Block::Clear removes all rows from all of the columns,
+    // without changing column instances, types, names, etc.
+
+    auto block = MakeBlock({
+        {"foo", std::make_shared<ColumnUInt8>(std::vector<uint8_t>{1, 2, 3, 4, 5})},
+        {"bar", std::make_shared<ColumnString>(std::vector<std::string>{"1", "2", "3", "4", "5"})},
+    });
+
+    std::vector<std::tuple<std::string, Column*>> expected_columns_description;
+    for (const auto & c : block) {
+        expected_columns_description.emplace_back(c.Name(), c.Column().get());
+    }
+
+    block.Clear();
+
+    // Block must report empty after being cleared
+    EXPECT_EQ(0u, block.GetRowCount());
+
+    size_t i = 0;
+    for (const auto & c : block) {
+        const auto & [expected_name, expected_column] = expected_columns_description[i];
+        SCOPED_TRACE(testing::Message("col #") << c.ColumnIndex() << " \"" << c.Name() << "\"");
+
+        // MUST be same column object
+        EXPECT_EQ(expected_column, c.Column().get());
+
+        // MUST have same column name
+        EXPECT_EQ(expected_name, c.Name());
+
+        // column MUST be empty
+        EXPECT_EQ(0u, c.Column()->Size())
+            << c.ColumnIndex() << " : " << c.Name();
+
+        ++i;
+        EXPECT_FALSE(true);
+    }
+}
+
 
