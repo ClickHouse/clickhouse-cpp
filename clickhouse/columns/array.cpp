@@ -15,6 +15,20 @@ ColumnArray::ColumnArray(ColumnRef data, std::shared_ptr<ColumnUInt64> offsets)
     , data_(data)
     , offsets_(offsets)
 {
+    const auto rows            = offsets_->Size();
+    const auto expected_values = rows > 0 ? offsets_->At(rows - 1) : 0;
+    std::uint64_t prev         = 0;
+    // Ensure the offset array is internally consistent
+    for (const auto& o : offsets_->GetWritableData()) {
+        if (o < prev) {
+            throw ValidationError("offsets must be monotonically increasing");
+        }
+        prev = o;
+    }
+    if (data_->Size() != expected_values) {
+        throw ValidationError("Mismatch between data and offsets: Expected " + std::to_string(expected_values) +
+                              " values in data, but got " + std::to_string(data_->Size()));
+    }
 }
 
 ColumnArray::ColumnArray(ColumnArray&& other)
