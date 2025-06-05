@@ -14,6 +14,8 @@
 namespace clickhouse {
     class Block;
     class Column;
+
+    std::ostream& operator<<(std::ostream& ostr, const ItemView& item_view);
 }
 
 inline bool operator==(const in6_addr& left, const in6_addr& right) {
@@ -104,6 +106,72 @@ struct ColumnAsContainerWrapper {
         return Iterator{nested_col, nested_col.Size()};
     }
 };
+
+// Helper to allow comparing values of two instances of clickhouse::Column, when concrete type is unknown.
+// Comparison is done by comparing result of Column::GetItem().
+template <>
+struct ColumnAsContainerWrapper<clickhouse::Column> {
+    const clickhouse::Column& nested_col;
+
+    struct Iterator {
+        const clickhouse::Column& nested_col;
+        size_t i = 0;
+
+        auto& operator++() {
+            ++i;
+            return *this;
+        }
+
+        struct ItemWrapper {
+            const clickhouse::ItemView item_view;
+
+            bool operator==(const ItemWrapper & other) const {
+                // type-erased comparison, byte-by-byte
+                return item_view.type == other.item_view.type
+                       && item_view.data == other.item_view.data;
+            }
+
+            template <typename U>
+            bool operator==(const U & other) const {
+                return item_view.get<U>() == other;
+            }
+
+            template <typename U>
+            bool operator!=(const U & other) const {
+                return !(*this == other);
+            }
+
+            friend std::ostream& operator<<(std::ostream& ostr, const ItemWrapper& val) {
+                return ostr << val.item_view;
+            }
+        };
+
+        auto operator*() const {
+            return ItemWrapper{nested_col.GetItem(i)};
+        }
+
+        bool operator==(const Iterator & other) const {
+            return &other.nested_col == &this->nested_col && other.i == this->i;
+        }
+
+        bool operator!=(const Iterator & other) const {
+            return !(other == *this);
+        }
+    };
+
+    size_t size() const {
+        return nested_col.Size();
+    }
+
+    auto begin() const {
+        return Iterator{nested_col, 0};
+    }
+
+    auto end() const {
+        return Iterator{nested_col, nested_col.Size()};
+    }
+};
+
 }
 
 template <typename T>
@@ -146,15 +214,18 @@ template <typename Left, typename Right>
     if constexpr (!is_string_v<Left> && !is_string_v<Right>
             && (is_container_v<Left> || std::is_base_of_v<clickhouse::Column, std::decay_t<Left>>)
             && (is_container_v<Right> || std::is_base_of_v<clickhouse::Column, std::decay_t<Right>>) ) {
+        // if constexpr (std::is_same_v<Left, Column> && std::is_same_v<Right, Column>) {
 
-        const auto & l = maybeWrapColumnAsContainer(left);
-        const auto & r = maybeWrapColumnAsContainer(right);
+        // } else {
+            const auto & l = maybeWrapColumnAsContainer(left);
+            const auto & r = maybeWrapColumnAsContainer(right);
 
-        if (auto result = CompareCotainersRecursive(l, r))
-            return result;
-        else
-            return result << "\nExpected container: " << PrintContainer{l}
-                          << "\nActual container  : " << PrintContainer{r};
+            if (auto result = CompareCotainersRecursive(l, r))
+                return result;
+            else
+                return result << "\nExpected container: " << PrintContainer{l}
+                              << "\nActual container  : " << PrintContainer{r};
+        // }
     } else {
         if (left != right) {
 

@@ -9,6 +9,7 @@
 #include <functional>
 #include <string_view>
 #include <type_traits>
+#include <cmath>
 
 #include <cassert>
 
@@ -175,7 +176,10 @@ ColumnLowCardinality::~ColumnLowCardinality()
 {}
 
 void ColumnLowCardinality::Reserve(size_t new_cap) {
-    dictionary_column_->Reserve(new_cap);
+    // Assumption is that dictionary must be smaller than index.
+    // NOTE(vnemkov): Formula below (`ceil(sqrt(x))`) is a gut-feeling-good-enough estimation,
+    // feel free to replace/adjust if you have better one suported by actual data.
+    dictionary_column_->Reserve(static_cast<size_t>(ceil(sqrt(new_cap))));
     index_column_->Reserve(new_cap);
 }
 

@@ -107,6 +107,13 @@ void Block::Clear() {
     RefreshRowCount();
 }
 
+void Block::Reserve(size_t new_cap) {
+    for (auto & c : columns_) {
+        c.column->Reserve(new_cap);
+    }
+}
+
+
 
 ColumnRef Block::operator [] (size_t idx) const {
     if (idx < columns_.size()) {
