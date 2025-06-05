@@ -441,7 +441,7 @@ std::ostream& operator<<(std::ostream& ostr, const ItemView& item_view) {
                 ostr << item_view.get<Int128>();
             }
             else {
-                throw std::runtime_error("Invalid data size of ItemView of type DateTime64");
+                throw std::runtime_error("Invalid data size of ItemView of type Decimal");
             }
         }
         break;
