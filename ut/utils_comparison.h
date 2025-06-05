@@ -214,18 +214,15 @@ template <typename Left, typename Right>
     if constexpr (!is_string_v<Left> && !is_string_v<Right>
             && (is_container_v<Left> || std::is_base_of_v<clickhouse::Column, std::decay_t<Left>>)
             && (is_container_v<Right> || std::is_base_of_v<clickhouse::Column, std::decay_t<Right>>) ) {
-        // if constexpr (std::is_same_v<Left, Column> && std::is_same_v<Right, Column>) {
 
-        // } else {
-            const auto & l = maybeWrapColumnAsContainer(left);
-            const auto & r = maybeWrapColumnAsContainer(right);
+        const auto & l = maybeWrapColumnAsContainer(left);
+        const auto & r = maybeWrapColumnAsContainer(right);
 
-            if (auto result = CompareCotainersRecursive(l, r))
-                return result;
-            else
-                return result << "\nExpected container: " << PrintContainer{l}
-                              << "\nActual container  : " << PrintContainer{r};
-        // }
+        if (auto result = CompareCotainersRecursive(l, r))
+            return result;
+        else
+            return result << "\nExpected container: " << PrintContainer{l}
+                          << "\nActual container  : " << PrintContainer{r};
     } else {
         if (left != right) {
 
