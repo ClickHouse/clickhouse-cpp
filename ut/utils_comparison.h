@@ -14,6 +14,8 @@
 namespace clickhouse {
     class Block;
     class Column;
+
+    std::ostream& operator<<(std::ostream& ostr, const ItemView& item_view);
 }
 
 inline bool operator==(const in6_addr& left, const in6_addr& right) {
@@ -104,6 +106,72 @@ struct ColumnAsContainerWrapper {
         return Iterator{nested_col, nested_col.Size()};
     }
 };
+
+// Helper to allow comparing values of two instances of clickhouse::Column, when concrete type is unknown.
+// Comparison is done by comparing result of Column::GetItem().
+template <>
+struct ColumnAsContainerWrapper<clickhouse::Column> {
+    const clickhouse::Column& nested_col;
+
+    struct Iterator {
+        const clickhouse::Column& nested_col;
+        size_t i = 0;
+
+        auto& operator++() {
+            ++i;
+            return *this;
+        }
+
+        struct ItemWrapper {
+            const clickhouse::ItemView item_view;
+
+            bool operator==(const ItemWrapper & other) const {
+                // type-erased comparison, byte-by-byte
+                return item_view.type == other.item_view.type
+                       && item_view.data == other.item_view.data;
+            }
+
+            template <typename U>
+            bool operator==(const U & other) const {
+                return item_view.get<U>() == other;
+            }
+
+            template <typename U>
+            bool operator!=(const U & other) const {
+                return !(*this == other);
+            }
+
+            friend std::ostream& operator<<(std::ostream& ostr, const ItemWrapper& val) {
+                return ostr << val.item_view;
+            }
+        };
+
+        auto operator*() const {
+            return ItemWrapper{nested_col.GetItem(i)};
+        }
+
+        bool operator==(const Iterator & other) const {
+            return &other.nested_col == &this->nested_col && other.i == this->i;
+        }
+
+        bool operator!=(const Iterator & other) const {
+            return !(other == *this);
+        }
+    };
+
+    size_t size() const {
+        return nested_col.Size();
+    }
+
+    auto begin() const {
+        return Iterator{nested_col, 0};
+    }
+
+    auto end() const {
+        return Iterator{nested_col, nested_col.Size()};
+    }
+};
+
 }
 
 template <typename T>

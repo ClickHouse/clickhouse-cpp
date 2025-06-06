@@ -1,9 +1,19 @@
 #include <gtest/gtest.h>
+#include "clickhouse/base/uuid.h"
+#include "clickhouse/columns/date.h"
+#include "clickhouse/columns/decimal.h"
+#include "clickhouse/columns/enum.h"
+#include "clickhouse/columns/ip4.h"
+#include "clickhouse/columns/numeric.h"
+#include "clickhouse/columns/string.h"
+#include "clickhouse/columns/uuid.h"
 #include "ut/value_generators.h"
 #include "utils.h"
+#include "absl/numeric/int128.h"
 
 #include <limits>
 #include <optional>
+#include <sstream>
 #include <vector>
 
 TEST(CompareRecursive, CompareValues) {
@@ -119,4 +129,86 @@ TEST(CompareRecursive, OptionalNan) {
 TEST(Generators, MakeArrays) {
     auto arrays = MakeArrays<std::string, MakeStrings>();
     ASSERT_LT(0u, arrays.size());
+}
+
+// I.e. object ItemView can be serialized to string
+std::string toString(const clickhouse::ItemView & iv) {
+    std::stringstream sstr;
+    sstr << iv;
+
+    return sstr.str();
+}
+
+#define STRINGIFY_HELPER(x) #x
+#define STRINGIFY(x) STRINGIFY_HELPER(x)
+
+#define EXPECTED_SERIALIZATION(expected, column_expression, value) \
+do {\
+    auto column = column_expression; \
+    column.Append((value)); \
+    EXPECT_EQ("ItemView {" expected "}", toString(column.GetItem(0))) \
+        << "Created from " << STRINGIFY(value); \
+}\
+while (false)
+
+TEST(ItemView, OutputToOstream_positive) {
+    // testing `std::ostream& operator<<(std::ostream& ostr, const ItemView& item_view)`
+    using namespace clickhouse;
+
+    // Positive cases: output should be generated
+    EXPECTED_SERIALIZATION("String : \"string\" (6 bytes)", ColumnString(), "string");
+    EXPECTED_SERIALIZATION("FixedString : \"string\" (6 bytes)", ColumnFixedString(6), "string");
+
+    EXPECTED_SERIALIZATION("Int8 : -123", ColumnInt8(), -123);
+    EXPECTED_SERIALIZATION("Int16 : -1234", ColumnInt16(), -1234);
+    EXPECTED_SERIALIZATION("Int32 : -12345", ColumnInt32(), -12345);
+    EXPECTED_SERIALIZATION("Int64 : -123456", ColumnInt64(), -123456);
+    EXPECTED_SERIALIZATION("Int128 : -123456789", ColumnInt128(), absl::MakeInt128(-1, -123456789ll));
+
+    EXPECTED_SERIALIZATION("UInt8 : 123", ColumnUInt8(), 123);
+    EXPECTED_SERIALIZATION("UInt16 : 1234", ColumnUInt16(), 1234);
+    EXPECTED_SERIALIZATION("UInt32 : 12345", ColumnUInt32(), 12345);
+    EXPECTED_SERIALIZATION("UInt64 : 1234567", ColumnUInt64(), 1234567);
+    EXPECTED_SERIALIZATION("UInt128 : 123456789", ColumnUInt128(), absl::MakeUint128(0, 123456789ll));
+
+    EXPECTED_SERIALIZATION("Float32 : 1", ColumnFloat32(), 1);
+    EXPECTED_SERIALIZATION("Float64 : 4", ColumnFloat64(), 4);
+
+    using EnumItem = Type::EnumItem;
+
+    EXPECTED_SERIALIZATION("Enum8 : 123", ColumnEnum8(Type::CreateEnum8({EnumItem{"one", 123}})), 123);
+    EXPECTED_SERIALIZATION("Enum16 : 12345", ColumnEnum16(Type::CreateEnum16({EnumItem{"one", 12345}})), 12345);
+
+    EXPECTED_SERIALIZATION("IPv4 : 127.0.0.1", ColumnIPv4(), "127.0.0.1");
+    EXPECTED_SERIALIZATION("IPv6 : ::ffff:204.152.189.116", ColumnIPv6(), "::ffff:204.152.189.116");
+
+    EXPECTED_SERIALIZATION("UUID : bb6a8c69-9ab2-414c-8669-7b7fd27f0825", ColumnUUID(), UUID(0xbb6a8c699ab2414cllu, 0x86697b7fd27f0825llu));
+
+    EXPECTED_SERIALIZATION("Decimal : 1234567", ColumnDecimal(6, 0), 1234567);
+    EXPECTED_SERIALIZATION("Decimal : 1234567", ColumnDecimal(6, 3), 1234567);
+    EXPECTED_SERIALIZATION("Decimal : 1234567", ColumnDecimal(12, 0), 1234567);
+    EXPECTED_SERIALIZATION("Decimal : 1234567", ColumnDecimal(12, 6), 1234567);
+    EXPECTED_SERIALIZATION("Decimal : 1234567", ColumnDecimal(18, 0), 1234567);
+    EXPECTED_SERIALIZATION("Decimal : 1234567", ColumnDecimal(18, 9), 1234567);
+
+    EXPECTED_SERIALIZATION("Date : 1970-05-04 00:00:00", ColumnDate(), time_t(123) * 86400);
+    EXPECTED_SERIALIZATION("Date32 : 1969-08-31 00:00:00", ColumnDate32(), time_t(-123) * 86400);
+    EXPECTED_SERIALIZATION("DateTime : 1970-01-15 06:56:07", ColumnDateTime(), 1234567);
+    // this is completely bogus, since precision is not taken into account
+    EXPECTED_SERIALIZATION("DateTime64 : 1970-01-15 06:56:07", ColumnDateTime64(3), 1234567);
+}
+
+TEST(ItemView, OutputToOstream_negative) {
+    using namespace clickhouse;
+
+    EXPECT_ANY_THROW(toString(ItemView{Type::LowCardinality, {}}));
+    EXPECT_ANY_THROW(toString(ItemView{Type::Array, {}}));
+    EXPECT_ANY_THROW(toString(ItemView{Type::Nullable, {}}));
+    EXPECT_ANY_THROW(toString(ItemView{Type::Tuple, {}}));
+    EXPECT_ANY_THROW(toString(ItemView{Type::Map, {}}));
+    EXPECT_ANY_THROW(toString(ItemView{Type::Point, {}}));
+    EXPECT_ANY_THROW(toString(ItemView{Type::Ring, {}}));
+    EXPECT_ANY_THROW(toString(ItemView{Type::Polygon, {}}));
+    EXPECT_ANY_THROW(toString(ItemView{Type::MultiPolygon, {}}));
+
 }
