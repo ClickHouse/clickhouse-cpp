@@ -54,6 +54,7 @@ public:
 
     /// Increase the capacity of the column for large block insertion.
     virtual void Reserve(size_t new_cap) = 0;
+    virtual size_t Capacity() const = 0;
 
     /// Template method to load column data from input stream. It'll call LoadPrefix and LoadBody.
     /// Should be called only once from the client. Derived classes should not call it.
@@ -89,6 +90,9 @@ public:
     virtual ColumnRef CloneEmpty() const = 0;
 
     virtual void Swap(Column&) = 0;
+
+    /// Estimated RAM usage by the column in bytes.
+    virtual size_t MemoryUsage() const = 0;
 
     /// Get a view on raw item data if it is supported by column, will throw an exception if index is out of range.
     /// Please note that view is invalidated once column items are added or deleted, column is loaded from strean or destroyed.

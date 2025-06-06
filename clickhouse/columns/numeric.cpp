@@ -44,6 +44,13 @@ std::vector<T>& ColumnVector<T>::GetWritableData() {
 }
 
 template <typename T>
+void ColumnVector<T>::Append(ColumnRef column) {
+    if (auto col = column->As<ColumnVector<T>>()) {
+        data_.insert(data_.end(), col->data_.begin(), col->data_.end());
+    }
+}
+
+template <typename T>
 void ColumnVector<T>::Reserve(size_t new_cap) {
     data_.reserve(new_cap);
 }
@@ -64,13 +71,6 @@ const T& ColumnVector<T>::At(size_t n) const {
 }
 
 template <typename T>
-void ColumnVector<T>::Append(ColumnRef column) {
-    if (auto col = column->As<ColumnVector<T>>()) {
-        data_.insert(data_.end(), col->data_.begin(), col->data_.end());
-    }
-}
-
-template <typename T>
 bool ColumnVector<T>::LoadBody(InputStream* input, size_t rows) {
     data_.resize(rows);
 
@@ -85,6 +85,11 @@ void ColumnVector<T>::SaveBody(OutputStream* output) {
 template <typename T>
 size_t ColumnVector<T>::Size() const {
     return data_.size();
+}
+
+template <typename T>
+size_t ColumnVector<T>::MemoryUsage() const {
+    return data_.capacity() * sizeof(data_[0]);
 }
 
 template <typename T>

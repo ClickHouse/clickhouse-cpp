@@ -1,5 +1,5 @@
-#include "connection_failed_client_test.h"
-#include "utils.h"
+#include <ut/connection_failed_client_test.h>
+#include <ut/utils.h>
 
 #include <clickhouse/columns/column.h>
 #include <clickhouse/block.h>

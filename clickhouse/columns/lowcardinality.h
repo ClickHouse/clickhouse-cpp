@@ -65,11 +65,13 @@ public:
 
     ~ColumnLowCardinality();
 
+    /// Appends another LowCardinality column to the end of this one, updating dictionary.
+    void Append(ColumnRef /*column*/) override;
+
     /// Increase the capacity of the column for large block insertion.
     void Reserve(size_t new_cap) override;
 
-    /// Appends another LowCardinality column to the end of this one, updating dictionary.
-    void Append(ColumnRef /*column*/) override;
+    size_t Capacity() const override;
 
     bool LoadPrefix(InputStream* input, size_t rows) override;
 
@@ -87,6 +89,7 @@ public:
 
     /// Returns count of rows in the column.
     size_t Size() const override;
+    size_t MemoryUsage() const override;
 
     /// Makes slice of current column, with compacted dictionary
     ColumnRef Slice(size_t begin, size_t len) const override;

@@ -34,11 +34,6 @@ ColumnRef ColumnNullable::Nulls() const
        return nulls_;
 }
 
-void ColumnNullable::Reserve(size_t new_cap) {
-    nested_->Reserve(new_cap);
-    nulls_->Reserve(new_cap);
-}
-
 void ColumnNullable::Append(ColumnRef column) {
     if (auto col = column->As<ColumnNullable>()) {
         if (!col->nested_->Type()->IsEqual(nested_->Type())) {
@@ -48,6 +43,15 @@ void ColumnNullable::Append(ColumnRef column) {
         nested_->Append(col->nested_);
         nulls_->Append(col->nulls_);
     }
+}
+
+void ColumnNullable::Reserve(size_t new_cap) {
+    nested_->Reserve(new_cap);
+    nulls_->Reserve(new_cap);
+}
+
+size_t ColumnNullable::Capacity() const {
+    return nested_->Capacity();
 }
 
 void ColumnNullable::Clear() {
@@ -80,6 +84,10 @@ void ColumnNullable::SaveBody(OutputStream* output) {
 
 size_t ColumnNullable::Size() const {
     return nulls_->Size();
+}
+
+size_t ColumnNullable::MemoryUsage() const {
+    return nested_->MemoryUsage() + nulls_->MemoryUsage();
 }
 
 ColumnRef ColumnNullable::Slice(size_t begin, size_t len) const {

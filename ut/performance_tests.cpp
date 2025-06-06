@@ -10,12 +10,12 @@
 #include <clickhouse/base/output.h>
 #include <clickhouse/base/input.h>
 
+#include <ut/utils.h>
+#include <ut/utils_performance.h>
+
 #include <gtest/gtest.h>
 
 #include <string>
-
-#include "utils.h"
-#include "utils_performance.h"
 
 using namespace clickhouse;
 

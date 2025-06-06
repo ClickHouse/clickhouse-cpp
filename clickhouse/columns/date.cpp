@@ -37,14 +37,14 @@ uint16_t ColumnDate::RawAt(size_t n) const {
     return data_->At(n);
 }
 
+std::vector<uint16_t>& ColumnDate::GetWritableData() {
+    return data_->GetWritableData();
+}
+
 void ColumnDate::Append(ColumnRef column) {
     if (auto col = column->As<ColumnDate>()) {
         data_->Append(col->data_);
     }
-}
-
-std::vector<uint16_t>& ColumnDate::GetWritableData() {
-    return data_->GetWritableData();
 }
 
 void ColumnDate::Reserve(size_t new_cap) {
@@ -65,6 +65,10 @@ void ColumnDate::SaveBody(OutputStream* output) {
 
 size_t ColumnDate::Size() const {
     return data_->Size();
+}
+
+size_t ColumnDate::MemoryUsage() const {
+    return data_->MemoryUsage();
 }
 
 ColumnRef ColumnDate::Slice(size_t begin, size_t len) const {
@@ -152,6 +156,10 @@ void ColumnDate32::SaveBody(OutputStream* output) {
 
 size_t ColumnDate32::Size() const {
     return data_->Size();
+}
+
+size_t ColumnDate32::MemoryUsage() const {
+    return data_->MemoryUsage();
 }
 
 ColumnRef ColumnDate32::Slice(size_t begin, size_t len) const {
@@ -248,6 +256,10 @@ size_t ColumnDateTime::Size() const {
     return data_->Size();
 }
 
+size_t ColumnDateTime::MemoryUsage() const {
+    return data_->MemoryUsage();
+}
+
 void ColumnDateTime::Clear() {
     data_->Clear();
 }
@@ -307,9 +319,12 @@ std::string ColumnDateTime64::Timezone() const {
     return type_->As<DateTime64Type>()->Timezone();
 }
 
-void ColumnDateTime64::Reserve(size_t new_cap)
-{
+void ColumnDateTime64::Reserve(size_t new_cap) {
     data_->Reserve(new_cap);
+}
+
+size_t ColumnDateTime64::Capacity() const {
+    return data_->Capacity();
 }
 
 void ColumnDateTime64::Append(ColumnRef column) {
@@ -332,6 +347,10 @@ void ColumnDateTime64::Clear() {
 
 size_t ColumnDateTime64::Size() const {
     return data_->Size();
+}
+
+size_t ColumnDateTime64::MemoryUsage() const {
+    return data_->MemoryUsage();
 }
 
 ItemView ColumnDateTime64::GetItem(size_t index) const {

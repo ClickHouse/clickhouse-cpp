@@ -15,18 +15,20 @@
 
 #include <clickhouse/client.h>
 
+#include <ut/utils_comparison.h>
+#include <ut/utils_meta.h>
+#include <ut/utils.h>
+#include <ut/roundtrip_column.h>
+#include <ut/value_generators.h>
+
 #include <gtest/gtest.h>
+
 #include <algorithm>
+#include <cstdint>
 #include <initializer_list>
 #include <memory>
+#include <numeric>
 #include <type_traits>
-
-#include "gtest/internal/gtest-internal.h"
-#include "ut/utils_comparison.h"
-#include "ut/utils_meta.h"
-#include "utils.h"
-#include "roundtrip_column.h"
-#include "value_generators.h"
 
 namespace {
 using namespace clickhouse;
@@ -74,6 +76,7 @@ struct GenericColumnTestCase
 template <typename T>
 class GenericColumnTest : public testing::Test {
 public:
+    using TestCase = T;
     using ColumnType = typename T::ColumnType;
 
     static auto MakeColumn()
@@ -239,6 +242,8 @@ TYPED_TEST_SUITE(GenericColumnTest, TestCases);
 TYPED_TEST(GenericColumnTest, Construct) {
     auto column = this->MakeColumn();
     ASSERT_EQ(0u, column->Size());
+
+    dumpMemoryUsage("Newly constructed column", column);
 }
 
 TYPED_TEST(GenericColumnTest, EmptyColumn) {
@@ -276,6 +281,7 @@ TYPED_TEST(GenericColumnTest, Append) {
     }
 
     EXPECT_TRUE(CompareRecursive(values, *column));
+    dumpMemoryUsage("After appending 10000 items ", column);
 }
 
 // To make some value types compatitable with Column::GetItem()
@@ -336,6 +342,7 @@ TYPED_TEST(GenericColumnTest, Slice) {
 
     EXPECT_TRUE(CompareRecursive(values, *slice));
 
+    dumpMemoryUsage("Memory usage of slice ", slice);
     // TODO: slices of different sizes
 }
 
@@ -349,14 +356,62 @@ TYPED_TEST(GenericColumnTest, CloneEmpty) {
     EXPECT_EQ(0u, clone->Size());
 
     EXPECT_EQ(column->GetType(), clone->GetType());
+
+    dumpMemoryUsage("Memory usage of empty clone ", clone);
 }
 
 TYPED_TEST(GenericColumnTest, Clear) {
     auto [column, values] = this->MakeColumnWithValues(10'000);
     EXPECT_EQ(values.size(), column->Size());
+    dumpMemoryUsage("Memory usage before clear ", column);
 
     column->Clear();
     EXPECT_EQ(0u, column->Size());
+    dumpMemoryUsage("Memory usage after clear  ", column);
+}
+
+TYPED_TEST(GenericColumnTest, MemoryUsage) {
+    auto column = this->MakeColumn();
+    const auto values = this->GenerateValues(10'000);
+
+    auto max_memory_usage = sizeof(values.front()) * values.size();
+    if (column->GetType().GetCode() == Type::Code::LowCardinality) {
+        // Low cardinality has a different memory usage profile:
+        // only unique values take space in the dictionary,
+        // rest are just indicies to said dictionary.
+
+        const auto unique_values = TestFixture::TestCase::generateValues();
+        max_memory_usage = sizeof(unique_values.begin()) * unique_values.size()
+                + sizeof(int32_t) * values.size() // indices
+                + sizeof(uint64_t) * values.size() * 2; // hashes for uniques checks
+    }
+
+    if constexpr (std::is_same_v<std::string, std::decay_t<decltype(values[0])>>) {
+        const auto unique_values = TestFixture::TestCase::generateValues();
+        const size_t total_size = std::accumulate(unique_values.begin(), unique_values.end(), 0, [](auto accumulator, auto i) {
+            return accumulator + i.size();
+        });
+        max_memory_usage = total_size / unique_values.size() * values.size();
+
+        if constexpr (std::is_same_v<typename TypeParam::ColumnType, ColumnString>) {
+            column->SetEstimatedValueSize(ColumnString::EstimatedValueSize(total_size / unique_values.size()));
+            // There is some over-allocation for ColumnString
+            max_memory_usage *= 1.2;
+        }
+    }
+
+    // Empty column should have low memory usage from the start,
+    // from 0 bytes to 1% of max estimated memory usage due to some pre-reservations.
+    EXPECT_NEAR(max_memory_usage * 0.01, column->MemoryUsage(), max_memory_usage * 0.01)
+        << "On empty column";
+
+    column->Reserve(values.size());
+    EXPECT_GE(max_memory_usage, column->MemoryUsage())
+        << "After reserve";
+
+    TestFixture::AppendValues(column, values);
+    EXPECT_GE(max_memory_usage, column->MemoryUsage())
+        << " After appending " << values.size() << " items";
 }
 
 TYPED_TEST(GenericColumnTest, Swap) {
@@ -390,10 +445,15 @@ TYPED_TEST(GenericColumnTest, ReserveAndCapacity) {
 
     if constexpr (has_method_Reserve_v<column_type> && has_method_Capacity_v<column_type>) {
         auto column = this->MakeColumn();
-        EXPECT_EQ(0u, column->Capacity());
+
+        EXPECT_GT(16u, column->Capacity());        // Column might have some non-zero capacity initially
+
         EXPECT_NO_THROW(column->Reserve(100u));
+
         EXPECT_EQ(100u, column->Capacity());
         EXPECT_EQ(0u, column->Size());
+
+        dumpMemoryUsage("After Reserving space for 100 items ", column);
     }
     else {
         COLUMN_DOESNT_IMPLEMENT("method Reserve() and Capacity()");

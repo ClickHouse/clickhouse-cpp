@@ -33,18 +33,22 @@ ColumnMap::ColumnMap(ColumnRef data)
     : Column(GetMapType(data->GetType())), data_(data->As<ColumnArray>()) {
 }
 
-void ColumnMap::Reserve(size_t new_cap) {
-    data_->Reserve(new_cap);
-}
-
-void ColumnMap::Clear() {
-    data_->Clear();
-}
-
 void ColumnMap::Append(ColumnRef column) {
     if (auto col = column->As<ColumnMap>()) {
         data_->Append(col->data_);
     }
+}
+
+void ColumnMap::Reserve(size_t new_cap) {
+    data_->Reserve(new_cap);
+}
+
+size_t ColumnMap::Capacity() const {
+    return data_->Capacity();
+}
+
+void ColumnMap::Clear() {
+    data_->Clear();
 }
 
 bool ColumnMap::LoadPrefix(InputStream* input, size_t rows) {
@@ -65,6 +69,10 @@ void ColumnMap::SaveBody(OutputStream* output) {
 
 size_t ColumnMap::Size() const {
     return data_->Size();
+}
+
+size_t ColumnMap::MemoryUsage() const {
+    return data_->MemoryUsage();
 }
 
 ColumnRef ColumnMap::Slice(size_t begin, size_t len) const {

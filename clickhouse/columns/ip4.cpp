@@ -75,14 +75,18 @@ std::string ColumnIPv4::AsString(size_t n) const {
     return ip_str;
 }
 
-void ColumnIPv4::Reserve(size_t new_cap) {
-    data_->Reserve(new_cap);
-}
-
 void ColumnIPv4::Append(ColumnRef column) {
     if (auto col = column->As<ColumnIPv4>()) {
         data_->Append(col->data_);
     }
+}
+
+void ColumnIPv4::Reserve(size_t new_cap) {
+    data_->Reserve(new_cap);
+}
+
+size_t ColumnIPv4::Capacity() const {
+    return data_->Capacity();
 }
 
 bool ColumnIPv4::LoadBody(InputStream * input, size_t rows) {
@@ -95,6 +99,10 @@ void ColumnIPv4::SaveBody(OutputStream* output) {
 
 size_t ColumnIPv4::Size() const {
     return data_->Size();
+}
+
+size_t ColumnIPv4::MemoryUsage() const {
+    return data_->MemoryUsage();
 }
 
 ColumnRef ColumnIPv4::Slice(size_t begin, size_t len) const {
