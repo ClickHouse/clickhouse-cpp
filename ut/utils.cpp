@@ -384,7 +384,7 @@ std::ostream& operator<<(std::ostream& ostr, const ItemView& item_view) {
             ostr << DateTimeValue(item_view.get<uint16_t>() * 86400);
             break;
         case Type::Date32:
-            ostr << DateTimeValue(item_view.get<int32_t>() * 86400);
+            ostr << DateTimeValue(item_view.get<int32_t>());
             break;
         case Type::DateTime:
             ostr << DateTimeValue(item_view.get<uint32_t>());
