@@ -201,14 +201,16 @@ TEST(ItemView, OutputToOstream_positive) {
 TEST(ItemView, OutputToOstream_negative) {
     using namespace clickhouse;
 
-    EXPECT_ANY_THROW(toString(ItemView{Type::LowCardinality, {}}));
-    EXPECT_ANY_THROW(toString(ItemView{Type::Array, {}}));
-    EXPECT_ANY_THROW(toString(ItemView{Type::Nullable, {}}));
-    EXPECT_ANY_THROW(toString(ItemView{Type::Tuple, {}}));
-    EXPECT_ANY_THROW(toString(ItemView{Type::Map, {}}));
-    EXPECT_ANY_THROW(toString(ItemView{Type::Point, {}}));
-    EXPECT_ANY_THROW(toString(ItemView{Type::Ring, {}}));
-    EXPECT_ANY_THROW(toString(ItemView{Type::Polygon, {}}));
-    EXPECT_ANY_THROW(toString(ItemView{Type::MultiPolygon, {}}));
+    constexpr auto NO_DATA = std::string_view{};
+
+    EXPECT_ANY_THROW(toString(ItemView{Type::LowCardinality, NO_DATA}));
+    EXPECT_ANY_THROW(toString(ItemView{Type::Array, NO_DATA}));
+    EXPECT_ANY_THROW(toString(ItemView{Type::Nullable, NO_DATA}));
+    EXPECT_ANY_THROW(toString(ItemView{Type::Tuple, NO_DATA}));
+    EXPECT_ANY_THROW(toString(ItemView{Type::Map, NO_DATA}));
+    EXPECT_ANY_THROW(toString(ItemView{Type::Point, NO_DATA}));
+    EXPECT_ANY_THROW(toString(ItemView{Type::Ring, NO_DATA}));
+    EXPECT_ANY_THROW(toString(ItemView{Type::Polygon, NO_DATA}));
+    EXPECT_ANY_THROW(toString(ItemView{Type::MultiPolygon, NO_DATA}));
 
 }
