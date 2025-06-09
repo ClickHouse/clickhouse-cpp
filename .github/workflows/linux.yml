@@ -22,7 +22,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-20.04]
+        os: [ubuntu-22.04]
         compiler: [clang-6, clang-10-libc++, gcc-7, gcc-8, gcc-9]
         ssl: [ssl_ON, ssl_OFF]
         dependencies: [dependencies_BUILT_IN]
@@ -58,7 +58,7 @@ jobs:
 
         - dependencies: dependencies_SYSTEM
           compiler: compiler_SYSTEM
-          os: ubuntu-22.04
+          os: ubuntu-24.04
           COMPILER_INSTALL: gcc g++
           C_COMPILER: gcc
           CXX_COMPILER: g++
