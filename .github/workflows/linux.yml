@@ -23,35 +23,35 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-22.04]
-        compiler: [clang-6, clang-10-libc++, gcc-7, gcc-8, gcc-9]
+        compiler: [clang-11, clang-12, gcc-8, gcc-9, gcc-10, gcc-12]
         ssl: [ssl_ON, ssl_OFF]
         dependencies: [dependencies_BUILT_IN]
 
         include:
-        - compiler: clang-6
-          COMPILER_INSTALL: clang-6.0 libc++-dev
-          C_COMPILER: clang-6.0
-          CXX_COMPILER: clang++-6.0
+        - compiler: clang-14
+          COMPILER_INSTALL: clang-14 libc++-14-dev
+          C_COMPILER: clang-14
+          CXX_COMPILER: clang++14
 
-        - compiler: clang-10-libc++
-          COMPILER_INSTALL: clang-10 libc++-dev
-          C_COMPILER: clang-10
-          CXX_COMPILER: clang++-10
-
-        - compiler: gcc-7
-          COMPILER_INSTALL: gcc-7 g++-7
-          C_COMPILER: gcc-7
-          CXX_COMPILER: g++-7
-
-        - compiler: gcc-8
-          COMPILER_INSTALL: gcc-8 g++-8
-          C_COMPILER: gcc-8
-          CXX_COMPILER: g++-8
+        - compiler: clang-18
+          COMPILER_INSTALL: clang-18 libc++-18-dev
+          C_COMPILER: clang-18
+          CXX_COMPILER: clang++-18
 
         - compiler: gcc-9
           COMPILER_INSTALL: gcc-9 g++-9
           C_COMPILER: gcc-9
           CXX_COMPILER: g++-9
+
+        - compiler: gcc-12
+          COMPILER_INSTALL: gcc-12 g++-12
+          C_COMPILER: gcc-12
+          CXX_COMPILER: g++-12
+
+        - compiler: gcc-14
+          COMPILER_INSTALL: gcc-14 g++-14
+          C_COMPILER: gcc-14
+          CXX_COMPILER: g++-14
 
         - ssl: ssl_ON
           SSL_CMAKE_OPTION: -D WITH_OPENSSL=ON
