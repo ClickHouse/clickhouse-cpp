@@ -200,9 +200,9 @@ TEST(ItemView, OutputToOstream_positive) {
 
 TEST(ItemView, OutputToOstream_negative) {
     using namespace clickhouse;
+    const auto NO_DATA = std::string_view{};
 
-    constexpr auto NO_DATA = std::string_view{};
-
+    // Doesn't matter what content we point ItemView into, those types are not supported.
     EXPECT_ANY_THROW(toString(ItemView{Type::LowCardinality, NO_DATA}));
     EXPECT_ANY_THROW(toString(ItemView{Type::Array, NO_DATA}));
     EXPECT_ANY_THROW(toString(ItemView{Type::Nullable, NO_DATA}));
