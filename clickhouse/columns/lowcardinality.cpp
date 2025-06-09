@@ -179,7 +179,7 @@ void ColumnLowCardinality::Reserve(size_t new_cap) {
     // Assumption is that dictionary must be smaller than index.
     // NOTE(vnemkov): Formula below (`ceil(sqrt(x))`) is a gut-feeling-good-enough estimation,
     // feel free to replace/adjust if you have better one suported by actual data.
-    dictionary_column_->Reserve(static_cast<size_t>(ceil(sqrt(new_cap))));
+    dictionary_column_->Reserve(static_cast<size_t>(ceil(sqrt(static_cast<double>(new_cap)))));    
     index_column_->Reserve(new_cap + 2); // + 1 for null item (at pos 0), + 1 for default item (at pos 1)
 }
 
