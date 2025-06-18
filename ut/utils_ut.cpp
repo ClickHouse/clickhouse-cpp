@@ -12,9 +12,84 @@ TEST(CompareRecursive, CompareValues) {
     EXPECT_TRUE(CompareRecursive(1.0, 1.0));
     EXPECT_TRUE(CompareRecursive(1.0L, 1.0L));
 
+    EXPECT_TRUE(CompareRecursive('a', 'a'));
+}
+
+TEST(CompareRecursive, CompareStrings) {
+    // literals
     EXPECT_TRUE(CompareRecursive("1.0L", "1.0L"));
-    EXPECT_TRUE(CompareRecursive(std::string{"1.0L"}, std::string{"1.0L"}));
+    EXPECT_TRUE(CompareRecursive("1.0L", std::string("1.0L")));
+    EXPECT_TRUE(CompareRecursive(std::string("1.0L"), "1.0L"));
+    EXPECT_TRUE(CompareRecursive("1.0L", std::string_view("1.0L")));
+    EXPECT_TRUE(CompareRecursive(std::string_view("1.0L"), "1.0L"));
+
+    // array
+    const char str[] = "1.0L";
+    EXPECT_TRUE(CompareRecursive("1.0L", str));
+    EXPECT_TRUE(CompareRecursive(str, "1.0L"));
+    EXPECT_TRUE(CompareRecursive(str, str));
+    EXPECT_TRUE(CompareRecursive(str, std::string("1.0L")));
+    EXPECT_TRUE(CompareRecursive(std::string("1.0L"), str));
+    EXPECT_TRUE(CompareRecursive(str, std::string_view("1.0L")));
+    EXPECT_TRUE(CompareRecursive(std::string_view("1.0L"), str));
+
+    // pointer
+    const char *str2 = "1.0L";
+    EXPECT_TRUE(CompareRecursive("1.0L", str2));
+    EXPECT_TRUE(CompareRecursive(str2, "1.0L"));
+    EXPECT_TRUE(CompareRecursive(str2, str2));
+    EXPECT_TRUE(CompareRecursive(str2, str));
+    EXPECT_TRUE(CompareRecursive(str, str2));
+    EXPECT_TRUE(CompareRecursive(str2, std::string("1.0L")));
+    EXPECT_TRUE(CompareRecursive(std::string("1.0L"), str2));
+    EXPECT_TRUE(CompareRecursive(str2, std::string_view("1.0L")));
+    EXPECT_TRUE(CompareRecursive(std::string_view("1.0L"), str2));
+
+    // string & string_view
+    EXPECT_TRUE(CompareRecursive(std::string{"1.0L"},      std::string{"1.0L"}));
     EXPECT_TRUE(CompareRecursive(std::string_view{"1.0L"}, std::string_view{"1.0L"}));
+    EXPECT_TRUE(CompareRecursive(std::string{"1.0L"},      std::string_view{"1.0L"}));
+    EXPECT_TRUE(CompareRecursive(std::string_view{"1.0L"}, std::string{"1.0L"}));
+}
+
+TEST(CompareRecursive, CompareContainerOfStrings) {
+    const std::vector<const char*> vector_of_cstrings = {
+        "abc",
+        "cde",
+        "ghi"
+    };
+
+    const std::vector<std::string> vector_of_strings = {
+        "abc",
+        "cde",
+        "ghi"
+    };
+
+    const std::vector<std::string_view> vector_of_string_views = {
+        "abc",
+        "cde",
+        "ghi"
+    };
+
+    {
+        // same values, but different pointers
+        const std::vector<const char*> vector_of_cstrings2 = {
+            vector_of_strings[0].data(),
+            vector_of_strings[1].data(),
+            vector_of_strings[2].data(),
+        };
+        EXPECT_TRUE(CompareRecursive(vector_of_cstrings, vector_of_cstrings2));
+    }
+
+    EXPECT_TRUE(CompareRecursive(vector_of_strings, vector_of_strings));
+    EXPECT_TRUE(CompareRecursive(vector_of_strings, vector_of_cstrings));
+    EXPECT_TRUE(CompareRecursive(vector_of_cstrings, vector_of_strings));
+
+    EXPECT_TRUE(CompareRecursive(vector_of_string_views, vector_of_string_views));
+    EXPECT_TRUE(CompareRecursive(vector_of_strings, vector_of_string_views));
+    EXPECT_TRUE(CompareRecursive(vector_of_string_views, vector_of_strings));
+    EXPECT_TRUE(CompareRecursive(vector_of_strings, vector_of_string_views));
+    EXPECT_TRUE(CompareRecursive(vector_of_string_views, vector_of_strings));
 }
 
 TEST(CompareRecursive, CompareContainers) {
