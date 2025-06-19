@@ -85,6 +85,12 @@ public:
         return columns_.at(idx).name;
     }
 
+    /// Convinience method to wipe out all rows from all columns
+    void Clear();
+
+    /// Convinience method to do Reserve() on all columns
+    void Reserve(size_t new_cap);
+
     /// Reference to column by index in the block.
     ColumnRef operator [] (size_t idx) const;
 
