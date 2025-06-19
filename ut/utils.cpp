@@ -390,13 +390,13 @@ std::ostream& operator<<(std::ostream& ostr, const ItemView& item_view) {
             ostr << DateTimeValue(item_view.get<uint32_t>());
             break;
         case Type::DateTime64: {
-            if (item_view.data.size() == 4) {
+            if (item_view.data.size() == sizeof(int32_t)) {
                 ostr << DateTimeValue(item_view.get<int32_t>());
             }
-            else if (item_view.data.size() == 8) {
+            else if (item_view.data.size() == sizeof(int64_t)) {
                 ostr << DateTimeValue(item_view.get<int64_t>());
             }
-            else if (item_view.data.size() == 16) {
+            else if (item_view.data.size() == sizeof(Int128)) {
                 ostr << DateTimeValue(item_view.get<Int128>());
             }
             else {
@@ -405,10 +405,10 @@ std::ostream& operator<<(std::ostream& ostr, const ItemView& item_view) {
             break;
         }
         case Type::Enum8:
-            ostr << static_cast<unsigned int>(item_view.get<uint8_t>());
+            ostr << static_cast<int>(item_view.get<int8_t>());
             break;
         case Type::Enum16:
-            ostr << static_cast<unsigned int>(item_view.get<uint16_t>());
+            ostr << static_cast<int>(item_view.get<int16_t>());
             break;
         case Type::UUID: {
             const auto & uuid_vals = reinterpret_cast<const uint64_t*>(item_view.data.data());
@@ -431,13 +431,13 @@ std::ostream& operator<<(std::ostream& ostr, const ItemView& item_view) {
             ostr << item_view.get<UInt128>();
             break;
         case Type::Decimal: {
-            if (item_view.data.size() == 4) {
+            if (item_view.data.size() == sizeof(int32_t)) {
                 ostr << item_view.get<int32_t>();
             }
-            else if (item_view.data.size() == 8) {
+            else if (item_view.data.size() == sizeof(int64_t)) {
                 ostr << item_view.get<int64_t>();
             }
-            else if (item_view.data.size() == 16) {
+            else if (item_view.data.size() == sizeof(Int128)) {
                 ostr << item_view.get<Int128>();
             }
             else {
