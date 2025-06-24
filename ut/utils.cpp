@@ -19,9 +19,15 @@
 #include <clickhouse/base/socket.h> // for ipv4-ipv6 platform-specific stuff
 
 #include <cinttypes>
+#include <cstdint>
+#include <ctime>
 #include <iomanip>
 #include <sstream>
+#include <stdexcept>
 #include <type_traits>
+#include "clickhouse/types/types.h"
+#include "absl/numeric/int128.h"
+
 
 
 namespace {
@@ -42,7 +48,7 @@ struct DateTimeValue {
 };
 
 std::ostream& operator<<(std::ostream & ostr, const DateTimeValue & time) {
-    const auto t = std::localtime(&time.value);
+    const auto t = std::gmtime(&time.value);
     char buffer[] = "2015-05-18 07:40:12\0\0";
     std::strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", t);
 
@@ -173,6 +179,7 @@ std::ostream & printColumnValue(const ColumnRef& c, const size_t row, std::ostre
         || doPrintValue<ColumnEnum8>(c, row, ostr)
         || doPrintValue<ColumnEnum16>(c, row, ostr)
         || doPrintValue<ColumnDate, DateTimeValue>(c, row, ostr)
+        || doPrintValue<ColumnDate32, DateTimeValue>(c, row, ostr)
         || doPrintValue<ColumnDateTime, DateTimeValue>(c, row, ostr)
         || doPrintValue<ColumnDateTime64, DateTimeValue>(c, row, ostr)
         || doPrintValue<ColumnDecimal>(c, row, ostr)
@@ -331,6 +338,141 @@ std::ostream & operator<<(std::ostream & ostr, const Progress & progress) {
         << " written_rows : " << progress.written_rows
         << " written_bytes : " << progress.written_bytes;
 }
+
+std::ostream& operator<<(std::ostream& ostr, const ItemView& item_view) {
+    ostr << "ItemView {" << clickhouse::Type::TypeName(item_view.type) << " : ";
+
+    switch (item_view.type) {
+        case Type::Void:
+            ostr << "--void--";
+            break;
+        case Type::Int8:
+            ostr << static_cast<int>(item_view.get<int8_t>());
+            break;
+        case Type::Int16:
+            ostr << static_cast<int>(item_view.get<int16_t>());
+            break;
+        case Type::Int32:
+            ostr << static_cast<int>(item_view.get<int32_t>());
+            break;
+        case Type::Int64:
+            ostr << item_view.get<int64_t>();
+            break;
+        case Type::UInt8:
+            ostr << static_cast<unsigned int>(item_view.get<uint8_t>());
+            break;
+        case Type::UInt16:
+            ostr << static_cast<unsigned int>(item_view.get<uint16_t>());
+            break;
+        case Type::UInt32:
+            ostr << static_cast<unsigned int>(item_view.get<uint32_t>());
+            break;
+        case Type::UInt64:
+            ostr << item_view.get<uint64_t>();
+            break;
+        case Type::Float32:
+            ostr << static_cast<float>(item_view.get<float>());
+            break;
+        case Type::Float64:
+            ostr << static_cast<double>(item_view.get<double>());
+            break;
+        case Type::String:
+        case Type::FixedString:
+            ostr << "\"" << item_view.data << "\" (" << item_view.data.size() << " bytes)";
+            break;
+        case Type::Date:
+            ostr << DateTimeValue(item_view.get<uint16_t>() * 86400);
+            break;
+        case Type::Date32:
+            ostr << DateTimeValue(item_view.get<int32_t>());
+            break;
+        case Type::DateTime:
+            ostr << DateTimeValue(item_view.get<uint32_t>());
+            break;
+        case Type::DateTime64: {
+            if (item_view.data.size() == sizeof(int32_t)) {
+                ostr << DateTimeValue(item_view.get<int32_t>());
+            }
+            else if (item_view.data.size() == sizeof(int64_t)) {
+                ostr << DateTimeValue(item_view.get<int64_t>());
+            }
+            else if (item_view.data.size() == sizeof(Int128)) {
+                ostr << DateTimeValue(item_view.get<Int128>());
+            }
+            else {
+                throw std::runtime_error("Invalid data size of ItemView of type DateTime64");
+            }
+            break;
+        }
+        case Type::Enum8:
+            ostr << static_cast<int>(item_view.get<int8_t>());
+            break;
+        case Type::Enum16:
+            ostr << static_cast<int>(item_view.get<int16_t>());
+            break;
+        case Type::UUID: {
+            const auto & uuid_vals = reinterpret_cast<const uint64_t*>(item_view.data.data());
+            ostr << ToString(clickhouse::UUID{uuid_vals[0], uuid_vals[1]});
+            break;
+        }
+        case Type::IPv4: {
+            in_addr addr;
+            addr.s_addr = ntohl(item_view.get<uint32_t>());
+            ostr << addr;
+            break;
+        }
+        case Type::IPv6:
+            ostr << *reinterpret_cast<const in6_addr*>(item_view.AsBinaryData().data());
+            break;
+        case Type::Int128:
+            ostr << item_view.get<Int128>();
+            break;
+        case Type::UInt128:
+            ostr << item_view.get<UInt128>();
+            break;
+        case Type::Decimal: {
+            if (item_view.data.size() == sizeof(int32_t)) {
+                ostr << item_view.get<int32_t>();
+            }
+            else if (item_view.data.size() == sizeof(int64_t)) {
+                ostr << item_view.get<int64_t>();
+            }
+            else if (item_view.data.size() == sizeof(Int128)) {
+                ostr << item_view.get<Int128>();
+            }
+            else {
+                throw std::runtime_error("Invalid data size of ItemView of type Decimal");
+            }
+        }
+        break;
+        case Type::Decimal32:
+            ostr << DateTimeValue(item_view.get<int32_t>());
+            break;
+        case Type::Decimal64:
+            ostr << DateTimeValue(item_view.get<int64_t>());
+            break;
+        case Type::Decimal128:
+            ostr << DateTimeValue(item_view.get<Int128>());
+            break;
+        // Unsupported types. i.e. there shouldn't be `ItemView`s of those types in practice.
+        // either because GetItem() is not implemented for corresponding column type
+        // OR this type code is never used, for `ItemView`s (but type code of wrapped column is).
+        case Type::LowCardinality:
+        case Type::Array:
+        case Type::Nullable:
+        case Type::Tuple:
+        case Type::Map:
+        case Type::Point:
+        case Type::Ring:
+        case Type::Polygon:
+        case Type::MultiPolygon: {
+            throw std::runtime_error("Invalid data size of ItemView of type " + std::string(Type::TypeName(item_view.type)));
+        }
+    };
+
+    return ostr << "}";
+}
+
 
 }
 
