@@ -40,6 +40,7 @@ ENDIF ()
 
 IF (UNIX)
     IF (NOT APPLE)
+        include(GNUInstallDirs)
         SET (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
     ENDIF ()
     SET (CMAKE_EXE_LINKER_FLAGS, "${CMAKE_EXE_LINKER_FLAGS} -lpthread")
