@@ -434,6 +434,20 @@ TEST_P(ClientCase, Nullable) {
     EXPECT_EQ(sizeof(TEST_DATA) / sizeof(TEST_DATA[0]), row);
 }
 
+TEST_P(ClientCase, Nothing) {
+    size_t total_row_count = 0;
+    client_->Select("SELECT NULL", [&total_row_count](const Block & block)
+        {
+            total_row_count += block.GetRowCount();
+            for (size_t i = 0; i < block.GetRowCount(); ++i) {
+                EXPECT_TRUE(block[0]->AsStrict<ColumnNullable>()->IsNull(i));
+                auto column = ColumnNullableT<ColumnNothing>::Wrap(block[0]->AsStrict<ColumnNullable>());
+                EXPECT_FALSE(column->At(i).has_value());
+            }
+        });
+    ASSERT_EQ(total_row_count, 1UL);
+}
+
 TEST_P(ClientCase, Numbers) {
     try {
         size_t num = 0;
