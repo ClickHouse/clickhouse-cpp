@@ -45,7 +45,7 @@ $ cmake .. [-DBUILD_TESTS=ON]
 $ make
 ```
 
-Plese refer to the workflows for the reference on dependencies/build options
+Please refer to the workflows for the reference on dependencies/build options
 - https://github.com/ClickHouse/clickhouse-cpp/blob/master/.github/workflows/linux.yml
 - https://github.com/ClickHouse/clickhouse-cpp/blob/master/.github/workflows/windows_msvc.yml
 - https://github.com/ClickHouse/clickhouse-cpp/blob/master/.github/workflows/windows_mingw.yml
@@ -211,7 +211,7 @@ client.Insert("default.test", block);
         </readonly>
     </profiles>
 ```
-- Enabling asynchronous inserts at the user level. Ensure your login accout has the privileges about ALTER USER. Then you can use insert_account for asynchronous inserts.
+- Enabling asynchronous inserts at the user level. Ensure your login account has the privileges about ALTER USER. Then you can use insert_account for asynchronous inserts.
 ```sql
 ALTER USER insert_account SETTINGS async_insert=1,wait_for_async_insert=1,async_insert_use_adaptive_busy_timeout=0,async_insert_busy_timeout_ms=5000,async_insert_max_data_size=104857600
 ```
