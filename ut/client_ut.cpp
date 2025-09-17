@@ -1553,3 +1553,30 @@ TEST_P(ClientCase, QueryParameters) {
 
     client_->Execute("DROP TEMPORARY TABLE " + table_name);
 }
+
+TEST_P(ClientCase, ClientName) {
+    const auto server_info = client_->GetServerInfo();
+
+    std::srand(std::time(nullptr) + reinterpret_cast<int64_t>(&server_info));
+    const auto * test_info = ::testing::UnitTest::GetInstance()->current_test_info();
+    const std::string query_id = std::to_string(std::rand()) + "-" + test_info->test_suite_name() + "/" + test_info->name();
+
+    SCOPED_TRACE(query_id);
+
+    client_->Select("SELECT 1", query_id, [](const Block&) { /* make sure the data is delivered in full */ });
+
+    FlushLogs();
+
+    std::string query_log_query 
+        = "SELECT CAST(client_name, 'String') FROM system.query_log WHERE query_id = '" + query_id + "'";
+
+    size_t total_rows = 0;
+    client_->Select(query_log_query, [&total_rows](const Block& block) {
+        const auto row_count = block.GetRowCount();
+        total_rows += row_count;
+        for (size_t i = 0; i < row_count; ++i) {
+            ASSERT_EQ(block[0]->AsStrict<ColumnString>()->At(i), "clickhouse-cpp");
+        }
+    });
+    ASSERT_GT(total_rows, 0UL) << "Query with query_id " << query_id << " is not found";
+}

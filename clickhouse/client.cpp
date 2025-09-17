@@ -17,7 +17,7 @@
 #include "base/sslsocket.h"
 #endif
 
-#define DBMS_NAME                                       "ClickHouse"
+#define CLIENT_NAME "clickhouse-cpp"
 
 #define DBMS_MIN_REVISION_WITH_TEMPORARY_TABLES         50264
 #define DBMS_MIN_REVISION_WITH_TOTAL_ROWS_IN_PROGRESS   51554
@@ -813,7 +813,7 @@ void Client::Impl::SendQuery(const Query& query, bool finalize) {
         ClientInfo info;
 
         info.query_kind = 1;
-        info.client_name = "ClickHouse client";
+        info.client_name          = CLIENT_NAME;
         info.client_version_major = CLICKHOUSE_CPP_VERSION_MAJOR;
         info.client_version_minor = CLICKHOUSE_CPP_VERSION_MINOR;
         info.client_version_patch = CLICKHOUSE_CPP_VERSION_PATCH;
@@ -978,7 +978,7 @@ void Client::Impl::InitializeStreams(std::unique_ptr<SocketBase>&& socket) {
 
 bool Client::Impl::SendHello() {
     WireFormat::WriteUInt64(*output_, ClientCodes::Hello);
-    WireFormat::WriteString(*output_, std::string(DBMS_NAME) + " client");
+    WireFormat::WriteString(*output_, std::string(CLIENT_NAME));
     WireFormat::WriteUInt64(*output_, CLICKHOUSE_CPP_VERSION_MAJOR);
     WireFormat::WriteUInt64(*output_, CLICKHOUSE_CPP_VERSION_MINOR);
     WireFormat::WriteUInt64(*output_, DMBS_PROTOCOL_REVISION);

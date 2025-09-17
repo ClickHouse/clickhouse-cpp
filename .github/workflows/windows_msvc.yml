@@ -68,7 +68,8 @@ jobs:
         env:
           # It is impossible to start CH server in docker on Windows due to github actions limitations,
           # so we use remote server to execute tests, some do not allow some features for anonymoust/free users:
-          # - system.query_log used by 'Client/ClientCase.Query_ID'
-          GTEST_FILTER: "-Client/ClientCase.Query_ID*:Client/ClientCase.TracingContext/*"
+          # - system.query_log used by 'Client/ClientCase.Query_ID' and 'Client/ClientCase.ClientName'
+          # - system.opentelemetry_span_log is used by 'Client/ClientCase.TracingContext'
+          GTEST_FILTER: "-Client/ClientCase.Query_ID*:Client/ClientCase.TracingContext/*:Client/ClientCase.ClientName/*"
         working-directory: ${{github.workspace}}/build/ut
         run: Release\clickhouse-cpp-ut.exe "${{env.GTEST_FILTER}}"
