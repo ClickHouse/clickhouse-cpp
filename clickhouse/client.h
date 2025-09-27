@@ -243,6 +243,12 @@ public:
             std::unique_ptr<SocketFactory> socket_factory);
     ~Client();
 
+    // movable only
+    Client(Client&&);
+    Client& operator=(Client&&);
+    Client(const Client&) = delete;
+    Client& operator=(const Client&) = delete;
+
     /// Intends for execute arbitrary queries.
     void Execute(const Query& query);
 
@@ -300,7 +306,7 @@ public:
     static Version GetVersion();
 
 private:
-    const ClientOptions options_;
+    ClientOptions options_;
 
     class Impl;
     std::unique_ptr<Impl> impl_;

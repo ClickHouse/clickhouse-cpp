@@ -322,7 +322,7 @@ void Client::Impl::SendBlockData(const Block& block) {
     if (compression_ == CompressionState::Enable) {
         std::unique_ptr<OutputStream> compressed_output = std::make_unique<CompressedOutput>(output_.get(), options_.max_compression_chunk_size, options_.compression_method);
         BufferedOutput buffered(std::move(compressed_output), options_.max_compression_chunk_size);
-    
+
         WriteBlock(block, buffered);
     } else {
         WriteBlock(block, *output_);
@@ -696,7 +696,7 @@ bool Client::Impl::ReadBlock(InputStream& input, Block* block) {
         if (!WireFormat::ReadString(input, &type)) {
             return false;
         }
-    
+
         if (server_info_.revision >= DBMS_MIN_REVISION_WITH_CUSTOM_SERIALIZATION) {
             uint8_t custom_format_len;
             if (!WireFormat::ReadFixed(input, &custom_format_len)) {
@@ -705,7 +705,7 @@ bool Client::Impl::ReadBlock(InputStream& input, Block* block) {
             if (custom_format_len > 0) {
                 throw UnimplementedError(std::string("unsupported custom serialization"));
             }
-        }  
+        }
 
         if (ColumnRef col = CreateColumnByType(type, create_column_settings)) {
             if (num_rows && !col->Load(&input, num_rows)) {
@@ -909,7 +909,7 @@ void Client::Impl::SendQuery(const Query& query, bool finalize) {
         }
         WireFormat::WriteString(*output_, std::string()); // empty string after last param
     }
- 
+
     if (finalize) {
         FinalizeQuery();
     }
@@ -1100,6 +1100,9 @@ Client::Client(const ClientOptions& opts,
 
 Client::~Client()
 { }
+
+Client::Client(Client&&) = default;
+Client& Client::operator=(Client&&) = default;
 
 void Client::Execute(const Query& query) {
     impl_->ExecuteQuery(query);
