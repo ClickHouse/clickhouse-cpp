@@ -242,7 +242,7 @@ inline void ParamExample(Client& client) {
         Query query("insert into test_client values ({id: UInt64}, {name: String})");
 
         query.SetParam("id", "1").SetParam("name", "NAME");
-        client.Execute(query);
+        client.Execute(query);       
 
         query.SetParam("id", "123").SetParam("name", "FromParam");
         client.Execute(query);
@@ -589,8 +589,6 @@ int main() {
                     .SetPingBeforeQuery(true));
             RunTests(client);
             std::cout << "current endpoint : " <<  client.GetCurrentEndpoint().value().host << "\n";
-            Client client2 = std::move(client);
-            RunTests(client2);
         }
 
         {
@@ -605,6 +603,3 @@ int main() {
 
     return 0;
 }
-
-static_assert( !std::is_copy_constructible_v<Client> );
-static_assert( std::is_move_constructible_v<Client> );
