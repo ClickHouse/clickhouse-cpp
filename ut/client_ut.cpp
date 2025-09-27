@@ -1740,7 +1740,7 @@ TEST_P(ClientCase, ClientMoveConstructor) {
         }
 
         ASSERT_EQ(1U, block.GetColumnCount());
-        if (auto col = block[0]->As<ColumnLowCardinalityT<ColumnString>>()) {
+        if (auto col = block[0]->As<ColumnString>()) {
             ASSERT_EQ(data.size(), col->Size());
             for (size_t i = 0; i < col->Size(); ++i) {
                 EXPECT_EQ(data[i], (*col)[i]) << " at index: " << i;
@@ -1766,7 +1766,7 @@ TEST_P(ClientCase, ClientMoveAssign) {
         }
 
         ASSERT_EQ(1U, block.GetColumnCount());
-        if (auto col = block[0]->As<ColumnLowCardinalityT<ColumnString>>()) {
+        if (auto col = block[0]->As<ColumnString>()) {
             ASSERT_EQ(data.size(), col->Size());
             for (size_t i = 0; i < col->Size(); ++i) {
                 EXPECT_EQ(data[i], (*col)[i]) << " at index: " << i;
