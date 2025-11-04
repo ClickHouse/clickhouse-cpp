@@ -50,8 +50,10 @@ enum class CompressionMethod : int8_t {
 struct Endpoint {
     std::string host;
     uint16_t port = 9000;
+    /// UNIX domain socket path. If set, this takes precedence over host/port.
+    std::string socket_path;
     inline bool operator==(const Endpoint& right) const {
-        return host == right.host && port == right.port;
+        return host == right.host && port == right.port && socket_path == right.socket_path;
     }
 };
 
@@ -72,6 +74,8 @@ struct ClientOptions {
     DECLARE_FIELD(host, std::string, SetHost, std::string());
     /// Service port.
     DECLARE_FIELD(port, uint16_t, SetPort, 9000);
+    /// UNIX domain socket path. If set, this takes precedence over host/port.
+    DECLARE_FIELD(socket_path, std::string, SetSocketPath, std::string());
 
     /** Set endpoints (host+port), only one is used.
      * Client tries to connect to those endpoints one by one, on the round-robin basis:

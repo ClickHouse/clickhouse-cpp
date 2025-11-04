@@ -15,6 +15,7 @@
 #   include <netdb.h>
 #   include <netinet/tcp.h>
 #   include <signal.h>
+#   include <sys/un.h>
 #   include <unistd.h>
 #endif
 
@@ -193,6 +194,69 @@ struct SocketRAIIWrapper {
     }
 };
 
+} // namespace
+
+#if defined(_unix_)
+namespace {
+SOCKET SocketConnectUnix(const std::string& socket_path, const SocketTimeoutParams& timeout_params) {
+    struct sockaddr_un addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sun_family = AF_UNIX;
+    
+    if (socket_path.size() >= sizeof(addr.sun_path)) {
+        throw std::system_error(EINVAL, std::system_category(), "UNIX socket path too long");
+    }
+    
+    strncpy(addr.sun_path, socket_path.c_str(), sizeof(addr.sun_path) - 1);
+    
+    SocketRAIIWrapper s{socket(AF_UNIX, SOCK_STREAM, 0)};
+    
+    if (*s == INVALID_SOCKET) {
+        throw std::system_error(getSocketErrorCode(), getErrorCategory(), "fail to create UNIX socket");
+    }
+    
+    SetNonBlock(*s, true);
+    SetTimeout(*s, timeout_params);
+    
+    if (connect(*s, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr)) != 0) {
+        int err = getSocketErrorCode();
+        if (err == EINPROGRESS || err == EAGAIN || err == EWOULDBLOCK) {
+            pollfd fd;
+            fd.fd = *s;
+            fd.events = POLLOUT;
+            fd.revents = 0;
+            ssize_t rval = Poll(&fd, 1, static_cast<int>(timeout_params.connect_timeout.count()));
+            
+            if (rval == -1) {
+                throw std::system_error(getSocketErrorCode(), getErrorCategory(), "fail to connect to UNIX socket");
+            }
+            if (rval == 0) {
+                throw std::system_error(ETIMEDOUT, getErrorCategory(), "timeout connecting to UNIX socket");
+            }
+            if (rval > 0) {
+                socklen_t len = sizeof(err);
+                getsockopt(*s, SOL_SOCKET, SO_ERROR, &err, &len);
+                
+                if (err) {
+                    throw std::system_error(err, getErrorCategory(), "fail to connect to UNIX socket");
+                }
+                SetNonBlock(*s, false);
+                return s.release();
+            }
+            // Should not reach here, but ensure we return a value
+            throw std::system_error(getSocketErrorCode(), getErrorCategory(), "fail to connect to UNIX socket");
+        } else {
+            throw std::system_error(err, getErrorCategory(), "fail to connect to UNIX socket");
+        }
+    } else {
+        SetNonBlock(*s, false);
+        return s.release();
+    }
+}
+} // namespace
+#endif
+
+namespace {
 SOCKET SocketConnect(const NetworkAddress& addr, const SocketTimeoutParams& timeout_params) {
     int last_err = 0;
     for (auto res = addr.Info(); res != nullptr; res = res->ai_next) {
@@ -324,6 +388,10 @@ Socket::Socket(const NetworkAddress & addr)
     : handle_(SocketConnect(addr, SocketTimeoutParams{}))
 {}
 
+Socket::Socket(SOCKET handle)
+    : handle_(handle)
+{}
+
 Socket::Socket(Socket&& other) noexcept
     : handle_(other.handle_)
 {
@@ -391,6 +459,15 @@ std::unique_ptr<OutputStream> Socket::makeOutputStream() const {
 NonSecureSocketFactory::~NonSecureSocketFactory()  {}
 
 std::unique_ptr<SocketBase> NonSecureSocketFactory::connect(const ClientOptions &opts, const Endpoint& endpoint) {
+#if defined(_unix_)
+    // Check if UNIX domain socket path is provided
+    if (!endpoint.socket_path.empty()) {
+        SocketTimeoutParams timeout_params { opts.connection_connect_timeout, opts.connection_recv_timeout, opts.connection_send_timeout };
+        SOCKET handle = SocketConnectUnix(endpoint.socket_path, timeout_params);
+        // Skip TCP-specific options for UNIX sockets
+        return std::make_unique<Socket>(handle);
+    }
+#endif
 
     const auto address = NetworkAddress(endpoint.host, std::to_string(endpoint.port));
     auto socket = doConnect(address, opts);

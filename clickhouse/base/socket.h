@@ -105,6 +105,7 @@ class Socket : public SocketBase {
 public:
     Socket(const NetworkAddress& addr, const SocketTimeoutParams& timeout_params);
     Socket(const NetworkAddress& addr);
+    explicit Socket(SOCKET handle);
     Socket(Socket&& other) noexcept;
     Socket& operator=(Socket&& other) noexcept;
 

@@ -65,6 +65,9 @@ struct ClientInfo {
 };
 
 std::ostream& operator<<(std::ostream& os, const Endpoint& endpoint) {
+    if (!endpoint.socket_path.empty()) {
+        return os << "unix://" << endpoint.socket_path;
+    }
     return os << endpoint.host << ":" << endpoint.port;
 }
 
@@ -75,7 +78,7 @@ std::ostream& operator<<(std::ostream& os, const ClientOptions& opt) {
 
     if (!opt.host.empty()) {
         extra_endpoints = 1;
-        os << opt.user << '@' << Endpoint{opt.host, opt.port};
+        os << opt.user << '@' << Endpoint{opt.host, opt.port, opt.socket_path};
 
         if (opt.endpoints.size())
             os << ", ";
@@ -255,10 +258,11 @@ private:
 
 ClientOptions modifyClientOptions(ClientOptions opts)
 {
-    if (opts.host.empty())
+    if (opts.host.empty() && opts.socket_path.empty()) {
         return opts;
+    }
 
-    Endpoint default_endpoint({opts.host, opts.port});
+    Endpoint default_endpoint({opts.host, opts.port, opts.socket_path});
     opts.endpoints.emplace(opts.endpoints.begin(), default_endpoint);
     return opts;
 }
@@ -431,7 +435,11 @@ void Client::Impl::ResetConnection() {
     InitializeStreams(socket_factory_->connect(options_, current_endpoint_.value()));
 
     if (!Handshake()) {
-        throw ProtocolError("fail to connect to " + options_.host);
+        const auto& endpoint = current_endpoint_.value();
+        std::string connection_target = endpoint.socket_path.empty() 
+            ? (options_.host.empty() ? endpoint.host : options_.host)
+            : endpoint.socket_path;
+        throw ProtocolError("fail to connect to " + connection_target);
     }
 }
 

@@ -576,9 +576,9 @@ int main() {
         const auto localHostEndpoint = ClientOptions()
                 .SetHost(   getEnvOrDefault("CLICKHOUSE_HOST",     "localhost"))
                 .SetPort(   getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "9000"))
-                .SetEndpoints({   {"asasdasd", 9000}
-                                 ,{"localhost"}
-                                 ,{"noalocalhost", 9000}
+                .SetEndpoints({   {"asasdasd", 9000, ""}
+                                 ,{"localhost", 9000, ""}
+                                 ,{"noalocalhost", 9000, ""}
                                })
                 .SetUser(           getEnvOrDefault("CLICKHOUSE_USER",     "default"))
                 .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", ""))

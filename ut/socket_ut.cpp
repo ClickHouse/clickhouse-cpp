@@ -129,3 +129,110 @@ TEST(Socketcase, connecttimeout) {
 //    auto input = socket.makeInputStream();
 //    input->Read(buffer, sizeof(buffer));
 //}
+
+#if defined(_unix_)
+
+#include "unix_socket_server.h"
+#include <clickhouse/client.h>
+
+TEST(Socketcase, UnixSocketConnect) {
+    const std::string socket_path = "/tmp/test_clickhouse_cpp_unix_socket.sock";
+    LocalUnixSocketServer server(socket_path);
+    server.start();
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+    try {
+        // Test connection via NonSecureSocketFactory
+        ClientOptions opts;
+        opts.SetSocketPath(socket_path);
+        Endpoint endpoint;
+        endpoint.socket_path = socket_path;
+        
+        NonSecureSocketFactory factory;
+        auto socket_base = factory.connect(opts, endpoint);
+        EXPECT_NE(nullptr, socket_base);
+        SUCCEED();
+    } catch (const std::system_error& e) {
+        FAIL() << "Failed to connect to UNIX socket: " << e.what();
+    }
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    server.stop();
+}
+
+TEST(Socketcase, UnixSocketConnectError) {
+    const std::string socket_path = "/tmp/test_clickhouse_cpp_unix_socket_nonexistent.sock";
+    
+    try {
+        ClientOptions opts;
+        opts.SetSocketPath(socket_path);
+        opts.SetConnectionConnectTimeout(std::chrono::milliseconds(100));
+        Endpoint endpoint;
+        endpoint.socket_path = socket_path;
+        
+        NonSecureSocketFactory factory;
+        auto socket_base = factory.connect(opts, endpoint);
+        FAIL() << "Should have failed to connect to non-existent UNIX socket";
+    } catch (const std::system_error& e) {
+        // Expected to fail
+        EXPECT_TRUE(e.code().value() == ECONNREFUSED || e.code().value() == ENOENT);
+    }
+}
+
+TEST(Socketcase, UnixSocketPathTooLong) {
+    const std::string long_path(200, 'a'); // Longer than UNIX_PATH_MAX (typically 108)
+    
+    try {
+        ClientOptions opts;
+        opts.SetSocketPath(long_path);
+        Endpoint endpoint;
+        endpoint.socket_path = long_path;
+        
+        NonSecureSocketFactory factory;
+        auto socket_base = factory.connect(opts, endpoint);
+        FAIL() << "Should have failed with path too long error";
+    } catch (const std::system_error& e) {
+        EXPECT_EQ(EINVAL, e.code().value());
+    }
+}
+
+TEST(ClientUnixSocket, UnixSocketEndpoint) {
+    // This test requires a real ClickHouse server listening on a UNIX socket
+    // For now, we'll just test that the endpoint structure works correctly
+    Endpoint endpoint;
+    endpoint.host = "localhost";
+    endpoint.port = 9000;
+    endpoint.socket_path = "/tmp/test.sock";
+    
+    Endpoint endpoint2;
+    endpoint2.host = "localhost";
+    endpoint2.port = 9000;
+    endpoint2.socket_path = "/tmp/test.sock";
+    
+    EXPECT_EQ(endpoint, endpoint2);
+    
+    Endpoint endpoint3;
+    endpoint3.host = "localhost";
+    endpoint3.port = 9000;
+    endpoint3.socket_path = "/tmp/different.sock";
+    
+    EXPECT_FALSE(endpoint == endpoint3);
+}
+
+TEST(ClientUnixSocket, UnixSocketClientOptions) {
+    ClientOptions opts;
+    opts.SetSocketPath("/tmp/test.sock");
+    EXPECT_EQ("/tmp/test.sock", opts.socket_path);
+    
+    opts.SetHost("localhost");
+    opts.SetPort(9000);
+    opts.SetSocketPath("/tmp/test.sock");
+    
+    // socket_path should take precedence
+    EXPECT_EQ("/tmp/test.sock", opts.socket_path);
+    EXPECT_EQ("localhost", opts.host);
+    EXPECT_EQ(9000u, opts.port);
+}
+
+#endif // defined(_unix_)

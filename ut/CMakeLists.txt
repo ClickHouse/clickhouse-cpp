@@ -28,6 +28,11 @@ SET ( clickhouse-cpp-ut-src
     low_cardinality_nullable_tests.cpp
 )
 
+# Add UNIX socket server for Unix-like systems
+IF (NOT WIN32)
+    LIST (APPEND clickhouse-cpp-ut-src unix_socket_server.cpp)
+ENDIF ()
+
 IF (WITH_OPENSSL)
     LIST (APPEND clickhouse-cpp-ut-src ssl_ut.cpp)
 ENDIF ()
