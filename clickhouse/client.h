@@ -51,7 +51,7 @@ struct Endpoint {
     std::string host;
     uint16_t port = 9000;
     /// UNIX domain socket path. If set, this takes precedence over host/port.
-    std::string socket_path;
+    std::string socket_path = std::string();
     inline bool operator==(const Endpoint& right) const {
         return host == right.host && port == right.port && socket_path == right.socket_path;
     }

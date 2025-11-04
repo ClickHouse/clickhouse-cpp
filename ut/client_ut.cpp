@@ -1297,10 +1297,10 @@ INSTANTIATE_TEST_SUITE_P(ClientMultipleEndpoints, ConnectionSuccessTestCase,
     ::testing::Values(ClientCase::ParamType{
         ClientOptions()
             .SetEndpoints({
-                      {"somedeadhost", 9000, ""}
-                    , {"deadaginghost", 1245, ""}
-                    , {"localhost", 9000, ""}
-                    , {"noalocalhost", 6784, ""}
+                      {"somedeadhost", 9000}
+                    , {"deadaginghost", 1245}
+                    , {"localhost", 9000}
+                    , {"noalocalhost", 6784}
                 })
             .SetUser(           getEnvOrDefault("CLICKHOUSE_USER",     "default"))
             .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", ""))
@@ -1315,10 +1315,10 @@ INSTANTIATE_TEST_SUITE_P(ClientMultipleEndpointsWithDefaultPort, ConnectionSucce
     ::testing::Values(ClientCase::ParamType{
         ClientOptions()
             .SetEndpoints({
-                      {"somedeadhost", 9000, ""}
-                    , {"deadaginghost", 1245, ""}
-                    , {"localhost", 9000, ""}
-                    , {"noalocalhost", 6784, ""}
+                      {"somedeadhost", 9000}
+                    , {"deadaginghost", 1245}
+                    , {"localhost", 9000}
+                    , {"noalocalhost", 6784}
                 })
             .SetUser(           getEnvOrDefault("CLICKHOUSE_USER",     "default"))
             .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", ""))
@@ -1333,9 +1333,9 @@ INSTANTIATE_TEST_SUITE_P(MultipleEndpointsFailed, ConnectionFailedClientTest,
     ::testing::Values(ConnectionFailedClientTest::ParamType{
         ClientOptions()
             .SetEndpoints({
-                     {"deadaginghost", 9000, ""}
-                    ,{"somedeadhost",  1245, ""}
-                    ,{"noalocalhost",  6784, ""}
+                     {"deadaginghost", 9000}
+                    ,{"somedeadhost",  1245}
+                    ,{"noalocalhost",  6784}
                 })
             .SetUser(           getEnvOrDefault("CLICKHOUSE_USER",     "default"))
             .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", ""))
@@ -1401,10 +1401,10 @@ INSTANTIATE_TEST_SUITE_P(ResetConnectionClientTest, ResetConnectionTestCase,
     ::testing::Values(ResetConnectionTestCase::ParamType {
         ClientOptions()
             .SetEndpoints({
-                     {"localhost", 9000, ""}
-                    ,{"somedeadhost",  1245, ""}
-                    ,{"noalocalhost",  6784, ""}
-                    ,{"127.0.0.1", 9000, ""}
+                     {"localhost", 9000}
+                    ,{"somedeadhost",  1245}
+                    ,{"noalocalhost",  6784}
+                    ,{"127.0.0.1", 9000}
                 })
             .SetUser(           getEnvOrDefault("CLICKHOUSE_USER",     "default"))
             .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", ""))
@@ -1479,8 +1479,8 @@ TEST(SimpleClientTest, issue_335_reconnects_count) {
     std::unique_ptr<SocketFactory> socket_factory = std::make_unique<CountingSocketFactoryAdapter>(*wrapped_socket_factory, connect_requests);
 
     const std::vector<Endpoint> endpoints = {
-        Endpoint{"foo-invalid-hostname", 1234, ""},
-        Endpoint{"bar-invalid-hostname", 4567, ""},
+        Endpoint{"foo-invalid-hostname", 1234},
+        Endpoint{"bar-invalid-hostname", 4567},
     };
 
     EXPECT_ANY_THROW(
