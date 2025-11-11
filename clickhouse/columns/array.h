@@ -46,6 +46,15 @@ public:
         return GetAsColumn(n)->AsStrict<T>();
     }
 
+    /// Create a new, empty column of the same type as the array element.
+    ColumnRef NewColumn() const;
+
+    /// Shorthand to create a new column casted to a proper type.
+    template <typename T>
+    auto NewColumnAsType() const {
+        return NewColumn()->AsStrict<T>();
+    }
+
 public:
     /// Increase the capacity of the column for large block insertion.
     void Reserve(size_t new_cap) override;
