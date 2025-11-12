@@ -157,6 +157,47 @@ target_link_libraries(${PROJECT_NAME} PRIVATE clickhouse-cpp-lib)
 - run `rm -rf build && cmake -B build -S . && cmake --build build -j32` to remove remainders of the previous builds, run CMake and build the
   application. The generated binary is located in location `build/application-example`.
 
+## Batch Insertion
+
+In addition to the `Insert` method, which inserts all the data in a block in a
+single call, you can use the `BeginInsert` / `InsertData` / `EndInsert`
+pattern to insert batches of data. This can be useful for managing larger data
+sets without inflating memory with the entire set.
+
+To use it pass `BeginInsert` an `INSERT` statement ending in `VALUES` but with
+no actual values. Use the resulting `Block` to append batches of data, sending
+each to the sever with `InsertData`. Finally, call `EndInsert` (or let the
+client go out of scope) to signal the server that insertion is complete.
+Example:
+
+```cpp
+// Start the insertion.
+auto block = client->BeginInsert("INSERT INTO foo (id, name) VALUES");
+
+// Grab the columns from the block.
+auto col1 = block[0]->As<ColumnUInt64>();
+auto col2 = block[1]->As<ColumnString>();
+
+// Add a couple of records to the block.
+col1.Append(1);
+col1.Append(2);
+col2.Append("holden");
+col2.Append("naomi");
+
+// Send those records.
+block.RefreshRowCount();
+client->InsertData(block);
+block.Clear();
+
+// Add another record.
+col1.Append(3);
+col2.Append("amos");
+
+// Send it and finish.
+block.RefreshRowCount();
+client->EndInsert(block);
+```
+
 ## Thread-safety
 ⚠ Please note that `Client` instance is NOT thread-safe. I.e. you must create a separate `Client` for each thread or utilize some synchronization techniques. ⚠
 

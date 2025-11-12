@@ -358,6 +358,97 @@ TEST_P(ClientCase, Generic) {
     EXPECT_EQ(sizeof(TEST_DATA)/sizeof(TEST_DATA[0]), row);
 }
 
+TEST_P(ClientCase, InsertData) {
+    client_->Execute(
+            "CREATE TEMPORARY TABLE IF NOT EXISTS test_clickhouse_cpp_insert (id UInt64, name String, f Bool)");
+
+    const struct {
+        uint64_t id;
+        std::string name;
+        bool f;
+    } TEST_DATA[] = {
+        { 1, "id", true },
+        { 3, "foo", false },
+        { 5, "bar", true },
+        { 7, "name", false },
+    };
+
+    const struct {
+        uint64_t id;
+        std::string name;
+        bool f;
+    } TEST_DATA2[] = {
+        { 2, "holden", true },
+        { 4, "naomi", false },
+        { 6, "amos", true },
+        { 8, "alex", false },
+    };
+
+    /// Insert some values.
+    {
+        // Prepare the insert.
+        auto block = client_->BeginInsert("INSERT INTO test_clickhouse_cpp_insert VALUES");
+        EXPECT_EQ(size_t(3), block.GetColumnCount());
+
+        // Fetch the derived columns.
+        auto id = block[0]->As<ColumnUInt64>();
+        auto name = block[1]->As<ColumnString>();
+        auto f = block[2]->As<ColumnUInt8>();
+
+        // Insert some values.
+        for (auto const& td : TEST_DATA) {
+            id->Append(td.id);
+            name->Append(td.name);
+            f->Append(td.f);
+        }
+        block.RefreshRowCount();
+        client_->InsertData(block);
+        block.Clear();
+
+        // Insert some more values.
+        for (auto const& td : TEST_DATA2) {
+            id->Append(td.id);
+            name->Append(td.name);
+            f->Append(td.f);
+        }
+        block.RefreshRowCount();
+        client_->InsertData(block);
+        block.Clear();
+        client_->EndInsert();
+        // Second call to EndInsert should be no-op.
+        client_->EndInsert();
+    }
+
+    /// Select values inserted in the previous steps.
+    size_t row = 0;
+    client_->Select("SELECT id, name, f FROM test_clickhouse_cpp_insert", [TEST_DATA, TEST_DATA2, &row](const Block& block)
+        {
+            if (block.GetRowCount() == 0) {
+                return;
+            }
+            EXPECT_EQ("id", block.GetColumnName(0));
+            EXPECT_EQ("name", block.GetColumnName(1));
+            size_t block_two_row_num = sizeof(TEST_DATA)/sizeof(TEST_DATA[0]);
+
+            if (row < block_two_row_num) {
+                for (size_t c = 0; c < block.GetRowCount(); ++c, ++row) {
+                    EXPECT_EQ(TEST_DATA[row].id, (*block[0]->As<ColumnUInt64>())[c]);
+                    EXPECT_EQ(TEST_DATA[row].name, (*block[1]->As<ColumnString>())[c]);
+                    EXPECT_EQ(TEST_DATA[row].f, (*block[2]->As<ColumnUInt8>())[c]);
+                }
+            } else {
+                for (size_t c = 0; c < block.GetRowCount(); ++c, ++row) {
+                    EXPECT_EQ(TEST_DATA2[row-block_two_row_num].id, (*block[0]->As<ColumnUInt64>())[c]);
+                    EXPECT_EQ(TEST_DATA2[row-block_two_row_num].name, (*block[1]->As<ColumnString>())[c]);
+                    EXPECT_EQ(TEST_DATA2[row-block_two_row_num].f, (*block[2]->As<ColumnUInt8>())[c]);
+                }
+            }
+        }
+    );
+    auto exp = sizeof(TEST_DATA)/sizeof(TEST_DATA[0]) + sizeof(TEST_DATA2)/sizeof(TEST_DATA2[0]);
+    EXPECT_EQ(exp, row);
+}
+
 TEST_P(ClientCase, Nullable) {
     /// Create a table.
     client_->Execute(
@@ -949,7 +1040,7 @@ TEST_P(ClientCase, Query_ID) {
     EXPECT_EQ(5u, total_count);
 }
 
-// Spontaneosly fails on INSERTint data.
+// Spontaneously fails on INSERT int data.
 TEST_P(ClientCase, DISABLED_ArrayArrayUInt64) {
     // Based on https://github.com/ClickHouse/clickhouse-cpp/issues/43
     std::cerr << "Connected to: " << client_->GetServerInfo() << std::endl;
