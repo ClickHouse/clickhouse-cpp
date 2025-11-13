@@ -161,6 +161,12 @@ public:
 
     void Insert(const std::string& table_name, const std::string& query_id, const Block& block);
 
+    Block BeginInsert(Query query);
+
+    void InsertData(const Block& block);
+
+    void EndInsert();
+
     void Ping();
 
     void ResetConnection();
@@ -175,6 +181,7 @@ private:
     bool Handshake();
 
     bool ReceivePacket(uint64_t* server_packet = nullptr);
+    bool ReceivePreparePackets(uint64_t* server_packet = nullptr);
 
     void SendQuery(const Query& query, bool finalize = true);
     void FinalizeQuery();
@@ -208,6 +215,7 @@ private:
     }
 
 private:
+    bool inserting;
     /// In case of network errors tries to reconnect to server and
     /// call fuc several times.
     void RetryGuard(std::function<void()> func);
@@ -280,10 +288,15 @@ Client::Impl::Impl(const ClientOptions& opts,
     }
 }
 
-Client::Impl::~Impl()
-{ }
+Client::Impl::~Impl() {
+    // Wrap up an insert if one is in progress.
+    EndInsert();
+}
 
 void Client::Impl::ExecuteQuery(Query query) {
+    if (inserting) {
+        throw ProtocolError("cannot execute query while inserting");
+    }
     EnsureNull en(static_cast<QueryEvents*>(&query), &events_);
 
     if (options_.ping_before_query) {
@@ -299,6 +312,9 @@ void Client::Impl::ExecuteQuery(Query query) {
 
 
 void Client::Impl::SelectWithExternalData(Query query, const ExternalTables& external_tables) {
+    if (inserting) {
+        throw ProtocolError("cannot execute query while inserting");
+    }
     if (server_info_.revision < DBMS_MIN_REVISION_WITH_TEMPORARY_TABLES) {
        throw UnimplementedError("This version of ClickHouse server doesn't support temporary tables");
     }
@@ -362,6 +378,9 @@ std::string NameToQueryString(const std::string &input)
 }
 
 void Client::Impl::Insert(const std::string& table_name, const std::string& query_id, const Block& block) {
+    if (inserting) {
+        throw ProtocolError("cannot execute query while inserting");
+    }
     if (options_.ping_before_query) {
         RetryGuard([this]() { Ping(); });
     }
@@ -397,10 +416,24 @@ void Client::Impl::Insert(const std::string& table_name, const std::string& quer
     }
 
     // Send data.
+    inserting = true;
     SendData(block);
-    // Send empty block as marker of
-    // end of data.
+    EndInsert();
+}
+
+void Client::Impl::InsertData(const Block& block) {
+    if (!inserting) {
+        throw ProtocolError("illegal call to InsertData without first calling BeginInsert");
+    }
+    SendData(block);
+}
+
+void Client::Impl::EndInsert() {
+    if (!inserting) return;
+
+    // Send empty block as marker of end of data.
     SendData(Block());
+    inserting = false;
 
     // Wait for EOS.
     uint64_t eos_packet{0};
@@ -416,6 +449,9 @@ void Client::Impl::Insert(const std::string& table_name, const std::string& quer
 }
 
 void Client::Impl::Ping() {
+    if (inserting) {
+        throw ProtocolError("cannot execute query while inserting");
+    }
     WireFormat::WriteUInt64(*output_, ClientCodes::Ping);
     output_->Flush();
 
@@ -429,6 +465,7 @@ void Client::Impl::Ping() {
 
 void Client::Impl::ResetConnection() {
     InitializeStreams(socket_factory_->connect(options_, current_endpoint_.value()));
+    inserting = false;
 
     if (!Handshake()) {
         throw ProtocolError("fail to connect to " + options_.host);
@@ -645,6 +682,78 @@ bool Client::Impl::ReceivePacket(uint64_t* server_packet) {
     default:
         throw UnimplementedError("unimplemented " + std::to_string((int)packet_type));
         break;
+    }
+}
+
+bool Client::Impl::ReceivePreparePackets(uint64_t* server_packet) {
+    uint64_t packet_type = 0;
+
+    while (true) {
+        if (!WireFormat::ReadVarint64(*input_, &packet_type)) {
+            throw std::runtime_error("unexpected package type " +
+                    std::to_string((int)packet_type) + " for insert query");
+        }
+        if (server_packet) {
+            *server_packet = packet_type;
+        }
+
+        switch (packet_type) {
+        case ServerCodes::Data: {
+            if (!ReceiveData()) {
+                throw ProtocolError("can't read data packet from input stream");
+            }
+            return true;
+        }
+
+        case ServerCodes::Exception: {
+            ReceiveException();
+            return false;
+        }
+
+        case ServerCodes::ProfileInfo:
+        case ServerCodes::Progress:
+        case ServerCodes::Pong:
+        case ServerCodes::Hello:
+            continue;
+
+        case ServerCodes::Log: {
+            // log tag
+            if (!WireFormat::SkipString(*input_)) {
+                return false;
+            }
+            Block block;
+
+            // Use uncompressed stream since log blocks usually contain only one row
+            if (!ReadBlock(*input_, &block)) {
+                return false;
+            }
+
+            if (events_) {
+                events_->OnServerLog(block);
+            }
+            continue;
+        }
+
+        case ServerCodes::TableColumns: {
+            // external table name
+            if (!WireFormat::SkipString(*input_)) {
+                return false;
+            }
+
+            //  columns metadata
+            if (!WireFormat::SkipString(*input_)) {
+                return false;
+            }
+            continue;
+        }
+
+        // No others expected.
+        case ServerCodes::EndOfStream:
+        case ServerCodes::ProfileEvents:
+        default:
+            throw UnimplementedError("unimplemented " + std::to_string((int)packet_type));
+            break;
+        }
     }
 }
 
@@ -923,7 +1032,6 @@ void Client::Impl::FinalizeQuery() {
     output_->Flush();
 }
 
-
 void Client::Impl::WriteBlock(const Block& block, OutputStream& output) {
     // Additional information about block.
     if (server_info_.revision >= DBMS_MIN_REVISION_WITH_BLOCK_INFO) {
@@ -1063,7 +1171,7 @@ void Client::Impl::RetryGuard(std::function<void()> func) {
             }
         }
     }
-    // Connectiong with current_endpoint_ are broken.
+    // Connections with current_endpoint_ are broken.
     // Trying to establish  with the another one from the list.
     size_t connection_attempts_count = GetConnectionAttempts();
     for (size_t i = 0; i < connection_attempts_count;)
@@ -1083,6 +1191,34 @@ void Client::Impl::RetryGuard(std::function<void()> func) {
             }
         }
     }
+}
+
+Block Client::Impl::BeginInsert(Query query) {
+    if (inserting) {
+        throw ProtocolError("cannot execute query while inserting");
+    }
+    EnsureNull en(static_cast<QueryEvents*>(&query), &events_);
+
+    if (options_.ping_before_query) {
+        RetryGuard([this]() { Ping(); });
+    }
+
+    // Create a callback to extract the block with the proper query columns.
+    Block block;
+    query.OnData([&block](const Block& b) {
+        block = std::move(b);
+        return true;
+    });
+
+    SendQuery(query.GetText());
+
+    // Receive data packet but keep the query/connection open.
+    if (!ReceivePreparePackets()) {
+       throw std::runtime_error("fail to receive data packet");
+    }
+
+    inserting = true;
+    return block;
 }
 
 Client::Client(const ClientOptions& opts)
@@ -1147,6 +1283,27 @@ void Client::Insert(const std::string& table_name, const Block& block) {
 
 void Client::Insert(const std::string& table_name, const std::string& query_id, const Block& block) {
     impl_->Insert(table_name, query_id, block);
+}
+
+Block Client::BeginInsert(const std::string& query) {
+    return impl_->BeginInsert(Query(query));
+}
+
+Block Client::BeginInsert(const std::string& query, const std::string& query_id) {
+    return impl_->BeginInsert(Query(query, query_id));
+}
+
+void Client::InsertData(const Block& block) {
+    impl_->InsertData(block);
+}
+
+void Client::EndInsert(const Block& block) {
+    impl_->InsertData(block);
+    impl_->EndInsert();
+}
+
+void Client::EndInsert() {
+    impl_->EndInsert();
 }
 
 void Client::Ping() {
