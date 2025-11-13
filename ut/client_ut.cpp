@@ -402,7 +402,7 @@ TEST_P(ClientCase, InsertData) {
             f->Append(td.f);
         }
         block.RefreshRowCount();
-        client_->InsertData(block);
+        client_->SendInsertBlock(block);
         block.Clear();
 
         // Insert some more values.
@@ -412,7 +412,7 @@ TEST_P(ClientCase, InsertData) {
             f->Append(td.f);
         }
         block.RefreshRowCount();
-        client_->InsertData(block);
+        client_->SendInsertBlock(block);
         block.Clear();
         client_->EndInsert();
         // Second call to EndInsert should be no-op.

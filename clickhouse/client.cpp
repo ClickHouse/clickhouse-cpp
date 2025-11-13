@@ -163,7 +163,7 @@ public:
 
     Block BeginInsert(Query query);
 
-    void InsertData(const Block& block);
+    void SendInsertBlock(const Block& block);
 
     void EndInsert();
 
@@ -181,7 +181,6 @@ private:
     bool Handshake();
 
     bool ReceivePacket(uint64_t* server_packet = nullptr);
-    bool ReceivePreparePackets(uint64_t* server_packet = nullptr);
 
     void SendQuery(const Query& query, bool finalize = true);
     void FinalizeQuery();
@@ -215,7 +214,6 @@ private:
     }
 
 private:
-    bool inserting;
     /// In case of network errors tries to reconnect to server and
     /// call fuc several times.
     void RetryGuard(std::function<void()> func);
@@ -259,6 +257,8 @@ private:
     std::optional<Endpoint> current_endpoint_;
 
     ServerInfo server_info_;
+
+    bool inserting_;
 };
 
 ClientOptions modifyClientOptions(ClientOptions opts)
@@ -294,9 +294,10 @@ Client::Impl::~Impl() {
 }
 
 void Client::Impl::ExecuteQuery(Query query) {
-    if (inserting) {
-        throw ProtocolError("cannot execute query while inserting");
+    if (inserting_) {
+        throw ValidationError("cannot execute query while inserting");
     }
+
     EnsureNull en(static_cast<QueryEvents*>(&query), &events_);
 
     if (options_.ping_before_query) {
@@ -312,9 +313,10 @@ void Client::Impl::ExecuteQuery(Query query) {
 
 
 void Client::Impl::SelectWithExternalData(Query query, const ExternalTables& external_tables) {
-    if (inserting) {
-        throw ProtocolError("cannot execute query while inserting");
+    if (inserting_) {
+        throw ValidationError("cannot execute query while inserting");
     }
+
     if (server_info_.revision < DBMS_MIN_REVISION_WITH_TEMPORARY_TABLES) {
        throw UnimplementedError("This version of ClickHouse server doesn't support temporary tables");
     }
@@ -378,15 +380,18 @@ std::string NameToQueryString(const std::string &input)
 }
 
 void Client::Impl::Insert(const std::string& table_name, const std::string& query_id, const Block& block) {
-    if (inserting) {
-        throw ProtocolError("cannot execute query while inserting");
+    if (inserting_) {
+        throw ValidationError("cannot execute query while inserting, use SendInsertData instead");
     }
+
     if (options_.ping_before_query) {
         RetryGuard([this]() { Ping(); });
     }
 
+    inserting_ = true;
+
     std::stringstream fields_section;
-        const auto num_columns = block.GetColumnCount();
+    const auto num_columns = block.GetColumnCount();
 
     for (unsigned int i = 0; i < num_columns; ++i) {
         if (i == num_columns - 1) {
@@ -399,41 +404,34 @@ void Client::Impl::Insert(const std::string& table_name, const std::string& quer
     Query query("INSERT INTO " + table_name + " ( " + fields_section.str() + " ) VALUES", query_id);
     SendQuery(query);
 
-    uint64_t server_packet;
-    // Receive data packet.
-    while (true) {
-        bool ret = ReceivePacket(&server_packet);
-
-        if (!ret) {
-            throw ProtocolError("fail to receive data packet");
-        }
+    // Wait for a data packet and return
+    uint64_t server_packet = 0;
+    while (ReceivePacket(&server_packet)) {
         if (server_packet == ServerCodes::Data) {
-            break;
-        }
-        if (server_packet == ServerCodes::Progress) {
-            continue;
+            SendData(block);
+            EndInsert();
+            return;
         }
     }
 
-    // Send data.
-    inserting = true;
-    SendData(block);
-    EndInsert();
+    throw ProtocolError("fail to receive data packet");
 }
 
-void Client::Impl::InsertData(const Block& block) {
-    if (!inserting) {
-        throw ProtocolError("illegal call to InsertData without first calling BeginInsert");
+void Client::Impl::SendInsertBlock(const Block& block) {
+    if (!inserting_) {
+        throw ValidationError("illegal call to InsertData without first calling BeginInsert");
     }
+
     SendData(block);
 }
 
 void Client::Impl::EndInsert() {
-    if (!inserting) return;
+    if (!inserting_) {
+        return;
+    }
 
     // Send empty block as marker of end of data.
     SendData(Block());
-    inserting = false;
 
     // Wait for EOS.
     uint64_t eos_packet{0};
@@ -446,12 +444,14 @@ void Client::Impl::EndInsert() {
         throw ProtocolError(std::string{"unexpected packet from server while receiving end of query, expected (expected Exception, EndOfStream or Log, got: "}
                             + (eos_packet ? std::to_string(eos_packet) : "nothing") + ")");
     }
+    inserting_ = false;
 }
 
 void Client::Impl::Ping() {
-    if (inserting) {
-        throw ProtocolError("cannot execute query while inserting");
+    if (inserting_) {
+        throw ValidationError("cannot execute query while inserting");
     }
+
     WireFormat::WriteUInt64(*output_, ClientCodes::Ping);
     output_->Flush();
 
@@ -465,7 +465,7 @@ void Client::Impl::Ping() {
 
 void Client::Impl::ResetConnection() {
     InitializeStreams(socket_factory_->connect(options_, current_endpoint_.value()));
-    inserting = false;
+    inserting_ = false;
 
     if (!Handshake()) {
         throw ProtocolError("fail to connect to " + options_.host);
@@ -682,78 +682,6 @@ bool Client::Impl::ReceivePacket(uint64_t* server_packet) {
     default:
         throw UnimplementedError("unimplemented " + std::to_string((int)packet_type));
         break;
-    }
-}
-
-bool Client::Impl::ReceivePreparePackets(uint64_t* server_packet) {
-    uint64_t packet_type = 0;
-
-    while (true) {
-        if (!WireFormat::ReadVarint64(*input_, &packet_type)) {
-            throw std::runtime_error("unexpected package type " +
-                    std::to_string((int)packet_type) + " for insert query");
-        }
-        if (server_packet) {
-            *server_packet = packet_type;
-        }
-
-        switch (packet_type) {
-        case ServerCodes::Data: {
-            if (!ReceiveData()) {
-                throw ProtocolError("can't read data packet from input stream");
-            }
-            return true;
-        }
-
-        case ServerCodes::Exception: {
-            ReceiveException();
-            return false;
-        }
-
-        case ServerCodes::ProfileInfo:
-        case ServerCodes::Progress:
-        case ServerCodes::Pong:
-        case ServerCodes::Hello:
-            continue;
-
-        case ServerCodes::Log: {
-            // log tag
-            if (!WireFormat::SkipString(*input_)) {
-                return false;
-            }
-            Block block;
-
-            // Use uncompressed stream since log blocks usually contain only one row
-            if (!ReadBlock(*input_, &block)) {
-                return false;
-            }
-
-            if (events_) {
-                events_->OnServerLog(block);
-            }
-            continue;
-        }
-
-        case ServerCodes::TableColumns: {
-            // external table name
-            if (!WireFormat::SkipString(*input_)) {
-                return false;
-            }
-
-            //  columns metadata
-            if (!WireFormat::SkipString(*input_)) {
-                return false;
-            }
-            continue;
-        }
-
-        // No others expected.
-        case ServerCodes::EndOfStream:
-        case ServerCodes::ProfileEvents:
-        default:
-            throw UnimplementedError("unimplemented " + std::to_string((int)packet_type));
-            break;
-        }
     }
 }
 
@@ -1194,14 +1122,17 @@ void Client::Impl::RetryGuard(std::function<void()> func) {
 }
 
 Block Client::Impl::BeginInsert(Query query) {
-    if (inserting) {
-        throw ProtocolError("cannot execute query while inserting");
+    if (inserting_) {
+        throw ValidationError("cannot execute query while inserting");
     }
+
     EnsureNull en(static_cast<QueryEvents*>(&query), &events_);
 
     if (options_.ping_before_query) {
         RetryGuard([this]() { Ping(); });
     }
+
+    inserting_ = true;
 
     // Create a callback to extract the block with the proper query columns.
     Block block;
@@ -1212,13 +1143,15 @@ Block Client::Impl::BeginInsert(Query query) {
 
     SendQuery(query.GetText());
 
-    // Receive data packet but keep the query/connection open.
-    if (!ReceivePreparePackets()) {
-       throw std::runtime_error("fail to receive data packet");
+    // Wait for a data packet and return
+    uint64_t server_packet = 0;
+    while (ReceivePacket(&server_packet)) {
+        if (server_packet == ServerCodes::Data) {
+            return block;
+        }
     }
 
-    inserting = true;
-    return block;
+    throw ProtocolError("fail to receive data packet");
 }
 
 Client::Client(const ClientOptions& opts)
@@ -1293,13 +1226,8 @@ Block Client::BeginInsert(const std::string& query, const std::string& query_id)
     return impl_->BeginInsert(Query(query, query_id));
 }
 
-void Client::InsertData(const Block& block) {
-    impl_->InsertData(block);
-}
-
-void Client::EndInsert(const Block& block) {
-    impl_->InsertData(block);
-    impl_->EndInsert();
+void Client::SendInsertBlock(const Block& block) {
+    impl_->SendInsertBlock(block);
 }
 
 void Client::EndInsert() {
