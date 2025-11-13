@@ -278,11 +278,10 @@ public:
     Block BeginInsert(const std::string& query, const std::string& query_id);
 
     /// Insert data using a \p block returned by \p BeginInsert.
-    void InsertData(const Block& block);
+    void SendInsertBlock(const Block& block);
 
     /// End an \p INSERT session started by \p BeginInsert.
     void EndInsert();
-    void EndInsert(const Block& block);
 
     /// Ping server for aliveness.
     void Ping();
