@@ -417,6 +417,39 @@ void Client::Impl::Insert(const std::string& table_name, const std::string& quer
     throw ProtocolError("fail to receive data packet");
 }
 
+Block Client::Impl::BeginInsert(Query query) {
+    if (inserting_) {
+        throw ValidationError("cannot execute query while inserting");
+    }
+
+    EnsureNull en(static_cast<QueryEvents*>(&query), &events_);
+
+    if (options_.ping_before_query) {
+        RetryGuard([this]() { Ping(); });
+    }
+
+    inserting_ = true;
+
+    // Create a callback to extract the block with the proper query columns.
+    Block block;
+    query.OnData([&block](const Block& b) {
+        block = std::move(b);
+        return true;
+    });
+
+    SendQuery(query.GetText());
+
+    // Wait for a data packet and return
+    uint64_t server_packet = 0;
+    while (ReceivePacket(&server_packet)) {
+        if (server_packet == ServerCodes::Data) {
+            return block;
+        }
+    }
+
+    throw ProtocolError("fail to receive data packet");
+}
+
 void Client::Impl::SendInsertBlock(const Block& block) {
     if (!inserting_) {
         throw ValidationError("illegal call to InsertData without first calling BeginInsert");
@@ -1119,39 +1152,6 @@ void Client::Impl::RetryGuard(std::function<void()> func) {
             }
         }
     }
-}
-
-Block Client::Impl::BeginInsert(Query query) {
-    if (inserting_) {
-        throw ValidationError("cannot execute query while inserting");
-    }
-
-    EnsureNull en(static_cast<QueryEvents*>(&query), &events_);
-
-    if (options_.ping_before_query) {
-        RetryGuard([this]() { Ping(); });
-    }
-
-    inserting_ = true;
-
-    // Create a callback to extract the block with the proper query columns.
-    Block block;
-    query.OnData([&block](const Block& b) {
-        block = std::move(b);
-        return true;
-    });
-
-    SendQuery(query.GetText());
-
-    // Wait for a data packet and return
-    uint64_t server_packet = 0;
-    while (ReceivePacket(&server_packet)) {
-        if (server_packet == ServerCodes::Data) {
-            return block;
-        }
-    }
-
-    throw ProtocolError("fail to receive data packet");
 }
 
 Client::Client(const ClientOptions& opts)
