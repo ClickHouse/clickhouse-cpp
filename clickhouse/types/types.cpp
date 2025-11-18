@@ -20,6 +20,7 @@ const char* Type::TypeName(Type::Code code) {
         case Type::Code::Int16:          return "Int16";
         case Type::Code::Int32:          return "Int32";
         case Type::Code::Int64:          return "Int64";
+        case Type::Code::Bool:           return "Bool";
         case Type::Code::UInt8:          return "UInt8";
         case Type::Code::UInt16:         return "UInt16";
         case Type::Code::UInt32:         return "UInt32";
@@ -65,6 +66,7 @@ std::string Type::GetName() const {
         case Int32:
         case Int64:
         case Int128:
+        case Bool:
         case UInt8:
         case UInt16:
         case UInt32:
@@ -124,6 +126,7 @@ uint64_t Type::GetTypeUniqueId() const {
         case Int32:
         case Int64:
         case Int128:
+        case Bool:
         case UInt8:
         case UInt16:
         case UInt32:
