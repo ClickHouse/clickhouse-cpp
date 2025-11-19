@@ -32,6 +32,7 @@ std::vector<uint32_t> MakeNumbers();
 std::vector<uint8_t> MakeBools();
 std::vector<std::string> MakeFixedStrings(size_t string_size);
 std::vector<std::string> MakeStrings();
+std::vector<std::string> MakeJSONStrings();
 std::vector<clickhouse::Int64> MakeDateTime64s(size_t scale, size_t values_size = 200);
 std::vector<int32_t> MakeDates32();
 std::vector<clickhouse::Int64> MakeDateTimes();

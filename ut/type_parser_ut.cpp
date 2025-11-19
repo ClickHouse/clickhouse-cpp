@@ -24,6 +24,15 @@ TEST(TypeParserCase, ParseFixedString) {
     ASSERT_EQ(ast.elements.front().value, 24U);
 }
 
+TEST(TypeParserCase, ParseJSON) {
+    TypeAst ast;
+    TypeParser("JSON").Parse(&ast);
+
+    ASSERT_EQ(ast.meta, TypeAst::Terminal);
+    ASSERT_EQ(ast.name, "JSON");
+    ASSERT_EQ(ast.code, Type::JSON);
+}
+
 TEST(TypeParserCase, ParseArray) {
     TypeAst ast;
     TypeParser("Array(Int32)").Parse(&ast);

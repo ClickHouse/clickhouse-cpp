@@ -86,6 +86,8 @@ static ColumnRef CreateTerminalColumn(const TypeAst& ast) {
 
     case Type::String:
         return std::make_shared<ColumnString>();
+    case Type::JSON:
+        return std::make_shared<ColumnJSON>();
     case Type::FixedString:
         return std::make_shared<ColumnFixedString>(GetASTChildElement(ast, 0).value);
 
@@ -201,6 +203,8 @@ static ColumnRef CreateColumnFromAst(const TypeAst& ast, CreateColumnByTypeSetti
                     // TODO (nemkov): update this to maximize code reuse.
                     case Type::String:
                         return std::make_shared<LowCardinalitySerializationAdaptor<ColumnString>>();
+                    case Type::JSON:
+                        return std::make_shared<LowCardinalitySerializationAdaptor<ColumnJSON>>();
                     case Type::FixedString:
                         return std::make_shared<LowCardinalitySerializationAdaptor<ColumnFixedString>>(GetASTChildElement(nested, 0).value);
                     case Type::Nullable:
@@ -214,6 +218,8 @@ static ColumnRef CreateColumnFromAst(const TypeAst& ast, CreateColumnByTypeSetti
                     // TODO (nemkov): update this to maximize code reuse.
                     case Type::String:
                         return std::make_shared<ColumnLowCardinalityT<ColumnString>>();
+                    case Type::JSON:
+                        return std::make_shared<ColumnLowCardinalityT<ColumnJSON>>();
                     case Type::FixedString:
                         return std::make_shared<ColumnLowCardinalityT<ColumnFixedString>>(GetASTChildElement(nested, 0).value);
                     case Type::Nullable:
