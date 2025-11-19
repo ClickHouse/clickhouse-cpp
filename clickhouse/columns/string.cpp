@@ -330,4 +330,215 @@ ItemView ColumnString::GetItem(size_t index) const {
     return ItemView{Type::String, this->At(index)};
 }
 
+struct ColumnJSON::Block
+{
+    using CharT = typename std::string::value_type;
+
+    explicit Block(size_t starting_capacity)
+        : size(0),
+        capacity(starting_capacity),
+        data_(new CharT[capacity])
+    {}
+
+    inline auto GetAvailable() const {
+        return capacity - size;
+    }
+
+    std::string_view AppendUnsafe(std::string_view str) {
+        const auto pos = &data_[size];
+
+        memcpy(pos, str.data(), str.size());
+        size += str.size();
+
+        return std::string_view(pos, str.size());
+    }
+
+    auto GetCurrentWritePos() {
+        return &data_[size];
+    }
+
+    std::string_view ConsumeTailAsJSONViewUnsafe(size_t len) {
+        const auto start = &data_[size];
+        size += len;
+        return std::string_view(start, len);
+    }
+
+    size_t size;
+    const size_t capacity;
+    std::unique_ptr<CharT[]> data_;
+};
+
+ColumnJSON::ColumnJSON()
+    : Column(Type::CreateJSON())
+{
+}
+
+ColumnJSON::ColumnJSON(size_t element_count)
+    : Column(Type::CreateJSON())
+{
+    items_.reserve(element_count);
+    // 16 is arbitrary number, assumption that string values are about ~256 bytes long.
+    blocks_.reserve(std::max<size_t>(1, element_count / 16));
+}
+
+ColumnJSON::ColumnJSON(const std::vector<std::string>& data)
+    : ColumnJSON()
+{
+    items_.reserve(data.size());
+    blocks_.emplace_back(ComputeTotalSize(data));
+
+    for (const auto & s : data) {
+        AppendUnsafe(s);
+    }
+}
+
+ColumnJSON::ColumnJSON(std::vector<std::string>&& data)
+    : ColumnJSON()
+{
+    items_.reserve(data.size());
+
+    for (auto&& d : data) {
+        append_data_.emplace_back(std::move(d));
+        auto& last_data = append_data_.back();
+        items_.emplace_back(std::string_view{ last_data.data(),last_data.length() });
+    }
+}
+
+ColumnJSON::~ColumnJSON()
+{}
+
+void ColumnJSON::Reserve(size_t new_cap) {
+    items_.reserve(new_cap);
+    // 16 is arbitrary number, assumption that string values are about ~256 bytes long.
+    blocks_.reserve(std::max<size_t>(1, new_cap / 16));
+}
+
+void ColumnJSON::Append(std::string_view str) {
+    if (blocks_.size() == 0 || blocks_.back().GetAvailable() < str.length()) {
+        blocks_.emplace_back(std::max(DEFAULT_BLOCK_SIZE, str.size()));
+    }
+
+    items_.emplace_back(blocks_.back().AppendUnsafe(str));
+}
+
+void ColumnJSON::Append(const char* str) {
+    Append(std::string_view(str, strlen(str)));
+}
+
+void ColumnJSON::Append(std::string&& steal_value) {
+    append_data_.emplace_back(std::move(steal_value));
+    auto& last_data = append_data_.back();
+    items_.emplace_back(std::string_view{ last_data.data(),last_data.length() });
+}
+
+void ColumnJSON::AppendNoManagedLifetime(std::string_view str) {
+    items_.emplace_back(str);
+}
+
+void ColumnJSON::AppendUnsafe(std::string_view str) {
+    items_.emplace_back(blocks_.back().AppendUnsafe(str));
+}
+
+void ColumnJSON::Clear() {
+    items_.clear();
+    blocks_.clear();
+    append_data_.clear();
+}
+
+std::string_view ColumnJSON::At(size_t n) const {
+    return items_.at(n);
+}
+
+void ColumnJSON::Append(ColumnRef column) {
+    if (auto col = column->As<ColumnJSON>()) {
+        const auto total_size = ComputeTotalSize(col->items_);
+
+        // TODO: fill up existing block with some items and then add a new one for the rest of items
+        if (blocks_.size() == 0 || blocks_.back().GetAvailable() < total_size)
+            blocks_.emplace_back(std::max(DEFAULT_BLOCK_SIZE, total_size));
+
+        // Intentionally not doing items_.reserve() since that cripples performance.
+        for (size_t i = 0; i < column->Size(); ++i) {
+            this->AppendUnsafe((*col)[i]);
+        }
+    }
+}
+
+bool ColumnJSON::LoadBody(InputStream* input, size_t rows) {
+    if (rows == 0) {
+        items_.clear();
+        blocks_.clear();
+
+        return true;
+    }
+
+    decltype(items_) new_items;
+    decltype(blocks_) new_blocks;
+
+    new_items.reserve(rows);
+
+    // Suboptimzal if the first row string is >DEFAULT_BLOCK_SIZE, but that must be a very rare case.
+    Block * block = &new_blocks.emplace_back(DEFAULT_BLOCK_SIZE);
+
+    for (size_t i = 0; i < rows; ++i) {
+        uint64_t len;
+        if (!WireFormat::ReadUInt64(*input, &len))
+            return false;
+
+        if (len > block->GetAvailable())
+            block = &new_blocks.emplace_back(std::max<size_t>(DEFAULT_BLOCK_SIZE, len));
+
+        if (!WireFormat::ReadBytes(*input, block->GetCurrentWritePos(), len))
+            return false;
+
+        new_items.emplace_back(block->ConsumeTailAsJSONViewUnsafe(len));
+    }
+
+    items_.swap(new_items);
+    blocks_.swap(new_blocks);
+
+    return true;
+}
+
+void ColumnJSON::SaveBody(OutputStream* output) {
+    for (const auto & item : items_) {
+        WireFormat::WriteString(*output, item);
+    }
+}
+
+size_t ColumnJSON::Size() const {
+    return items_.size();
+}
+
+ColumnRef ColumnJSON::Slice(size_t begin, size_t len) const {
+    auto result = std::make_shared<ColumnJSON>();
+
+    if (begin < items_.size()) {
+        len = std::min(len, items_.size() - begin);
+        result->items_.reserve(len);
+
+        result->blocks_.emplace_back(ComputeTotalSize(items_, begin, len));
+        for (size_t i = begin; i < begin + len; ++i) {
+            result->Append(items_[i]);
+        }
+    }
+
+    return result;
+}
+
+ColumnRef ColumnJSON::CloneEmpty() const {
+    return std::make_shared<ColumnJSON>();
+}
+
+void ColumnJSON::Swap(Column& other) {
+    auto & col = dynamic_cast<ColumnJSON &>(other);
+    items_.swap(col.items_);
+    blocks_.swap(col.blocks_);
+    append_data_.swap(col.append_data_);
+}
+
+ItemView ColumnJSON::GetItem(size_t index) const {
+    return ItemView{Type::JSON, this->At(index)};
+}
+
 }

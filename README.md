@@ -23,6 +23,7 @@ C++ client for [ClickHouse](https://clickhouse.com/).
 * UUID
 * Map
 * Point, Ring, Polygon, MultiPolygon
+* JSON
 
 ## Dependencies
 In the most basic case one needs only:

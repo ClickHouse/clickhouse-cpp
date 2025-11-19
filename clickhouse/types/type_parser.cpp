@@ -40,6 +40,7 @@ static const std::unordered_map<std::string, Type::Code> kTypeCode = {
     { "Float32",     Type::Float32 },
     { "Float64",     Type::Float64 },
     { "String",      Type::String },
+    { "JSON",        Type::JSON },
     { "FixedString", Type::FixedString },
     { "DateTime",    Type::DateTime },
     { "DateTime64",  Type::DateTime64 },
@@ -68,7 +69,7 @@ static const std::unordered_map<std::string, Type::Code> kTypeCode = {
 };
 
 template <typename L, typename R>
-inline int CompateStringsCaseInsensitive(const L& left, const R& right) {
+inline int CompareStringsCaseInsensitive(const L& left, const R& right) {
     int64_t size_diff = left.size() - right.size();
     if (size_diff != 0)
         return size_diff > 0 ? 1 : -1;
@@ -129,7 +130,7 @@ bool ValidateAST(const TypeAst& ast) {
     // Void terminal that is not actually "void" produced when unknown type is encountered.
     if (ast.meta == TypeAst::Terminal
             && ast.code == Type::Void
-            && CompateStringsCaseInsensitive(ast.name, std::string_view("void")) != 0)
+            && CompareStringsCaseInsensitive(ast.name, std::string_view("void")) != 0)
         //throw UnimplementedError("Unsupported type: " + ast.name);
         return false;
 

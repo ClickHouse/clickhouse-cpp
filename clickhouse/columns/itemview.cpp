@@ -70,6 +70,7 @@ void ItemView::ValidateData(Type::Code type, DataType data) {
 
         case Type::Code::String:
         case Type::Code::FixedString:
+        case Type::Code::JSON:
             // value can be of any size
             return;
 

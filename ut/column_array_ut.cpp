@@ -227,6 +227,21 @@ TEST(ColumnArrayT, SimpleFixedString) {
     EXPECT_EQ("world\0"sv, (*array)[0][1]);
 }
 
+TEST(ColumnArrayT, JSON) {
+    using namespace std::literals;
+    auto array = std::make_shared<ColumnArrayT<ColumnJSON>>(6);
+    array->Append({"[\"hello\"]", "{\"place\": \"world\"}"});
+
+    EXPECT_EQ("[\"hello\"]"sv, array->At(0).At(0));
+
+    auto row = array->At(0);
+    EXPECT_EQ("[\"hello\"]"sv, row.At(0));
+    EXPECT_EQ(9u, row[0].length());
+    EXPECT_EQ("[\"hel", row[0].substr(0, 5));
+
+    EXPECT_EQ("{\"place\": \"world\"}"sv, (*array)[0][1]);
+}
+
 TEST(ColumnArrayT, SimpleUInt64_2D) {
     // Nested 2D-arrays are supported too:
     auto array = std::make_shared<ColumnArrayT<ColumnArrayT<ColumnUInt64>>>();
