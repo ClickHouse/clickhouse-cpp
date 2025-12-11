@@ -289,8 +289,10 @@ Client::Impl::Impl(const ClientOptions& opts,
 }
 
 Client::Impl::~Impl() {
-    // Wrap up an insert if one is in progress.
-    EndInsert();
+    try {
+        EndInsert();
+    } catch (...) {
+    }
 }
 
 void Client::Impl::ExecuteQuery(Query query) {
