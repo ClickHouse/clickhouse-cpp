@@ -19,6 +19,8 @@
 #include <string_view>
 #include <thread>
 #include <chrono>
+#include <string>
+#include <list>
 
 using namespace clickhouse;
 
@@ -841,6 +843,9 @@ TEST_P(ClientCase, Decimal) {
         auto decimal = [&b](size_t column, size_t row) {
             return b[column]->As<ColumnDecimal>()->At(row);
         };
+        auto dec_string = [&b](size_t column, size_t row) {
+            return b[column]->As<ColumnDecimal>()->GetString(row);
+        };
 
         EXPECT_EQ(1u, b[0]->As<ColumnUInt64>()->At(0));
         EXPECT_EQ("123456789", int128_to_string(decimal(1, 0)));
@@ -849,6 +854,12 @@ TEST_P(ClientCase, Decimal) {
         EXPECT_EQ("123456789", int128_to_string(decimal(4, 0)));
         EXPECT_EQ("123456789012345678", int128_to_string(decimal(5, 0)));
         EXPECT_EQ("1234567890123456789", int128_to_string(decimal(6, 0)));
+        EXPECT_EQ("12345.6789", dec_string(1, 0));
+        EXPECT_EQ("123456789.012345678", dec_string(2, 0));
+        EXPECT_EQ("0.1234567890123456789", dec_string(3, 0));
+        EXPECT_EQ("12345.6789", dec_string(4, 0));
+        EXPECT_EQ("123456789.012345678", dec_string(5, 0));
+        EXPECT_EQ("0.1234567890123456789", dec_string(6, 0));
 
         EXPECT_EQ(2u, b[0]->As<ColumnUInt64>()->At(1));
         EXPECT_EQ("999999999", int128_to_string(decimal(1, 1)));
@@ -857,6 +868,12 @@ TEST_P(ClientCase, Decimal) {
         EXPECT_EQ("999999999", int128_to_string(decimal(4, 1)));
         EXPECT_EQ("999999999999999999", int128_to_string(decimal(5, 1)));
         EXPECT_EQ("999999999999999999", int128_to_string(decimal(6, 1)));
+        EXPECT_EQ("99999.9999", dec_string(1, 1));
+        EXPECT_EQ("999999999.999999999", dec_string(2, 1));
+        EXPECT_EQ("0.0999999999999999999", dec_string(3, 1));
+        EXPECT_EQ("99999.9999", dec_string(4, 1));
+        EXPECT_EQ("999999999.999999999", dec_string(5, 1));
+        EXPECT_EQ("0.0999999999999999999", dec_string(6, 1));
 
         EXPECT_EQ(3u, b[0]->As<ColumnUInt64>()->At(2));
         EXPECT_EQ("-999999999", int128_to_string(decimal(1, 2)));
@@ -865,6 +882,12 @@ TEST_P(ClientCase, Decimal) {
         EXPECT_EQ("-999999999", int128_to_string(decimal(4, 2)));
         EXPECT_EQ("-999999999999999999", int128_to_string(decimal(5, 2)));
         EXPECT_EQ("-999999999999999999", int128_to_string(decimal(6, 2)));
+        EXPECT_EQ("-99999.9999", dec_string(1, 2));
+        EXPECT_EQ("-999999999.999999999", dec_string(2, 2));
+        EXPECT_EQ("-0.0999999999999999999", dec_string(3, 2));
+        EXPECT_EQ("-99999.9999", dec_string(4, 2));
+        EXPECT_EQ("-999999999.999999999", dec_string(5, 2));
+        EXPECT_EQ("-0.0999999999999999999", dec_string(6, 2));
 
         EXPECT_EQ(4u, b[0]->As<ColumnUInt64>()->At(3));
         EXPECT_EQ("123456789", int128_to_string(decimal(1, 3)));
@@ -873,6 +896,12 @@ TEST_P(ClientCase, Decimal) {
         EXPECT_EQ("123456789", int128_to_string(decimal(4, 3)));
         EXPECT_EQ("123456789012345678", int128_to_string(decimal(5, 3)));
         EXPECT_EQ("12345678901234567890123456789012345678", int128_to_string(decimal(6, 3)));
+        EXPECT_EQ("12345.6789", dec_string(1, 3));
+        EXPECT_EQ("123456789.012345678", dec_string(2, 3));
+        EXPECT_EQ("1234567890123456789.0123456789012345678", dec_string(3, 3));
+        EXPECT_EQ("12345.6789", dec_string(4, 3));
+        EXPECT_EQ("123456789.012345678", dec_string(5, 3));
+        EXPECT_EQ("1234567890123456789.0123456789012345678", dec_string(6, 3));
 
         EXPECT_EQ(5u, b[0]->As<ColumnUInt64>()->At(4));
         EXPECT_EQ("-123456789", int128_to_string(decimal(1, 4)));
@@ -881,6 +910,12 @@ TEST_P(ClientCase, Decimal) {
         EXPECT_EQ("-123456789", int128_to_string(decimal(4, 4)));
         EXPECT_EQ("-123456789012345678", int128_to_string(decimal(5, 4)));
         EXPECT_EQ("-12345678901234567890123456789012345678", int128_to_string(decimal(6, 4)));
+        EXPECT_EQ("-12345.6789", dec_string(1, 4));
+        EXPECT_EQ("-123456789.012345678", dec_string(2, 4));
+        EXPECT_EQ("-1234567890123456789.0123456789012345678", dec_string(3, 4));
+        EXPECT_EQ("-12345.6789", dec_string(4, 4));
+        EXPECT_EQ("-123456789.012345678", dec_string(5, 4));
+        EXPECT_EQ("-1234567890123456789.0123456789012345678", dec_string(6, 4));
 
         EXPECT_EQ(6u, b[0]->As<ColumnUInt64>()->At(5));
         EXPECT_EQ("123456780", int128_to_string(decimal(1, 5)));
@@ -889,7 +924,73 @@ TEST_P(ClientCase, Decimal) {
         EXPECT_EQ("123456789", int128_to_string(decimal(4, 5)));
         EXPECT_EQ("123456789012345678", int128_to_string(decimal(5, 5)));
         EXPECT_EQ("12345678901234567890123456789012345678", int128_to_string(decimal(6, 5)));
+        EXPECT_EQ("12345.6780", dec_string(1, 5));
+        EXPECT_EQ("123456789.012345678", dec_string(2, 5));
+        EXPECT_EQ("1234567890123456789.0123456789012345678", dec_string(3, 5));
+        EXPECT_EQ("12345.6789", dec_string(4, 5));
+        EXPECT_EQ("123456789.012345678", dec_string(5, 5));
+        EXPECT_EQ("1234567890123456789.0123456789012345678", dec_string(6, 5));
     });
+}
+
+TEST_P(ClientCase, DecimalString) {
+    struct testCase {
+        int64_t input;
+        std::vector<std::string> exp;
+    };
+
+    auto columns = std::vector<std::shared_ptr<ColumnDecimal>> {
+        std::make_shared<ColumnDecimal>(8, 0),
+        std::make_shared<ColumnDecimal>(8, 2),
+        std::make_shared<ColumnDecimal>(8, 4),
+        std::make_shared<ColumnDecimal>(8, 6),
+        std::make_shared<ColumnDecimal>(8, 8),
+    };
+
+    for (auto const& tc : std::list<testCase> {
+        testCase{
+            1,
+            {"1", "0.01", "0.0001", "0.000001", "0.00000001"},
+        },
+        testCase{
+            64,
+            {"64", "0.64", "0.0064", "0.000064", "0.00000064"},
+        },
+        testCase{
+            128,
+            {"128", "1.28", "0.0128", "0.000128", "0.00000128"},
+        },
+        testCase{
+            1024,
+            {"1024", "10.24", "0.1024", "0.001024", "0.00001024"},
+        },
+        testCase{
+            87654,
+            {"87654", "876.54", "8.7654", "0.087654", "0.00087654"},
+        },
+        testCase{
+            918273,
+            {"918273", "9182.73", "91.8273", "0.918273", "0.00918273"},
+        },
+        testCase{
+            23456789,
+            {"23456789", "234567.89", "2345.6789", "23.456789", "0.23456789"},
+        },
+        testCase{
+            1234567890,
+            {"1234567890", "12345678.90", "123456.7890", "1234.567890", "12.34567890"},
+        },
+    }) {
+        for (size_t i = 0; i < tc.exp.size(); i++) {
+            auto col = columns[i];
+            col->Append(tc.input);
+            EXPECT_EQ(tc.exp[i], col->GetString(0));
+            col->Clear();
+            col->Append(-tc.input);
+            EXPECT_EQ("-"+tc.exp[i], col->GetString(0));
+            col->Clear();
+        }
+    }
 }
 
 // Test special chars in names

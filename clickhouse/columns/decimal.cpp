@@ -1,3 +1,4 @@
+#include <sstream>
 #include "decimal.h"
 
 namespace
@@ -244,6 +245,44 @@ size_t ColumnDecimal::GetScale() const
 size_t ColumnDecimal::GetPrecision() const
 {
     return type_->As<DecimalType>()->GetPrecision();
+}
+
+std::string ColumnDecimal::GetString(size_t index) const {
+    auto val = At(index);
+
+    // Convert the Int128 to a string.
+    std::stringstream ss;
+    ss << val;
+    std::string str = ss.str();
+
+    // Start a destination string.
+    std::stringstream res;
+    auto scale = GetScale();
+
+    // Output a dash for negative values
+    if (val < 0) {
+        res << '-';
+        str.erase(0, 1);
+    }
+
+    if (scale == 0) {
+        // No decimal point, just output the entire value.
+        res << str;
+    } else if (str.length() <= scale) {
+        // Append the entire value prepended with zeros after the decimal.
+        res << "0." << std::string(scale-str.length(), '0') << str;
+    } else {
+        // There are digits before the decimal.
+        auto decAt = str.length() - scale;
+        res << str.substr(0, decAt);
+
+        // Append any digits after the decimal.
+        if (decAt < str.length()) {
+            res << '.' << str.substr(decAt);
+        }
+    }
+
+    return res.str();
 }
 
 }
