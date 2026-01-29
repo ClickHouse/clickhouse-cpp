@@ -40,6 +40,9 @@ TEST(CreateColumnByType, LowCardinalityAsWrappedColumn) {
 
     ASSERT_EQ(Type::FixedString, CreateColumnByType("LowCardinality(FixedString(10000))", create_column_settings)->GetType().GetCode());
     ASSERT_EQ(Type::FixedString, CreateColumnByType("LowCardinality(FixedString(10000))", create_column_settings)->As<ColumnFixedString>()->GetType().GetCode());
+
+    ASSERT_EQ(Type::JSON, CreateColumnByType("LowCardinality(JSON)", create_column_settings)->GetType().GetCode());
+    ASSERT_EQ(Type::JSON, CreateColumnByType("LowCardinality(JSON)", create_column_settings)->As<ColumnJSON>()->GetType().GetCode());
 }
 
 TEST(CreateColumnByType, DateTime) {
