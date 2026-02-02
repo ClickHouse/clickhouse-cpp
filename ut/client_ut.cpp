@@ -18,6 +18,7 @@
 #include <ostream>
 #include <string_view>
 #include <thread>
+#include <tuple>
 #include <chrono>
 
 using namespace clickhouse;
@@ -1658,7 +1659,7 @@ TEST_P(ClientCase, ClientName) {
 
     FlushLogs();
 
-    std::string query_log_query 
+    std::string query_log_query
         = "SELECT CAST(client_name, 'String') FROM system.query_log WHERE query_id = '" + query_id + "'";
 
     size_t total_rows = 0;
@@ -1670,4 +1671,198 @@ TEST_P(ClientCase, ClientName) {
         }
     });
     ASSERT_GT(total_rows, 0UL) << "Query with query_id " << query_id << " is not found";
+}
+
+
+namespace clickhouse {
+
+// in cpp20, the equality operators can be defaulted and this code removed
+
+bool operator==(
+  const ClientOptions::SSLOptions::CommandAndValue& lhs,
+  const ClientOptions::SSLOptions::CommandAndValue& rhs) {
+  return lhs.command == rhs.command &&
+    lhs.value == rhs.value;
+}
+
+bool operator!=(
+  const ClientOptions::SSLOptions::CommandAndValue& lhs,
+  const ClientOptions::SSLOptions::CommandAndValue& rhs) {
+  return !(lhs == rhs);
+}
+
+auto tied(const ClientOptions::SSLOptions& o) {
+  return std::tie(
+      o.ssl_context,
+      o.use_default_ca_locations,
+      o.path_to_ca_files,
+      o.path_to_ca_directory,
+      o.min_protocol_version,
+      o.max_protocol_version,
+      o.context_options,
+      o.use_sni,
+      o.skip_verification,
+      o.host_flags,
+      o.configuration
+    );
+}
+
+bool operator==(
+    const ClientOptions::SSLOptions& lhs,
+    const ClientOptions::SSLOptions& rhs) {
+  return tied(lhs) == tied(rhs);
+}
+
+bool operator!=(
+    const ClientOptions::SSLOptions& lhs,
+    const ClientOptions::SSLOptions& rhs) {
+  return !(lhs == rhs);
+}
+
+
+auto tied(const ClientOptions& o) {
+  return std::tie(
+      o.host,
+      o.port,
+      o.endpoints,
+      o.default_database,
+      o.user,
+      o.password,
+      o.rethrow_exceptions,
+      o.ping_before_query,
+      o.send_retries,
+      o.retry_timeout,
+      o.tcp_keepalive,
+      o.tcp_keepalive_idle,
+      o.tcp_keepalive_intvl,
+      o.tcp_keepalive_cnt,
+      o.tcp_nodelay,
+      o.connection_connect_timeout,
+      o.connection_recv_timeout,
+      o.connection_send_timeout,
+      o.backward_compatibility_lowcardinality_as_wrapped_column,
+      o.max_compression_chunk_size,
+      o.ssl_options
+    );
+}
+
+bool operator==(const ClientOptions& lhs, const ClientOptions& rhs) {
+  return tied(lhs) == tied(rhs);
+}
+
+bool operator!=(const ClientOptions& lhs, const ClientOptions& rhs) {
+  return !(lhs == rhs);
+}
+
+} // namespace clickhouse
+
+
+TEST_P(ClientCase, ClientOptionsMove) {
+    using secs = std::chrono::seconds;
+
+    // purposely initialize with values different than default
+    auto sslopt = ClientOptions::SSLOptions{}
+                      .SetUseDefaultCALocations(false)
+                      .SetPathToCAFiles({"path"})
+                      .SetPathToCADirectory({"pathdir"})
+                      .SetMinProtocolVersion(42)
+                      .SetMaxProtocolVersion(99)
+                      .SetContextOptions(33)
+                      .SetUseSNI(false)
+                      .SetSkipVerification(true)
+                      .SetHostVerifyFlags(66)
+                      .SetConfiguration({{"cmd", "value"}});
+
+    auto opt = ClientOptions{}
+                   .SetHost("host")
+                   .SetPort(static_cast<uint16_t>(9010))
+                   .SetEndpoints({{"ehost", 7777}})
+                   .SetUser("user")
+                   .SetPassword("pwd")
+                   .SetDefaultDatabase("db")
+                   .SetRethrowException(false)
+                   .SetPingBeforeQuery(true)
+                   .SetSendRetries(2)
+                   .SetRetryTimeout(secs(6))
+                   .TcpKeepAlive(true)
+                   .SetTcpKeepAliveIdle(secs(7))
+                   .SetTcpKeepAliveCount(4)
+                   .TcpNoDelay(false)
+                   .SetConnectionConnectTimeout(secs(8))
+                   .SetConnectionRecvTimeout(secs(1))
+                   .SetConnectionSendTimeout(secs(1))
+                   .SetMaxCompressionChunkSize(30000)
+#ifdef WITH_OPENSSL
+                   .SetSSLOptions(sslopt)
+#endif
+        ;
+
+    ASSERT_NE(opt, ClientOptions{});
+    auto ogOpt = opt;
+    ASSERT_EQ(opt, ogOpt);
+    auto moveOptCtor{std::move(opt)};
+    ASSERT_EQ(moveOptCtor, ogOpt);
+    ASSERT_NE(moveOptCtor, opt);
+    ASSERT_NE(moveOptCtor, ClientOptions{});
+
+    ASSERT_NE(opt, ogOpt);
+    opt = ogOpt;
+    ASSERT_EQ(opt, ogOpt);
+    auto moveOptAssign = std::move(opt);
+    ASSERT_EQ(moveOptAssign, moveOptCtor);
+    ASSERT_EQ(moveOptAssign, ogOpt);
+    ASSERT_NE(moveOptAssign, opt);
+    ASSERT_NE(moveOptAssign, ClientOptions{});
+}
+
+TEST_P(ClientCase, ClientMoveConstructor) {
+    Client client{std::move(*client_.get())};
+    ::createTableWithOneColumn<ColumnString>(client, table_name, column_name);
+
+    client.Execute("INSERT INTO " + table_name + " (*) VALUES (\'Foo\'), (\'Bar\')");
+
+    std::array<std::string, 2> data{"Foo", "Bar"};
+
+    size_t total_rows = 0;
+    client.Select(getOneColumnSelectQuery(), [&total_rows, &data](const Block& block) {
+        total_rows += block.GetRowCount();
+        if (block.GetRowCount() == 0) {
+            return;
+        }
+
+        ASSERT_EQ(1U, block.GetColumnCount());
+        if (auto col = block[0]->As<ColumnString>()) {
+            ASSERT_EQ(data.size(), col->Size());
+            for (size_t i = 0; i < col->Size(); ++i) {
+                EXPECT_EQ(data[i], (*col)[i]) << " at index: " << i;
+            }
+        }
+    });
+    ASSERT_EQ(total_rows, 2U);
+}
+
+TEST_P(ClientCase, ClientMoveAssign) {
+    Client client = std::move(*client_.get());
+    ::createTableWithOneColumn<ColumnString>(client, table_name, column_name);
+
+    client.Execute("INSERT INTO " + table_name + " (*) VALUES (\'Foo\'), (\'Bar\')");
+
+    std::array<std::string, 2> data{"Foo", "Bar"};
+
+    size_t total_rows = 0;
+    client.Select(getOneColumnSelectQuery(), [&total_rows, &data](const Block& block) {
+        total_rows += block.GetRowCount();
+        if (block.GetRowCount() == 0) {
+            return;
+        }
+
+        ASSERT_EQ(1U, block.GetColumnCount());
+        if (auto col = block[0]->As<ColumnString>()) {
+            ASSERT_EQ(data.size(), col->Size());
+            for (size_t i = 0; i < col->Size(); ++i) {
+                EXPECT_EQ(data[i], (*col)[i]) << " at index: " << i;
+            }
+        }
+    });
+    ASSERT_EQ(total_rows, 2U);
 }
