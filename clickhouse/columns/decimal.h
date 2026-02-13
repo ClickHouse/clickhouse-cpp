@@ -33,6 +33,9 @@ public:
     void Swap(Column& other) override;
     ItemView GetItem(size_t index) const override;
 
+    /// Returns a string representation of the Decimal value at \p index.
+    std::string GetString(size_t index) const;
+
     size_t GetScale() const;
     size_t GetPrecision() const;
 
