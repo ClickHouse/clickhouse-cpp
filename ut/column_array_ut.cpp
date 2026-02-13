@@ -53,7 +53,7 @@ TEST(ColumnArray, Append) {
     auto arr1 = std::make_shared<ColumnArray>(std::make_shared<ColumnUInt64>());
     auto arr2 = std::make_shared<ColumnArray>(std::make_shared<ColumnUInt64>());
 
-    auto id = std::make_shared<ColumnUInt64>();
+    auto id = arr1->NewColumnAsType<ColumnUInt64>();
     id->Append(1);
     arr1->AppendAsColumn(id);
 
