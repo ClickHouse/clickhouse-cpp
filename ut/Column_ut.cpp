@@ -194,6 +194,7 @@ using TestCases = ::testing::Types<
 
     GenericColumnTestCase<ColumnString, &makeColumn<ColumnString>, std::string, &MakeStrings>,
     GenericColumnTestCase<ColumnFixedString, &makeColumn<ColumnFixedString, 12>, std::string, &MakeFixedStrings<12>>,
+    GenericColumnTestCase<ColumnJSON, &makeColumn<ColumnJSON>, std::string, &MakeJSONStrings>,
 
     GenericColumnTestCase<ColumnDate, &makeColumn<ColumnDate>, time_t, &MakeDates<time_t>>,
     GenericColumnTestCase<ColumnDate32, &makeColumn<ColumnDate32>, time_t, &MakeDates<time_t>>,

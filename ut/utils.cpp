@@ -60,6 +60,7 @@ bool doPrintValue(const ColumnRef & c, const size_t row, std::ostream & ostr) {
     if (const auto & casted_c = c->As<ColumnType>()) {
         if constexpr (is_container_v<std::decay_t<AsType>>
                 && !std::is_same_v<ColumnType, ColumnString>
+                && !std::is_same_v<ColumnType, ColumnJSON>
                 && !std::is_same_v<ColumnType, ColumnFixedString>) {
             ostr << PrintContainer{static_cast<AsType>(casted_c->At(row))};
         } else {
@@ -166,6 +167,7 @@ std::ostream & printColumnValue(const ColumnRef& c, const size_t row, std::ostre
     const auto r = false
         || doPrintValue<ColumnString>(c, row, ostr)
         || doPrintValue<ColumnFixedString>(c, row, ostr)
+        || doPrintValue<ColumnJSON>(c, row, ostr)
         || doPrintValue<ColumnUInt8, unsigned int>(c, row, ostr)
         || doPrintValue<ColumnUInt32>(c, row, ostr)
         || doPrintValue<ColumnUInt16>(c, row, ostr)
@@ -377,6 +379,7 @@ std::ostream& operator<<(std::ostream& ostr, const ItemView& item_view) {
             ostr << static_cast<double>(item_view.get<double>());
             break;
         case Type::String:
+        case Type::JSON:
         case Type::FixedString:
             ostr << "\"" << item_view.data << "\" (" << item_view.data.size() << " bytes)";
             break;

@@ -33,6 +33,7 @@ public:
         Float64,
         String,
         FixedString,
+        JSON,
         DateTime,
         Date,
         Array,
@@ -56,7 +57,7 @@ public:
         Point,
         Ring,
         Polygon,
-        MultiPolygon
+        MultiPolygon,
     };
 
     using EnumItem = std::pair<std::string /* name */, int16_t /* value */>;
@@ -121,6 +122,8 @@ public:
     static TypeRef CreateString();
 
     static TypeRef CreateString(size_t n);
+
+    static TypeRef CreateJSON();
 
     static TypeRef CreateTuple(const std::vector<TypeRef>& item_types);
 
