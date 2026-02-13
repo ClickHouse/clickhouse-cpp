@@ -25,6 +25,7 @@ public:
         Int16,
         Int32,
         Int64,
+        Bool,
         UInt8,
         UInt16,
         UInt32,
@@ -344,6 +345,11 @@ inline TypeRef Type::CreateSimple<Int128>() {
 template <>
 inline TypeRef Type::CreateSimple<UInt128>() {
     return TypeRef(new Type(UInt128));
+}
+
+template <>
+inline TypeRef Type::CreateSimple<bool>() {
+    return TypeRef(new Type(Bool));
 }
 
 template <>

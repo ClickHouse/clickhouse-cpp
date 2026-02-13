@@ -70,6 +70,7 @@ using Int128 = absl::int128;
 using UInt128 = absl::uint128;
 using Int64 = int64_t;
 
+using ColumnBool    = ColumnVector<uint8_t>;
 using ColumnUInt8   = ColumnVector<uint8_t>;
 using ColumnUInt16  = ColumnVector<uint16_t>;
 using ColumnUInt32  = ColumnVector<uint32_t>;
