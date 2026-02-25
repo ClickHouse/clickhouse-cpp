@@ -109,21 +109,27 @@ ColumnDecimal::ColumnDecimal(size_t precision, size_t scale)
     } else {
         data_ = std::make_shared<ColumnInt128>();
     }
+    data_type_code_ = data_->Type()->GetCode();
 }
 
 ColumnDecimal::ColumnDecimal(TypeRef type, ColumnRef data)
     : Column(type),
-      data_(data)
+      data_(data),
+      data_type_code_(data_->Type()->GetCode())
 {
 }
 
 void ColumnDecimal::Append(const Int128& value) {
-    if (data_->Type()->GetCode() == Type::Int32) {
-        data_->As<ColumnInt32>()->Append(static_cast<ColumnInt32::DataType>(value));
-    } else if (data_->Type()->GetCode() == Type::Int64) {
-        data_->As<ColumnInt64>()->Append(static_cast<ColumnInt64::DataType>(value));
-    } else {
-        data_->As<ColumnInt128>()->Append(static_cast<ColumnInt128::DataType>(value));
+    switch (data_type_code_) {
+        case Type::Int32:
+            static_cast<ColumnInt32*>(data_.get())->Append(static_cast<int32_t>(value));
+            break;
+        case Type::Int64:
+            static_cast<ColumnInt64*>(data_.get())->Append(static_cast<int64_t>(value));
+            break;
+        default:
+            static_cast<ColumnInt128*>(data_.get())->Append(static_cast<Int128>(value));
+            break;
     }
 }
 
@@ -179,13 +185,13 @@ void ColumnDecimal::Append(const std::string& value) {
 }
 
 Int128 ColumnDecimal::At(size_t i) const {
-    switch (data_->Type()->GetCode()) {
+    switch (data_type_code_) {
         case Type::Int32:
-            return static_cast<Int128>(data_->As<ColumnInt32>()->At(i));
+            return static_cast<Int128>(static_cast<const ColumnInt32*>(data_.get())->At(i));
         case Type::Int64:
-            return static_cast<Int128>(data_->As<ColumnInt64>()->At(i));
+            return static_cast<Int128>(static_cast<const ColumnInt64*>(data_.get())->At(i));
         case Type::Int128:
-            return data_->As<ColumnInt128>()->At(i);
+            return static_cast<const ColumnInt128*>(data_.get())->At(i);
         default:
             throw ValidationError("Invalid data_ column type in ColumnDecimal");
     }

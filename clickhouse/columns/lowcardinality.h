@@ -110,6 +110,8 @@ private:
     void AppendNullItem();
     void AppendDefaultItem();
 
+    Type::Code index_type_code_;
+
 public:
     static details::LowCardinalityHashKey computeHashKey(const ItemView &);
 };
