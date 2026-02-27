@@ -15,9 +15,8 @@ on:
 
 env:
   BUILD_TYPE: Release
-  CLICKHOUSE_USER: clickhouse_cpp_cicd
-  CLICKHOUSE_PASSWORD: clickhouse_cpp_cicd
-  #
+  CLICKHOUSE_USER: default
+  CLICKHOUSE_PASSWORD: ${{ secrets.INTEGRATIONS_TEAM_TESTS_CLOUD_PASSWORD_SMT }}
   # CLICKHOUSE_HOST: localhost
   # CLICKHOUSE_PORT: 9000
   # CLICKHOUSE_USER: default
@@ -62,7 +61,7 @@ jobs:
               choco install wget
               wget https://github.com/filimonov/go-tlsoffloader/releases/download/v0.1.2/go-tlsoffloader_0.1.2_Windows_x86_64.tar.gz
               tar -xvzf go-tlsoffloader_0.1.2_Windows_x86_64.tar.gz
-              ./go-tlsoffloader.exe -l localhost:9000 -b github.demo.trial.altinity.cloud:9440 &
+              ./go-tlsoffloader.exe -l localhost:9000 -b ${{ secrets.INTEGRATIONS_TEAM_TESTS_CLOUD_HOST_SMT }}:9440 &
 
       - name: Test
         env:
