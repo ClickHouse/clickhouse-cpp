@@ -109,8 +109,25 @@ SET_TARGET_PROPERTIES (clickhouse-cpp-lib
     LINKER_LANGUAGE CXX
     VERSION ${CLICKHOUSE_CPP_VERSION}
 )
+
+# Make sure the API of absl's UInt128 is also available when using ClickHouse-cpp
+# as a shared library. This currently works only for Linux and Windows
+IF (BUILD_SHARED_LIBS AND NOT WITH_SYSTEM_ABSEIL)
+    GET_TARGET_PROPERTY(absl_lib absl::int128 ALIASED_TARGET)
+    SET_PROPERTY (TARGET ${absl_lib} PROPERTY POSITION_INDEPENDENT_CODE ON)
+    TARGET_LINK_LIBRARIES (clickhouse-cpp-lib
+        $<$<PLATFORM_ID:Darwin>:-Wl,-force_load,$<TARGET_FILE:${absl_lib}>>
+        $<$<PLATFORM_ID:Linux>:-Wl,--whole-archive>
+        absl::int128
+        $<$<PLATFORM_ID:Linux>:-Wl,--no-whole-archive>
+    )
+ELSE ()
+    TARGET_LINK_LIBRARIES (clickhouse-cpp-lib
+        absl::int128
+    )
+ENDIF ()
+
 TARGET_LINK_LIBRARIES (clickhouse-cpp-lib
-    absl::int128
     cityhash::cityhash
     lz4::lz4
     zstd::zstd
