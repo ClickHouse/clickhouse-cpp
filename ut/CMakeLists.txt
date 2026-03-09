@@ -11,6 +11,8 @@ SET ( clickhouse-cpp-ut-src
     type_parser_ut.cpp
     types_ut.cpp
     utils_ut.cpp
+    byte_ring_ut.cpp
+    async_client_ut.cpp
 
     performance_tests.cpp
     tcp_server.cpp
