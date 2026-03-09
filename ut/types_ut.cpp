@@ -82,6 +82,7 @@ TEST(TypesCase, IsEqual) {
         "Int8",
 //        "UInt128",
         "String",
+        "JSON",
         "FixedString(0)",
         "FixedString(10000)",
         "DateTime('UTC')",

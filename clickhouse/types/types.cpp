@@ -52,6 +52,7 @@ const char* Type::TypeName(Type::Code code) {
         case Type::Code::Ring:           return "Ring";
         case Type::Code::Polygon:        return "Polygon";
         case Type::Code::MultiPolygon:   return "MultiPolygon";
+        case Type::Code::JSON:           return "JSON";
     }
 
     return "Unknown type";
@@ -82,6 +83,7 @@ std::string Type::GetName() const {
         case Ring:
         case Polygon:
         case MultiPolygon:
+        case JSON:
             return TypeName(code_);
         case FixedString:
             return As<FixedStringType>()->GetName();
@@ -141,6 +143,7 @@ uint64_t Type::GetTypeUniqueId() const {
         case Ring:
         case Polygon:
         case MultiPolygon:
+        case JSON:
             // For simple types, unique ID is the same as Type::Code
             return code_;
 
@@ -222,6 +225,10 @@ TypeRef Type::CreateString() {
 
 TypeRef Type::CreateString(size_t n) {
     return TypeRef(new FixedStringType(n));
+}
+
+TypeRef Type::CreateJSON() {
+    return TypeRef(new Type(Type::JSON));
 }
 
 TypeRef Type::CreateTuple(const std::vector<TypeRef>& item_types) {
