@@ -155,6 +155,77 @@ TEST_P(ClientCase, Array) {
     EXPECT_EQ(4U, row);
 }
 
+TEST_P(ClientCase, Time) {
+    Block b;
+
+    client_->Execute("CREATE TEMPORARY TABLE IF NOT EXISTS test_clickhouse_cpp_time (t Time)");
+    auto t = std::make_shared<ColumnTime>();
+
+    int32_t ts = 3600 * 15 + 60 * 4 + 5;
+    t->Append(ts);
+    b.AppendColumn("t", t);
+    client_->Insert("test_clickhouse_cpp_time", b);
+
+    size_t total_rows = 0; 
+    client_->Select("SELECT t, toString(t) FROM test_clickhouse_cpp_time", [ts, &total_rows](const Block& block)
+        {
+            if (block.GetRowCount() == 0) {
+                    return;
+            }
+            EXPECT_EQ(ts, block[0]->As<ColumnTime>()->At(0));
+            EXPECT_EQ("15:04:05", block[1]->As<ColumnString>()->At(0));
+            total_rows += block.GetRowCount();
+        });
+    EXPECT_EQ(total_rows, 1UL);
+}
+
+TEST_P(ClientCase, Time64) {
+    Block b;
+
+    client_->Execute("CREATE TEMPORARY TABLE IF NOT EXISTS test_clickhouse_cpp_time64 "
+                     "(t0 Time64(0), t3 Time64(3), t6 Time64(6))");
+    auto t0 = std::make_shared<ColumnTime64>(0);
+    auto t3 = std::make_shared<ColumnTime64>(3);
+    auto t6 = std::make_shared<ColumnTime64>(6);
+
+    int64_t ts0 = 3600 * 15 + 60 * 4 + 5;
+    int64_t ts3 = ts0 * 1000 + 123;
+    int64_t ts6 = ts0 * 1000000 + 123456;
+    t0->Append(ts0);
+    t3->Append(ts3);
+    t6->Append(ts6);
+    b.AppendColumn("t0", t0);
+    b.AppendColumn("t3", t3);
+    b.AppendColumn("t6", t6);
+    client_->Insert("test_clickhouse_cpp_time64", b);
+
+    size_t total_rows = 0;
+    client_->Select("SELECT "
+                    "t0, toString(t0), "
+                    "t3, toString(t3), "
+                    "t6, toString(t6) "
+                    "FROM test_clickhouse_cpp_time64",
+        [ts0, ts3, ts6, &total_rows](const Block& block)
+        {
+            if (block.GetRowCount() == 0) {
+                return;
+            }
+            EXPECT_EQ(ts0, block[0]->As<ColumnTime64>()->At(0));
+            EXPECT_EQ(0UL, block[0]->As<ColumnTime64>()->GetPrecision());
+            EXPECT_EQ("15:04:05", block[1]->As<ColumnString>()->At(0));
+
+            EXPECT_EQ(ts3, block[2]->As<ColumnTime64>()->At(0));
+            EXPECT_EQ(3UL, block[2]->As<ColumnTime64>()->GetPrecision());
+            EXPECT_EQ("15:04:05.123", block[3]->As<ColumnString>()->At(0));
+
+            EXPECT_EQ(ts6, block[4]->As<ColumnTime64>()->At(0));
+            EXPECT_EQ(6UL, block[4]->As<ColumnTime64>()->GetPrecision());
+            EXPECT_EQ("15:04:05.123456", block[5]->As<ColumnString>()->At(0));
+            total_rows += block.GetRowCount();
+        });
+    EXPECT_EQ(total_rows, 1UL);
+}
+
 TEST_P(ClientCase, Date) {
     Block b;
 

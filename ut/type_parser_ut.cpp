@@ -214,6 +214,26 @@ TEST(TypeParserCase, SimpleAggregateFunction_UInt64) {
     ASSERT_EQ(ast.elements[1].meta, TypeAst::Terminal);
 }
 
+TEST(TypeParserCase, ParseTime) {
+    TypeAst ast;
+    TypeParser("Time").Parse(&ast);
+    ASSERT_EQ(ast.meta, TypeAst::Terminal);
+    ASSERT_EQ(ast.name, "Time");
+    ASSERT_EQ(ast.code, Type::Time);
+    ASSERT_EQ(ast.elements.size(), 0u);
+}
+
+TEST(TypeParserCase, ParseTime64) {
+    TypeAst ast;
+    TypeParser("Time64(3)").Parse(&ast);
+    ASSERT_EQ(ast.meta, TypeAst::Terminal);
+    ASSERT_EQ(ast.name, "Time64");
+    ASSERT_EQ(ast.code, Type::Time64);
+    ASSERT_EQ(ast.elements.size(), 1u);
+    ASSERT_EQ(ast.elements[0].name, "");
+    ASSERT_EQ(ast.elements[0].value, 3);
+}
+
 TEST(TypeParserCase, ParseDateTime64) {
     TypeAst ast;
     TypeParser("DateTime64(3, 'UTC')").Parse(&ast);

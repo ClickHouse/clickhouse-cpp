@@ -14,6 +14,7 @@
 #include "nullable.h"
 #include "numeric.h"
 #include "string.h"
+#include "./time.h" // `./` avoids possible conflicts with standard C time.h
 #include "tuple.h"
 #include "uuid.h"
 
@@ -108,7 +109,6 @@ static ColumnRef CreateTerminalColumn(const TypeAst& ast) {
         return std::make_shared<ColumnDate>();
     case Type::Date32:
         return std::make_shared<ColumnDate32>();
-
     case Type::IPv4:
         return std::make_shared<ColumnIPv4>();
     case Type::IPv6:
@@ -129,6 +129,13 @@ static ColumnRef CreateTerminalColumn(const TypeAst& ast) {
     case Type::MultiPolygon:
         return std::make_shared<ColumnMultiPolygon>();
 
+    case Type::Time:
+        return std::make_shared<ColumnTime>();
+    case Type::Time64:
+        if (ast.elements.empty()) {
+            return nullptr;
+        }
+        return std::make_shared<ColumnTime64>(GetASTChildElement(ast, 0).value);
     default:
         return nullptr;
     }

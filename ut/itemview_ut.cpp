@@ -46,6 +46,8 @@ TEST(ItemView, StorableTypes) {
     TEST_ITEMVIEW_TYPE_VALUES(Type::Code::Float64, double);
     TEST_ITEMVIEW_TYPE_VALUE(Type::Code::Float64, double, 0.5);
 
+    TEST_ITEMVIEW_TYPE_VALUES(Type::Code::Time,       int32_t);
+    TEST_ITEMVIEW_TYPE_VALUES(Type::Code::Time64,     int64_t);
     TEST_ITEMVIEW_TYPE_VALUES(Type::Code::Date,       uint16_t);
     TEST_ITEMVIEW_TYPE_VALUES(Type::Code::DateTime,   uint32_t);
     TEST_ITEMVIEW_TYPE_VALUES(Type::Code::DateTime64, int64_t);
@@ -142,6 +144,16 @@ TEST(ItemView, TypeSizeMismatch) {
     EXPECT_ITEMVIEW_ERROR(Type::Code::Float64, int32_t);
     EXPECT_ITEMVIEW_ERROR(Type::Code::Float64, Int128);
     EXPECT_ITEMVIEW_ERROR(Type::Code::Float64, float);
+
+    EXPECT_ITEMVIEW_ERROR(Type::Code::Time, int8_t);
+    EXPECT_ITEMVIEW_ERROR(Type::Code::Time, int16_t);
+    EXPECT_ITEMVIEW_ERROR(Type::Code::Time, int64_t);
+    EXPECT_ITEMVIEW_ERROR(Type::Code::Time, Int128);
+
+    EXPECT_ITEMVIEW_ERROR(Type::Code::Time64, int8_t);
+    EXPECT_ITEMVIEW_ERROR(Type::Code::Time64, int16_t);
+    EXPECT_ITEMVIEW_ERROR(Type::Code::Time64, int32_t);
+    EXPECT_ITEMVIEW_ERROR(Type::Code::Time64, Int128);
 
     EXPECT_ITEMVIEW_ERROR(Type::Code::Date, int8_t);
     EXPECT_ITEMVIEW_ERROR(Type::Code::Date, int32_t);

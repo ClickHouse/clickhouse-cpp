@@ -1,6 +1,7 @@
 #include <clickhouse/columns/array.h>
 #include <clickhouse/columns/tuple.h>
 #include <clickhouse/columns/date.h>
+#include <clickhouse/columns/time.h>
 #include <clickhouse/columns/enum.h>
 #include <clickhouse/columns/lowcardinality.h>
 #include <clickhouse/columns/nullable.h>
@@ -202,6 +203,11 @@ using TestCases = ::testing::Types<
     GenericColumnTestCase<ColumnDateTime64, &makeColumn<ColumnDateTime64, 3>, clickhouse::Int64, &MakeDateTime64s<3>>,
     GenericColumnTestCase<ColumnDateTime64, &makeColumn<ColumnDateTime64, 6>, clickhouse::Int64, &MakeDateTime64s<6>>,
     GenericColumnTestCase<ColumnDateTime64, &makeColumn<ColumnDateTime64, 9>, clickhouse::Int64, &MakeDateTime64s<9>>,
+    GenericColumnTestCase<ColumnTime, &makeColumn<ColumnTime>, int32_t, &MakeTime>,
+    GenericColumnTestCase<ColumnTime64, &makeColumn<ColumnTime64, 0>, int64_t, &MakeTime64<0>>,
+    GenericColumnTestCase<ColumnTime64, &makeColumn<ColumnTime64, 3>, int64_t, &MakeTime64<3>>,
+    GenericColumnTestCase<ColumnTime64, &makeColumn<ColumnTime64, 6>, int64_t, &MakeTime64<6>>,
+    GenericColumnTestCase<ColumnTime64, &makeColumn<ColumnTime64, 9>, int64_t, &MakeTime64<9>>,
 
     GenericColumnTestCase<ColumnIPv4, &makeColumn<ColumnIPv4>, in_addr, &MakeIPv4s>,
     GenericColumnTestCase<ColumnIPv6, &makeColumn<ColumnIPv6>, in6_addr, &MakeIPv6s>,

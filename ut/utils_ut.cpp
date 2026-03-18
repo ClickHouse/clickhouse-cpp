@@ -268,6 +268,9 @@ TEST(ItemView, OutputToOstream_VALID) {
     EXPECTED_SERIALIZATION("Decimal : 1234567", ColumnDecimal(18, 0), 1234567);
     EXPECTED_SERIALIZATION("Decimal : 1234567", ColumnDecimal(18, 9), 1234567);
 
+    EXPECTED_SERIALIZATION("Time : 42", ColumnTime(), 42);
+    EXPECTED_SERIALIZATION("Time64 : 42", ColumnTime64(3), 42);
+
     EXPECTED_SERIALIZATION("Date : 1970-05-04 00:00:00", ColumnDate(), time_t(123) * 86400);
     EXPECTED_SERIALIZATION("DateTime : 1970-01-15 06:56:07", ColumnDateTime(), 1234567);
     // this is completely bogus, since precision is not taken into account
