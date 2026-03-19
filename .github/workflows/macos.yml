@@ -15,11 +15,11 @@ on:
 env:
   BUILD_TYPE: Release
   CLICKHOUSE_USER: default
-  CLICKHOUSE_PASSWORD: ${{ secrets.INTEGRATIONS_TEAM_TESTS_CLOUD_PASSWORD_SMT }}
-  CLICKHOUSE_SECURE_HOST: ${{ secrets.INTEGRATIONS_TEAM_TESTS_CLOUD_HOST_SMT }}
+  CLICKHOUSE_PASSWORD: ${{ secrets.INTEGRATIONS_TEAM_TESTS_CLOUD_PASSWORD_SMT_PROD }}
+  CLICKHOUSE_SECURE_HOST: ${{ secrets.INTEGRATIONS_TEAM_TESTS_CLOUD_HOST_SMT_PROD }}
   CLICKHOUSE_SECURE_PORT: 9440
   CLICKHOUSE_SECURE_USER: default
-  CLICKHOUSE_SECURE_PASSWORD: ${{ secrets.INTEGRATIONS_TEAM_TESTS_CLOUD_PASSWORD_SMT }}
+  CLICKHOUSE_SECURE_PASSWORD: ${{ secrets.INTEGRATIONS_TEAM_TESTS_CLOUD_PASSWORD_SMT_PROD }}
   CLICKHOUSE_SECURE_DB: default
 
 jobs:
@@ -74,7 +74,7 @@ jobs:
         run: |
               wget https://github.com/filimonov/go-tlsoffloader/releases/download/v0.1.2/go-tlsoffloader_0.1.2_Darwin_x86_64.tar.gz
               tar -xvzf go-tlsoffloader_0.1.2_Darwin_x86_64.tar.gz
-              ./go-tlsoffloader -l localhost:9000 -b ${{ secrets.INTEGRATIONS_TEAM_TESTS_CLOUD_HOST_SMT }}:9440 &
+              ./go-tlsoffloader -l localhost:9000 -b ${{ secrets.INTEGRATIONS_TEAM_TESTS_CLOUD_HOST_SMT_PROD }}:9440 &
 
       - name: Test
         working-directory: ${{github.workspace}}/build/ut
