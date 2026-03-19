@@ -56,7 +56,9 @@ public:
         Point,
         Ring,
         Polygon,
-        MultiPolygon
+        MultiPolygon,
+        Time,
+        Time64,
     };
 
     using EnumItem = std::pair<std::string /* name */, int16_t /* value */>;
@@ -142,6 +144,10 @@ public:
 
     static TypeRef CreateMultiPolygon();
 
+    static TypeRef CreateTime();
+
+    static TypeRef CreateTime64(size_t precision);
+
 private:
     uint64_t GetTypeUniqueId() const;
 
@@ -203,6 +209,18 @@ private:
     std::string timezone_;
 };
 }
+
+class Time64Type : public Type {
+public:
+    explicit Time64Type(size_t precision);
+
+    std::string GetName() const;
+
+    inline size_t GetPrecision() const { return precision_; }
+
+private:
+    size_t precision_;
+};
 
 class DateTimeType : public Type, public details::TypeWithTimeZoneMixin {
 public:

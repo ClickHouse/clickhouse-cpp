@@ -17,6 +17,7 @@
 #include "columns/map.h"
 #include "columns/string.h"
 #include "columns/tuple.h"
+#include "columns/time.h"
 #include "columns/uuid.h"
 
 #include <chrono>

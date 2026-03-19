@@ -170,6 +170,56 @@ TEST(ColumnsCase, TupleSlice){
     ASSERT_EQ((*tuple2)[1]->As<ColumnString>()->At(0), "3");
 }
 
+TEST(ColumnsCase, TimeAppend) {
+    auto col = std::make_shared<ColumnTime>();
+    col->Append(1);
+    col->Append(60);
+    ASSERT_EQ(col->Size(), 2u);
+    ASSERT_EQ(col->At(0), 1);
+    ASSERT_EQ(col->At(1), 60);
+}
+
+TEST(ColumnsCase, Time_Int32_construct_from_rvalue_data) {
+    auto const expected = MakeNumbers<int32_t>();
+
+    auto data = expected;
+    auto col = std::make_shared<ColumnTime>(std::move(data));
+
+    ASSERT_EQ(col->Size(), expected.size());
+    for (size_t i = 0; i < expected.size(); ++i) {
+        ASSERT_EQ(col->At(i), expected[i]);
+    }
+}
+
+TEST(ColumnsCase, Time64Append) {
+    auto col = std::make_shared<ColumnTime64>(3);
+    col->Append(1);
+    col->Append(60);
+    ASSERT_EQ(col->Size(), 2u);
+    ASSERT_EQ(col->At(0), 1);
+    ASSERT_EQ(col->At(1), 60);
+}
+
+TEST(ColumnsCase, Time64_Int64_construct_from_rvalue_data) {
+    auto const expected = MakeNumbers<int64_t>();
+
+    auto data = expected;
+    auto col1 = std::make_shared<ColumnTime64>(3, std::move(data));
+
+    ASSERT_EQ(col1->Size(), expected.size());
+    for (size_t i = 0; i < expected.size(); ++i) {
+        ASSERT_EQ(col1->At(i), expected[i]);
+    }
+    ASSERT_EQ(col1->GetPrecision(), 3UL);
+}
+
+TEST(ColumnsCase, Time64SwapDifferentPrecision) {
+    auto col1 = std::make_shared<ColumnTime64>(3);
+    auto col2 = std::make_shared<ColumnTime64>(6);
+    col1->Append(1);
+    col1->Append(60);
+    EXPECT_THROW(col1->Swap(*col2), ValidationError) ;
+}
 
 TEST(ColumnsCase, DateAppend) {
     auto col1 = std::make_shared<ColumnDate>();
@@ -182,7 +232,6 @@ TEST(ColumnsCase, DateAppend) {
     ASSERT_EQ(col2->Size(), 1u);
     ASSERT_EQ(col2->At(0), (now / 86400) * 86400);
 }
-
 
 TEST(ColumnsCase, Date_UInt16_interface) {
     auto col1 = std::make_shared<ColumnDate>();

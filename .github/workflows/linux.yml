@@ -15,10 +15,10 @@ on:
 
 env:
   BUILD_TYPE: Release
-  CLICKHOUSE_SERVER_IMAGE: "clickhouse/clickhouse-server:22.3"
-  CLICKHOUSE_SECURE_HOST: ${{ secrets.INTEGRATIONS_TEAM_TESTS_CLOUD_HOST_SMT }}
+  CLICKHOUSE_SERVER_IMAGE: "clickhouse/clickhouse-server:25.10"
+  CLICKHOUSE_SECURE_HOST: ${{ secrets.INTEGRATIONS_TEAM_TESTS_CLOUD_HOST_SMT_PROD }}
   CLICKHOUSE_SECURE_USER: default
-  CLICKHOUSE_SECURE_PASSWORD: ${{ secrets.INTEGRATIONS_TEAM_TESTS_CLOUD_PASSWORD_SMT }}
+  CLICKHOUSE_SECURE_PASSWORD: ${{ secrets.INTEGRATIONS_TEAM_TESTS_CLOUD_PASSWORD_SMT_PROD }}
 
 jobs:
   build:
@@ -128,7 +128,7 @@ jobs:
       - name: Test - Start ClickHouse server in background
         run: |
           docker pull ${CLICKHOUSE_SERVER_IMAGE}
-          docker run -d --name clickhouse -p 9000:9000 ${CLICKHOUSE_SERVER_IMAGE}
+          docker run -d --name clickhouse -p 9000:9000 -e CLICKHOUSE_SKIP_USER_SETUP=1 ${CLICKHOUSE_SERVER_IMAGE}
           docker ps -a
           docker stats -a --no-stream
           ## Check and wait until CH is ready to accept connections

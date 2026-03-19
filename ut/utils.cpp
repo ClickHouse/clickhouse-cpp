@@ -404,6 +404,12 @@ std::ostream& operator<<(std::ostream& ostr, const ItemView& item_view) {
             }
             break;
         }
+        case Type::Time:
+            ostr << item_view.get<int32_t>();
+            break;
+        case Type::Time64:
+            ostr << item_view.get<int64_t>();
+            break;
         case Type::Enum8:
             ostr << static_cast<int>(item_view.get<int8_t>());
             break;
