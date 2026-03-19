@@ -158,7 +158,9 @@ TEST_P(ClientCase, Array) {
 TEST_P(ClientCase, Time) {
     Block b;
 
-    client_->Execute("CREATE TEMPORARY TABLE IF NOT EXISTS test_clickhouse_cpp_time (t Time)");
+    client_->Execute("CREATE TEMPORARY TABLE IF NOT EXISTS test_clickhouse_cpp_time (t Time) "
+                     "ENGINE = Memory "
+                     "SETTINGS enable_time_time64_type = 1");
     auto t = std::make_shared<ColumnTime>();
 
     int32_t ts = 3600 * 15 + 60 * 4 + 5;
@@ -183,7 +185,9 @@ TEST_P(ClientCase, Time64) {
     Block b;
 
     client_->Execute("CREATE TEMPORARY TABLE IF NOT EXISTS test_clickhouse_cpp_time64 "
-                     "(t0 Time64(0), t3 Time64(3), t6 Time64(6))");
+                     "(t0 Time64(0), t3 Time64(3), t6 Time64(6)) "
+                     "ENGINE = Memory "
+                     "SETTINGS enable_time_time64_type = 1");
     auto t0 = std::make_shared<ColumnTime64>(0);
     auto t3 = std::make_shared<ColumnTime64>(3);
     auto t6 = std::make_shared<ColumnTime64>(6);
