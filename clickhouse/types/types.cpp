@@ -52,6 +52,8 @@ const char* Type::TypeName(Type::Code code) {
         case Type::Code::Ring:           return "Ring";
         case Type::Code::Polygon:        return "Polygon";
         case Type::Code::MultiPolygon:   return "MultiPolygon";
+        case Type::Code::Time:           return "Time";
+        case Type::Code::Time64:         return "Time64";
     }
 
     return "Unknown type";
@@ -78,11 +80,14 @@ std::string Type::GetName() const {
         case IPv6:
         case Date:
         case Date32:
+        case Time:
         case Point:
         case Ring:
         case Polygon:
         case MultiPolygon:
             return TypeName(code_);
+        case Time64:
+            return As<Time64Type>()->GetName();
         case FixedString:
             return As<FixedStringType>()->GetName();
         case DateTime:
@@ -145,6 +150,8 @@ uint64_t Type::GetTypeUniqueId() const {
             return code_;
 
         case FixedString:
+        case Time:
+        case Time64:
         case DateTime:
         case DateTime64:
         case Array:
@@ -186,6 +193,14 @@ TypeRef Type::CreateDate() {
 
 TypeRef Type::CreateDate32() {
     return TypeRef(new Type(Type::Date32));
+}
+
+TypeRef Type::CreateTime() {
+    return TypeRef(new Type(Type::Time));
+}
+
+TypeRef Type::CreateTime64(size_t precision) {
+    return TypeRef(new Time64Type(precision));
 }
 
 TypeRef Type::CreateDateTime(std::string timezone) {
@@ -364,6 +379,18 @@ TypeWithTimeZoneMixin::TypeWithTimeZoneMixin(std::string timezone)
 const std::string & TypeWithTimeZoneMixin::Timezone() const {
     return timezone_;
 }
+}
+
+/// class Time64
+Time64Type::Time64Type(size_t precision)
+    : Type(Time64), precision_{precision} {
+    if (precision_ > 9) {
+        throw ValidationError("Time64 precision is > 9");
+    }
+}
+
+std::string Time64Type::GetName() const {
+    return "Time64(" + std::to_string(precision_) + ")";
 }
 
 /// class DateTimeType

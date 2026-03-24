@@ -8,6 +8,9 @@
 
 #include <vector>
 #include <random>
+#include <algorithm>
+#include <iterator>
+#include <type_traits>
 
 inline in_addr MakeIPv4(uint32_t ip) {
     static_assert(sizeof(in_addr) == sizeof(ip));
@@ -106,6 +109,21 @@ inline std::vector<clickhouse::Int128> MakeDecimals() {
     return MakeDecimals(precision, scale);
 }
 
+std::vector<int32_t> MakeTime();
+
+template <size_t Precision>
+inline std::vector<int64_t> MakeTime64() {
+    std::vector<int64_t> ret{}; 
+    auto time32 = MakeTime();
+    int64_t exp = 1;
+    for (size_t i = 0; i < Precision; ++i) {
+        exp *= 10;
+    }
+    std::transform(time32.cbegin(), time32.cend(), std::back_inserter(ret), [exp](int32_t x) {
+        return x * exp;
+    });
+    return ret;
+}
 
 template <typename ResultType>
 inline auto MakeDates() {

@@ -59,6 +59,7 @@ void ItemView::ValidateData(Type::Code type, DataType data) {
         case Type::Code::Date32:
         case Type::Code::IPv4:
         case Type::Code::Decimal32:
+        case Type::Code::Time:
             return AssertSize({4});
 
         case Type::Code::Int64:
@@ -66,6 +67,7 @@ void ItemView::ValidateData(Type::Code type, DataType data) {
         case Type::Code::Float64:
         case Type::Code::DateTime64:
         case Type::Code::Decimal64:
+        case Type::Code::Time64:
             return AssertSize({8});
 
         case Type::Code::String:

@@ -22,6 +22,7 @@ SET ( clickhouse-cpp-lib-src
     columns/map.cpp
     columns/string.cpp
     columns/tuple.cpp
+    columns/time.cpp
     columns/uuid.cpp
 
     columns/itemview.cpp
@@ -67,6 +68,7 @@ SET ( clickhouse-cpp-lib-src
     columns/nullable.h
     columns/numeric.h
     columns/string.h
+    columns/time.h
     columns/tuple.h
     columns/utils.h
     columns/uuid.h
@@ -226,6 +228,7 @@ INSTALL(FILES columns/nullable.h DESTINATION include/clickhouse/columns/)
 INSTALL(FILES columns/numeric.h DESTINATION include/clickhouse/columns/)
 INSTALL(FILES columns/map.h DESTINATION include/clickhouse/columns/)
 INSTALL(FILES columns/string.h DESTINATION include/clickhouse/columns/)
+INSTALL(FILES columns/time.h DESTINATION include/clickhouse/columns/)
 INSTALL(FILES columns/tuple.h DESTINATION include/clickhouse/columns/)
 INSTALL(FILES columns/utils.h DESTINATION include/clickhouse/columns/)
 INSTALL(FILES columns/uuid.h DESTINATION include/clickhouse/columns/)
