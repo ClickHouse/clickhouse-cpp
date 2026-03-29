@@ -160,13 +160,13 @@ target_link_libraries(${PROJECT_NAME} PRIVATE clickhouse-cpp-lib)
 ## Batch Insertion
 
 In addition to the `Insert` method, which inserts all the data in a block in a
-single call, you can use the `BeginInsert` / `InsertData` / `EndInsert`
+single call, you can use the `BeginInsert` / `SendInsertBlock` / `EndInsert`
 pattern to insert batches of data. This can be useful for managing larger data
 sets without inflating memory with the entire set.
 
 To use it pass `BeginInsert` an `INSERT` statement ending in `VALUES` but with
 no actual values. Use the resulting `Block` to append batches of data, sending
-each to the sever with `InsertData`. Finally, call `EndInsert` (or let the
+each to the sever with `SendInsertBlock`. Finally, call `EndInsert` (or let the
 client go out of scope) to signal the server that insertion is complete.
 Example:
 
@@ -186,7 +186,7 @@ col2.Append("naomi");
 
 // Send those records.
 block.RefreshRowCount();
-client->InsertData(block);
+client->SendInsertBlock(block);
 block.Clear();
 
 // Add another record.
@@ -195,7 +195,7 @@ col2.Append("amos");
 
 // Send it and finish.
 block.RefreshRowCount();
-client->EndInsert(block);
+client->EndInsert();
 ```
 
 ## Thread-safety
