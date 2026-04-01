@@ -33,9 +33,11 @@ SET ( clickhouse-cpp-lib-src
     block.cpp
     client.cpp
     query.cpp
+    async_client.cpp
 
     # Headers
     base/buffer.h
+    base/byte_ring.h
     base/compressed.h
     base/endpoints_iterator.h
     base/input.h
@@ -78,6 +80,7 @@ SET ( clickhouse-cpp-lib-src
 
     block.h
     client.h
+    async_client.h
     error_codes.h
     exceptions.h
     protocol.h
@@ -188,6 +191,7 @@ ENDIF()
 # general
 INSTALL(FILES block.h DESTINATION include/clickhouse/)
 INSTALL(FILES client.h DESTINATION include/clickhouse/)
+INSTALL(FILES async_client.h DESTINATION include/clickhouse/)
 INSTALL(FILES error_codes.h DESTINATION include/clickhouse/)
 INSTALL(FILES exceptions.h DESTINATION include/clickhouse/)
 INSTALL(FILES server_exception.h DESTINATION include/clickhouse/)
@@ -197,6 +201,7 @@ INSTALL(FILES version.h DESTINATION include/clickhouse/)
 
 # base
 INSTALL(FILES base/buffer.h DESTINATION include/clickhouse/base/)
+INSTALL(FILES base/byte_ring.h DESTINATION include/clickhouse/base/)
 INSTALL(FILES base/compressed.h DESTINATION include/clickhouse/base/)
 INSTALL(FILES base/input.h DESTINATION include/clickhouse/base/)
 INSTALL(FILES base/open_telemetry.h DESTINATION include/clickhouse/base/)
