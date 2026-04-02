@@ -640,6 +640,134 @@ TEST_P(ClientCase, Numbers) {
     }
 }
 
+TEST_P(ClientCase, StreamingSelect) {
+    try {
+        size_t num = 0;
+
+        client_->BeginSelect("SELECT number, number FROM system.numbers LIMIT 1000");
+
+        while (auto block = client_->ReceiveSelectBlock()) {
+            if (block->GetColumnCount() == 0 || block->GetRowCount() == 0) {
+                continue;
+            }
+
+            ASSERT_EQ(2u, block->GetColumnCount());
+
+            auto col = (*block)[0]->As<ColumnUInt64>();
+            ASSERT_NE(nullptr, col);
+
+            for (size_t i = 0; i < col->Size(); ++i, ++num) {
+                EXPECT_EQ(num, col->At(i));
+            }
+        }
+
+        EXPECT_FALSE(client_->ReceiveSelectBlock().has_value());
+        EXPECT_EQ(1000u, num);
+
+        client_->EndSelect();
+        client_->EndSelect();
+    }
+    catch (const clickhouse::ServerError & e) {
+        if (e.GetCode() == ErrorCodes::ACCESS_DENIED)
+            GTEST_SKIP() << e.what() << " : " << GetParam();
+        else
+            throw;
+    }
+}
+
+TEST_P(ClientCase, StreamingSelectPreservesQueryCallbacks) {
+    try {
+        Query query("SELECT * FROM system.numbers LIMIT 10;");
+
+        std::optional<Profile> profile;
+        size_t total_rows = 0;
+
+        query.OnProfile([&profile](const Profile& new_profile) {
+            profile = new_profile;
+        });
+
+        client_->BeginSelect(query);
+        while (auto block = client_->ReceiveSelectBlock()) {
+            total_rows += block->GetRowCount();
+        }
+        client_->EndSelect();
+
+        EXPECT_EQ(10u, total_rows);
+        ASSERT_NE(profile, std::nullopt);
+        EXPECT_GE(profile->rows, 10u);
+        EXPECT_GE(profile->blocks, 1u);
+        EXPECT_GT(profile->bytes, 1u);
+    }
+    catch (const clickhouse::ServerError & e) {
+        if (e.GetCode() == ErrorCodes::ACCESS_DENIED)
+            GTEST_SKIP() << e.what() << " : " << GetParam();
+        else
+            throw;
+    }
+}
+
+TEST_P(ClientCase, StreamingSelectCanEndEarly) {
+    try {
+        client_->BeginSelect("SELECT number FROM system.numbers LIMIT 1000000");
+
+        ASSERT_TRUE(client_->ReceiveSelectBlock().has_value());
+
+        EXPECT_NO_THROW(client_->EndSelect());
+        EXPECT_NO_THROW(client_->EndSelect());
+
+        size_t total_rows = 0;
+        client_->Select("SELECT 1", [&total_rows](const Block& next_block) {
+            total_rows += next_block.GetRowCount();
+        });
+        EXPECT_EQ(1u, total_rows);
+    }
+    catch (const clickhouse::ServerError & e) {
+        if (e.GetCode() == ErrorCodes::ACCESS_DENIED)
+            GTEST_SKIP() << e.what() << " : " << GetParam();
+        else
+            throw;
+    }
+}
+
+TEST_P(ClientCase, StreamingSelectAfterEosCanReuseConnection) {
+    try {
+        size_t total_rows = 0;
+
+        client_->BeginSelect("SELECT number FROM system.numbers LIMIT 10");
+        while (auto block = client_->ReceiveSelectBlock()) {
+            total_rows += block->GetRowCount();
+        }
+        client_->EndSelect();
+
+        EXPECT_EQ(10u, total_rows);
+
+        size_t reused_rows = 0;
+        client_->Select("SELECT 1", [&reused_rows](const Block& block) {
+            reused_rows += block.GetRowCount();
+        });
+        EXPECT_EQ(1u, reused_rows);
+    }
+    catch (const clickhouse::ServerError & e) {
+        if (e.GetCode() == ErrorCodes::ACCESS_DENIED)
+            GTEST_SKIP() << e.what() << " : " << GetParam();
+        else
+            throw;
+    }
+}
+
+TEST_P(ClientCase, StreamingSelectExceptionCanCleanupAndReuseConnection) {
+    client_->BeginSelect("SELECT missing_streaming_select_column FROM system.one");
+
+    EXPECT_THROW(client_->ReceiveSelectBlock(), ServerException);
+    EXPECT_NO_THROW(client_->EndSelect());
+
+    size_t reused_rows = 0;
+    client_->Select("SELECT 1", [&reused_rows](const Block& block) {
+        reused_rows += block.GetRowCount();
+    });
+    EXPECT_EQ(1u, reused_rows);
+}
+
 TEST_P(ClientCase, SimpleAggregateFunction) {
     const auto & server_info = client_->GetServerInfo();
     if (versionNumber(server_info) < versionNumber(19, 9)) {
