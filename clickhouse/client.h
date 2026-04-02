@@ -270,6 +270,18 @@ public:
     /// Alias for Execute.
     void Select(const Query& query);
 
+    /// Start a select query and consume result blocks with ReceiveSelectBlock.
+    void BeginSelect(const Query& query);
+    void BeginSelect(const char* query);
+    void BeginSelect(const std::string& query);
+    void BeginSelect(const std::string& query, const std::string& query_id);
+
+    /// Receive the next block for a select session started by BeginSelect.
+    std::optional<Block> ReceiveSelectBlock();
+
+    /// End a select session started by BeginSelect.
+    void EndSelect();
+
     /// Intends for insert block of data into a table \p table_name.
     void Insert(const std::string& table_name, const Block& block);
     void Insert(const std::string& table_name, const std::string& query_id, const Block& block);
