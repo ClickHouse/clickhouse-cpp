@@ -18,7 +18,7 @@ C++ client for [ClickHouse](https://clickhouse.com/).
 * String
 * LowCardinality(String) or LowCardinality(FixedString(N))
 * Tuple
-* UInt8, UInt16, UInt32, UInt64, Int8, Int16, Int32, Int64
+* UInt8, UInt16, UInt32, UInt64, Int8, Int16, Int32, Int64, Bool
 * UInt128, Int128
 * UUID
 * Map

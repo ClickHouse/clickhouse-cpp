@@ -358,6 +358,9 @@ std::ostream& operator<<(std::ostream& ostr, const ItemView& item_view) {
         case Type::Int64:
             ostr << item_view.get<int64_t>();
             break;
+        case Type::Bool:
+            ostr << static_cast<bool>(item_view.get<bool>());
+            break;
         case Type::UInt8:
             ostr << static_cast<unsigned int>(item_view.get<uint8_t>());
             break;
