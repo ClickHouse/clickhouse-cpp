@@ -115,7 +115,7 @@ void Block::Reserve(size_t new_cap) {
 
 
 
-ColumnRef Block::operator [] (size_t idx) const {
+ColumnRef Block::At(size_t idx) const {
     if (idx < columns_.size()) {
         return columns_[idx].column;
     }

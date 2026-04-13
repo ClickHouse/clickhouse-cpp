@@ -1385,6 +1385,190 @@ TEST_P(ClientCase, SelectAggregateFunction) {
 }
 
 
+// ============================================================================
+// Interactive (pull-based) Select API tests
+// ============================================================================
+
+TEST_P(ClientCase, InteractiveSelect_Basic) {
+    client_->Execute("CREATE TEMPORARY TABLE IF NOT EXISTS test_interactive_basic (id UInt64)");
+
+    {
+        Block block;
+        auto id = std::make_shared<ColumnUInt64>();
+        id->Append(1);
+        id->Append(2);
+        id->Append(3);
+        block.AppendColumn("id", id);
+        client_->Insert("test_interactive_basic", block);
+    }
+
+    // Initially not selecting.
+    EXPECT_FALSE(client_->IsSelecting());
+
+    client_->BeginSelect("SELECT id FROM test_interactive_basic ORDER BY id");
+    EXPECT_TRUE(client_->IsSelecting());
+
+    std::vector<uint64_t> values;
+    while (auto block = client_->NextBlock()) {
+        if (block->GetRowCount() == 0) continue;
+        auto col = block->At(0)->AsStrict<ColumnUInt64>();
+        for (size_t i = 0; i < block->GetRowCount(); ++i) {
+            values.push_back(col->At(i));
+        }
+    }
+
+    EXPECT_FALSE(client_->IsSelecting());
+    ASSERT_EQ(3u, values.size());
+    EXPECT_EQ(1u, values[0]);
+    EXPECT_EQ(2u, values[1]);
+    EXPECT_EQ(3u, values[2]);
+
+    // Client is reusable after drain.
+    client_->BeginSelect("SELECT CAST(42, 'UInt64') AS val");
+    {
+        uint64_t val = 0;
+        size_t rows = 0;
+        while (auto b = client_->NextBlock()) {
+            for (size_t i = 0; i < b->GetRowCount(); ++i) {
+                val = b->At(0)->AsStrict<ColumnUInt64>()->At(i);
+                rows++;
+            }
+        }
+        EXPECT_EQ(1u, rows);
+        EXPECT_EQ(42u, val);
+    }
+    EXPECT_FALSE(client_->IsSelecting());
+}
+
+TEST_P(ClientCase, InteractiveSelect_MultipleBlocks) {
+    Query query("SELECT number FROM system.numbers LIMIT 10");
+    query.SetSetting("max_block_size", {"2"});
+
+    client_->BeginSelect(query);
+
+    size_t block_count = 0;
+    std::vector<uint64_t> values;
+    while (auto block = client_->NextBlock()) {
+        if (block->GetRowCount() == 0) continue;
+        EXPECT_LE(block->GetRowCount(), 2u);
+        block_count++;
+        auto col = block->At(0)->AsStrict<ColumnUInt64>();
+        for (size_t i = 0; i < block->GetRowCount(); ++i) {
+            values.push_back(col->At(i));
+        }
+    }
+
+    EXPECT_EQ(10u, values.size());
+    EXPECT_GE(block_count, 2u);
+    for (size_t i = 0; i < values.size(); ++i) {
+        EXPECT_EQ(i, values[i]);
+    }
+}
+
+TEST_P(ClientCase, InteractiveSelect_Cancel) {
+    // Cancel mid-stream on a large result set with small blocks to ensure
+    // we don't receive all data in a single block.
+    Query query("SELECT number FROM system.numbers LIMIT 100000");
+    query.SetSetting("max_block_size", {"100"});
+
+    client_->BeginSelect(query);
+    // Consume one block of data, skipping any blocks with 0 rows.
+    size_t rows_before_cancel = 0;
+    while (auto b = client_->NextBlock()) {
+        if (b->GetRowCount() == 0) continue;
+        rows_before_cancel = b->GetRowCount();
+        break;
+    }
+    ASSERT_GT(rows_before_cancel, 0u);
+    ASSERT_LT(rows_before_cancel, 100000u);
+    EXPECT_TRUE(client_->IsSelecting());
+
+    EXPECT_NO_THROW(client_->Cancel());
+    EXPECT_FALSE(client_->IsSelecting());
+
+    // Client is reusable after cancel.
+    client_->BeginSelect("SELECT 99 AS val");
+    {
+        size_t rows = 0;
+        while (auto b = client_->NextBlock()) {
+            for (size_t i = 0; i < b->GetRowCount(); ++i) {
+                EXPECT_EQ(99u, b->At(0)->AsStrict<ColumnUInt8>()->At(i));
+                rows++;
+            }
+        }
+        EXPECT_EQ(1u, rows);
+    }
+
+}
+
+TEST_P(ClientCase, InteractiveSelect_StateErrors) {
+    // NextBlock while idle.
+    EXPECT_THROW(client_->NextBlock(), ValidationError);
+
+    // Cancel while idle.
+    EXPECT_THROW(client_->Cancel(), ValidationError);
+
+    // Double BeginSelect.
+    client_->BeginSelect("SELECT 1");
+    EXPECT_THROW(client_->BeginSelect("SELECT 2"), ValidationError);
+    client_->Cancel();
+
+    // Server error (non-existent table) resets state back to Idle.
+    client_->BeginSelect("SELECT * FROM non_existent_table_xyz_clickhouse_cpp_test");
+    EXPECT_THROW(client_->NextBlock(), ServerException);
+    EXPECT_FALSE(client_->IsSelecting());
+
+    // Client is usable after server error.
+    client_->BeginSelect("SELECT 1 AS val");
+    {
+        size_t rows = 0;
+        while (auto b = client_->NextBlock()) {
+            for (size_t i = 0; i < b->GetRowCount(); ++i) {
+                EXPECT_EQ(1u, b->At(0)->AsStrict<ColumnUInt8>()->At(i));
+                rows++;
+            }
+        }
+        EXPECT_EQ(1u, rows);
+    }
+}
+
+TEST_P(ClientCase, InteractiveSelect_WithCallbacks) {
+    client_->Execute("CREATE TEMPORARY TABLE IF NOT EXISTS test_interactive_cb (id UInt64)");
+
+    {
+        Block block;
+        auto id = std::make_shared<ColumnUInt64>();
+        for (uint64_t i = 0; i < 100; ++i) {
+            id->Append(i);
+        }
+        block.AppendColumn("id", id);
+        client_->Insert("test_interactive_cb", block);
+    }
+
+    size_t callback_rows = 0;
+    bool progress_received = false;
+
+    Query query("SELECT id FROM test_interactive_cb");
+    query.OnData([&](const Block& block) {
+        callback_rows += block.GetRowCount();
+    });
+    query.OnProgress([&](const Progress&) {
+        progress_received = true;
+    });
+
+    client_->BeginSelect(query);
+
+    size_t nextblock_rows = 0;
+    while (auto block = client_->NextBlock()) {
+        nextblock_rows += block->GetRowCount();
+    }
+
+    EXPECT_EQ(100u, nextblock_rows);
+    // OnData fires for non-empty blocks too — both methods see the data.
+    EXPECT_GT(callback_rows, 0u);
+    EXPECT_TRUE(progress_received);
+}
+
 const auto LocalHostEndpoint = ClientOptions()
         .SetHost(           getEnvOrDefault("CLICKHOUSE_HOST",     "localhost"))
         .SetPort(   getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "9000"))

@@ -247,6 +247,9 @@ public:
     /// Intends for execute arbitrary queries.
     void Execute(const Query& query);
 
+    /// Alias for Execute.
+    void Select(const Query& query);
+
     /// Intends for execute select queries.  Data will be returned with
     /// one or more call of \p cb.
     void Select(const std::string& query, SelectCallback cb);
@@ -267,8 +270,30 @@ public:
     void SelectWithExternalDataCancelable(const std::string& query, const ExternalTables& external_tables, SelectCancelableCallback cb);
     void SelectWithExternalDataCancelable(const std::string& query, const std::string& query_id, const ExternalTables& external_tables, SelectCancelableCallback cb);
 
-    /// Alias for Execute.
-    void Select(const Query& query);
+    /// EXPERIMENTAL. Intends for execute arbitrary queries while reading the data interactively with
+    /// NextBlock().
+    void BeginExecute(const Query& query);
+
+    /// EXPERIMENTAL. Alias for BeginExecute.
+    void BeginSelect(const Query& query);
+
+    /// EXPERIMENTAL. Interactive version of select, data will be returned on consequent calls
+    /// to NextBlock().
+    void BeginSelect(const char* query);
+    void BeginSelect(const std::string& query);
+    void BeginSelect(const std::string& query, const std::string& query_id);
+
+    /// Returns the next block in the dataset after using BeginSelect family of functions
+    /// functions.
+    std::optional<Block> NextBlock();
+
+    // EXPERIMENTAL. Cancels current execution of BeginSelect and drains all in-flight data.
+    // Consecutive calls to NextBlock() after Cancel() will throw an exception.
+    void Cancel();
+
+    // EXPERIMENTAL. Returns true if the client is still in data-receiving mode and more future
+    // calls to NextBlock().
+    bool IsSelecting() const;
 
     /// Intends for insert block of data into a table \p table_name.
     void Insert(const std::string& table_name, const Block& block);
@@ -283,6 +308,8 @@ public:
 
     /// End an \p INSERT session started by \p BeginInsert.
     void EndInsert();
+
+    bool IsInserting() const;
 
     /// Ping server for aliveness.
     void Ping();
