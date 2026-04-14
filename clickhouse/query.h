@@ -229,8 +229,8 @@ private:
     }
 
 private:
-    const std::string query_;
-    const std::string query_id_;
+    std::string query_;
+    std::string query_id_;
     std::optional<open_telemetry::TracingContext> tracing_context_;
     QuerySettings query_settings_;
     QueryParams query_params_;
