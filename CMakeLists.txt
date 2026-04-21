@@ -21,6 +21,7 @@ OPTION (WITH_SYSTEM_ZSTD "Use system ZSTD" OFF)
 OPTION (DEBUG_DEPENDENCIES "Print debug info about dependencies duting build" ON)
 OPTION (CHECK_VERSION "Check that version number corresponds to git tag, usefull in CI/CD to validate that new version published on GitHub has same version in sources" OFF)
 OPTION (DISABLE_CLANG_LIBC_WORKAROUND "Disable linking compiler-rt & gcc_s if using clang & libstdc++" OFF)
+OPTION (CH_MAP_BOOL_TO_UINT8 "Map ClickHouse Bool type to UInt8 instead of exposing a distinct Bool API." ON)
 
 PROJECT (CLICKHOUSE-CLIENT
     VERSION "${CLICKHOUSE_CPP_VERSION}"
