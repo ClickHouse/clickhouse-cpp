@@ -6,6 +6,7 @@ C++ client for [ClickHouse](https://clickhouse.com/).
 ## Supported data types
 
 * Array(T)
+* Bool (mapped to UInt8 by default; use `-DCH_MAP_BOOL_TO_UINT8=OFF` for a distinct `clickhouse::Bool`/`ColumnBool` API)
 * Date
 * DateTime, DateTime64
 * DateTime([timezone]), DateTime64(N, [timezone])
@@ -23,6 +24,10 @@ C++ client for [ClickHouse](https://clickhouse.com/).
 * UUID
 * Map
 * Point, Ring, Polygon, MultiPolygon
+
+The distinct `Bool` type will become the default in some future version. The
+current mapping to `UInt8` is provided only for compatibility and controlled via
+`DCH_MAP_BOOL_TO_UINT8`.
 
 ## Dependencies
 In the most basic case one needs only:
@@ -256,5 +261,3 @@ client.Insert("default.test", block);
 ```sql
 ALTER USER insert_account SETTINGS async_insert=1,wait_for_async_insert=1,async_insert_use_adaptive_busy_timeout=0,async_insert_busy_timeout_ms=5000,async_insert_max_data_size=104857600
 ```
-
-

@@ -62,7 +62,15 @@ class CreateColumnByTypeWithName : public ::testing::TestWithParam<const char* /
 TEST(CreateColumnByType, Bool) {
     const auto col = CreateColumnByType("Bool");
     ASSERT_NE(nullptr, col);
+#if CH_MAP_BOOL_TO_UINT8
     EXPECT_EQ(col->GetType().GetName(), "UInt8");
+    EXPECT_EQ(col->GetType().GetCode(), Type::UInt8);
+    EXPECT_NE(nullptr, col->As<ColumnUInt8>());
+#else
+    EXPECT_EQ(col->GetType().GetName(), "Bool");
+    EXPECT_EQ(col->GetType().GetCode(), Type::Bool);
+    EXPECT_NE(nullptr, col->As<ColumnBool>());
+#endif
 }
 
 TEST_P(CreateColumnByTypeWithName, CreateColumnByType)
@@ -75,6 +83,9 @@ TEST_P(CreateColumnByTypeWithName, CreateColumnByType)
 INSTANTIATE_TEST_SUITE_P(Basic, CreateColumnByTypeWithName, ::testing::Values(
     "Int8", "Int16", "Int32", "Int64",
     "UInt8", "UInt16", "UInt32", "UInt64",
+#if !CH_MAP_BOOL_TO_UINT8
+    "Bool",
+#endif
     "String", "Date", "DateTime",
     "UUID", "Int128", "UInt128"
 ));

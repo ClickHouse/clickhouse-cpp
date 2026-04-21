@@ -32,7 +32,11 @@ static const std::unordered_map<std::string, Type::Code> kTypeCode = {
     { "Int16",       Type::Int16 },
     { "Int32",       Type::Int32 },
     { "Int64",       Type::Int64 },
+#if CH_MAP_BOOL_TO_UINT8
     { "Bool",        Type::UInt8 },
+#else
+    { "Bool",        Type::Bool },
+#endif
     { "UInt8",       Type::UInt8 },
     { "UInt16",      Type::UInt16 },
     { "UInt32",      Type::UInt32 },

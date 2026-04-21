@@ -361,6 +361,11 @@ std::ostream& operator<<(std::ostream& ostr, const ItemView& item_view) {
         case Type::UInt8:
             ostr << static_cast<unsigned int>(item_view.get<uint8_t>());
             break;
+#if !CH_MAP_BOOL_TO_UINT8
+        case Type::Bool:
+            ostr << (item_view.get<Bool>() ? "true" : "false");
+            break;
+#endif
         case Type::UInt16:
             ostr << static_cast<unsigned int>(item_view.get<uint16_t>());
             break;

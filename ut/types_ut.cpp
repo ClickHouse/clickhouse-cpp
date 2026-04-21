@@ -1,5 +1,6 @@
 #include <clickhouse/types/types.h>
 #include <clickhouse/columns/factory.h>
+#include <clickhouse/columns/numeric.h>
 #include <ut/utils.h>
 
 #include <gtest/gtest.h>
@@ -34,7 +35,27 @@ TEST(TypesCase, TypeName) {
     );
 
     ASSERT_EQ(Type::CreateMap(Type::CreateSimple<int32_t>(), Type::CreateString())->GetName(), "Map(Int32, String)");
+
+#if !CH_MAP_BOOL_TO_UINT8
+    ASSERT_EQ(Type::CreateSimple<Bool>()->GetName(), "Bool");
+#endif
 }
+
+#if !CH_MAP_BOOL_TO_UINT8
+TEST(TypesCase, ColumnBool) {
+    auto col = std::make_shared<ColumnBool>();
+    col->Append(true_);
+    col->Append(false_);
+    col->Append(true_);
+
+    ASSERT_EQ(col->Size(), 3u);
+    ASSERT_EQ(col->At(0), true_);
+    ASSERT_EQ(col->At(1), false_);
+    ASSERT_EQ(col->At(2), true_);
+    ASSERT_EQ(col->GetType().GetName(), "Bool");
+    ASSERT_EQ(col->GetType().GetCode(), Type::Bool);
+}
+#endif
 
 TEST(TypesCase, NullableType) {
     TypeRef nested = Type::CreateSimple<int32_t>();

@@ -9,11 +9,25 @@
 #include <vector>
 #include <stdexcept>
 
+#ifndef CH_MAP_BOOL_TO_UINT8
+#define CH_MAP_BOOL_TO_UINT8 1
+#endif
+
 namespace clickhouse {
 
 using Int128 = absl::int128;
 using UInt128 = absl::uint128;
 using Int64 = int64_t;
+
+#if !CH_MAP_BOOL_TO_UINT8
+/// Distinct type for the ClickHouse Bool type. Backed by `bool` so it has the
+/// same single-byte layout as `uint8_t` without std::vector<bool>'s
+/// bit-packing, while remaining a type distinct from all integer types.
+enum Bool : bool {
+    false_ = false,
+    true_ = true,
+};
+#endif
 
 using TypeRef = std::shared_ptr<class Type>;
 
@@ -59,6 +73,9 @@ public:
         MultiPolygon,
         Time,
         Time64,
+#if !CH_MAP_BOOL_TO_UINT8
+        Bool,
+#endif
     };
 
     using EnumItem = std::pair<std::string /* name */, int16_t /* value */>;
@@ -383,6 +400,13 @@ template <>
 inline TypeRef Type::CreateSimple<uint64_t>() {
     return TypeRef(new Type(UInt64));
 }
+
+#if !CH_MAP_BOOL_TO_UINT8
+template <>
+inline TypeRef Type::CreateSimple<Bool>() {
+    return TypeRef(new Type(Bool));
+}
+#endif
 
 template <>
 inline TypeRef Type::CreateSimple<float>() {

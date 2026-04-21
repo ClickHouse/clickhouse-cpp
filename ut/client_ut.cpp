@@ -22,6 +22,22 @@
 
 using namespace clickhouse;
 
+#if CH_MAP_BOOL_TO_UINT8
+using ClientBoolColumn = ColumnUInt8;
+using ClientBoolValue = uint8_t;
+#else
+using ClientBoolColumn = ColumnBool;
+using ClientBoolValue = Bool;
+#endif
+
+ClientBoolValue MakeClientBoolValue(bool value) {
+#if CH_MAP_BOOL_TO_UINT8
+    return static_cast<uint8_t>(value);
+#else
+    return static_cast<Bool>(value);
+#endif
+}
+
 template <typename T>
 std::shared_ptr<T> createTableWithOneColumn(Client & client, const std::string & table_name, const std::string & column_name)
 {
@@ -400,11 +416,11 @@ TEST_P(ClientCase, Generic) {
 
         auto id = std::make_shared<ColumnUInt64>();
         auto name = std::make_shared<ColumnString>();
-        auto f = std::make_shared<ColumnUInt8> ();
+        auto f = std::make_shared<ClientBoolColumn>();
         for (auto const& td : TEST_DATA) {
             id->Append(td.id);
             name->Append(td.name);
-            f->Append(td.f);
+            f->Append(MakeClientBoolValue(td.f));
         }
 
         block.AppendColumn("id"  , id);
@@ -426,7 +442,7 @@ TEST_P(ClientCase, Generic) {
             for (size_t c = 0; c < block.GetRowCount(); ++c, ++row) {
                 EXPECT_EQ(TEST_DATA[row].id, (*block[0]->As<ColumnUInt64>())[c]);
                 EXPECT_EQ(TEST_DATA[row].name, (*block[1]->As<ColumnString>())[c]);
-                EXPECT_EQ(TEST_DATA[row].f, (*block[2]->As<ColumnUInt8>())[c]);
+                EXPECT_EQ(MakeClientBoolValue(TEST_DATA[row].f), (*block[2]->As<ClientBoolColumn>())[c]);
             }
         }
     );
@@ -468,13 +484,13 @@ TEST_P(ClientCase, InsertData) {
         // Fetch the derived columns.
         auto id = block[0]->As<ColumnUInt64>();
         auto name = block[1]->As<ColumnString>();
-        auto f = block[2]->As<ColumnUInt8>();
+        auto f = block[2]->As<ClientBoolColumn>();
 
         // Insert some values.
         for (auto const& td : TEST_DATA) {
             id->Append(td.id);
             name->Append(td.name);
-            f->Append(td.f);
+            f->Append(MakeClientBoolValue(td.f));
         }
         block.RefreshRowCount();
         client_->SendInsertBlock(block);
@@ -484,7 +500,7 @@ TEST_P(ClientCase, InsertData) {
         for (auto const& td : TEST_DATA2) {
             id->Append(td.id);
             name->Append(td.name);
-            f->Append(td.f);
+            f->Append(MakeClientBoolValue(td.f));
         }
         block.RefreshRowCount();
         client_->SendInsertBlock(block);
@@ -509,13 +525,13 @@ TEST_P(ClientCase, InsertData) {
                 for (size_t c = 0; c < block.GetRowCount(); ++c, ++row) {
                     EXPECT_EQ(TEST_DATA[row].id, (*block[0]->As<ColumnUInt64>())[c]);
                     EXPECT_EQ(TEST_DATA[row].name, (*block[1]->As<ColumnString>())[c]);
-                    EXPECT_EQ(TEST_DATA[row].f, (*block[2]->As<ColumnUInt8>())[c]);
+                    EXPECT_EQ(MakeClientBoolValue(TEST_DATA[row].f), (*block[2]->As<ClientBoolColumn>())[c]);
                 }
             } else {
                 for (size_t c = 0; c < block.GetRowCount(); ++c, ++row) {
                     EXPECT_EQ(TEST_DATA2[row-block_two_row_num].id, (*block[0]->As<ColumnUInt64>())[c]);
                     EXPECT_EQ(TEST_DATA2[row-block_two_row_num].name, (*block[1]->As<ColumnString>())[c]);
-                    EXPECT_EQ(TEST_DATA2[row-block_two_row_num].f, (*block[2]->As<ColumnUInt8>())[c]);
+                    EXPECT_EQ(MakeClientBoolValue(TEST_DATA2[row-block_two_row_num].f), (*block[2]->As<ClientBoolColumn>())[c]);
                 }
             }
         }
