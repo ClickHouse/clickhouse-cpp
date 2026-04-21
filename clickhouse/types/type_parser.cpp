@@ -22,7 +22,9 @@ bool TypeAst::operator==(const TypeAst & other) const {
     return meta == other.meta
         && code == other.code
         && name == other.name
+        && element_name == other.element_name
         && value == other.value
+        && value_string == other.value_string
         && std::equal(elements.begin(), elements.end(), other.elements.begin(), other.elements.end());
 }
 
@@ -167,6 +169,12 @@ bool TypeParser::Parse(TypeAst* type) {
                 break;
             }
             case Token::Name:
+                if (!type_->name.empty()) {
+                    // A second Name token on the same element means the
+                    // previous one was a field name in a named-tuple element
+                    // (e.g. "a" in "Tuple(a Int32, …)").
+                    type_->element_name = std::move(type_->name);
+                }
                 type_->meta = GetTypeMeta(token.value);
                 type_->name = token.value.to_string();
                 type_->code = GetTypeCode(type_->name);

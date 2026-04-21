@@ -31,6 +31,9 @@ struct TypeAst {
     /// Type's name.
     /// Need to cache TypeAst, so can't use StringView for name.
     std::string name;
+    /// Name of this element inside its parent (e.g. field name inside a named
+    /// Tuple). Empty for unnamed elements.
+    std::string element_name;
     /// Value associated with the node,
     /// used for fixed-width types and enum values.
     int64_t value = 0;
