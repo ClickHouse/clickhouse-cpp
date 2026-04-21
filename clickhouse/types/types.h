@@ -15,6 +15,14 @@ using Int128 = absl::int128;
 using UInt128 = absl::uint128;
 using Int64 = int64_t;
 
+/// Distinct type for the ClickHouse Bool type. Backed by `bool` so it has the
+/// same single-byte layout as `uint8_t` without std::vector<bool>'s
+/// bit-packing, while remaining a type distinct from all integer types.
+enum Bool : bool {
+    false_ = false,
+    true_ = true,
+};
+
 using TypeRef = std::shared_ptr<class Type>;
 
 class Type {
@@ -59,6 +67,7 @@ public:
         MultiPolygon,
         Time,
         Time64,
+        Bool,
     };
 
     using EnumItem = std::pair<std::string /* name */, int16_t /* value */>;
@@ -392,6 +401,11 @@ inline TypeRef Type::CreateSimple<uint32_t>() {
 template <>
 inline TypeRef Type::CreateSimple<uint64_t>() {
     return TypeRef(new Type(UInt64));
+}
+
+template <>
+inline TypeRef Type::CreateSimple<Bool>() {
+    return TypeRef(new Type(Bool));
 }
 
 template <>

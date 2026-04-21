@@ -6,6 +6,7 @@ C++ client for [ClickHouse](https://clickhouse.com/).
 ## Supported data types
 
 * Array(T)
+* Bool
 * Date
 * DateTime, DateTime64
 * DateTime([timezone]), DateTime64(N, [timezone])
@@ -256,5 +257,3 @@ client.Insert("default.test", block);
 ```sql
 ALTER USER insert_account SETTINGS async_insert=1,wait_for_async_insert=1,async_insert_use_adaptive_busy_timeout=0,async_insert_busy_timeout_ms=5000,async_insert_max_data_size=104857600
 ```
-
-

@@ -54,6 +54,7 @@ const char* Type::TypeName(Type::Code code) {
         case Type::Code::MultiPolygon:   return "MultiPolygon";
         case Type::Code::Time:           return "Time";
         case Type::Code::Time64:         return "Time64";
+        case Type::Code::Bool:           return "Bool";
     }
 
     return "Unknown type";
@@ -85,6 +86,7 @@ std::string Type::GetName() const {
         case Ring:
         case Polygon:
         case MultiPolygon:
+        case Bool:
             return TypeName(code_);
         case Time64:
             return As<Time64Type>()->GetName();
@@ -146,6 +148,7 @@ uint64_t Type::GetTypeUniqueId() const {
         case Ring:
         case Polygon:
         case MultiPolygon:
+        case Bool:
             // For simple types, unique ID is the same as Type::Code
             return code_;
 

@@ -113,6 +113,7 @@ template class ColumnVector<int16_t>;
 template class ColumnVector<int32_t>;
 template class ColumnVector<int64_t>;
 
+template class ColumnVector<Bool>;
 template class ColumnVector<uint8_t>;
 template class ColumnVector<uint16_t>;
 template class ColumnVector<uint32_t>;
