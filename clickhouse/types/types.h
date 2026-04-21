@@ -126,6 +126,9 @@ public:
 
     static TypeRef CreateTuple(const std::vector<TypeRef>& item_types);
 
+    static TypeRef CreateTuple(const std::vector<TypeRef>& item_types,
+                               std::vector<std::string> item_names);
+
     static TypeRef CreateEnum8(const std::vector<EnumItem>& enum_items);
 
     static TypeRef CreateEnum16(const std::vector<EnumItem>& enum_items);
@@ -293,14 +296,21 @@ private:
 class TupleType : public Type {
 public:
     explicit TupleType(const std::vector<TypeRef>& item_types);
+    TupleType(const std::vector<TypeRef>& item_types,
+              std::vector<std::string> item_names);
 
     std::string GetName() const;
 
     /// Type of nested Tuple element type.
     std::vector<TypeRef> GetTupleType() const { return item_types_; }
 
+    /// Field names for named tuples. Same length as GetTupleType() when
+    /// populated, or empty when the tuple has no field names.
+    const std::vector<std::string>& GetItemNames() const { return item_names_; }
+
 private:
     std::vector<TypeRef> item_types_;
+    std::vector<std::string> item_names_;
 };
 
 class LowCardinalityType : public Type {

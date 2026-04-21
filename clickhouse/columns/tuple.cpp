@@ -16,6 +16,13 @@ ColumnTuple::ColumnTuple(const std::vector<ColumnRef>& columns)
 {
 }
 
+ColumnTuple::ColumnTuple(const std::vector<ColumnRef>& columns,
+                         std::vector<std::string> names)
+    : Column(Type::CreateTuple(CollectTypes(columns), std::move(names)))
+    , columns_(columns)
+{
+}
+
 size_t ColumnTuple::TupleSize() const {
     return columns_.size();
 }
@@ -48,7 +55,11 @@ ColumnRef ColumnTuple::Slice(size_t begin, size_t len) const {
         sliced_columns.push_back(column->Slice(begin, len));
     }
 
-    return std::make_shared<ColumnTuple>(sliced_columns);
+    const auto& names = this->Type()->As<TupleType>()->GetItemNames();
+    if (names.empty()) {
+        return std::make_shared<ColumnTuple>(sliced_columns);
+    }
+    return std::make_shared<ColumnTuple>(sliced_columns, names);
 }
 
 ColumnRef ColumnTuple::CloneEmpty() const {
@@ -59,7 +70,11 @@ ColumnRef ColumnTuple::CloneEmpty() const {
         result_columns.push_back(column->CloneEmpty());
     }
 
-    return std::make_shared<ColumnTuple>(result_columns);
+    const auto& names = this->Type()->As<TupleType>()->GetItemNames();
+    if (names.empty()) {
+        return std::make_shared<ColumnTuple>(result_columns);
+    }
+    return std::make_shared<ColumnTuple>(result_columns, names);
 }
 
 bool ColumnTuple::LoadPrefix(InputStream* input, size_t rows) {
