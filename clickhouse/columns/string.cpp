@@ -136,8 +136,13 @@ struct ColumnString::Block
     std::string_view AppendUnsafe(std::string_view str) {
         const auto pos = &data_[size];
 
-        memcpy(pos, str.data(), str.size());
-        size += str.size();
+        // memcpy's source pointer is declared nonnull regardless of the
+        // size argument, so an empty string_view backed by std::string()
+        // (where data() may be null) trips UBSan on every empty append.
+        if (str.size() > 0) {
+            memcpy(pos, str.data(), str.size());
+            size += str.size();
+        }
 
         return std::string_view(pos, str.size());
     }
