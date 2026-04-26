@@ -47,7 +47,9 @@ ColumnRef RoundtripColumnValues(Client& client, ColumnRef expected) {
         client.Insert("temporary_roundtrip_table", block);
     }
 
-    client.Select("SELECT col FROM temporary_roundtrip_table ORDER BY id", [&result](const Block& b) {
+    std::string query = "SELECT col FROM temporary_roundtrip_table ORDER BY id "
+                        "SETTINGS output_format_native_write_json_as_string=1";
+    client.Select(query, [&result](const Block& b) {
         if (b.GetRowCount() == 0)
             return;
 

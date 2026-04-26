@@ -54,6 +54,7 @@ const char* Type::TypeName(Type::Code code) {
         case Type::Code::MultiPolygon:   return "MultiPolygon";
         case Type::Code::Time:           return "Time";
         case Type::Code::Time64:         return "Time64";
+        case Type::Code::JSON:           return "JSON";
     }
 
     return "Unknown type";
@@ -85,6 +86,7 @@ std::string Type::GetName() const {
         case Ring:
         case Polygon:
         case MultiPolygon:
+        case JSON:
             return TypeName(code_);
         case Time64:
             return As<Time64Type>()->GetName();
@@ -138,6 +140,7 @@ uint64_t Type::GetTypeUniqueId() const {
         case Float32:
         case Float64:
         case String:
+        case JSON:
         case IPv4:
         case IPv6:
         case Date:
@@ -277,6 +280,10 @@ TypeRef Type::CreatePolygon() {
 
 TypeRef Type::CreateMultiPolygon() {
     return TypeRef(new Type(Type::MultiPolygon));
+}
+
+TypeRef Type::CreateJSON() {
+    return TypeRef(new Type(Type::JSON));
 }
 
 /// class ArrayType

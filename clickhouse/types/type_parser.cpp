@@ -67,6 +67,7 @@ static const std::unordered_map<std::string, Type::Code> kTypeCode = {
     { "MultiPolygon", Type::MultiPolygon },
     { "Time",        Type::Time },
     { "Time64",      Type::Time64 },
+    { "JSON",        Type::JSON },
 };
 
 template <typename L, typename R>
