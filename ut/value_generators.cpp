@@ -51,6 +51,15 @@ std::vector<std::string> MakeStrings() {
     };
 }
 
+std::vector<std::string> MakeJSONs() {
+    return {
+        R"({})",
+        R"({"a":"1"})",
+        R"({"age":"30","name":"Alice"})",
+        R"({"escapes":"line1\nline2\t\"quoted\"","unicode":"éèê"})",
+    };
+}
+
 std::vector<UUID> MakeUUIDs() {
     return {
         UUID(0llu, 0llu),
