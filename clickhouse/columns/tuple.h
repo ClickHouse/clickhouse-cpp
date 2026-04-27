@@ -13,6 +13,8 @@ namespace clickhouse {
 class ColumnTuple : public Column {
 public:
     ColumnTuple(const std::vector<ColumnRef>& columns);
+    ColumnTuple(const std::vector<ColumnRef>& columns,
+                std::vector<std::string> names);
 
     /// Returns count of columns in the tuple.
     size_t TupleSize() const;

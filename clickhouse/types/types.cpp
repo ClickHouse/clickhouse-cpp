@@ -54,6 +54,7 @@ const char* Type::TypeName(Type::Code code) {
         case Type::Code::MultiPolygon:   return "MultiPolygon";
         case Type::Code::Time:           return "Time";
         case Type::Code::Time64:         return "Time64";
+        case Type::Code::Bool:           return "Bool";
     }
 
     return "Unknown type";
@@ -85,6 +86,7 @@ std::string Type::GetName() const {
         case Ring:
         case Polygon:
         case MultiPolygon:
+        case Bool:
             return TypeName(code_);
         case Time64:
             return As<Time64Type>()->GetName();
@@ -146,6 +148,7 @@ uint64_t Type::GetTypeUniqueId() const {
         case Ring:
         case Polygon:
         case MultiPolygon:
+        case Bool:
             // For simple types, unique ID is the same as Type::Code
             return code_;
 
@@ -241,6 +244,11 @@ TypeRef Type::CreateString(size_t n) {
 
 TypeRef Type::CreateTuple(const std::vector<TypeRef>& item_types) {
     return TypeRef(new TupleType(item_types));
+}
+
+TypeRef Type::CreateTuple(const std::vector<TypeRef>& item_types,
+                          std::vector<std::string> item_names) {
+    return TypeRef(new TupleType(item_types, std::move(item_names)));
 }
 
 TypeRef Type::CreateEnum8(const std::vector<EnumItem>& enum_items) {
@@ -447,6 +455,11 @@ NullableType::NullableType(TypeRef nested_type) : Type(Nullable), nested_type_(n
 TupleType::TupleType(const std::vector<TypeRef>& item_types) : Type(Tuple), item_types_(item_types) {
 }
 
+TupleType::TupleType(const std::vector<TypeRef>& item_types,
+                     std::vector<std::string> item_names)
+    : Type(Tuple), item_types_(item_types), item_names_(std::move(item_names)) {
+}
+
 /// class LowCardinalityType
 LowCardinalityType::LowCardinalityType(TypeRef nested_type) : Type(LowCardinality), nested_type_(nested_type) {
 }
@@ -456,13 +469,30 @@ LowCardinalityType::~LowCardinalityType() {
 
 std::string TupleType::GetName() const {
     std::string result("Tuple(");
+    bool has_complete_names = item_names_.size() == item_types_.size();
+    if (has_complete_names) {
+        for (const auto& item_name : item_names_) {
+            if (item_name.empty()) {
+                has_complete_names = false;
+                break;
+            }
+        }
+    }
 
     if (!item_types_.empty()) {
-        result += item_types_[0]->GetName();
+        if (has_complete_names) {
+            result += item_names_[0] + " " + item_types_[0]->GetName();
+        } else {
+            result += item_types_[0]->GetName();
+        }
     }
 
     for (size_t i = 1; i < item_types_.size(); ++i) {
-        result += ", " + item_types_[i]->GetName();
+        if (has_complete_names) {
+            result += ", " + item_names_[i] + " " + item_types_[i]->GetName();
+        } else {
+            result += ", " + item_types_[i]->GetName();
+        }
     }
 
     result += ")";

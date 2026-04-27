@@ -278,3 +278,6 @@ BUCKAROO_DEPS
 # Vim
 *.swp
 *.swo
+
+# clangd cache
+/.cache/clangd

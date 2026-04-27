@@ -400,11 +400,11 @@ TEST_P(ClientCase, Generic) {
 
         auto id = std::make_shared<ColumnUInt64>();
         auto name = std::make_shared<ColumnString>();
-        auto f = std::make_shared<ColumnUInt8> ();
+        auto f = std::make_shared<ColumnBool>();
         for (auto const& td : TEST_DATA) {
             id->Append(td.id);
             name->Append(td.name);
-            f->Append(td.f);
+            f->Append(static_cast<Bool>(td.f));
         }
 
         block.AppendColumn("id"  , id);
@@ -426,7 +426,7 @@ TEST_P(ClientCase, Generic) {
             for (size_t c = 0; c < block.GetRowCount(); ++c, ++row) {
                 EXPECT_EQ(TEST_DATA[row].id, (*block[0]->As<ColumnUInt64>())[c]);
                 EXPECT_EQ(TEST_DATA[row].name, (*block[1]->As<ColumnString>())[c]);
-                EXPECT_EQ(TEST_DATA[row].f, (*block[2]->As<ColumnUInt8>())[c]);
+                EXPECT_EQ(static_cast<Bool>(TEST_DATA[row].f), (*block[2]->As<ColumnBool>())[c]);
             }
         }
     );
@@ -468,13 +468,13 @@ TEST_P(ClientCase, InsertData) {
         // Fetch the derived columns.
         auto id = block[0]->As<ColumnUInt64>();
         auto name = block[1]->As<ColumnString>();
-        auto f = block[2]->As<ColumnUInt8>();
+        auto f = block[2]->As<ColumnBool>();
 
         // Insert some values.
         for (auto const& td : TEST_DATA) {
             id->Append(td.id);
             name->Append(td.name);
-            f->Append(td.f);
+            f->Append(static_cast<Bool>(td.f));
         }
         block.RefreshRowCount();
         client_->SendInsertBlock(block);
@@ -484,7 +484,7 @@ TEST_P(ClientCase, InsertData) {
         for (auto const& td : TEST_DATA2) {
             id->Append(td.id);
             name->Append(td.name);
-            f->Append(td.f);
+            f->Append(static_cast<Bool>(td.f));
         }
         block.RefreshRowCount();
         client_->SendInsertBlock(block);
@@ -509,13 +509,13 @@ TEST_P(ClientCase, InsertData) {
                 for (size_t c = 0; c < block.GetRowCount(); ++c, ++row) {
                     EXPECT_EQ(TEST_DATA[row].id, (*block[0]->As<ColumnUInt64>())[c]);
                     EXPECT_EQ(TEST_DATA[row].name, (*block[1]->As<ColumnString>())[c]);
-                    EXPECT_EQ(TEST_DATA[row].f, (*block[2]->As<ColumnUInt8>())[c]);
+                    EXPECT_EQ(static_cast<Bool>(TEST_DATA[row].f), (*block[2]->As<ColumnBool>())[c]);
                 }
             } else {
                 for (size_t c = 0; c < block.GetRowCount(); ++c, ++row) {
                     EXPECT_EQ(TEST_DATA2[row-block_two_row_num].id, (*block[0]->As<ColumnUInt64>())[c]);
                     EXPECT_EQ(TEST_DATA2[row-block_two_row_num].name, (*block[1]->As<ColumnString>())[c]);
-                    EXPECT_EQ(TEST_DATA2[row-block_two_row_num].f, (*block[2]->As<ColumnUInt8>())[c]);
+                    EXPECT_EQ(static_cast<Bool>(TEST_DATA2[row-block_two_row_num].f), (*block[2]->As<ColumnBool>())[c]);
                 }
             }
         }

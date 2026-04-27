@@ -1,5 +1,6 @@
 #include <clickhouse/types/types.h>
 #include <clickhouse/columns/factory.h>
+#include <clickhouse/columns/numeric.h>
 #include <ut/utils.h>
 
 #include <gtest/gtest.h>
@@ -34,11 +35,87 @@ TEST(TypesCase, TypeName) {
     );
 
     ASSERT_EQ(Type::CreateMap(Type::CreateSimple<int32_t>(), Type::CreateString())->GetName(), "Map(Int32, String)");
+
+    ASSERT_EQ(Type::CreateSimple<Bool>()->GetName(), "Bool");
+}
+
+TEST(TypesCase, ColumnBool) {
+    auto col = std::make_shared<ColumnBool>();
+    col->Append(true_);
+    col->Append(false_);
+    col->Append(true_);
+
+    ASSERT_EQ(col->Size(), 3u);
+    ASSERT_EQ(col->At(0), true_);
+    ASSERT_EQ(col->At(1), false_);
+    ASSERT_EQ(col->At(2), true_);
+    ASSERT_EQ(col->GetType().GetName(), "Bool");
+    ASSERT_EQ(col->GetType().GetCode(), Type::Bool);
 }
 
 TEST(TypesCase, NullableType) {
     TypeRef nested = Type::CreateSimple<int32_t>();
     ASSERT_EQ(Type::CreateNullable(nested)->As<NullableType>()->GetNestedType(), nested);
+}
+
+TEST(TypesCase, TupleTypeItemNames) {
+    auto unnamed = Type::CreateTuple({
+        Type::CreateSimple<int32_t>(),
+        Type::CreateString()});
+    ASSERT_TRUE(unnamed->As<TupleType>()->GetItemNames().empty());
+
+    auto named = Type::CreateTuple(
+        {Type::CreateSimple<int32_t>(), Type::CreateString()},
+        {"a", "b"});
+    const auto& names = named->As<TupleType>()->GetItemNames();
+    ASSERT_EQ(names.size(), 2u);
+    ASSERT_EQ(names[0], "a");
+    ASSERT_EQ(names[1], "b");
+}
+
+TEST(TypesCase, TupleTypeNameIncludesFieldNames) {
+    auto named = Type::CreateTuple(
+        {Type::CreateSimple<uint8_t>(), Type::CreateString()},
+        {"a", "b"});
+    ASSERT_EQ(named->GetName(), "Tuple(a UInt8, b String)");
+
+    auto partially_named = Type::CreateTuple(
+        {Type::CreateSimple<uint8_t>(), Type::CreateString()},
+        {"a", ""});
+    ASSERT_EQ(partially_named->GetName(), "Tuple(UInt8, String)");
+
+    auto mismatched_names = Type::CreateTuple(
+        {Type::CreateSimple<uint8_t>(), Type::CreateString()},
+        {"a"});
+    ASSERT_EQ(mismatched_names->GetName(), "Tuple(UInt8, String)");
+}
+
+TEST(TypesCase, TupleTypeNamesFromFactory) {
+    auto col = CreateColumnByType("Tuple(a UInt8, b String)");
+    ASSERT_NE(col, nullptr);
+    const auto& names = col->Type()->As<TupleType>()->GetItemNames();
+    ASSERT_EQ(names.size(), 2u);
+    ASSERT_EQ(names[0], "a");
+    ASSERT_EQ(names[1], "b");
+
+    auto col_unnamed = CreateColumnByType("Tuple(UInt8, String)");
+    ASSERT_NE(col_unnamed, nullptr);
+    ASSERT_TRUE(col_unnamed->Type()->As<TupleType>()->GetItemNames().empty());
+}
+
+TEST(TypesCase, TupleTypeEqualityIncludesFieldNames) {
+    auto unnamed = Type::CreateTuple(
+        {Type::CreateSimple<uint8_t>(), Type::CreateString()});
+    auto named_ab = Type::CreateTuple(
+        {Type::CreateSimple<uint8_t>(), Type::CreateString()},
+        {"a", "b"});
+    auto named_xy = Type::CreateTuple(
+        {Type::CreateSimple<uint8_t>(), Type::CreateString()},
+        {"x", "y"});
+
+    ASSERT_TRUE(named_ab->IsEqual(named_ab));
+    ASSERT_FALSE(named_ab->IsEqual(unnamed));
+    ASSERT_FALSE(named_ab->IsEqual(named_xy));
 }
 
 TEST(TypesCase, EnumTypes) {

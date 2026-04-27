@@ -15,6 +15,14 @@ using Int128 = absl::int128;
 using UInt128 = absl::uint128;
 using Int64 = int64_t;
 
+/// Distinct type for the ClickHouse Bool type. Backed by `bool` so it has the
+/// same single-byte layout as `uint8_t` without std::vector<bool>'s
+/// bit-packing, while remaining a type distinct from all integer types.
+enum Bool : bool {
+    false_ = false,
+    true_ = true,
+};
+
 using TypeRef = std::shared_ptr<class Type>;
 
 class Type {
@@ -59,6 +67,7 @@ public:
         MultiPolygon,
         Time,
         Time64,
+        Bool,
     };
 
     using EnumItem = std::pair<std::string /* name */, int16_t /* value */>;
@@ -125,6 +134,9 @@ public:
     static TypeRef CreateString(size_t n);
 
     static TypeRef CreateTuple(const std::vector<TypeRef>& item_types);
+
+    static TypeRef CreateTuple(const std::vector<TypeRef>& item_types,
+                               std::vector<std::string> item_names);
 
     static TypeRef CreateEnum8(const std::vector<EnumItem>& enum_items);
 
@@ -293,14 +305,21 @@ private:
 class TupleType : public Type {
 public:
     explicit TupleType(const std::vector<TypeRef>& item_types);
+    TupleType(const std::vector<TypeRef>& item_types,
+              std::vector<std::string> item_names);
 
     std::string GetName() const;
 
     /// Type of nested Tuple element type.
     std::vector<TypeRef> GetTupleType() const { return item_types_; }
 
+    /// Field names for named tuples. Same length as GetTupleType() when
+    /// populated, or empty when the tuple has no field names.
+    const std::vector<std::string>& GetItemNames() const { return item_names_; }
+
 private:
     std::vector<TypeRef> item_types_;
+    std::vector<std::string> item_names_;
 };
 
 class LowCardinalityType : public Type {
@@ -382,6 +401,11 @@ inline TypeRef Type::CreateSimple<uint32_t>() {
 template <>
 inline TypeRef Type::CreateSimple<uint64_t>() {
     return TypeRef(new Type(UInt64));
+}
+
+template <>
+inline TypeRef Type::CreateSimple<Bool>() {
+    return TypeRef(new Type(Bool));
 }
 
 template <>
