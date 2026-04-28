@@ -113,7 +113,8 @@ TEST(TypesCase, IsEqual) {
         "Point",
         "Ring",
         "Polygon",
-        "MultiPolygon"
+        "MultiPolygon",
+        "JSON",
     };
 
     // Check that Type::IsEqual returns true only if:

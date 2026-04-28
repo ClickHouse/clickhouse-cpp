@@ -2,6 +2,7 @@
 #include <clickhouse/columns/date.h>
 #include <clickhouse/columns/numeric.h>
 #include <clickhouse/columns/string.h>
+#include <clickhouse/columns/json.h>
 
 #include <gtest/gtest.h>
 

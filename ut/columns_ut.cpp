@@ -137,6 +137,30 @@ TEST(ColumnsCase, StringAppend) {
     ASSERT_EQ(col->At(2), "11");
 }
 
+TEST(ColumnsCase, JSONInit) {
+    auto values = MakeJSONs();
+    auto col = std::make_shared<ColumnJSON>(values);
+
+    ASSERT_EQ(col->Size(), values.size());
+    ASSERT_EQ(col->At(1), values[1]);
+    ASSERT_EQ(col->At(2), values[2]);
+    ASSERT_EQ(col->At(3), values[3]);
+}
+
+TEST(ColumnsCase, JSONAppend) {
+    auto col = std::make_shared<ColumnJSON>();
+    const char* expected = "\"ufiudhf3493fyiudferyer3yrifhdflkdjfeuroe\"";
+    std::string data(expected);
+    col->Append(data);
+    col->Append(std::move(data));
+    col->Append("11");
+
+    ASSERT_EQ(col->Size(), 3u);
+    ASSERT_EQ(col->At(0), expected);
+    ASSERT_EQ(col->At(1), expected);
+    ASSERT_EQ(col->At(2), "11");
+}
+
 TEST(ColumnsCase, TupleAppend){
     auto tuple1 = std::make_shared<ColumnTuple>(std::vector<ColumnRef>({
                                 std::make_shared<ColumnUInt64>(),
