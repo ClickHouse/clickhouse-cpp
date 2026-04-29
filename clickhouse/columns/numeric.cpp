@@ -113,6 +113,9 @@ template class ColumnVector<int16_t>;
 template class ColumnVector<int32_t>;
 template class ColumnVector<int64_t>;
 
+#if !CH_MAP_BOOL_TO_UINT8
+template class ColumnVector<Bool>;
+#endif
 template class ColumnVector<uint8_t>;
 template class ColumnVector<uint16_t>;
 template class ColumnVector<uint32_t>;

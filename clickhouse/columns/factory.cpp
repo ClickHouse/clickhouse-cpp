@@ -49,6 +49,10 @@ static ColumnRef CreateTerminalColumn(const TypeAst& ast) {
     case Type::Void:
         return std::make_shared<ColumnNothing>();
 
+#if !CH_MAP_BOOL_TO_UINT8
+    case Type::Bool:
+        return std::make_shared<ColumnBool>();
+#endif
     case Type::UInt8:
         return std::make_shared<ColumnUInt8>();
     case Type::UInt16:

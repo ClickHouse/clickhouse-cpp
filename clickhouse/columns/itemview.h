@@ -28,7 +28,12 @@ private:
     inline auto ConvertToStorageValue(const T& t) {
         if constexpr (std::is_same_v<std::string_view, T> || std::is_same_v<std::string, T>) {
             return std::string_view{t};
-        } else if constexpr (std::is_fundamental_v<T> || std::is_same_v<Int128, std::decay_t<T>> || std::is_same_v<UInt128, std::decay_t<T>>) {
+        } else if constexpr (std::is_fundamental_v<T>
+#if !CH_MAP_BOOL_TO_UINT8
+                          || std::is_same_v<Bool, std::decay_t<T>>
+#endif
+                          || std::is_same_v<Int128, std::decay_t<T>>
+                          || std::is_same_v<UInt128, std::decay_t<T>>) {
             return std::string_view{reinterpret_cast<const char*>(&t), sizeof(T)};
         } else {
             static_assert(!std::is_same_v<T, T>, "Unknown type, which can't be stored in ItemView");
@@ -65,7 +70,12 @@ public:
         using ValueType = std::remove_cv_t<std::decay_t<T>>;
         if constexpr (std::is_same_v<std::string_view, ValueType> || std::is_same_v<std::string, ValueType>) {
             return data;
-        } else if constexpr (std::is_fundamental_v<ValueType> || std::is_same_v<Int128, ValueType> || std::is_same_v<UInt128, ValueType>) {
+        } else if constexpr (std::is_fundamental_v<ValueType>
+#if !CH_MAP_BOOL_TO_UINT8
+                          || std::is_same_v<Bool, ValueType>
+#endif
+                          || std::is_same_v<Int128, ValueType>
+                          || std::is_same_v<UInt128, ValueType>) {
             if (sizeof(ValueType) == data.size()) {
                 return *reinterpret_cast<const T*>(data.data());
             } else {

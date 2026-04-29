@@ -44,6 +44,9 @@ void ItemView::ValidateData(Type::Code type, DataType data) {
         case Type::Code::Int8:
         case Type::Code::UInt8:
         case Type::Code::Enum8:
+#if !CH_MAP_BOOL_TO_UINT8
+        case Type::Code::Bool:
+#endif
             return AssertSize({1});
 
         case Type::Code::Int16:
