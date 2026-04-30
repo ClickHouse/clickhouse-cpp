@@ -162,16 +162,26 @@ static ColumnRef CreateColumnFromAst(const TypeAst& ast, CreateColumnByTypeSetti
 
         case TypeAst::Tuple: {
             std::vector<ColumnRef> columns;
+            std::vector<std::string> names;
 
             columns.reserve(ast.elements.size());
+            names.reserve(ast.elements.size());
+            bool any_named = false;
             for (const auto& elem : ast.elements) {
                 if (auto col = CreateColumnFromAst(elem, settings)) {
                     columns.push_back(col);
+                    names.push_back(elem.element_name);
+                    if (!elem.element_name.empty()) {
+                        any_named = true;
+                    }
                 } else {
                     return nullptr;
                 }
             }
 
+            if (any_named) {
+                return std::make_shared<ColumnTuple>(columns, std::move(names));
+            }
             return std::make_shared<ColumnTuple>(columns);
         }
 

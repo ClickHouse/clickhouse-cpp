@@ -89,8 +89,26 @@ TEST(TypeParserCase, ParseTuple) {
     auto element = ast.elements.begin();
     for (size_t i = 0; i < 2; ++i) {
         ASSERT_EQ(element->name, names[i]);
+        ASSERT_TRUE(element->element_name.empty());
         ++element;
     }
+}
+
+TEST(TypeParserCase, ParseNamedTuple) {
+    TypeAst ast;
+    TypeParser("Tuple(a UInt8, b String)").Parse(&ast);
+    ASSERT_EQ(ast.meta, TypeAst::Tuple);
+    ASSERT_EQ(ast.name, "Tuple");
+    ASSERT_EQ(ast.code, Type::Tuple);
+    ASSERT_EQ(ast.elements.size(), 2u);
+
+    ASSERT_EQ(ast.elements[0].element_name, "a");
+    ASSERT_EQ(ast.elements[0].name, "UInt8");
+    ASSERT_EQ(ast.elements[0].code, Type::UInt8);
+
+    ASSERT_EQ(ast.elements[1].element_name, "b");
+    ASSERT_EQ(ast.elements[1].name, "String");
+    ASSERT_EQ(ast.elements[1].code, Type::String);
 }
 
 TEST(TypeParserCase, ParseDecimal) {
@@ -167,6 +185,20 @@ TEST(TypeParserCase, ParseDateTime_MINSK_TIMEZONE) {
     ASSERT_EQ(ast.elements[0].meta, TypeAst::Terminal);
 }
 
+TEST(TypeParserCase, EqualityIncludesValueString) {
+    TypeAst utc;
+    TypeAst minsk;
+    ASSERT_TRUE(TypeParser("DateTime('UTC')").Parse(&utc));
+    ASSERT_TRUE(TypeParser("DateTime('Europe/Minsk')").Parse(&minsk));
+    ASSERT_NE(utc, minsk);
+
+    TypeAst enum_one;
+    TypeAst enum_two;
+    ASSERT_TRUE(TypeParser("Enum8('ONE' = 1)").Parse(&enum_one));
+    ASSERT_TRUE(TypeParser("Enum8('TWO' = 1)").Parse(&enum_two));
+    ASSERT_NE(enum_one, enum_two);
+}
+
 TEST(TypeParserCase, LowCardinality_String) {
     TypeAst ast;
     ASSERT_TRUE(TypeParser("LowCardinality(String)").Parse(&ast));
@@ -194,7 +226,7 @@ TEST(TypeParserCase, LowCardinality_FixedString) {
     ASSERT_EQ(ast.elements[0].name, "FixedString");
     ASSERT_EQ(ast.elements[0].value, 0);
     ASSERT_EQ(ast.elements[0].elements.size(), 1u);
-    auto param = TypeAst{TypeAst::Number, Type::Void, "", 10, {}, {}};
+    auto param = TypeAst{TypeAst::Number, Type::Void, "", "", 10, {}, {}};
     ASSERT_EQ(ast.elements[0].elements[0], param);
 }
 
