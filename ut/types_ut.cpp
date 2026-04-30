@@ -62,15 +62,17 @@ TEST(TypesCase, TupleTypeNameIncludesFieldNames) {
         {"a", "b"});
     ASSERT_EQ(named->GetName(), "Tuple(a UInt8, b String)");
 
-    auto partially_named = Type::CreateTuple(
-        {Type::CreateSimple<uint8_t>(), Type::CreateString()},
-        {"a", ""});
-    ASSERT_EQ(partially_named->GetName(), "Tuple(UInt8, String)");
+    ASSERT_THROW(
+        Type::CreateTuple(
+            {Type::CreateSimple<uint8_t>(), Type::CreateString()},
+            {"a", ""}),
+        ValidationError);
 
-    auto mismatched_names = Type::CreateTuple(
-        {Type::CreateSimple<uint8_t>(), Type::CreateString()},
-        {"a"});
-    ASSERT_EQ(mismatched_names->GetName(), "Tuple(UInt8, String)");
+    ASSERT_THROW(
+        Type::CreateTuple(
+            {Type::CreateSimple<uint8_t>(), Type::CreateString()},
+            {"a"}),
+        ValidationError);
 }
 
 TEST(TypesCase, TupleTypeNamesFromFactory) {

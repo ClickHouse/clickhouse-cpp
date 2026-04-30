@@ -1,13 +1,40 @@
 #include "tuple.h"
 
 namespace clickhouse {
+namespace {
 
-static std::vector<TypeRef> CollectTypes(const std::vector<ColumnRef>& columns) {
+std::vector<TypeRef> CollectTypes(const std::vector<ColumnRef>& columns) {
     std::vector<TypeRef> types;
     for (const auto& col : columns) {
         types.push_back(col->Type());
     }
     return types;
+}
+
+/// Tuple types can be appended if they have the same shape.
+bool CanAppendType(const TypeRef& destination_type, const TypeRef& source_type) {
+    if (destination_type->GetCode() != Type::Tuple || source_type->GetCode() != Type::Tuple) {
+        return destination_type->IsEqual(source_type);
+    }
+
+    const auto* destination_tuple = destination_type->As<TupleType>();
+    const auto* source_tuple      = source_type->As<TupleType>();
+
+    const auto destination_item_types = destination_tuple->GetTupleType();
+    const auto source_item_types      = source_tuple->GetTupleType();
+    if (destination_item_types.size() != source_item_types.size()) {
+        return false;
+    }
+
+    for (size_t i = 0; i < destination_item_types.size(); ++i) {
+        if (!CanAppendType(destination_item_types[i], source_item_types[i])) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 }
 
 ColumnTuple::ColumnTuple(const std::vector<ColumnRef>& columns)
@@ -30,11 +57,11 @@ size_t ColumnTuple::TupleSize() const {
 void ColumnTuple::Reserve(size_t new_cap) {
     for (auto& column : columns_) {
         column->Reserve(new_cap);
-    }  
+    }
 }
 
 void ColumnTuple::Append(ColumnRef column) {
-    if (!this->Type()->IsEqual(column->Type())) {
+    if (!CanAppendType(this->Type(), column->Type())) {
         throw ValidationError(
             "can't append column of type " + column->Type()->GetName() + " "
             "to column type " + this->Type()->GetName());
@@ -44,6 +71,7 @@ void ColumnTuple::Append(ColumnRef column) {
         columns_[ci]->Append((*source_tuple_column)[ci]);
     }
 }
+
 size_t ColumnTuple::Size() const {
     return columns_.empty() ? 0 : columns_[0]->Size();
 }

@@ -124,10 +124,8 @@ public:
 
     static TypeRef CreateString(size_t n);
 
-    static TypeRef CreateTuple(const std::vector<TypeRef>& item_types);
-
     static TypeRef CreateTuple(const std::vector<TypeRef>& item_types,
-                               std::vector<std::string> item_names);
+                               std::vector<std::string> item_names = {});
 
     static TypeRef CreateEnum8(const std::vector<EnumItem>& enum_items);
 
@@ -295,9 +293,8 @@ private:
 
 class TupleType : public Type {
 public:
-    explicit TupleType(const std::vector<TypeRef>& item_types);
-    TupleType(const std::vector<TypeRef>& item_types,
-              std::vector<std::string> item_names);
+    explicit TupleType(const std::vector<TypeRef>& item_types,
+                       std::vector<std::string> item_names = {});
 
     std::string GetName() const;
 

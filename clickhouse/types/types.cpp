@@ -239,10 +239,6 @@ TypeRef Type::CreateString(size_t n) {
     return TypeRef(new FixedStringType(n));
 }
 
-TypeRef Type::CreateTuple(const std::vector<TypeRef>& item_types) {
-    return TypeRef(new TupleType(item_types));
-}
-
 TypeRef Type::CreateTuple(const std::vector<TypeRef>& item_types,
                           std::vector<std::string> item_names) {
     return TypeRef(new TupleType(item_types, std::move(item_names)));
@@ -447,14 +443,17 @@ FixedStringType::FixedStringType(size_t n) : Type(FixedString), size_(n) {
 NullableType::NullableType(TypeRef nested_type) : Type(Nullable), nested_type_(nested_type) {
 }
 
-/// class TupleType
-
-TupleType::TupleType(const std::vector<TypeRef>& item_types) : Type(Tuple), item_types_(item_types) {
-}
-
 TupleType::TupleType(const std::vector<TypeRef>& item_types,
                      std::vector<std::string> item_names)
     : Type(Tuple), item_types_(item_types), item_names_(std::move(item_names)) {
+    if (!item_names_.empty() && item_names_.size() != item_types_.size()) {
+        throw ValidationError("Tuple field names count doesn't match tuple element count");
+    }
+    for (const auto& item_name : item_names_) {
+        if (item_name.empty()) {
+            throw ValidationError("Tuple field names can't be empty");
+        }
+    }
 }
 
 /// class LowCardinalityType
@@ -466,15 +465,7 @@ LowCardinalityType::~LowCardinalityType() {
 
 std::string TupleType::GetName() const {
     std::string result("Tuple(");
-    bool has_complete_names = item_names_.size() == item_types_.size();
-    if (has_complete_names) {
-        for (const auto& item_name : item_names_) {
-            if (item_name.empty()) {
-                has_complete_names = false;
-                break;
-            }
-        }
-    }
+    bool has_complete_names = !item_names_.empty();
 
     if (!item_types_.empty()) {
         if (has_complete_names) {

@@ -154,6 +154,89 @@ TEST(ColumnsCase, TupleAppend){
     ASSERT_EQ((*tuple2)[1]->As<ColumnString>()->At(0), "2");
 }
 
+TEST(ColumnsCase, TupleAppendWithSameFieldNames){
+    auto tuple1 = std::make_shared<ColumnTuple>(std::vector<ColumnRef>({
+                                std::make_shared<ColumnUInt64>(),
+                                std::make_shared<ColumnString>()
+                            }), std::vector<std::string>{"a", "b"});
+    auto tuple2 = std::make_shared<ColumnTuple>(std::vector<ColumnRef>({
+                                std::make_shared<ColumnUInt64>(),
+                                std::make_shared<ColumnString>()
+                            }), std::vector<std::string>{"a", "b"});
+    (*tuple1)[0]->As<ColumnUInt64>()->Append(2u);
+    (*tuple1)[1]->As<ColumnString>()->Append("2");
+    tuple2->Append(tuple1);
+
+    ASSERT_EQ((*tuple2)[0]->As<ColumnUInt64>()->At(0), 2u);
+    ASSERT_EQ((*tuple2)[1]->As<ColumnString>()->At(0), "2");
+}
+
+TEST(ColumnsCase, TupleAppendUnnamedSourceIntoNamedDestination){
+    auto tuple1 = std::make_shared<ColumnTuple>(std::vector<ColumnRef>({
+                                std::make_shared<ColumnUInt64>(),
+                                std::make_shared<ColumnString>()
+                            }));
+    auto tuple2 = std::make_shared<ColumnTuple>(std::vector<ColumnRef>({
+                                std::make_shared<ColumnUInt64>(),
+                                std::make_shared<ColumnString>()
+                            }), std::vector<std::string>{"a", "b"});
+    (*tuple1)[0]->As<ColumnUInt64>()->Append(2u);
+    (*tuple1)[1]->As<ColumnString>()->Append("2");
+    tuple2->Append(tuple1);
+
+    ASSERT_EQ((*tuple2)[0]->As<ColumnUInt64>()->At(0), 2u);
+    ASSERT_EQ((*tuple2)[1]->As<ColumnString>()->At(0), "2");
+}
+
+TEST(ColumnsCase, TupleAppendWithDifferentFieldNames){
+    auto tuple1 = std::make_shared<ColumnTuple>(std::vector<ColumnRef>({
+                                std::make_shared<ColumnUInt64>(),
+                                std::make_shared<ColumnString>()
+                            }), std::vector<std::string>{"x", "y"});
+    auto tuple2 = std::make_shared<ColumnTuple>(std::vector<ColumnRef>({
+                                std::make_shared<ColumnUInt64>(),
+                                std::make_shared<ColumnString>()
+                            }), std::vector<std::string>{"a", "b"});
+
+    (*tuple1)[0]->As<ColumnUInt64>()->Append(2u);
+    (*tuple1)[1]->As<ColumnString>()->Append("2");
+    tuple2->Append(tuple1);
+
+    ASSERT_EQ((*tuple2)[0]->As<ColumnUInt64>()->At(0), 2u);
+    ASSERT_EQ((*tuple2)[1]->As<ColumnString>()->At(0), "2");
+}
+
+TEST(ColumnsCase, TupleAppendNamedSourceIntoUnnamedDestination){
+    auto tuple1 = std::make_shared<ColumnTuple>(std::vector<ColumnRef>({
+                                std::make_shared<ColumnUInt64>(),
+                                std::make_shared<ColumnString>()
+                            }), std::vector<std::string>{"a", "b"});
+    auto tuple2 = std::make_shared<ColumnTuple>(std::vector<ColumnRef>({
+                                std::make_shared<ColumnUInt64>(),
+                                std::make_shared<ColumnString>()
+                            }));
+
+    (*tuple1)[0]->As<ColumnUInt64>()->Append(2u);
+    (*tuple1)[1]->As<ColumnString>()->Append("2");
+    tuple2->Append(tuple1);
+
+    ASSERT_EQ((*tuple2)[0]->As<ColumnUInt64>()->At(0), 2u);
+    ASSERT_EQ((*tuple2)[1]->As<ColumnString>()->At(0), "2");
+}
+
+TEST(ColumnsCase, TupleAppendRejectsIncompatibleStructure){
+    auto tuple1 = std::make_shared<ColumnTuple>(std::vector<ColumnRef>({
+                                std::make_shared<ColumnUInt64>(),
+                                std::make_shared<ColumnUInt64>()
+                            }));
+    auto tuple2 = std::make_shared<ColumnTuple>(std::vector<ColumnRef>({
+                                std::make_shared<ColumnUInt64>(),
+                                std::make_shared<ColumnString>()
+                            }));
+
+    EXPECT_THROW(tuple2->Append(tuple1), ValidationError);
+}
+
 TEST(ColumnsCase, TupleSlice){
     auto tuple1 = std::make_shared<ColumnTuple>(std::vector<ColumnRef>({
                                 std::make_shared<ColumnUInt64>(),
