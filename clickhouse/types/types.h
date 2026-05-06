@@ -59,6 +59,7 @@ public:
         MultiPolygon,
         Time,
         Time64,
+        JSON,
     };
 
     using EnumItem = std::pair<std::string /* name */, int16_t /* value */>;
@@ -147,6 +148,8 @@ public:
     static TypeRef CreateTime();
 
     static TypeRef CreateTime64(size_t precision);
+
+    static TypeRef CreateJSON();
 
 private:
     uint64_t GetTypeUniqueId() const;

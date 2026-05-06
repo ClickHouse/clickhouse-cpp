@@ -70,6 +70,8 @@ TEST(ItemView, StorableTypes) {
 
     TEST_ITEMVIEW_TYPE_VALUE(Type::Code::FixedString, std::string_view, "");
     TEST_ITEMVIEW_TYPE_VALUE(Type::Code::FixedString, std::string_view, "here is a string");
+    TEST_ITEMVIEW_TYPE_VALUE(Type::Code::JSON, std::string_view, "{}");
+    TEST_ITEMVIEW_TYPE_VALUE(Type::Code::JSON, std::string_view, R"({"key": "value"})");
 }
 
 #define EXPECT_ITEMVIEW_ERROR(TypeCode, NativeType) \

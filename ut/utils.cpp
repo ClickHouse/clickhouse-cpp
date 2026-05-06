@@ -166,6 +166,7 @@ std::ostream & printColumnValue(const ColumnRef& c, const size_t row, std::ostre
     const auto r = false
         || doPrintValue<ColumnString>(c, row, ostr)
         || doPrintValue<ColumnFixedString>(c, row, ostr)
+        || doPrintValue<ColumnJSON>(c, row, ostr)
         || doPrintValue<ColumnUInt8, unsigned int>(c, row, ostr)
         || doPrintValue<ColumnUInt32>(c, row, ostr)
         || doPrintValue<ColumnUInt16>(c, row, ostr)
@@ -378,6 +379,7 @@ std::ostream& operator<<(std::ostream& ostr, const ItemView& item_view) {
             break;
         case Type::String:
         case Type::FixedString:
+        case Type::JSON:
             ostr << "\"" << item_view.data << "\" (" << item_view.data.size() << " bytes)";
             break;
         case Type::Date:

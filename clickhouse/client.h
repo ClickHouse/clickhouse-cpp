@@ -10,6 +10,7 @@
 #include "columns/geo.h"
 #include "columns/ip4.h"
 #include "columns/ip6.h"
+#include "columns/json.h"
 #include "columns/lowcardinality.h"
 #include "columns/nothing.h"
 #include "columns/nullable.h"

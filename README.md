@@ -23,6 +23,8 @@ C++ client for [ClickHouse](https://clickhouse.com/).
 * UUID
 * Map
 * Point, Ring, Polygon, MultiPolygon
+* JSON - experimental support; requires output_format_native_write_json_as_string=1; data is passed as strings
+
 
 ## Dependencies
 In the most basic case one needs only:

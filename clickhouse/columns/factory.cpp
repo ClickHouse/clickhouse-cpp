@@ -7,6 +7,7 @@
 #include "geo.h"
 #include "ip4.h"
 #include "ip6.h"
+#include "json.h"
 #include "lowcardinality.h"
 #include "lowcardinalityadaptor.h"
 #include "map.h"
@@ -136,6 +137,8 @@ static ColumnRef CreateTerminalColumn(const TypeAst& ast) {
             return nullptr;
         }
         return std::make_shared<ColumnTime64>(GetASTChildElement(ast, 0).value);
+    case Type::JSON:
+        return std::make_shared<ColumnJSON>();
     default:
         return nullptr;
     }
