@@ -1592,7 +1592,7 @@ using namespace clickhouse;
 const auto QUERIES = std::vector<std::string>{
     "SELECT version()",
     "SELECT fqdn()",
-    "SELECT buildId()",
+    "SELECT blockSize()",
     "SELECT uptime()",
     "SELECT now()"
 };
