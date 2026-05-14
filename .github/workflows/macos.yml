@@ -22,6 +22,9 @@ env:
   CLICKHOUSE_SECURE_PASSWORD: ${{ secrets.INTEGRATIONS_TEAM_TESTS_CLOUD_PASSWORD_SMT_PROD }}
   CLICKHOUSE_SECURE_DB: default
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: macos-latest
