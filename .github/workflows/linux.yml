@@ -20,6 +20,9 @@ env:
   CLICKHOUSE_SECURE_USER: default
   CLICKHOUSE_SECURE_PASSWORD: ${{ secrets.INTEGRATIONS_TEAM_TESTS_CLOUD_PASSWORD_SMT_PROD }}
 
+permissions:
+  contents: read
+
 jobs:
   build:
     strategy:
