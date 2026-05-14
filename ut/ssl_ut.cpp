@@ -14,7 +14,7 @@ namespace {
     const auto QUERIES = std::vector<std::string> {
         "SELECT version()",
         "SELECT fqdn()",
-        "SELECT buildId()",
+        "SELECT blockSize()",
         "SELECT uptime()",
         "SELECT now()"
     };
@@ -38,10 +38,10 @@ INSTANTIATE_TEST_SUITE_P(
     RemoteTLS, ReadonlyClientTest,
     ::testing::Values(ReadonlyClientTest::ParamType {
         ClientOptions()
-            .SetHost(           getEnvOrDefault("CLICKHOUSE_SECURE_HOST",     "github.demo.trial.altinity.cloud"))
+            .SetHost(           getEnvOrDefault("CLICKHOUSE_SECURE_HOST",     "play.clickhouse.com"))
             .SetPort(   getEnvOrDefault<size_t>("CLICKHOUSE_SECURE_PORT",     "9440"))
-            .SetUser(           getEnvOrDefault("CLICKHOUSE_SECURE_USER",     "demo"))
-            .SetPassword(       getEnvOrDefault("CLICKHOUSE_SECURE_PASSWORD", "demo"))
+            .SetUser(           getEnvOrDefault("CLICKHOUSE_SECURE_USER",     "explorer"))
+            .SetPassword(       getEnvOrDefault("CLICKHOUSE_SECURE_PASSWORD", ""))
             .SetDefaultDatabase(getEnvOrDefault("CLICKHOUSE_SECURE_DB",       "default"))
             .SetSendRetries(1)
             .SetPingBeforeQuery(true)

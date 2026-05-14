@@ -14,13 +14,6 @@ on:
 
 env:
   BUILD_TYPE: Release
-  CLICKHOUSE_USER: default
-  CLICKHOUSE_PASSWORD: ${{ secrets.INTEGRATIONS_TEAM_TESTS_CLOUD_PASSWORD_SMT_PROD }}
-  CLICKHOUSE_SECURE_HOST: ${{ secrets.INTEGRATIONS_TEAM_TESTS_CLOUD_HOST_SMT_PROD }}
-  CLICKHOUSE_SECURE_PORT: 9440
-  CLICKHOUSE_SECURE_USER: default
-  CLICKHOUSE_SECURE_PASSWORD: ${{ secrets.INTEGRATIONS_TEAM_TESTS_CLOUD_PASSWORD_SMT_PROD }}
-  CLICKHOUSE_SECURE_DB: default
 
 jobs:
   build:
@@ -40,7 +33,7 @@ jobs:
           SSL_INSTALL: openssl
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 100
           fetch-tags: true
@@ -67,21 +60,25 @@ jobs:
             --config ${{env.BUILD_TYPE}} \
             --target all
 
-      - name: Start tls offoader proxy
-        # that mimics non-secure clickhouse running on localhost
-        # by tunneling queries to remote tls server
-        # (needed because we can't start real clickhouse instance on macOS)
+      - name: Install and start ClickHouse
+        working-directory: ${{ runner.temp }}
         run: |
-              wget https://github.com/filimonov/go-tlsoffloader/releases/download/v0.1.2/go-tlsoffloader_0.1.2_Darwin_x86_64.tar.gz
-              tar -xvzf go-tlsoffloader_0.1.2_Darwin_x86_64.tar.gz
-              ./go-tlsoffloader -l localhost:9000 -b ${{ secrets.INTEGRATIONS_TEAM_TESTS_CLOUD_HOST_SMT_PROD }}:9440 &
+          curl https://builds.clickhouse.com/25.12/macos-aarch64/clickhouse -o clickhouse
+          chmod +x ./clickhouse
+          sudo mkdir -p /var/lib/clickhouse /var/log/clickhouse-server
+          sudo chown -R "$USER" /var/lib/clickhouse /var/log/clickhouse-server
+          nohup ./clickhouse server --config-file="$GITHUB_WORKSPACE/ci/docker-compose/config.xml" > clickhouse.log 2>&1 &
+          for i in {1..60}; do
+            if curl -fsS http://localhost:8123/ > /dev/null; then
+              echo "ClickHouse is ready"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "ClickHouse failed to start"
+          tail -200 clickhouse.log || true
+          exit 1
 
       - name: Test
         working-directory: ${{github.workspace}}/build/ut
-        env:
-          # It is impossible to start CH server in docker on macOS due to github actions limitations,
-          # so we use remote server to execute tests, some do not allow some features for anonymoust/free users:
-          # - system.query_log used by 'Client/ClientCase.Query_ID' and 'Client/ClientCase.ClientName'
-          # - system.opentelemetry_span_log is used by 'Client/ClientCase.TracingContext'
-          GTEST_FILTER: "-Client/ClientCase.Query_ID*:Client/ClientCase.TracingContext/*:Client/ClientCase.ClientName/*"
         run: ./clickhouse-cpp-ut ${GTEST_FILTER}
