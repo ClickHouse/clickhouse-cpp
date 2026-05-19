@@ -2,8 +2,6 @@
 
 #include "../types/types.h"
 
-#if !CH_MAP_BOOL_TO_UINT8
-
 namespace clickhouse {
 
 ColumnBool::ColumnBool()
@@ -75,5 +73,3 @@ ItemView ColumnBool::GetItem(size_t index) const {
 }
 
 }  // namespace clickhouse
-
-#endif  // !CH_MAP_BOOL_TO_UINT8

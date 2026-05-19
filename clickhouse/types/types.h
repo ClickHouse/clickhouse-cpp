@@ -9,16 +9,11 @@
 #include <vector>
 #include <stdexcept>
 
-#ifndef CH_MAP_BOOL_TO_UINT8
-#define CH_MAP_BOOL_TO_UINT8 1
-#endif
-
 namespace clickhouse {
 
 using Int128 = absl::int128;
 using UInt128 = absl::uint128;
 using Int64 = int64_t;
-
 
 using TypeRef = std::shared_ptr<class Type>;
 
@@ -65,9 +60,7 @@ public:
         Time,
         Time64,
         JSON,
-#if !CH_MAP_BOOL_TO_UINT8
         Bool,
-#endif
     };
 
     using EnumItem = std::pair<std::string /* name */, int16_t /* value */>;
@@ -402,12 +395,10 @@ inline TypeRef Type::CreateSimple<uint64_t>() {
     return TypeRef(new Type(UInt64));
 }
 
-#if !CH_MAP_BOOL_TO_UINT8
 template <>
 inline TypeRef Type::CreateSimple<bool>() {
     return TypeRef(new Type(Bool));
 }
-#endif
 
 template <>
 inline TypeRef Type::CreateSimple<float>() {

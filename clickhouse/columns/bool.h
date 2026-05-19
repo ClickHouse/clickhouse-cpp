@@ -5,8 +5,6 @@
 
 #include "../types/types.h"
 
-#if !CH_MAP_BOOL_TO_UINT8
-
 #include <vector>
 
 namespace clickhouse {
@@ -59,5 +57,3 @@ private:
 };
 
 }  // namespace clickhouse
-
-#endif  // !CH_MAP_BOOL_TO_UINT8
