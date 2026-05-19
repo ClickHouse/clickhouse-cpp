@@ -28,6 +28,9 @@ public:
     /// Returns element at given row number.
     bool operator[](size_t n) const { return At(n); }
 
+    /// Returns the capacity of the column
+    size_t Capacity() const;
+
 public:
     /// Appends content of given column to the end of current one.
     /// Accepts ColumnBool or ColumnUInt8.

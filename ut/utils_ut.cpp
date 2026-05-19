@@ -237,6 +237,8 @@ TEST(ItemView, OutputToOstream_VALID) {
     EXPECTED_SERIALIZATION("FixedString : \"string\" (6 bytes)", ColumnFixedString(6), "string");
     EXPECTED_SERIALIZATION(R"(JSON : "{"key": "value"}" (16 bytes))", ColumnJSON(), R"({"key": "value"})");
 
+    EXPECTED_SERIALIZATION("Bool : false", ColumnBool(), false);
+    EXPECTED_SERIALIZATION("Bool : true", ColumnBool(), true);
     EXPECTED_SERIALIZATION("Int8 : -123", ColumnInt8(), -123);
     EXPECTED_SERIALIZATION("Int16 : -1234", ColumnInt16(), -1234);
     EXPECTED_SERIALIZATION("Int32 : -12345", ColumnInt32(), -12345);

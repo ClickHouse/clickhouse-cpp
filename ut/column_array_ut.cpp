@@ -337,6 +337,19 @@ TEST(ColumnArrayT, Wrap_UInt64_2D) {
     EXPECT_TRUE(CompareRecursive(values, array));
 }
 
+TEST(ColumnArrayT, Bool) {
+    // Check inserting\reading back data from clickhouse::ColumnArrayT<ColumnBool>
+
+    const std::vector<std::vector<uint8_t>> values = {
+        {1u, 0u, 0u},
+        {0u, 1u, 1u, 0u, 1u, 0u},
+        {0u},
+        {},
+        {1u, 0u}
+    };
+    CreateAndTestColumnArrayT<ColumnBool>(values);
+}
+
 TEST(ColumnArrayT, left_value_no_move) {
     std::string value0 = "000000000000000000";
     std::string value1 = "111111111111111111";

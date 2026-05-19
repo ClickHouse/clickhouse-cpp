@@ -20,6 +20,10 @@ void ColumnBool::Reserve(size_t new_cap) {
     data_.Reserve(new_cap);
 }
 
+size_t ColumnBool::Capacity() const {
+    return data_.Capacity();
+}
+
 void ColumnBool::Append(bool value) {
     data_.Append(static_cast<uint8_t>(value));
 }

@@ -24,6 +24,19 @@ TEST(TypeParserCase, ParseFixedString) {
     ASSERT_EQ(ast.elements.front().value, 24U);
 }
 
+TEST(TypeParserCase, ParseBool) {
+    TypeAst ast;
+    TypeParser("Bool").Parse(&ast);
+
+    ASSERT_EQ(ast.meta, TypeAst::Terminal);
+    ASSERT_EQ(ast.name, "Bool");
+#if !CH_MAP_BOOL_TO_UINT8
+    ASSERT_EQ(ast.code, Type::Bool);
+#else
+    ASSERT_EQ(ast.code, Type::UInt8);
+#endif
+}
+
 TEST(TypeParserCase, ParseJSON) {
     TypeAst ast;
     TypeParser("JSON").Parse(&ast);

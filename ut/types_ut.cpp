@@ -37,26 +37,8 @@ TEST(TypesCase, TypeName) {
 
     ASSERT_EQ(Type::CreateMap(Type::CreateSimple<int32_t>(), Type::CreateString())->GetName(), "Map(Int32, String)");
 
-#if !CH_MAP_BOOL_TO_UINT8
     ASSERT_EQ(Type::CreateSimple<bool>()->GetName(), "Bool");
-#endif
 }
-
-#if !CH_MAP_BOOL_TO_UINT8
-TEST(TypesCase, ColumnBool) {
-    auto col = std::make_shared<ColumnBool>();
-    col->Append(true);
-    col->Append(false);
-    col->Append(true);
-
-    ASSERT_EQ(col->Size(), 3u);
-    ASSERT_EQ(col->At(0), true);
-    ASSERT_EQ(col->At(1), false);
-    ASSERT_EQ(col->At(2), true);
-    ASSERT_EQ(col->GetType().GetName(), "Bool");
-    ASSERT_EQ(col->GetType().GetCode(), Type::Bool);
-}
-#endif
 
 TEST(TypesCase, NullableType) {
     TypeRef nested = Type::CreateSimple<int32_t>();
@@ -162,6 +144,9 @@ TEST(TypesCase, DecimalTypes) {
 
 TEST(TypesCase, IsEqual) {
     const std::string type_names[] = {
+#if !CH_MAP_BOOL_TO_UINT8
+        "Bool",
+#endif
         "UInt8",
         "Int8",
 //        "UInt128",
