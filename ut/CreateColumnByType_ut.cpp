@@ -85,12 +85,12 @@ TEST_P(CreateColumnByTypeWithName, CreateColumnByType)
 INSTANTIATE_TEST_SUITE_P(Basic, CreateColumnByTypeWithName, ::testing::Values(
     "Int8", "Int16", "Int32", "Int64",
     "UInt8", "UInt16", "UInt32", "UInt64",
-#if !CH_MAP_BOOL_TO_UINT8
-    "Bool",
-#endif
     "String", "Date", "DateTime",
     "UUID", "Int128", "UInt128"
 ));
+#if !CH_MAP_BOOL_TO_UINT8
+INSTANTIATE_TEST_SUITE_P(BasicBool, CreateColumnByTypeWithName, ::testing::Values("Bool"));
+#endif
 
 INSTANTIATE_TEST_SUITE_P(Parametrized, CreateColumnByTypeWithName, ::testing::Values(
     "FixedString(0)", "FixedString(10000)",
