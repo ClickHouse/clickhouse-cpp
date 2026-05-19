@@ -6,7 +6,7 @@ C++ client for [ClickHouse](https://clickhouse.com/).
 ## Supported data types
 
 * Array(T)
-* Bool (mapped to UInt8 by default; use `-DCH_MAP_BOOL_TO_UINT8=OFF` for a distinct `clickhouse::Bool`/`ColumnBool` API)
+* Bool \* (by default, mapped to UInt8 when receiving data)
 * Date
 * DateTime, DateTime64
 * DateTime([timezone]), DateTime64(N, [timezone])
@@ -26,10 +26,13 @@ C++ client for [ClickHouse](https://clickhouse.com/).
 * Point, Ring, Polygon, MultiPolygon
 * JSON - experimental support; requires output_format_native_write_json_as_string=1; data is passed as strings
 
-
-The distinct `Bool` type will become the default in some future version. The
-current mapping to `UInt8` is provided only for compatibility and controlled via
-`DCH_MAP_BOOL_TO_UINT8`.
+\*: There exists a distinct `ColumnBool` and entry in the `Type` enumeration that
+can be used.
+By default, data received from the server will map Bool columns to UInt8. This is
+a backwards compatibility feature.
+If you want the library to produce ColumnBool, set the CMake variable `DCH_MAP_BOOL_TO_UINT8=OFF`.
+The default for this variable will switch, with it being subsequently removed, in
+a future release.
 
 ## Dependencies
 In the most basic case one needs only:
