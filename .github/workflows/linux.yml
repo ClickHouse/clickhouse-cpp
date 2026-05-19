@@ -98,6 +98,7 @@ jobs:
             -D CMAKE_C_COMPILER=${{matrix.C_COMPILER}} \
             -D CMAKE_CXX_COMPILER=${{matrix.CXX_COMPILER}} \
             -D CMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
+            -D CH_MAP_BOOL_TO_UINT8=OFF \
             -D BUILD_TESTS=ON \
             ${{matrix.SSL_CMAKE_OPTION}} \
             ${{matrix.DEPENDENCIES_CMAKE_OPTIONS}} \
