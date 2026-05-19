@@ -1,5 +1,7 @@
 #include <clickhouse/types/types.h>
+#include <clickhouse/columns/bool.h>
 #include <clickhouse/columns/factory.h>
+#include <clickhouse/columns/numeric.h>
 #include <ut/utils.h>
 
 #include <gtest/gtest.h>
@@ -34,6 +36,8 @@ TEST(TypesCase, TypeName) {
     );
 
     ASSERT_EQ(Type::CreateMap(Type::CreateSimple<int32_t>(), Type::CreateString())->GetName(), "Map(Int32, String)");
+
+    ASSERT_EQ(Type::CreateSimple<bool>()->GetName(), "Bool");
 }
 
 TEST(TypesCase, NullableType) {
@@ -140,6 +144,9 @@ TEST(TypesCase, DecimalTypes) {
 
 TEST(TypesCase, IsEqual) {
     const std::string type_names[] = {
+#if !CH_MAP_BOOL_TO_UINT8
+        "Bool",
+#endif
         "UInt8",
         "Int8",
 //        "UInt128",

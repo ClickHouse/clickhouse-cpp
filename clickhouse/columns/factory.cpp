@@ -13,6 +13,7 @@
 #include "map.h"
 #include "nothing.h"
 #include "nullable.h"
+#include "bool.h"
 #include "numeric.h"
 #include "string.h"
 #include "./time.h" // `./` avoids possible conflicts with standard C time.h
@@ -50,6 +51,8 @@ static ColumnRef CreateTerminalColumn(const TypeAst& ast) {
     case Type::Void:
         return std::make_shared<ColumnNothing>();
 
+    case Type::Bool:
+        return std::make_shared<ColumnBool>();
     case Type::UInt8:
         return std::make_shared<ColumnUInt8>();
     case Type::UInt16:

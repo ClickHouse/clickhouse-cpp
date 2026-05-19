@@ -6,6 +6,7 @@ C++ client for [ClickHouse](https://clickhouse.com/).
 ## Supported data types
 
 * Array(T)
+* Bool \* (by default, mapped to UInt8 when receiving data)
 * Date
 * DateTime, DateTime64
 * DateTime([timezone]), DateTime64(N, [timezone])
@@ -25,6 +26,13 @@ C++ client for [ClickHouse](https://clickhouse.com/).
 * Point, Ring, Polygon, MultiPolygon
 * JSON - experimental support; requires output_format_native_write_json_as_string=1; data is passed as strings
 
+\*: There exists a distinct `ColumnBool` and entry in the `Type` enumeration that
+can be used.
+By default, data received from the server will map Bool columns to UInt8. This is
+a backwards compatibility feature.
+If you want the library to produce ColumnBool, set the CMake variable `DCH_MAP_BOOL_TO_UINT8=OFF`.
+The default for this variable will switch, with it being subsequently removed, in
+a future release.
 
 ## Dependencies
 In the most basic case one needs only:
@@ -258,5 +266,3 @@ client.Insert("default.test", block);
 ```sql
 ALTER USER insert_account SETTINGS async_insert=1,wait_for_async_insert=1,async_insert_use_adaptive_busy_timeout=0,async_insert_busy_timeout_ms=5000,async_insert_max_data_size=104857600
 ```
-
-

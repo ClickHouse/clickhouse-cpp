@@ -48,6 +48,7 @@ jobs:
         run: |
           cmake \
             -D CMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
+            -D CH_MAP_BOOL_TO_UINT8=OFF \
             -D BUILD_TESTS=ON \
             ${{matrix.SSL_CMAKE_OPTION}} \
             -S ${{github.workspace}} \

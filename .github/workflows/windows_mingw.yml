@@ -52,7 +52,7 @@ jobs:
             tar
 
       - name: Configure CMake
-        run: cmake -B build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DBUILD_TESTS=ON -DCHECK_VERSION=OFF
+        run: cmake -B build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCH_MAP_BOOL_TO_UINT8=OFF -DBUILD_TESTS=ON -DCHECK_VERSION=OFF
         # -DWITH_OPENSSL=ON was not able to make it work (some strange issues with CA paths, need debug)
         # -DCHECK_VERSION=OFF since it requires git, which can't be found from within cmake for some reason.
 

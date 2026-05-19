@@ -137,6 +137,27 @@ TEST(ColumnsCase, StringAppend) {
     ASSERT_EQ(col->At(2), "11");
 }
 
+TEST(ColumnsCase, BoolInit)
+{
+    auto values = MakeBools();
+    auto col = std::make_shared<ColumnBool>(values);
+
+    ASSERT_EQ(col->Size(), values.size());
+    ASSERT_EQ(col->At(0), 1);
+    ASSERT_EQ(col->At(3), 0);
+}
+
+TEST(ColumnsCase, BoolAppend)
+{
+    auto col = std::make_shared<ColumnBool>();
+    col->Append(true);
+    col->Append(false);
+
+    ASSERT_EQ(col->Size(), 2u);
+    ASSERT_EQ(col->At(0), true);
+    ASSERT_EQ(col->At(1), false);
+}
+
 TEST(ColumnsCase, JSONInit) {
     auto values = MakeJSONs();
     auto col = std::make_shared<ColumnJSON>(values);

@@ -60,6 +60,7 @@ public:
         Time,
         Time64,
         JSON,
+        Bool,
     };
 
     using EnumItem = std::pair<std::string /* name */, int16_t /* value */>;
@@ -392,6 +393,11 @@ inline TypeRef Type::CreateSimple<uint32_t>() {
 template <>
 inline TypeRef Type::CreateSimple<uint64_t>() {
     return TypeRef(new Type(UInt64));
+}
+
+template <>
+inline TypeRef Type::CreateSimple<bool>() {
+    return TypeRef(new Type(Bool));
 }
 
 template <>

@@ -20,6 +20,7 @@
 #include "columns/tuple.h"
 #include "columns/time.h"
 #include "columns/uuid.h"
+#include "columns/bool.h"
 
 #include <chrono>
 #include <cstdint>

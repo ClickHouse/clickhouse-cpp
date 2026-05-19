@@ -193,6 +193,10 @@ using TestCases = ::testing::Types<
     NumberColumnTestCase<ColumnFloat32>,
     NumberColumnTestCase<ColumnFloat64>,
 
+#if !CH_MAP_BOOL_TO_UINT8
+    GenericColumnTestCase<ColumnBool, &makeColumn<ColumnBool>, uint8_t, &MakeBools>,
+#endif
+
     GenericColumnTestCase<ColumnString, &makeColumn<ColumnString>, std::string, &MakeStrings>,
     GenericColumnTestCase<ColumnFixedString, &makeColumn<ColumnFixedString, 12>, std::string, &MakeFixedStrings<12>>,
     GenericColumnTestCase<ColumnJSON, &makeColumn<ColumnJSON>, std::string, &MakeJSONs>,

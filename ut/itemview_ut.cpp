@@ -29,6 +29,11 @@ TEST(ItemView, StorableTypes) {
     TEST_ITEMVIEW_TYPE_VALUE(TypeCode, NativeType, std::numeric_limits<NativeType>::max() - 1); \
     TEST_ITEMVIEW_TYPE_VALUE(TypeCode, NativeType, std::numeric_limits<NativeType>::max());
 
+    TEST_ITEMVIEW_TYPE_VALUES(Type::Code::Bool,  int8_t);
+    TEST_ITEMVIEW_TYPE_VALUES(Type::Code::Bool,  bool);
+    TEST_ITEMVIEW_TYPE_VALUE(Type::Code::Bool,  bool, false);
+    TEST_ITEMVIEW_TYPE_VALUE(Type::Code::Bool,  bool, true);
+
     TEST_ITEMVIEW_TYPE_VALUES(Type::Code::Int8,  int8_t);
     TEST_ITEMVIEW_TYPE_VALUES(Type::Code::Int16, int16_t);
     TEST_ITEMVIEW_TYPE_VALUES(Type::Code::Int32, int32_t);

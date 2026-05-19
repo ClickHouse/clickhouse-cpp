@@ -8,6 +8,7 @@ SET ( clickhouse-cpp-lib-src
     base/endpoints_iterator.cpp
 
     columns/array.cpp
+    columns/bool.cpp
     columns/column.cpp
     columns/date.cpp
     columns/decimal.cpp
@@ -53,6 +54,7 @@ SET ( clickhouse-cpp-lib-src
     base/wire_format.h
 
     columns/array.h
+    columns/bool.h
     columns/column.h
     columns/date.h
     columns/decimal.h
@@ -122,6 +124,11 @@ TARGET_LINK_LIBRARIES (clickhouse-cpp-lib
 TARGET_INCLUDE_DIRECTORIES (clickhouse-cpp-lib
     PUBLIC ${PROJECT_SOURCE_DIR}
 )
+IF (CH_MAP_BOOL_TO_UINT8)
+    TARGET_COMPILE_DEFINITIONS (clickhouse-cpp-lib PUBLIC CH_MAP_BOOL_TO_UINT8=1)
+ELSE ()
+    TARGET_COMPILE_DEFINITIONS (clickhouse-cpp-lib PUBLIC CH_MAP_BOOL_TO_UINT8=0)
+ENDIF ()
 
 IF (NOT BUILD_SHARED_LIBS)
     ADD_LIBRARY (clickhouse-cpp-lib-static ALIAS clickhouse-cpp-lib)
