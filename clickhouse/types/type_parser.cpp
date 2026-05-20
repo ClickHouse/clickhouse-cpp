@@ -173,6 +173,7 @@ bool TypeParser::Parse(TypeAst* type) {
                 type_->code = Type::String;
                 break;
             }
+            case Token::QuotedIdentifier:
             case Token::Name:
                 if (!type_->name.empty()) {
                     // A second Name token on the same element means the
@@ -259,6 +260,61 @@ TypeParser::Token TypeParser::NextToken() {
                     }
                 }
                 return Token{Token::QuotedString, StringView(cur_++, 1)};
+            }
+            case '"':
+            case '`':
+            {
+                const auto quote = *cur_;
+                ++cur_;
+                const auto start = cur_;
+
+                // Fast path: scan for the closing quote with no escape
+                // sequences. Returns a StringView directly into the input
+                // buffer. Switches to the slow path on the first escape hit.
+                //
+                // Two escape forms are recognised, both quote-specific (e.g.
+                // inside a backtick-quoted identifier only backtick escapes
+                // apply; a doubled double-quote is treated as two literals):
+                //   \q  – backslash followed by the opening quote character
+                //   qq  – two consecutive opening quote characters
+                for (; cur_ < end_; ++cur_) {
+                    if (*cur_ == '\\' && cur_ + 1 < end_ && *(cur_ + 1) == quote) {
+                        break; // backslash-escape found, switch to slow path
+                    }
+                    if (*cur_ == quote) {
+                        if (cur_ + 1 < end_ && *(cur_ + 1) == quote) {
+                            break; // doubled-quote escape, switch to slow path
+                        }
+                        const StringView result{start, static_cast<size_t>(cur_ - start)};
+                        ++cur_;
+                        return Token{Token::QuotedIdentifier, result};
+                    }
+                }
+
+                if (cur_ >= end_) {
+                    return Token{Token::Invalid, StringView()};
+                }
+
+                // Slow path: copy content seen so far into scratch_, then
+                // continue scanning and unescaping into it.
+                scratch_.assign(start, cur_);
+                for (; cur_ < end_; ++cur_) {
+                    if (*cur_ == '\\' && cur_ + 1 < end_ && *(cur_ + 1) == quote) {
+                        scratch_ += quote;
+                        ++cur_;
+                    } else if (*cur_ == quote) {
+                        if (cur_ + 1 < end_ && *(cur_ + 1) == quote) {
+                            scratch_ += quote;
+                            ++cur_;
+                        } else {
+                            ++cur_;
+                            return Token{Token::QuotedIdentifier, StringView{scratch_}};
+                        }
+                    } else {
+                        scratch_ += *cur_;
+                    }
+                }
+                return Token{Token::Invalid, StringView()};
             }
 
             default: {

@@ -298,6 +298,15 @@ TEST(ColumnsCase, TupleSlice){
     ASSERT_EQ((*tuple2)[1]->As<ColumnString>()->At(0), "3");
 }
 
+TEST(ColumnsCase, TupleWithQuotedFieldNames) {
+    auto col = CreateColumnByType("Tuple(`a.b` Int8, `c.d` String)");
+    ASSERT_NE(col, nullptr);
+    const auto& names = col->AsStrict<ColumnTuple>()->Type()->As<TupleType>()->GetItemNames();
+    ASSERT_EQ(names.size(), 2u);
+    EXPECT_EQ(names[0], "a.b");
+    EXPECT_EQ(names[1], "c.d");
+}
+
 TEST(ColumnsCase, TimeAppend) {
     auto col = std::make_shared<ColumnTime>();
     col->Append(1);

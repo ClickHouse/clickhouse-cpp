@@ -133,6 +133,77 @@ TEST(TypeParserCase, ParseNamedTuple) {
     ASSERT_EQ(ast.elements[1].code, Type::String);
 }
 
+TEST(TypeParserCase, ParseNamedTuple_BacktickQuotedFieldNames) {
+    TypeAst ast;
+    ASSERT_TRUE(TypeParser("Tuple(`a.b` Int8, `c.d` String)").Parse(&ast));
+    ASSERT_EQ(ast.meta, TypeAst::Tuple);
+    ASSERT_EQ(ast.elements.size(), 2u);
+
+    ASSERT_EQ(ast.elements[0].element_name, "a.b");
+    ASSERT_EQ(ast.elements[0].name, "Int8");
+    ASSERT_EQ(ast.elements[0].code, Type::Int8);
+
+    ASSERT_EQ(ast.elements[1].element_name, "c.d");
+    ASSERT_EQ(ast.elements[1].name, "String");
+    ASSERT_EQ(ast.elements[1].code, Type::String);
+}
+
+TEST(TypeParserCase, ParseNamedTuple_DoubleQuotedFieldNames) {
+    TypeAst ast;
+    ASSERT_TRUE(TypeParser("Tuple(\"a.b\" Int8, \"c.d\" String)").Parse(&ast));
+    ASSERT_EQ(ast.meta, TypeAst::Tuple);
+    ASSERT_EQ(ast.elements.size(), 2u);
+
+    ASSERT_EQ(ast.elements[0].element_name, "a.b");
+    ASSERT_EQ(ast.elements[0].name, "Int8");
+    ASSERT_EQ(ast.elements[0].code, Type::Int8);
+
+    ASSERT_EQ(ast.elements[1].element_name, "c.d");
+    ASSERT_EQ(ast.elements[1].name, "String");
+    ASSERT_EQ(ast.elements[1].code, Type::String);
+}
+
+TEST(TypeParserCase, ParseNamedTuple_UnterminatedQuote) {
+    TypeAst ast;
+    EXPECT_FALSE(TypeParser("Tuple(`a.b Int8)").Parse(&ast));
+    EXPECT_FALSE(TypeParser("Tuple(a.b` Int8)").Parse(&ast));
+}
+
+TEST(TypeParserCase, ParseNamedTuple_DoubledBacktickEscape) {
+    TypeAst ast;
+    ASSERT_TRUE(TypeParser("Tuple(`a``b` UInt8)").Parse(&ast));
+    ASSERT_EQ(ast.elements[0].element_name, "a`b");
+    ASSERT_EQ(ast.elements[0].code, Type::UInt8);
+}
+
+TEST(TypeParserCase, ParseNamedTuple_BackslashBacktickEscape) {
+    TypeAst ast;
+    ASSERT_TRUE(TypeParser("Tuple(`a\\`b` UInt8)").Parse(&ast));
+    ASSERT_EQ(ast.elements[0].element_name, "a`b");
+    ASSERT_EQ(ast.elements[0].code, Type::UInt8);
+}
+
+TEST(TypeParserCase, ParseNamedTuple_DoubleQuoteNotEscape) {
+    TypeAst ast;
+    ASSERT_TRUE(TypeParser("Tuple(`a\"\"b` UInt8)").Parse(&ast));
+    ASSERT_EQ(ast.elements[0].element_name, "a\"\"b");
+    ASSERT_EQ(ast.elements[0].code, Type::UInt8);
+}
+
+TEST(TypeParserCase, ParseNamedTuple_DoubledDoubleQuoteEscape) {
+    TypeAst ast;
+    ASSERT_TRUE(TypeParser("Tuple(\"a\"\"b\" UInt8)").Parse(&ast));
+    ASSERT_EQ(ast.elements[0].element_name, "a\"b");
+    ASSERT_EQ(ast.elements[0].code, Type::UInt8);
+}
+
+TEST(TypeParserCase, ParseNamedTuple_BacktickNotEscape) {
+    TypeAst ast;
+    ASSERT_TRUE(TypeParser("Tuple(\"a``b\" UInt8)").Parse(&ast));
+    ASSERT_EQ(ast.elements[0].element_name, "a``b");
+    ASSERT_EQ(ast.elements[0].code, Type::UInt8);
+}
+
 TEST(TypeParserCase, ParseDecimal) {
     TypeAst ast;
     TypeParser("Decimal(12, 5)").Parse(&ast);
