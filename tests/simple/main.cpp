@@ -614,15 +614,36 @@ static std::string EnvOrDefault(const char* name, const char* fallback) {
     return fallback;
 }
 
-int main() {
-    clickhouse::ClientOptions options;
-    options.SetHost(EnvOrDefault("CLICKHOUSE_HOST", "127.0.0.1"));
-    options.SetPort(static_cast<uint16_t>(std::stoul(EnvOrDefault("CLICKHOUSE_PORT", "9000"))));
-    options.SetUser(EnvOrDefault("CLICKHOUSE_USER", "test"));
-    options.SetPassword(EnvOrDefault("CLICKHOUSE_PASSWORD", "test"));
-    options.SetDefaultDatabase(EnvOrDefault("CLICKHOUSE_DB", "default"));
+static uint16_t ParsePortFromEnvOrDefault(const char* name, const char* fallback) {
+    const std::string port_str = EnvOrDefault(name, fallback);
+    size_t parsed = 0;
+    const unsigned long port = std::stoul(port_str, &parsed);
 
-    clickhouse::Client ch_client(options);
-    RunTests(ch_client);
-    return 0;
+    if (parsed != port_str.size()) {
+        throw std::invalid_argument(std::string(name) + " must be a valid integer port number");
+    }
+
+    if (port < 1 || port > 65535) {
+        throw std::out_of_range(std::string(name) + " must be in range [1, 65535]");
+    }
+
+    return static_cast<uint16_t>(port);
+}
+
+int main() {
+    try {
+        clickhouse::ClientOptions options;
+        options.SetHost(EnvOrDefault("CLICKHOUSE_HOST", "127.0.0.1"));
+        options.SetPort(ParsePortFromEnvOrDefault("CLICKHOUSE_PORT", "9000"));
+        options.SetUser(EnvOrDefault("CLICKHOUSE_USER", "test"));
+        options.SetPassword(EnvOrDefault("CLICKHOUSE_PASSWORD", "test"));
+        options.SetDefaultDatabase(EnvOrDefault("CLICKHOUSE_DB", "default"));
+
+        clickhouse::Client ch_client(options);
+        RunTests(ch_client);
+        return 0;
+    } catch (const std::exception& ex) {
+        std::cerr << "Configuration error: " << ex.what() << std::endl;
+        return 1;
+    }
 }
