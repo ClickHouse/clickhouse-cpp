@@ -168,6 +168,43 @@ inline void DateTime64Example(Client& client) {
     client.Execute("DROP TEMPORARY TABLE test_datetime64");
 }
 
+inline void DateTime64Issue398Check(Client& client) {
+    client.Execute("CREATE TEMPORARY TABLE test_datetime64_issue398 (dt64 DateTime64(6))");
+
+    // Text insert (server parses this in server timezone for DateTime64 without explicit timezone).
+    client.Execute("INSERT INTO test_datetime64_issue398 VALUES ('2024-10-10 11:00:00')");
+
+    // Ask server for exact epoch micros for the same wall-clock value.
+    Int64 expected_micros = 0;
+    client.Select(
+        "SELECT toUnixTimestamp64Micro(toDateTime64('2024-10-10 11:00:00', 6))",
+        [&expected_micros](const Block& block) {
+            expected_micros = block[0]->As<ColumnInt64>()->At(0);
+        });
+
+    // Binary insert using the same epoch micros.
+    Block b;
+    auto d = std::make_shared<ColumnDateTime64>(6);
+    d->Append(expected_micros);
+    b.AppendColumn("dt64", d);
+    client.Insert("test_datetime64_issue398", b);
+
+    // Verify both rows are identical in epoch micros.
+    std::vector<Int64> rows;
+    client.Select(
+        "SELECT toUnixTimestamp64Micro(dt64) FROM test_datetime64_issue398 ORDER BY toUnixTimestamp64Micro(dt64)",
+        [&rows](const Block& block) {
+            auto col = block[0]->As<ColumnInt64>();
+            for (size_t i = 0; i < col->Size(); ++i) {
+                rows.push_back(col->At(i));
+            }
+        });
+
+    if (rows.size() != 2 || rows[0] != rows[1]) {
+        throw std::runtime_error("Issue398 repro: text insert and binary insert are inconsistent.");
+    }
+}
+
 inline void DecimalExample(Client& client) {
     Block b;
 
@@ -559,6 +596,7 @@ static void RunTests(Client& client) {
     CancelableExample(client);
     DateExample(client);
     DateTime64Example(client);
+    DateTime64Issue398Check(client);
     DecimalExample(client);
     EnumExample(client);
     ExecptionExample(client);
@@ -571,35 +609,41 @@ static void RunTests(Client& client) {
     ShowTables(client);
 }
 
-int main() {
-    try {
-        const auto localHostEndpoint = ClientOptions()
-                .SetHost(   getEnvOrDefault("CLICKHOUSE_HOST",     "localhost"))
-                .SetPort(   getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "9000"))
-                .SetEndpoints({   {"asasdasd", 9000}
-                                 ,{"localhost"}
-                                 ,{"noalocalhost", 9000}
-                               })
-                .SetUser(           getEnvOrDefault("CLICKHOUSE_USER",     "default"))
-                .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", ""))
-                .SetDefaultDatabase(getEnvOrDefault("CLICKHOUSE_DB",       "default"));
+static std::string EnvOrDefault(const char* name, const char* fallback) {
+    if (const char* v = std::getenv(name)) return v;
+    return fallback;
+}
 
-        {
-            Client client(ClientOptions(localHostEndpoint)
-                    .SetPingBeforeQuery(true));
-            RunTests(client);
-            std::cout << "current endpoint : " <<  client.GetCurrentEndpoint().value().host << "\n";
-        }
+static uint16_t ParsePortFromEnvOrDefault(const char* name, const char* fallback) {
+    const std::string port_str = EnvOrDefault(name, fallback);
+    size_t parsed = 0;
+    const unsigned long port = std::stoul(port_str, &parsed);
 
-        {
-            Client client(ClientOptions(localHostEndpoint)
-                    .SetPingBeforeQuery(true)
-                    .SetCompressionMethod(CompressionMethod::LZ4));
-            RunTests(client);
-        }
-    } catch (const std::exception& e) {
-        std::cerr << "exception : " << e.what() << std::endl;
+    if (parsed != port_str.size()) {
+        throw std::invalid_argument(std::string(name) + " must be a valid integer port number");
     }
 
-    return 0;
+    if (port < 1 || port > 65535) {
+        throw std::out_of_range(std::string(name) + " must be in range [1, 65535]");
+    }
+
+    return static_cast<uint16_t>(port);
+}
+
+int main() {
+    try {
+        clickhouse::ClientOptions options;
+        options.SetHost(EnvOrDefault("CLICKHOUSE_HOST", "127.0.0.1"));
+        options.SetPort(ParsePortFromEnvOrDefault("CLICKHOUSE_PORT", "9000"));
+        options.SetUser(EnvOrDefault("CLICKHOUSE_USER", "test"));
+        options.SetPassword(EnvOrDefault("CLICKHOUSE_PASSWORD", "test"));
+        options.SetDefaultDatabase(EnvOrDefault("CLICKHOUSE_DB", "default"));
+
+        clickhouse::Client ch_client(options);
+        RunTests(ch_client);
+        return 0;
+    } catch (const std::exception& ex) {
+        std::cerr << "Configuration error: " << ex.what() << std::endl;
+        return 1;
+    }
 }

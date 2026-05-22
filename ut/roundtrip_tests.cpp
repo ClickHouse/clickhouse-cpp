@@ -337,3 +337,46 @@ INSTANTIATE_TEST_SUITE_P(
             .SetCompressionMethod(CompressionMethod::ZSTD)
             .SetBakcwardCompatibilityFeatureLowCardinalityAsWrappedColumn(false)
     ));
+
+
+TEST(DateTime64, Issue398_TextAndBinarySameEpoch) {
+    Client client(LocalHostEndpoint);
+
+    const char* table = "test_datetime64_issue398";
+    client.Execute(std::string("DROP TABLE IF EXISTS ") + table);
+    client.Execute(std::string("CREATE TABLE ") + table + " (dt64 DateTime64(6, 'UTC')) ENGINE = Memory");
+
+    // Text path
+    client.Execute(std::string("INSERT INTO ") + table + " VALUES ('2024-10-10 11:00:00')");
+
+    // Binary path (2024-10-10 11:00:00 UTC in microseconds)
+    constexpr Int64 kEpochMicros = 1728558000000000LL;
+    {
+        Block b;
+        auto c = std::make_shared<ColumnDateTime64>(6);
+        c->Append(kEpochMicros);
+        b.AppendColumn("dt64", c);
+        client.Insert(table, b);
+    }
+
+    bool got_result = false;
+    bool same_epoch = false;
+
+    client.Select(
+        std::string("SELECT toUInt8(count() = 2 AND min(v) = max(v)) ")
+        + "FROM (SELECT toUnixTimestamp64Micro(dt64) AS v FROM " + table + ")",
+        [&](const Block& block) {
+            if (block.GetColumnCount() == 0 || block.GetRowCount() == 0) {
+                return;
+            }
+            auto col = block[0]->As<ColumnUInt8>();
+            ASSERT_TRUE(col != nullptr);
+            same_epoch = (col->At(0) != 0);
+            got_result = true;
+        });
+
+    ASSERT_TRUE(got_result);
+    EXPECT_TRUE(same_epoch);
+
+    client.Execute(std::string("DROP TABLE IF EXISTS ") + table);
+}
