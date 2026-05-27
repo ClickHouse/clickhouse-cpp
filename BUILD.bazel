@@ -1,0 +1,71 @@
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
+# Bazel build for clickhouse-cpp. The canonical build is CMake
+# (top-level CMakeLists.txt); this file mirrors the same library as
+# a bzlmod target so downstream Bazel projects can depend on it via
+# the Bazel Central Registry without standing up CMake.
+#
+# Differences from the CMake build that callers should be aware of:
+#   * TLS links against BoringSSL (`@boringssl`), not OpenSSL — BCR
+#     ships BoringSSL natively. `USE_BORINGSSL` ifdef-guards the two
+#     OpenSSL-only surfaces (`SSL_CONF_*` command API and `SSL_read_ex`)
+#     that BoringSSL doesn't provide; see clickhouse/base/sslsocket.cpp.
+#   * lz4 / zstd / abseil come from BCR modules instead of contrib/;
+#     the contrib/ trees are only used by the CMake build. The
+#     vendored cityhash under contrib/cityhash/cityhash IS used here
+#     because cityhash isn't in BCR.
+
+# Vendored cityhash from contrib/. Exposed only to :clickhouse because
+# nothing else should be linking against this directly — callers should
+# use the public :clickhouse target.
+cc_library(
+    name = "cityhash",
+    srcs = ["contrib/cityhash/cityhash/city.cc"],
+    hdrs = [
+        "contrib/cityhash/cityhash/city.h",
+        "contrib/cityhash/cityhash/citycrc.h",
+        "contrib/cityhash/cityhash/config.h",
+    ],
+    # types.cpp / lowcardinality.cpp use `#include <city.h>`.
+    strip_include_prefix = "contrib/cityhash/cityhash",
+    visibility = ["//visibility:private"],
+)
+
+# The main clickhouse-cpp library. Downstream callers use
+# `#include <clickhouse/client.h>` and link `@clickhouse_cpp//:clickhouse`.
+cc_library(
+    name = "clickhouse",
+    srcs = glob([
+        "clickhouse/*.cpp",
+        "clickhouse/base/*.cpp",
+        "clickhouse/columns/*.cpp",
+        "clickhouse/types/*.cpp",
+    ]),
+    hdrs = glob([
+        "clickhouse/*.h",
+        "clickhouse/base/*.h",
+        "clickhouse/columns/*.h",
+        "clickhouse/types/*.h",
+    ]),
+    defines = [
+        # Enable the TLS code paths in client.cpp / sslsocket.cpp.
+        # Matches CMake's `option(WITH_OPENSSL ON)`.
+        "WITH_OPENSSL",
+        # Take the BoringSSL-compatible branches in sslsocket.cpp.
+        "USE_BORINGSSL",
+    ],
+    # Expose headers at their workspace path so both internal
+    # (`#include "client.h"` from clickhouse/*.cpp via quote-form
+    # source-dir search) and external (`#include <clickhouse/client.h>`)
+    # include forms resolve.
+    strip_include_prefix = "/",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":cityhash",
+        "@abseil-cpp//absl/numeric:int128",
+        "@boringssl//:crypto",
+        "@boringssl//:ssl",
+        "@lz4//:lz4",
+        "@zstd//:zstd",
+    ],
+)
