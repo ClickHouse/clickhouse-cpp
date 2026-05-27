@@ -50,6 +50,13 @@ void throwSSLError(SSL * ssl, int error, const char * /*location*/, const char *
 }
 
 void configureSSL(const clickhouse::SSLParams::ConfigurationType & configuration, SSL * ssl, SSL_CTX * context = nullptr) {
+#ifdef USE_BORINGSSL
+    // BoringSSL doesn't ship the SSL_CONF_* command API, so this becomes
+    // a no-op. The configuration vector is ignored.
+    (void)configuration;
+    (void)ssl;
+    (void)context;
+#else
     std::unique_ptr<SSL_CONF_CTX, decltype(&SSL_CONF_CTX_free)> conf_ctx_holder(SSL_CONF_CTX_new(), SSL_CONF_CTX_free);
     auto conf_ctx = conf_ctx_holder.get();
 
@@ -84,6 +91,7 @@ void configureSSL(const clickhouse::SSLParams::ConfigurationType & configuration
         else
             throw clickhouse::OpenSSLError("Failed to configure OpenSSL: command '" + kv.first + "' unknown error: " + std::to_string(err));
     }
+#endif
 }
 
 #define STRINGIFY_HELPER(x) #x
@@ -285,9 +293,18 @@ SSLSocketInput::SSLSocketInput(SSL *ssl)
 {}
 
 size_t SSLSocketInput::DoRead(void* buf, size_t len) {
+#ifdef USE_BORINGSSL
+    // BoringSSL doesn't have SSL_read_ex (OpenSSL 3.0+ API); fall back to
+    // SSL_read with the length clamped to INT_MAX.
+    const int max_read = static_cast<int>(
+        std::min<std::size_t>(len, std::numeric_limits<int>::max()));
+    return static_cast<size_t>(
+        HANDLE_SSL_ERROR(ssl_, SSL_read(ssl_, buf, max_read)));
+#else
     size_t actually_read;
     HANDLE_SSL_ERROR(ssl_, SSL_read_ex(ssl_, buf, len, &actually_read));
     return actually_read;
+#endif
 }
 
 SSLSocketOutput::SSLSocketOutput(SSL *ssl)

@@ -281,3 +281,6 @@ BUCKAROO_DEPS
 
 # clangd cache
 /.cache/clangd
+
+# Bazel
+/bazel-*
