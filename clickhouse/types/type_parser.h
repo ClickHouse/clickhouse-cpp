@@ -62,6 +62,7 @@ class TypeParser {
             RPar,
             Comma,
             QuotedString, // string with quotation marks included
+            QuotedIdentifier,
             EOS,
         };
 
@@ -84,6 +85,11 @@ private:
 
     TypeAst* type_;
     std::stack<TypeAst*> open_elements_;
+    // Backing storage for unescaped QuotedIdentifier token values. When a
+    // quoted identifier contains escape sequences the unescaped content is
+    // written here and the returned StringView points into this string.
+    // Valid only until the next NextToken() call.
+    std::string scratch_;
 };
 
 
