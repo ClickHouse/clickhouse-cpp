@@ -753,40 +753,14 @@ bool Client::Impl::ReceiveData() {
 
 bool Client::Impl::ReceiveException(bool rethrow) {
     std::shared_ptr<Exception> e(new Exception);
-    Exception* current = e.get();
+    bool has_nested = false; // obsolete: https://github.com/ClickHouse/ClickHouse/blob/ef11941cf5a/src/IO/ReadHelpers.cpp#L2017
 
-    bool exception_received = true;
-    do {
-        bool has_nested = false;
-
-        if (!WireFormat::ReadFixed(*input_, &current->code)) {
-           exception_received = false;
-           break;
-        }
-        if (!WireFormat::ReadString(*input_, &current->name)) {
-            exception_received = false;
-            break;
-        }
-        if (!WireFormat::ReadString(*input_, &current->display_text)) {
-            exception_received = false;
-            break;
-        }
-        if (!WireFormat::ReadString(*input_, &current->stack_trace)) {
-            exception_received = false;
-            break;
-        }
-        if (!WireFormat::ReadFixed(*input_, &has_nested)) {
-            exception_received = false;
-            break;
-        }
-
-        if (has_nested) {
-            current->nested.reset(new Exception);
-            current = current->nested.get();
-        } else {
-            break;
-        }
-    } while (true);
+    bool exception_received =
+        WireFormat::ReadFixed(*input_, &e->code)
+        && WireFormat::ReadString(*input_, &e->name)
+        && WireFormat::ReadString(*input_, &e->display_text)
+        && WireFormat::ReadString(*input_, &e->stack_trace)
+        && WireFormat::ReadFixed(*input_, &has_nested);
 
     if (events_) {
         events_->OnServerException(*e);
