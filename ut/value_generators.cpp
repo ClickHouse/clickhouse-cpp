@@ -51,6 +51,15 @@ std::vector<std::string> MakeStrings() {
     };
 }
 
+std::vector<std::string> MakeJSONs() {
+    return {
+        R"({})",
+        R"({"a":"1"})",
+        R"({"age":"30","name":"Alice"})",
+        R"({"escapes":"line1\nline2\t\"quoted\"","unicode":"éèê"})",
+    };
+}
+
 std::vector<UUID> MakeUUIDs() {
     return {
         UUID(0llu, 0llu),
@@ -104,11 +113,47 @@ std::vector<clickhouse::Int64> MakeDateTimes() {
 std::vector<clickhouse::Int128> MakeInt128s() {
     return {
         absl::MakeInt128(0xffffffffffffffffll, 0xffffffffffffffffll), // -1
-        absl::MakeInt128(0, 0xffffffffffffffffll),  // 2^64
+        absl::MakeInt128(0, 0xffffffffffffffffll),  // 2^64 - 1
         absl::MakeInt128(0xffffffffffffffffll, 0),
         absl::MakeInt128(0x8000000000000000ll, 0),
         Int128(0)
     };
+}
+
+std::vector<clickhouse::UInt128> MakeUInt128s() {
+    return {
+        absl::MakeUint128(0xffffffffffffffffll, 0xffffffffffffffffll), // 2^128 - 1
+        absl::MakeUint128(0, 0xffffffffffffffffll),  // 2^64 - 1
+        absl::MakeUint128(0xffffffffffffffffll, 0),  // 2^128 - 2^64
+        absl::MakeUint128(0x8000000000000000ll, 0),
+        UInt128(0)
+    };
+}
+
+std::vector<int32_t> MakeTime() {
+    std::vector<int32_t> values{
+        1,       // 1 second
+        2,
+        5,
+        60,
+        60 * 2,
+        60 * 5,
+        3600,
+        3600 * 2,
+        3600 * 5,
+        3600 * 24,
+        3600 * 24 * 2,
+        3600 * 24 * 5,
+        3600 * 999 + 60 * 59 + 59,
+    };
+
+    auto ret = values;
+    ret.reserve(values.size() * 2 + 1);
+    ret.push_back(0);
+
+    // append negative values as well
+    std::transform(values.cbegin(), values.cend(), std::back_inserter(ret), [](int32_t x){ return -x; });
+    return ret;
 }
 
 std::vector<clickhouse::Int128> MakeDecimals(size_t /*precision*/, size_t scale) {

@@ -24,6 +24,28 @@ TEST(TypeParserCase, ParseFixedString) {
     ASSERT_EQ(ast.elements.front().value, 24U);
 }
 
+TEST(TypeParserCase, ParseBool) {
+    TypeAst ast;
+    TypeParser("Bool").Parse(&ast);
+
+    ASSERT_EQ(ast.meta, TypeAst::Terminal);
+    ASSERT_EQ(ast.name, "Bool");
+#if !CH_MAP_BOOL_TO_UINT8
+    ASSERT_EQ(ast.code, Type::Bool);
+#else
+    ASSERT_EQ(ast.code, Type::UInt8);
+#endif
+}
+
+TEST(TypeParserCase, ParseJSON) {
+    TypeAst ast;
+    TypeParser("JSON").Parse(&ast);
+
+    ASSERT_EQ(ast.meta, TypeAst::Terminal);
+    ASSERT_EQ(ast.name, "JSON");
+    ASSERT_EQ(ast.code, Type::JSON);
+}
+
 TEST(TypeParserCase, ParseArray) {
     TypeAst ast;
     TypeParser("Array(Int32)").Parse(&ast);
@@ -89,8 +111,26 @@ TEST(TypeParserCase, ParseTuple) {
     auto element = ast.elements.begin();
     for (size_t i = 0; i < 2; ++i) {
         ASSERT_EQ(element->name, names[i]);
+        ASSERT_TRUE(element->element_name.empty());
         ++element;
     }
+}
+
+TEST(TypeParserCase, ParseNamedTuple) {
+    TypeAst ast;
+    TypeParser("Tuple(a UInt8, b String)").Parse(&ast);
+    ASSERT_EQ(ast.meta, TypeAst::Tuple);
+    ASSERT_EQ(ast.name, "Tuple");
+    ASSERT_EQ(ast.code, Type::Tuple);
+    ASSERT_EQ(ast.elements.size(), 2u);
+
+    ASSERT_EQ(ast.elements[0].element_name, "a");
+    ASSERT_EQ(ast.elements[0].name, "UInt8");
+    ASSERT_EQ(ast.elements[0].code, Type::UInt8);
+
+    ASSERT_EQ(ast.elements[1].element_name, "b");
+    ASSERT_EQ(ast.elements[1].name, "String");
+    ASSERT_EQ(ast.elements[1].code, Type::String);
 }
 
 TEST(TypeParserCase, ParseDecimal) {
@@ -167,6 +207,20 @@ TEST(TypeParserCase, ParseDateTime_MINSK_TIMEZONE) {
     ASSERT_EQ(ast.elements[0].meta, TypeAst::Terminal);
 }
 
+TEST(TypeParserCase, EqualityIncludesValueString) {
+    TypeAst utc;
+    TypeAst minsk;
+    ASSERT_TRUE(TypeParser("DateTime('UTC')").Parse(&utc));
+    ASSERT_TRUE(TypeParser("DateTime('Europe/Minsk')").Parse(&minsk));
+    ASSERT_NE(utc, minsk);
+
+    TypeAst enum_one;
+    TypeAst enum_two;
+    ASSERT_TRUE(TypeParser("Enum8('ONE' = 1)").Parse(&enum_one));
+    ASSERT_TRUE(TypeParser("Enum8('TWO' = 1)").Parse(&enum_two));
+    ASSERT_NE(enum_one, enum_two);
+}
+
 TEST(TypeParserCase, LowCardinality_String) {
     TypeAst ast;
     ASSERT_TRUE(TypeParser("LowCardinality(String)").Parse(&ast));
@@ -194,7 +248,7 @@ TEST(TypeParserCase, LowCardinality_FixedString) {
     ASSERT_EQ(ast.elements[0].name, "FixedString");
     ASSERT_EQ(ast.elements[0].value, 0);
     ASSERT_EQ(ast.elements[0].elements.size(), 1u);
-    auto param = TypeAst{TypeAst::Number, Type::Void, "", 10, {}, {}};
+    auto param = TypeAst{TypeAst::Number, Type::Void, "", "", 10, {}, {}};
     ASSERT_EQ(ast.elements[0].elements[0], param);
 }
 
@@ -212,6 +266,26 @@ TEST(TypeParserCase, SimpleAggregateFunction_UInt64) {
     ASSERT_EQ(ast.elements[1].name, "UInt64");
     ASSERT_EQ(ast.elements[1].code, Type::UInt64);
     ASSERT_EQ(ast.elements[1].meta, TypeAst::Terminal);
+}
+
+TEST(TypeParserCase, ParseTime) {
+    TypeAst ast;
+    TypeParser("Time").Parse(&ast);
+    ASSERT_EQ(ast.meta, TypeAst::Terminal);
+    ASSERT_EQ(ast.name, "Time");
+    ASSERT_EQ(ast.code, Type::Time);
+    ASSERT_EQ(ast.elements.size(), 0u);
+}
+
+TEST(TypeParserCase, ParseTime64) {
+    TypeAst ast;
+    TypeParser("Time64(3)").Parse(&ast);
+    ASSERT_EQ(ast.meta, TypeAst::Terminal);
+    ASSERT_EQ(ast.name, "Time64");
+    ASSERT_EQ(ast.code, Type::Time64);
+    ASSERT_EQ(ast.elements.size(), 1u);
+    ASSERT_EQ(ast.elements[0].name, "");
+    ASSERT_EQ(ast.elements[0].value, 3);
 }
 
 TEST(TypeParserCase, ParseDateTime64) {

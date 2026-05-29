@@ -22,7 +22,9 @@ bool TypeAst::operator==(const TypeAst & other) const {
     return meta == other.meta
         && code == other.code
         && name == other.name
+        && element_name == other.element_name
         && value == other.value
+        && value_string == other.value_string
         && std::equal(elements.begin(), elements.end(), other.elements.begin(), other.elements.end());
 }
 
@@ -32,7 +34,11 @@ static const std::unordered_map<std::string, Type::Code> kTypeCode = {
     { "Int16",       Type::Int16 },
     { "Int32",       Type::Int32 },
     { "Int64",       Type::Int64 },
+#if CH_MAP_BOOL_TO_UINT8
     { "Bool",        Type::UInt8 },
+#else
+    { "Bool",        Type::Bool },
+#endif
     { "UInt8",       Type::UInt8 },
     { "UInt16",      Type::UInt16 },
     { "UInt32",      Type::UInt32 },
@@ -54,7 +60,7 @@ static const std::unordered_map<std::string, Type::Code> kTypeCode = {
     { "IPv4",        Type::IPv4 },
     { "IPv6",        Type::IPv6 },
     { "Int128",      Type::Int128 },
-//    { "UInt128",      Type::UInt128 },
+    { "UInt128",     Type::UInt128 },
     { "Decimal",     Type::Decimal },
     { "Decimal32",   Type::Decimal32 },
     { "Decimal64",   Type::Decimal64 },
@@ -65,6 +71,9 @@ static const std::unordered_map<std::string, Type::Code> kTypeCode = {
     { "Ring",        Type::Ring },
     { "Polygon",     Type::Polygon },
     { "MultiPolygon", Type::MultiPolygon },
+    { "Time",        Type::Time },
+    { "Time64",      Type::Time64 },
+    { "JSON",        Type::JSON },
 };
 
 template <typename L, typename R>
@@ -165,6 +174,12 @@ bool TypeParser::Parse(TypeAst* type) {
                 break;
             }
             case Token::Name:
+                if (!type_->name.empty()) {
+                    // A second Name token on the same element means the
+                    // previous one was a field name in a named-tuple element
+                    // (e.g. "a" in "Tuple(a Int32, …)").
+                    type_->element_name = std::move(type_->name);
+                }
                 type_->meta = GetTypeMeta(token.value);
                 type_->name = token.value.to_string();
                 type_->code = GetTypeCode(type_->name);

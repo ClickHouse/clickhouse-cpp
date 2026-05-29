@@ -5,9 +5,17 @@
 
 namespace clickhouse {
 
-ColumnArray::ColumnArray(ColumnRef data)
-    : ColumnArray(data, std::make_shared<ColumnUInt64>())
-{
+namespace {
+std::shared_ptr<ColumnUInt64> make_single_offset(size_t value) {
+    auto res = std::make_shared<ColumnUInt64>();
+    if (value != 0) {
+        res->Append(value);
+    }
+    return res;
+}
+}  // namespace
+
+ColumnArray::ColumnArray(ColumnRef data) : ColumnArray(data, make_single_offset(data->Size())) {
 }
 
 ColumnArray::ColumnArray(ColumnRef data, std::shared_ptr<ColumnUInt64> offsets)
@@ -15,6 +23,20 @@ ColumnArray::ColumnArray(ColumnRef data, std::shared_ptr<ColumnUInt64> offsets)
     , data_(data)
     , offsets_(offsets)
 {
+    const auto rows            = offsets_->Size();
+    const auto expected_values = rows > 0 ? offsets_->At(rows - 1) : 0;
+    std::uint64_t prev         = 0;
+    // Ensure the offset array is internally consistent
+    for (const auto& o : offsets_->GetWritableData()) {
+        if (o < prev) {
+            throw ValidationError("offsets must be monotonically increasing");
+        }
+        prev = o;
+    }
+    if (data_->Size() != expected_values) {
+        throw ValidationError("Mismatch between data and offsets: Expected " + std::to_string(expected_values) +
+                              " values in data, but got " + std::to_string(data_->Size()));
+    }
 }
 
 ColumnArray::ColumnArray(ColumnArray&& other)
@@ -41,11 +63,15 @@ ColumnRef ColumnArray::Slice(size_t begin, size_t size) const {
     if (size && begin + size > Size())
         throw ValidationError("Slice indexes are out of bounds");
 
-    auto result = std::make_shared<ColumnArray>(data_->Slice(GetOffset(begin), GetOffset(begin + size) - GetOffset(begin)));
-    for (size_t i = 0; i < size; i++)
-        result->AddOffset(GetSize(begin + i));
+    auto sliced_data = data_->Slice(GetOffset(begin), GetOffset(begin + size) - GetOffset(begin));
+    auto offsets     = std::make_shared<ColumnUInt64>();
+    auto offset      = uint64_t{0};
+    for (size_t i = 0; i < size; i++) {
+        offset += GetSize(begin + i);
+        offsets->Append(offset);
+    }
 
-    return result;
+    return std::make_shared<ColumnArray>(std::move(sliced_data), std::move(offsets));
 }
 
 ColumnRef ColumnArray::CloneEmpty() const {

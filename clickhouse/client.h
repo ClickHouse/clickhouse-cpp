@@ -10,13 +10,17 @@
 #include "columns/geo.h"
 #include "columns/ip4.h"
 #include "columns/ip6.h"
+#include "columns/json.h"
 #include "columns/lowcardinality.h"
+#include "columns/nothing.h"
 #include "columns/nullable.h"
 #include "columns/numeric.h"
 #include "columns/map.h"
 #include "columns/string.h"
 #include "columns/tuple.h"
+#include "columns/time.h"
 #include "columns/uuid.h"
+#include "columns/bool.h"
 
 #include <chrono>
 #include <cstdint>
@@ -225,6 +229,13 @@ std::ostream& operator<<(std::ostream& os, const Endpoint& options);
 
 class SocketFactory;
 
+struct ExternalTable {
+  const std::string_view name;
+  const Block& data;
+};
+
+using ExternalTables = std::vector<ExternalTable>;
+
 /**
  *
  */
@@ -238,6 +249,9 @@ public:
     /// Intends for execute arbitrary queries.
     void Execute(const Query& query);
 
+    /// Alias for Execute.
+    void Select(const Query& query);
+
     /// Intends for execute select queries.  Data will be returned with
     /// one or more call of \p cb.
     void Select(const std::string& query, SelectCallback cb);
@@ -248,12 +262,56 @@ public:
     void SelectCancelable(const std::string& query, SelectCancelableCallback cb);
     void SelectCancelable(const std::string& query, const std::string& query_id, SelectCancelableCallback cb);
 
-    /// Alias for Execute.
-    void Select(const Query& query);
+    // The same as Select but with an external data
+    // required for the query, see https://clickhouse.com/docs/engines/table-engines/special/external-data
+    void SelectWithExternalData(const std::string& query, const ExternalTables& external_tables, SelectCallback cb);
+    void SelectWithExternalData(const std::string& query, const std::string& query_id, const ExternalTables& external_tables, SelectCallback cb);
+
+    // The same as SelectWithExternalData but can be canceled by returning false from
+    // the data handler function \p cb.
+    void SelectWithExternalDataCancelable(const std::string& query, const ExternalTables& external_tables, SelectCancelableCallback cb);
+    void SelectWithExternalDataCancelable(const std::string& query, const std::string& query_id, const ExternalTables& external_tables, SelectCancelableCallback cb);
+
+    /// EXPERIMENTAL. Intends for execute arbitrary queries while reading the data interactively with
+    /// NextBlock().
+    void BeginExecute(const Query& query);
+
+    /// EXPERIMENTAL. Alias for BeginExecute.
+    void BeginSelect(const Query& query);
+
+    /// EXPERIMENTAL. Interactive version of select, data will be returned on consequent calls
+    /// to NextBlock().
+    void BeginSelect(const char* query);
+    void BeginSelect(const std::string& query);
+    void BeginSelect(const std::string& query, const std::string& query_id);
+
+    /// Returns the next block in the dataset after using BeginSelect family of functions
+    /// functions.
+    std::optional<Block> NextBlock();
+
+    // EXPERIMENTAL. Cancels current execution of BeginSelect and drains all in-flight data.
+    // Consecutive calls to NextBlock() after Cancel() will throw an exception.
+    void Cancel();
+
+    // EXPERIMENTAL. Returns true if the client is still in data-receiving mode and more future
+    // calls to NextBlock().
+    bool IsSelecting() const;
 
     /// Intends for insert block of data into a table \p table_name.
     void Insert(const std::string& table_name, const Block& block);
     void Insert(const std::string& table_name, const std::string& query_id, const Block& block);
+
+    /// Start an \p INSERT statement, insert batches of data, then finish the insert.
+    Block BeginInsert(const std::string& query);
+    Block BeginInsert(const std::string& query, const std::string& query_id);
+
+    /// Insert data using a \p block returned by \p BeginInsert.
+    void SendInsertBlock(const Block& block);
+
+    /// End an \p INSERT session started by \p BeginInsert.
+    void EndInsert();
+
+    bool IsInserting() const;
 
     /// Ping server for aliveness.
     void Ping();

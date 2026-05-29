@@ -12,6 +12,7 @@
 namespace clickhouse {
 
 using Int128 = absl::int128;
+using UInt128 = absl::uint128;
 using Int64 = int64_t;
 
 using TypeRef = std::shared_ptr<class Type>;
@@ -43,6 +44,7 @@ public:
         IPv4,
         IPv6,
         Int128,
+        UInt128,
         Decimal,
         Decimal32,
         Decimal64,
@@ -54,7 +56,11 @@ public:
         Point,
         Ring,
         Polygon,
-        MultiPolygon
+        MultiPolygon,
+        Time,
+        Time64,
+        JSON,
+        Bool,
     };
 
     using EnumItem = std::pair<std::string /* name */, int16_t /* value */>;
@@ -120,7 +126,8 @@ public:
 
     static TypeRef CreateString(size_t n);
 
-    static TypeRef CreateTuple(const std::vector<TypeRef>& item_types);
+    static TypeRef CreateTuple(const std::vector<TypeRef>& item_types,
+                               std::vector<std::string> item_names = {});
 
     static TypeRef CreateEnum8(const std::vector<EnumItem>& enum_items);
 
@@ -139,6 +146,12 @@ public:
     static TypeRef CreatePolygon();
 
     static TypeRef CreateMultiPolygon();
+
+    static TypeRef CreateTime();
+
+    static TypeRef CreateTime64(size_t precision);
+
+    static TypeRef CreateJSON();
 
 private:
     uint64_t GetTypeUniqueId() const;
@@ -201,6 +214,18 @@ private:
     std::string timezone_;
 };
 }
+
+class Time64Type : public Type {
+public:
+    explicit Time64Type(size_t precision);
+
+    std::string GetName() const;
+
+    inline size_t GetPrecision() const { return precision_; }
+
+private:
+    size_t precision_;
+};
 
 class DateTimeType : public Type, public details::TypeWithTimeZoneMixin {
 public:
@@ -272,15 +297,21 @@ private:
 
 class TupleType : public Type {
 public:
-    explicit TupleType(const std::vector<TypeRef>& item_types);
+    explicit TupleType(const std::vector<TypeRef>& item_types,
+                       std::vector<std::string> item_names = {});
 
     std::string GetName() const;
 
     /// Type of nested Tuple element type.
     std::vector<TypeRef> GetTupleType() const { return item_types_; }
 
+    /// Field names for named tuples. Same length as GetTupleType() when
+    /// populated, or empty when the tuple has no field names.
+    const std::vector<std::string>& GetItemNames() const { return item_names_; }
+
 private:
     std::vector<TypeRef> item_types_;
+    std::vector<std::string> item_names_;
 };
 
 class LowCardinalityType : public Type {
@@ -340,6 +371,11 @@ inline TypeRef Type::CreateSimple<Int128>() {
 }
 
 template <>
+inline TypeRef Type::CreateSimple<UInt128>() {
+    return TypeRef(new Type(UInt128));
+}
+
+template <>
 inline TypeRef Type::CreateSimple<uint8_t>() {
     return TypeRef(new Type(UInt8));
 }
@@ -357,6 +393,11 @@ inline TypeRef Type::CreateSimple<uint32_t>() {
 template <>
 inline TypeRef Type::CreateSimple<uint64_t>() {
     return TypeRef(new Type(UInt64));
+}
+
+template <>
+inline TypeRef Type::CreateSimple<bool>() {
+    return TypeRef(new Type(Bool));
 }
 
 template <>

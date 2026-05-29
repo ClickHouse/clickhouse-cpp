@@ -29,6 +29,11 @@ TEST(ItemView, StorableTypes) {
     TEST_ITEMVIEW_TYPE_VALUE(TypeCode, NativeType, std::numeric_limits<NativeType>::max() - 1); \
     TEST_ITEMVIEW_TYPE_VALUE(TypeCode, NativeType, std::numeric_limits<NativeType>::max());
 
+    TEST_ITEMVIEW_TYPE_VALUES(Type::Code::Bool,  int8_t);
+    TEST_ITEMVIEW_TYPE_VALUES(Type::Code::Bool,  bool);
+    TEST_ITEMVIEW_TYPE_VALUE(Type::Code::Bool,  bool, false);
+    TEST_ITEMVIEW_TYPE_VALUE(Type::Code::Bool,  bool, true);
+
     TEST_ITEMVIEW_TYPE_VALUES(Type::Code::Int8,  int8_t);
     TEST_ITEMVIEW_TYPE_VALUES(Type::Code::Int16, int16_t);
     TEST_ITEMVIEW_TYPE_VALUES(Type::Code::Int32, int32_t);
@@ -46,6 +51,8 @@ TEST(ItemView, StorableTypes) {
     TEST_ITEMVIEW_TYPE_VALUES(Type::Code::Float64, double);
     TEST_ITEMVIEW_TYPE_VALUE(Type::Code::Float64, double, 0.5);
 
+    TEST_ITEMVIEW_TYPE_VALUES(Type::Code::Time,       int32_t);
+    TEST_ITEMVIEW_TYPE_VALUES(Type::Code::Time64,     int64_t);
     TEST_ITEMVIEW_TYPE_VALUES(Type::Code::Date,       uint16_t);
     TEST_ITEMVIEW_TYPE_VALUES(Type::Code::DateTime,   uint32_t);
     TEST_ITEMVIEW_TYPE_VALUES(Type::Code::DateTime64, int64_t);
@@ -68,6 +75,8 @@ TEST(ItemView, StorableTypes) {
 
     TEST_ITEMVIEW_TYPE_VALUE(Type::Code::FixedString, std::string_view, "");
     TEST_ITEMVIEW_TYPE_VALUE(Type::Code::FixedString, std::string_view, "here is a string");
+    TEST_ITEMVIEW_TYPE_VALUE(Type::Code::JSON, std::string_view, "{}");
+    TEST_ITEMVIEW_TYPE_VALUE(Type::Code::JSON, std::string_view, R"({"key": "value"})");
 }
 
 #define EXPECT_ITEMVIEW_ERROR(TypeCode, NativeType) \
@@ -142,6 +151,16 @@ TEST(ItemView, TypeSizeMismatch) {
     EXPECT_ITEMVIEW_ERROR(Type::Code::Float64, int32_t);
     EXPECT_ITEMVIEW_ERROR(Type::Code::Float64, Int128);
     EXPECT_ITEMVIEW_ERROR(Type::Code::Float64, float);
+
+    EXPECT_ITEMVIEW_ERROR(Type::Code::Time, int8_t);
+    EXPECT_ITEMVIEW_ERROR(Type::Code::Time, int16_t);
+    EXPECT_ITEMVIEW_ERROR(Type::Code::Time, int64_t);
+    EXPECT_ITEMVIEW_ERROR(Type::Code::Time, Int128);
+
+    EXPECT_ITEMVIEW_ERROR(Type::Code::Time64, int8_t);
+    EXPECT_ITEMVIEW_ERROR(Type::Code::Time64, int16_t);
+    EXPECT_ITEMVIEW_ERROR(Type::Code::Time64, int32_t);
+    EXPECT_ITEMVIEW_ERROR(Type::Code::Time64, Int128);
 
     EXPECT_ITEMVIEW_ERROR(Type::Code::Date, int8_t);
     EXPECT_ITEMVIEW_ERROR(Type::Code::Date, int32_t);

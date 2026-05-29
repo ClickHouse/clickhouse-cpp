@@ -8,6 +8,7 @@ SET ( clickhouse-cpp-lib-src
     base/endpoints_iterator.cpp
 
     columns/array.cpp
+    columns/bool.cpp
     columns/column.cpp
     columns/date.cpp
     columns/decimal.cpp
@@ -16,12 +17,14 @@ SET ( clickhouse-cpp-lib-src
     columns/geo.cpp
     columns/ip4.cpp
     columns/ip6.cpp
+    columns/json.cpp
     columns/lowcardinality.cpp
     columns/nullable.cpp
     columns/numeric.cpp
     columns/map.cpp
     columns/string.cpp
     columns/tuple.cpp
+    columns/time.cpp
     columns/uuid.cpp
 
     columns/itemview.cpp
@@ -51,6 +54,7 @@ SET ( clickhouse-cpp-lib-src
     base/wire_format.h
 
     columns/array.h
+    columns/bool.h
     columns/column.h
     columns/date.h
     columns/decimal.h
@@ -59,6 +63,7 @@ SET ( clickhouse-cpp-lib-src
     columns/geo.h
     columns/ip4.h
     columns/ip6.h
+    columns/json.h
     columns/itemview.h
     columns/lowcardinality.h
     columns/lowcardinalityadaptor.h
@@ -67,6 +72,7 @@ SET ( clickhouse-cpp-lib-src
     columns/nullable.h
     columns/numeric.h
     columns/string.h
+    columns/time.h
     columns/tuple.h
     columns/utils.h
     columns/uuid.h
@@ -127,6 +133,11 @@ TARGET_INCLUDE_DIRECTORIES (clickhouse-cpp-lib PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
+IF (CH_MAP_BOOL_TO_UINT8)
+    TARGET_COMPILE_DEFINITIONS (clickhouse-cpp-lib PUBLIC CH_MAP_BOOL_TO_UINT8=1)
+ELSE ()
+    TARGET_COMPILE_DEFINITIONS (clickhouse-cpp-lib PUBLIC CH_MAP_BOOL_TO_UINT8=0)
+ENDIF ()
 
 IF (BUILD_SHARED_LIBS)
     SET_TARGET_PROPERTIES (clickhouse-cpp-lib PROPERTIES
@@ -235,12 +246,15 @@ INSTALL(FILES columns/factory.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/clickhou
 INSTALL(FILES columns/geo.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/clickhouse/columns/)
 INSTALL(FILES columns/ip4.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/clickhouse/columns/)
 INSTALL(FILES columns/ip6.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/clickhouse/columns/)
+INSTALL(FILES columns/json.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/clickhouse/columns/)
 INSTALL(FILES columns/itemview.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/clickhouse/columns/)
 INSTALL(FILES columns/lowcardinality.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/clickhouse/columns/)
+INSTALL(FILES columns/nothing.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/clickhouse/columns/)
 INSTALL(FILES columns/nullable.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/clickhouse/columns/)
 INSTALL(FILES columns/numeric.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/clickhouse/columns/)
 INSTALL(FILES columns/map.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/clickhouse/columns/)
 INSTALL(FILES columns/string.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/clickhouse/columns/)
+INSTALL(FILES columns/time.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/clickhouse/columns/)
 INSTALL(FILES columns/tuple.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/clickhouse/columns/)
 INSTALL(FILES columns/utils.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/clickhouse/columns/)
 INSTALL(FILES columns/uuid.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/clickhouse/columns/)

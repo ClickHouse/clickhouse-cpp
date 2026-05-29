@@ -3,6 +3,7 @@
 #include <clickhouse/base/platform.h>
 #include <clickhouse/base/uuid.h>
 
+#include "clickhouse/columns/itemview.h"
 #include "clickhouse/query.h"
 #include "utils_meta.h"
 #include "utils_comparison.h"
@@ -144,6 +145,7 @@ std::ostream& operator<<(std::ostream & ostr, const Type & type);
 std::ostream & operator<<(std::ostream & ostr, const ServerInfo & server_info);
 std::ostream & operator<<(std::ostream & ostr, const Profile & profile);
 std::ostream & operator<<(std::ostream & ostr, const Progress & progress);
+std::ostream & operator<<(std::ostream& ostr, const ItemView& item_view);
 }
 
 std::ostream& operator<<(std::ostream & ostr, const PrettyPrintBlock & block);

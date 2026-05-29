@@ -1,4 +1,5 @@
 #include <clickhouse/client.h>
+#include <clickhouse/columns/bool.h>
 
 #include "clickhouse/base/socket.h"
 #include "clickhouse/version.h"
@@ -21,6 +22,22 @@
 #include <chrono>
 
 using namespace clickhouse;
+
+#if CH_MAP_BOOL_TO_UINT8
+using ClientBoolColumn = ColumnUInt8;
+using ClientBoolValue = uint8_t;
+#else
+using ClientBoolColumn = ColumnBool;
+using ClientBoolValue = bool;
+#endif
+
+ClientBoolValue MakeClientBoolValue(bool value) {
+#if CH_MAP_BOOL_TO_UINT8
+    return static_cast<uint8_t>(value);
+#else
+    return value;
+#endif
+}
 
 template <typename T>
 std::shared_ptr<T> createTableWithOneColumn(Client & client, const std::string & table_name, const std::string & column_name)
@@ -153,6 +170,81 @@ TEST_P(ClientCase, Array) {
     );
 
     EXPECT_EQ(4U, row);
+}
+
+TEST_P(ClientCase, Time) {
+    Block b;
+
+    client_->Execute("CREATE TEMPORARY TABLE IF NOT EXISTS test_clickhouse_cpp_time (t Time) "
+                     "ENGINE = Memory "
+                     "SETTINGS enable_time_time64_type = 1");
+    auto t = std::make_shared<ColumnTime>();
+
+    int32_t ts = 3600 * 15 + 60 * 4 + 5;
+    t->Append(ts);
+    b.AppendColumn("t", t);
+    client_->Insert("test_clickhouse_cpp_time", b);
+
+    size_t total_rows = 0; 
+    client_->Select("SELECT t, toString(t) FROM test_clickhouse_cpp_time", [ts, &total_rows](const Block& block)
+        {
+            if (block.GetRowCount() == 0) {
+                    return;
+            }
+            EXPECT_EQ(ts, block[0]->As<ColumnTime>()->At(0));
+            EXPECT_EQ("15:04:05", block[1]->As<ColumnString>()->At(0));
+            total_rows += block.GetRowCount();
+        });
+    EXPECT_EQ(total_rows, 1UL);
+}
+
+TEST_P(ClientCase, Time64) {
+    Block b;
+
+    client_->Execute("CREATE TEMPORARY TABLE IF NOT EXISTS test_clickhouse_cpp_time64 "
+                     "(t0 Time64(0), t3 Time64(3), t6 Time64(6)) "
+                     "ENGINE = Memory "
+                     "SETTINGS enable_time_time64_type = 1");
+    auto t0 = std::make_shared<ColumnTime64>(0);
+    auto t3 = std::make_shared<ColumnTime64>(3);
+    auto t6 = std::make_shared<ColumnTime64>(6);
+
+    int64_t ts0 = 3600 * 15 + 60 * 4 + 5;
+    int64_t ts3 = ts0 * 1000 + 123;
+    int64_t ts6 = ts0 * 1000000 + 123456;
+    t0->Append(ts0);
+    t3->Append(ts3);
+    t6->Append(ts6);
+    b.AppendColumn("t0", t0);
+    b.AppendColumn("t3", t3);
+    b.AppendColumn("t6", t6);
+    client_->Insert("test_clickhouse_cpp_time64", b);
+
+    size_t total_rows = 0;
+    client_->Select("SELECT "
+                    "t0, toString(t0), "
+                    "t3, toString(t3), "
+                    "t6, toString(t6) "
+                    "FROM test_clickhouse_cpp_time64",
+        [ts0, ts3, ts6, &total_rows](const Block& block)
+        {
+            if (block.GetRowCount() == 0) {
+                return;
+            }
+            EXPECT_EQ(ts0, block[0]->As<ColumnTime64>()->At(0));
+            EXPECT_EQ(0UL, block[0]->As<ColumnTime64>()->GetPrecision());
+            EXPECT_EQ("15:04:05", block[1]->As<ColumnString>()->At(0));
+
+            EXPECT_EQ(ts3, block[2]->As<ColumnTime64>()->At(0));
+            EXPECT_EQ(3UL, block[2]->As<ColumnTime64>()->GetPrecision());
+            EXPECT_EQ("15:04:05.123", block[3]->As<ColumnString>()->At(0));
+
+            EXPECT_EQ(ts6, block[4]->As<ColumnTime64>()->At(0));
+            EXPECT_EQ(6UL, block[4]->As<ColumnTime64>()->GetPrecision());
+            EXPECT_EQ("15:04:05.123456", block[5]->As<ColumnString>()->At(0));
+            total_rows += block.GetRowCount();
+        });
+    EXPECT_EQ(total_rows, 1UL);
 }
 
 TEST_P(ClientCase, Date) {
@@ -325,11 +417,11 @@ TEST_P(ClientCase, Generic) {
 
         auto id = std::make_shared<ColumnUInt64>();
         auto name = std::make_shared<ColumnString>();
-        auto f = std::make_shared<ColumnUInt8> ();
+        auto f = std::make_shared<ClientBoolColumn>();
         for (auto const& td : TEST_DATA) {
             id->Append(td.id);
             name->Append(td.name);
-            f->Append(td.f);
+            f->Append(MakeClientBoolValue(td.f));
         }
 
         block.AppendColumn("id"  , id);
@@ -351,11 +443,102 @@ TEST_P(ClientCase, Generic) {
             for (size_t c = 0; c < block.GetRowCount(); ++c, ++row) {
                 EXPECT_EQ(TEST_DATA[row].id, (*block[0]->As<ColumnUInt64>())[c]);
                 EXPECT_EQ(TEST_DATA[row].name, (*block[1]->As<ColumnString>())[c]);
-                EXPECT_EQ(TEST_DATA[row].f, (*block[2]->As<ColumnUInt8>())[c]);
+                EXPECT_EQ(MakeClientBoolValue(TEST_DATA[row].f), (*block[2]->As<ClientBoolColumn>())[c]);
             }
         }
     );
     EXPECT_EQ(sizeof(TEST_DATA)/sizeof(TEST_DATA[0]), row);
+}
+
+TEST_P(ClientCase, InsertData) {
+    client_->Execute(
+            "CREATE TEMPORARY TABLE IF NOT EXISTS test_clickhouse_cpp_insert (id UInt64, name String, f Bool)");
+
+    const struct {
+        uint64_t id;
+        std::string name;
+        bool f;
+    } TEST_DATA[] = {
+        { 1, "id", true },
+        { 3, "foo", false },
+        { 5, "bar", true },
+        { 7, "name", false },
+    };
+
+    const struct {
+        uint64_t id;
+        std::string name;
+        bool f;
+    } TEST_DATA2[] = {
+        { 2, "holden", true },
+        { 4, "naomi", false },
+        { 6, "amos", true },
+        { 8, "alex", false },
+    };
+
+    /// Insert some values.
+    {
+        // Prepare the insert.
+        auto block = client_->BeginInsert("INSERT INTO test_clickhouse_cpp_insert VALUES");
+        EXPECT_EQ(size_t(3), block.GetColumnCount());
+
+        // Fetch the derived columns.
+        auto id = block[0]->As<ColumnUInt64>();
+        auto name = block[1]->As<ColumnString>();
+        auto f = block[2]->As<ClientBoolColumn>();
+
+        // Insert some values.
+        for (auto const& td : TEST_DATA) {
+            id->Append(td.id);
+            name->Append(td.name);
+            f->Append(MakeClientBoolValue(td.f));
+        }
+        block.RefreshRowCount();
+        client_->SendInsertBlock(block);
+        block.Clear();
+
+        // Insert some more values.
+        for (auto const& td : TEST_DATA2) {
+            id->Append(td.id);
+            name->Append(td.name);
+            f->Append(MakeClientBoolValue(td.f));
+        }
+        block.RefreshRowCount();
+        client_->SendInsertBlock(block);
+        block.Clear();
+        client_->EndInsert();
+        // Second call to EndInsert should be no-op.
+        client_->EndInsert();
+    }
+
+    /// Select values inserted in the previous steps.
+    size_t row = 0;
+    client_->Select("SELECT id, name, f FROM test_clickhouse_cpp_insert", [TEST_DATA, TEST_DATA2, &row](const Block& block)
+        {
+            if (block.GetRowCount() == 0) {
+                return;
+            }
+            EXPECT_EQ("id", block.GetColumnName(0));
+            EXPECT_EQ("name", block.GetColumnName(1));
+            size_t block_two_row_num = sizeof(TEST_DATA)/sizeof(TEST_DATA[0]);
+
+            if (row < block_two_row_num) {
+                for (size_t c = 0; c < block.GetRowCount(); ++c, ++row) {
+                    EXPECT_EQ(TEST_DATA[row].id, (*block[0]->As<ColumnUInt64>())[c]);
+                    EXPECT_EQ(TEST_DATA[row].name, (*block[1]->As<ColumnString>())[c]);
+                    EXPECT_EQ(MakeClientBoolValue(TEST_DATA[row].f), (*block[2]->As<ClientBoolColumn>())[c]);
+                }
+            } else {
+                for (size_t c = 0; c < block.GetRowCount(); ++c, ++row) {
+                    EXPECT_EQ(TEST_DATA2[row-block_two_row_num].id, (*block[0]->As<ColumnUInt64>())[c]);
+                    EXPECT_EQ(TEST_DATA2[row-block_two_row_num].name, (*block[1]->As<ColumnString>())[c]);
+                    EXPECT_EQ(MakeClientBoolValue(TEST_DATA2[row-block_two_row_num].f), (*block[2]->As<ClientBoolColumn>())[c]);
+                }
+            }
+        }
+    );
+    auto exp = sizeof(TEST_DATA)/sizeof(TEST_DATA[0]) + sizeof(TEST_DATA2)/sizeof(TEST_DATA2[0]);
+    EXPECT_EQ(exp, row);
 }
 
 TEST_P(ClientCase, Nullable) {
@@ -432,6 +615,20 @@ TEST_P(ClientCase, Nullable) {
     );
 
     EXPECT_EQ(sizeof(TEST_DATA) / sizeof(TEST_DATA[0]), row);
+}
+
+TEST_P(ClientCase, Nothing) {
+    size_t total_row_count = 0;
+    client_->Select("SELECT NULL", [&total_row_count](const Block & block)
+        {
+            total_row_count += block.GetRowCount();
+            for (size_t i = 0; i < block.GetRowCount(); ++i) {
+                EXPECT_TRUE(block[0]->AsStrict<ColumnNullable>()->IsNull(i));
+                auto column = ColumnNullableT<ColumnNothing>::Wrap(block[0]->AsStrict<ColumnNullable>());
+                EXPECT_FALSE(column->At(i).has_value());
+            }
+        });
+    ASSERT_EQ(total_row_count, 1UL);
 }
 
 TEST_P(ClientCase, Numbers) {
@@ -935,7 +1132,7 @@ TEST_P(ClientCase, Query_ID) {
     EXPECT_EQ(5u, total_count);
 }
 
-// Spontaneosly fails on INSERTint data.
+// Spontaneously fails on INSERT int data.
 TEST_P(ClientCase, DISABLED_ArrayArrayUInt64) {
     // Based on https://github.com/ClickHouse/clickhouse-cpp/issues/43
     std::cerr << "Connected to: " << client_->GetServerInfo() << std::endl;
@@ -1205,6 +1402,190 @@ TEST_P(ClientCase, SelectAggregateFunction) {
 }
 
 
+// ============================================================================
+// Interactive (pull-based) Select API tests
+// ============================================================================
+
+TEST_P(ClientCase, InteractiveSelect_Basic) {
+    client_->Execute("CREATE TEMPORARY TABLE IF NOT EXISTS test_interactive_basic (id UInt64)");
+
+    {
+        Block block;
+        auto id = std::make_shared<ColumnUInt64>();
+        id->Append(1);
+        id->Append(2);
+        id->Append(3);
+        block.AppendColumn("id", id);
+        client_->Insert("test_interactive_basic", block);
+    }
+
+    // Initially not selecting.
+    EXPECT_FALSE(client_->IsSelecting());
+
+    client_->BeginSelect("SELECT id FROM test_interactive_basic ORDER BY id");
+    EXPECT_TRUE(client_->IsSelecting());
+
+    std::vector<uint64_t> values;
+    while (auto block = client_->NextBlock()) {
+        if (block->GetRowCount() == 0) continue;
+        auto col = block->At(0)->AsStrict<ColumnUInt64>();
+        for (size_t i = 0; i < block->GetRowCount(); ++i) {
+            values.push_back(col->At(i));
+        }
+    }
+
+    EXPECT_FALSE(client_->IsSelecting());
+    ASSERT_EQ(3u, values.size());
+    EXPECT_EQ(1u, values[0]);
+    EXPECT_EQ(2u, values[1]);
+    EXPECT_EQ(3u, values[2]);
+
+    // Client is reusable after drain.
+    client_->BeginSelect("SELECT CAST(42, 'UInt64') AS val");
+    {
+        uint64_t val = 0;
+        size_t rows = 0;
+        while (auto b = client_->NextBlock()) {
+            for (size_t i = 0; i < b->GetRowCount(); ++i) {
+                val = b->At(0)->AsStrict<ColumnUInt64>()->At(i);
+                rows++;
+            }
+        }
+        EXPECT_EQ(1u, rows);
+        EXPECT_EQ(42u, val);
+    }
+    EXPECT_FALSE(client_->IsSelecting());
+}
+
+TEST_P(ClientCase, InteractiveSelect_MultipleBlocks) {
+    Query query("SELECT number FROM system.numbers LIMIT 10");
+    query.SetSetting("max_block_size", {"2"});
+
+    client_->BeginSelect(query);
+
+    size_t block_count = 0;
+    std::vector<uint64_t> values;
+    while (auto block = client_->NextBlock()) {
+        if (block->GetRowCount() == 0) continue;
+        EXPECT_LE(block->GetRowCount(), 2u);
+        block_count++;
+        auto col = block->At(0)->AsStrict<ColumnUInt64>();
+        for (size_t i = 0; i < block->GetRowCount(); ++i) {
+            values.push_back(col->At(i));
+        }
+    }
+
+    EXPECT_EQ(10u, values.size());
+    EXPECT_GE(block_count, 2u);
+    for (size_t i = 0; i < values.size(); ++i) {
+        EXPECT_EQ(i, values[i]);
+    }
+}
+
+TEST_P(ClientCase, InteractiveSelect_Cancel) {
+    // Cancel mid-stream on a large result set with small blocks to ensure
+    // we don't receive all data in a single block.
+    Query query("SELECT number FROM system.numbers LIMIT 100000");
+    query.SetSetting("max_block_size", {"100"});
+
+    client_->BeginSelect(query);
+    // Consume one block of data, skipping any blocks with 0 rows.
+    size_t rows_before_cancel = 0;
+    while (auto b = client_->NextBlock()) {
+        if (b->GetRowCount() == 0) continue;
+        rows_before_cancel = b->GetRowCount();
+        break;
+    }
+    ASSERT_GT(rows_before_cancel, 0u);
+    ASSERT_LT(rows_before_cancel, 100000u);
+    EXPECT_TRUE(client_->IsSelecting());
+
+    EXPECT_NO_THROW(client_->Cancel());
+    EXPECT_FALSE(client_->IsSelecting());
+
+    // Client is reusable after cancel.
+    client_->BeginSelect("SELECT 99 AS val");
+    {
+        size_t rows = 0;
+        while (auto b = client_->NextBlock()) {
+            for (size_t i = 0; i < b->GetRowCount(); ++i) {
+                EXPECT_EQ(99u, b->At(0)->AsStrict<ColumnUInt8>()->At(i));
+                rows++;
+            }
+        }
+        EXPECT_EQ(1u, rows);
+    }
+
+}
+
+TEST_P(ClientCase, InteractiveSelect_StateErrors) {
+    // NextBlock while idle.
+    EXPECT_THROW(client_->NextBlock(), ValidationError);
+
+    // Cancel while idle.
+    EXPECT_THROW(client_->Cancel(), ValidationError);
+
+    // Double BeginSelect.
+    client_->BeginSelect("SELECT 1");
+    EXPECT_THROW(client_->BeginSelect("SELECT 2"), ValidationError);
+    client_->Cancel();
+
+    // Server error (non-existent table) resets state back to Idle.
+    client_->BeginSelect("SELECT * FROM non_existent_table_xyz_clickhouse_cpp_test");
+    EXPECT_THROW(client_->NextBlock(), ServerException);
+    EXPECT_FALSE(client_->IsSelecting());
+
+    // Client is usable after server error.
+    client_->BeginSelect("SELECT 1 AS val");
+    {
+        size_t rows = 0;
+        while (auto b = client_->NextBlock()) {
+            for (size_t i = 0; i < b->GetRowCount(); ++i) {
+                EXPECT_EQ(1u, b->At(0)->AsStrict<ColumnUInt8>()->At(i));
+                rows++;
+            }
+        }
+        EXPECT_EQ(1u, rows);
+    }
+}
+
+TEST_P(ClientCase, InteractiveSelect_WithCallbacks) {
+    client_->Execute("CREATE TEMPORARY TABLE IF NOT EXISTS test_interactive_cb (id UInt64)");
+
+    {
+        Block block;
+        auto id = std::make_shared<ColumnUInt64>();
+        for (uint64_t i = 0; i < 100; ++i) {
+            id->Append(i);
+        }
+        block.AppendColumn("id", id);
+        client_->Insert("test_interactive_cb", block);
+    }
+
+    size_t callback_rows = 0;
+    bool progress_received = false;
+
+    Query query("SELECT id FROM test_interactive_cb");
+    query.OnData([&](const Block& block) {
+        callback_rows += block.GetRowCount();
+    });
+    query.OnProgress([&](const Progress&) {
+        progress_received = true;
+    });
+
+    client_->BeginSelect(query);
+
+    size_t nextblock_rows = 0;
+    while (auto block = client_->NextBlock()) {
+        nextblock_rows += block->GetRowCount();
+    }
+
+    EXPECT_EQ(100u, nextblock_rows);
+    // OnData fires for non-empty blocks too — both methods see the data.
+    EXPECT_GT(callback_rows, 0u);
+    EXPECT_TRUE(progress_received);
+}
+
 const auto LocalHostEndpoint = ClientOptions()
         .SetHost(           getEnvOrDefault("CLICKHOUSE_HOST",     "localhost"))
         .SetPort(   getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "9000"))
@@ -1228,7 +1609,7 @@ using namespace clickhouse;
 const auto QUERIES = std::vector<std::string>{
     "SELECT version()",
     "SELECT fqdn()",
-    "SELECT buildId()",
+    "SELECT blockSize()",
     "SELECT uptime()",
     "SELECT now()"
 };
@@ -1538,4 +1919,31 @@ TEST_P(ClientCase, QueryParameters) {
     EXPECT_EQ(4u, total_count);
 
     client_->Execute("DROP TEMPORARY TABLE " + table_name);
+}
+
+TEST_P(ClientCase, ClientName) {
+    const auto server_info = client_->GetServerInfo();
+
+    std::srand(std::time(nullptr) + reinterpret_cast<int64_t>(&server_info));
+    const auto * test_info = ::testing::UnitTest::GetInstance()->current_test_info();
+    const std::string query_id = std::to_string(std::rand()) + "-" + test_info->test_suite_name() + "/" + test_info->name();
+
+    SCOPED_TRACE(query_id);
+
+    client_->Select("SELECT 1", query_id, [](const Block&) { /* make sure the data is delivered in full */ });
+
+    FlushLogs();
+
+    std::string query_log_query 
+        = "SELECT CAST(client_name, 'String') FROM system.query_log WHERE query_id = '" + query_id + "'";
+
+    size_t total_rows = 0;
+    client_->Select(query_log_query, [&total_rows](const Block& block) {
+        const auto row_count = block.GetRowCount();
+        total_rows += row_count;
+        for (size_t i = 0; i < row_count; ++i) {
+            ASSERT_EQ(block[0]->AsStrict<ColumnString>()->At(i), "clickhouse-cpp");
+        }
+    });
+    ASSERT_GT(total_rows, 0UL) << "Query with query_id " << query_id << " is not found";
 }

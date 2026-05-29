@@ -227,6 +227,29 @@ TEST(ColumnArrayT, SimpleFixedString) {
     EXPECT_EQ("world\0"sv, (*array)[0][1]);
 }
 
+TEST(ColumnArrayT, JSON) {
+    using namespace std::literals;
+    auto i1 = R"({"item": 1})"sv;
+    auto i2 = R"({"item": 2})"sv;
+    auto i3 = R"({"item": 3})"sv;
+    auto array = std::make_shared<ColumnArrayT<ColumnJSON>>();
+    array->Append({i1});
+    array->Append({i2, i3});
+
+    EXPECT_EQ(i1, array->At(0).At(0));
+    EXPECT_EQ(i2, array->At(1).At(0));
+    EXPECT_EQ(i3, array->At(1).At(1));
+
+    auto r1 = array->At(0);
+    EXPECT_EQ(1u, r1.Size());
+    EXPECT_EQ(i1, r1.At(0));
+
+    auto r2 = array->At(1);
+    EXPECT_EQ(2u, r2.Size());
+    EXPECT_EQ(i2, r2.At(0));
+    EXPECT_EQ(i3, r2.At(1));
+}
+
 TEST(ColumnArrayT, SimpleUInt64_2D) {
     // Nested 2D-arrays are supported too:
     auto array = std::make_shared<ColumnArrayT<ColumnArrayT<ColumnUInt64>>>();
@@ -312,6 +335,19 @@ TEST(ColumnArrayT, Wrap_UInt64_2D) {
     const auto & array = *wrapped_array;
 
     EXPECT_TRUE(CompareRecursive(values, array));
+}
+
+TEST(ColumnArrayT, Bool) {
+    // Check inserting\reading back data from clickhouse::ColumnArrayT<ColumnBool>
+
+    const std::vector<std::vector<uint8_t>> values = {
+        {1u, 0u, 0u},
+        {0u, 1u, 1u, 0u, 1u, 0u},
+        {0u},
+        {},
+        {1u, 0u}
+    };
+    CreateAndTestColumnArrayT<ColumnBool>(values);
 }
 
 TEST(ColumnArrayT, left_value_no_move) {

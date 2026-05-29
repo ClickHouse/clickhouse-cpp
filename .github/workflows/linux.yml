@@ -4,7 +4,7 @@ on:
   schedule:
     - cron: '0 0 * * 1'
   push:
-    branches: [ master ]
+    branches: [ '*' ]
   pull_request:
     branches: [ master ]
 
@@ -15,50 +15,62 @@ on:
 
 env:
   BUILD_TYPE: Release
-  CLICKHOUSE_SERVER_IMAGE: "clickhouse/clickhouse-server:22.3"
+
+permissions:
+  contents: read
 
 jobs:
   build:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-20.04]
-        compiler: [clang-6, clang-10-libc++, gcc-7, gcc-8, gcc-9]
+        compiler: [clang-11, clang-14, clang-18, gcc-9, gcc-12, gcc-14]
         ssl: [ssl_ON, ssl_OFF]
         dependencies: [dependencies_BUILT_IN]
 
         include:
-        - compiler: clang-6
-          COMPILER_INSTALL: clang-6.0 libc++-dev
-          C_COMPILER: clang-6.0
-          CXX_COMPILER: clang++-6.0
+        - compiler: clang-11
+          os: ubuntu-22.04
+          COMPILER_INSTALL: clang-11 libc++-11-dev
+          C_COMPILER: clang-11
+          CXX_COMPILER: clang++-11
 
-        - compiler: clang-10-libc++
-          COMPILER_INSTALL: clang-10 libc++-dev
-          C_COMPILER: clang-10
-          CXX_COMPILER: clang++-10
+        - compiler: clang-14
+          os: ubuntu-24.04
+          COMPILER_INSTALL: clang-14 libc++-14-dev
+          C_COMPILER: clang-14
+          CXX_COMPILER: clang++-14
 
-        - compiler: gcc-7
-          COMPILER_INSTALL: gcc-7 g++-7
-          C_COMPILER: gcc-7
-          CXX_COMPILER: g++-7
-
-        - compiler: gcc-8
-          COMPILER_INSTALL: gcc-8 g++-8
-          C_COMPILER: gcc-8
-          CXX_COMPILER: g++-8
+        - compiler: clang-18
+          os: ubuntu-24.04
+          COMPILER_INSTALL: clang-18 libc++-18-dev
+          C_COMPILER: clang-18
+          CXX_COMPILER: clang++-18
 
         - compiler: gcc-9
+          os: ubuntu-22.04
           COMPILER_INSTALL: gcc-9 g++-9
           C_COMPILER: gcc-9
           CXX_COMPILER: g++-9
+
+        - compiler: gcc-12
+          os: ubuntu-24.04
+          COMPILER_INSTALL: gcc-12 g++-12
+          C_COMPILER: gcc-12
+          CXX_COMPILER: g++-12
+
+        - compiler: gcc-14
+          os: ubuntu-24.04
+          COMPILER_INSTALL: gcc-14 g++-14
+          C_COMPILER: gcc-14
+          CXX_COMPILER: g++-14
 
         - ssl: ssl_ON
           SSL_CMAKE_OPTION: -D WITH_OPENSSL=ON
 
         - dependencies: dependencies_SYSTEM
           compiler: compiler_SYSTEM
-          os: ubuntu-22.04
+          os: ubuntu-24.04
           COMPILER_INSTALL: gcc g++
           C_COMPILER: gcc
           CXX_COMPILER: g++
@@ -70,28 +82,18 @@ jobs:
     runs-on: ${{matrix.os}}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 100
           fetch-tags: true
 
       - name: Install dependencies
         run: |
-          sudo apt-get update && \
+          sudo apt-get update
           sudo apt-get install -y \
-            docker \
             cmake \
             ${{matrix.COMPILER_INSTALL}} \
             ${{matrix.DEPENDENCIES_INSTALL}}
-
-      - name: Install dependencies - Docker
-        run: |
-          sudo apt remove -y docker docker-engine docker.io containerd runc
-          sudo apt install -y apt-transport-https ca-certificates curl gnupg lsb-release
-          curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-          sudo apt update -q
-          sudo apt install docker-ce docker-ce-cli containerd.io
 
       - name: Configure project
         run: |
@@ -99,6 +101,7 @@ jobs:
             -D CMAKE_C_COMPILER=${{matrix.C_COMPILER}} \
             -D CMAKE_CXX_COMPILER=${{matrix.CXX_COMPILER}} \
             -D CMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
+            -D CH_MAP_BOOL_TO_UINT8=OFF \
             -D BUILD_TESTS=ON \
             ${{matrix.SSL_CMAKE_OPTION}} \
             ${{matrix.DEPENDENCIES_CMAKE_OPTIONS}} \
@@ -112,15 +115,24 @@ jobs:
             --config ${{env.BUILD_TYPE}} \
             --target all
 
-      - name: Test - Start ClickHouse server in background
-        run: |
-          docker pull ${CLICKHOUSE_SERVER_IMAGE}
-          docker run -d --name clickhouse -p 9000:9000 ${CLICKHOUSE_SERVER_IMAGE}
-          docker ps -a
-          docker stats -a --no-stream
-          ## Check and wait until CH is ready to accept connections
-          docker exec clickhouse bash -c 'for i in {1..10}; do echo checking if clickhouse server is started  attempt \#$i; if ( grep -q "<Information> Application: Ready for connections." /var/log/clickhouse-server/clickhouse-server.log ); then echo seems like clickhouse server is started; exit 0; fi; sleep 1; done; exit -1'
+      - name: Start ClickHouse in Docker
+        uses: hoverkraft-tech/compose-action@v2.0.1
+        with:
+          compose-file: ci/docker-compose.yml
+          down-flags: --volumes
 
+      - name: Check if ClickHouse is available
+        run: |
+          for i in {1..60}; do
+            if curl -fsS http://localhost:8123/ > /dev/null; then
+              echo "ClickHouse is ready"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "ClickHouse failed to start"
+          exit 1
+  
       - name: Test
         working-directory: ${{github.workspace}}/build/ut
         run: ./clickhouse-cpp-ut

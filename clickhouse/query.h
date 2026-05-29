@@ -82,7 +82,7 @@ using SelectCallback           = std::function<void(const Block& block)>;
 using SelectCancelableCallback = std::function<bool(const Block& block)>;
 using SelectServerLogCallback  = std::function<bool(const Block& block)>;
 using ProfileEventsCallback    = std::function<bool(const Block& block)>;
-using ProfileCallbak           = std::function<void(const Profile& profile)>;
+using ProfileCallback          = std::function<void(const Profile& profile)>;
 
 
 class Query : public QueryEvents {
@@ -174,7 +174,7 @@ public:
         return *this;
     }
 
-    inline Query& OnProfile(ProfileCallbak cb) {
+    inline Query& OnProfile(ProfileCallback cb) {
         profile_callback_cb_ = std::move(cb);
         return *this;
     }
@@ -229,8 +229,8 @@ private:
     }
 
 private:
-    const std::string query_;
-    const std::string query_id_;
+    std::string query_;
+    std::string query_id_;
     std::optional<open_telemetry::TracingContext> tracing_context_;
     QuerySettings query_settings_;
     QueryParams query_params_;
@@ -240,7 +240,7 @@ private:
     SelectCancelableCallback select_cancelable_cb_;
     SelectServerLogCallback select_server_log_cb_;
     ProfileEventsCallback profile_events_callback_cb_;
-    ProfileCallbak profile_callback_cb_;
+    ProfileCallback profile_callback_cb_;
 };
 
 }

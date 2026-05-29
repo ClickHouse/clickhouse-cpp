@@ -5,8 +5,6 @@
 
 namespace clickhouse {
 
-using UInt128 = std::pair<uint64_t, uint64_t>;
-
-using UUID = UInt128;
+using UUID = std::pair<uint64_t, uint64_t>;
 
 }
