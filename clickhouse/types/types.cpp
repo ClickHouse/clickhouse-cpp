@@ -477,8 +477,8 @@ LowCardinalityType::~LowCardinalityType() {
 // The condition for this is a match against `^[a-zA-Z_][0-9a-zA-Z_]*$`
 static bool IsPlainIdentifier(const std::string& name) {
     if (name.empty()) return false;
-    auto is_alpha_or_under = [](char c) { return std::isalpha(c) || c == '_'; };
-    auto is_alnum_or_under = [](char c) { return std::isalnum(c) || c == '_'; };
+    auto is_alpha_or_under = [](char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'; };
+    auto is_alnum_or_under = [&is_alpha_or_under](char c) { return is_alpha_or_under(c) || (c >= '0' && c <= '9'); };
     if (!is_alpha_or_under(name[0])) return false;
     for (size_t i = 1; i < name.size(); ++i)
         if (!is_alnum_or_under(name[i])) return false;
