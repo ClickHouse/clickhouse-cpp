@@ -1,0 +1,37 @@
+name: Bazel
+
+on:
+  schedule:
+    - cron: '0 0 * * 1'
+  push:
+    branches: [ '*' ]
+  pull_request:
+    branches: [ master ]
+
+  release:
+    types:
+      - published
+      - prereleased
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 100
+          fetch-tags: true
+
+      - name: Setup Bazel
+        uses: bazel-contrib/setup-bazel@0.15.0
+        with:
+          bazelisk-cache: true
+          disk-cache: true
+          repository-cache: true
+
+      - name: Build project
+        run: bazel build //...
