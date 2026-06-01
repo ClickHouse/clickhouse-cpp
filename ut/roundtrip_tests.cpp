@@ -255,6 +255,128 @@ TEST_P(RoundtripCase, TupleTNullableString) {
     EXPECT_TRUE(CompareRecursive(*col, *result_typed));
 }
 
+TEST_P(RoundtripCase, TupleWithQuotedFieldNames) {
+    auto int_col = std::make_shared<ColumnInt8>();
+    auto str_col = std::make_shared<ColumnString>();
+    int_col->Append(42);
+    str_col->Append("hello");
+    int_col->Append(-1);
+    str_col->Append("world");
+
+    auto col = std::make_shared<ColumnTuple>(
+        std::vector<ColumnRef>({int_col, str_col}),
+        std::vector<std::string>{"a.b", "c.d"}
+    );
+
+    auto result = RoundtripColumnValues(*client_, col)->AsStrict<ColumnTuple>();
+    ASSERT_EQ(result->Size(), 2u);
+    EXPECT_EQ(result->At(0)->AsStrict<ColumnInt8>()->At(0), int8_t{42});
+    EXPECT_EQ(result->At(1)->AsStrict<ColumnString>()->At(0), "hello");
+    EXPECT_EQ(result->At(0)->AsStrict<ColumnInt8>()->At(1), int8_t{-1});
+    EXPECT_EQ(result->At(1)->AsStrict<ColumnString>()->At(1), "world");
+
+    // Verify field names as returned by the server (from the header block).
+    TypeRef server_type;
+    client_->Select("SELECT col FROM temporary_roundtrip_table LIMIT 0",
+        [&server_type](const Block& b) {
+            if (b.GetColumnCount() > 0)
+                server_type = b[0]->Type();
+        });
+    ASSERT_NE(server_type, nullptr);
+    const auto& names = server_type->As<TupleType>()->GetItemNames();
+    ASSERT_EQ(names.size(), 2u);
+    EXPECT_EQ(names[0], "a.b");
+    EXPECT_EQ(names[1], "c.d");
+}
+
+TEST_P(RoundtripCase, TupleWithBacktickInFieldName) {
+    auto int_col = std::make_shared<ColumnInt8>();
+    auto str_col = std::make_shared<ColumnString>();
+    int_col->Append(7);
+    str_col->Append("foo");
+
+    // Field names contain literal backticks; GetName() will escape them as ``
+    auto col = std::make_shared<ColumnTuple>(
+        std::vector<ColumnRef>({int_col, str_col}),
+        std::vector<std::string>{"a`b", "c``d"}
+    );
+
+    auto result = RoundtripColumnValues(*client_, col)->AsStrict<ColumnTuple>();
+    ASSERT_EQ(result->Size(), 1u);
+    EXPECT_EQ(result->At(0)->AsStrict<ColumnInt8>()->At(0), int8_t{7});
+    EXPECT_EQ(result->At(1)->AsStrict<ColumnString>()->At(0), "foo");
+
+    TypeRef server_type;
+    client_->Select("SELECT col FROM temporary_roundtrip_table LIMIT 0",
+        [&server_type](const Block& b) {
+            if (b.GetColumnCount() > 0)
+                server_type = b[0]->Type();
+        });
+    ASSERT_NE(server_type, nullptr);
+    const auto& names = server_type->As<TupleType>()->GetItemNames();
+    ASSERT_EQ(names.size(), 2u);
+    EXPECT_EQ(names[0], "a`b");
+    EXPECT_EQ(names[1], "c``d");
+}
+
+TEST_P(RoundtripCase, TupleFieldAccessByQuotedName) {
+    auto int_col = std::make_shared<ColumnInt8>();
+    auto str_col = std::make_shared<ColumnString>();
+    int_col->Append(42);
+    str_col->Append("hello");
+    int_col->Append(-1);
+    str_col->Append("world");
+
+    auto col = std::make_shared<ColumnTuple>(
+        std::vector<ColumnRef>({int_col, str_col}),
+        std::vector<std::string>{"a.b", "c.d"}
+    );
+    RoundtripColumnValues(*client_, col);
+
+    std::vector<int8_t>    field1_values;
+    std::vector<std::string> field2_values;
+    client_->Select("SELECT col.`a.b`, col.`c.d` FROM temporary_roundtrip_table ORDER BY col.`a.b`",
+        [&](const Block& b) {
+            if (b.GetRowCount() == 0) return;
+            for (size_t i = 0; i < b.GetRowCount(); ++i) {
+                field1_values.push_back(b[0]->AsStrict<ColumnInt8>()->At(i));
+                field2_values.push_back(std::string(b[1]->AsStrict<ColumnString>()->At(i)));
+            }
+        });
+
+    ASSERT_EQ(field1_values.size(), 2u);
+    EXPECT_EQ(field1_values[0], int8_t{-1});
+    EXPECT_EQ(field1_values[1], int8_t{42});
+    EXPECT_EQ(field2_values[0], "world");
+    EXPECT_EQ(field2_values[1], "hello");
+}
+
+TEST_P(RoundtripCase, TupleFieldAccessWithBacktickInName) {
+    auto int_col = std::make_shared<ColumnInt8>();
+    auto str_col = std::make_shared<ColumnString>();
+    int_col->Append(7);
+    str_col->Append("foo");
+
+    // Field names contain literal backticks; in SQL they are escaped as ``
+    auto col = std::make_shared<ColumnTuple>(
+        std::vector<ColumnRef>({int_col, str_col}),
+        std::vector<std::string>{"a`b", "c``d"}
+    );
+    RoundtripColumnValues(*client_, col);
+
+    int8_t field1_value = 0;
+    std::string field2_value;
+    client_->Select("SELECT col.`a``b`, col.`c````d` FROM temporary_roundtrip_table",
+        [&](const Block& b) {
+            if (b.GetRowCount() == 0) return;
+            field1_value = b[0]->AsStrict<ColumnInt8>()->At(0);
+            field2_value = std::string(b[1]->AsStrict<ColumnString>()->At(0));
+        });
+
+    EXPECT_EQ(field1_value, int8_t{7});
+    EXPECT_EQ(field2_value, "foo");
+}
+
 TEST_P(RoundtripCase, Map_TString_TNullableString) {
     using Key =  ColumnString;
     using Value = ColumnNullableT<ColumnString>;
