@@ -163,11 +163,19 @@ size_t ColumnArray::GetSize(size_t n) const {
     return (n == 0) ? (*offsets_)[n] : ((*offsets_)[n] - (*offsets_)[n - 1]);
 }
 
-ColumnRef ColumnArray::GetData() const {
+ColumnRef ColumnArray::GetData() {
     return data_;
 }
 
-const std::shared_ptr<ColumnUInt64>& ColumnArray::GetOffsets() const {
+std::shared_ptr<const Column> ColumnArray::GetData() const {
+    return data_;
+}
+
+std::shared_ptr<ColumnUInt64>& ColumnArray::GetOffsets() {
+    return offsets_;
+}
+
+std::shared_ptr<const ColumnUInt64> ColumnArray::GetOffsets() const {
     return offsets_;
 }
 

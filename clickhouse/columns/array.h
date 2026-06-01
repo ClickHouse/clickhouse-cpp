@@ -79,11 +79,13 @@ public:
     void OffsetsIncrease(size_t);
 
     /// Gets the backing data array of the Array's. This does not include any Array Bounds.
-    ColumnRef GetData() const;
+    ColumnRef GetData();
+    std::shared_ptr<const Column> GetData() const;
 
     /// Gets all offsets denoting the list boundaries overlayed GetData.
     /// The layout is [size_i, ...] where `i` is the row.
-    const std::shared_ptr<ColumnUInt64>& GetOffsets() const;
+    std::shared_ptr<ColumnUInt64>& GetOffsets();
+    std::shared_ptr<const ColumnUInt64> GetOffsets() const;
 
     /// Gets the offset of the start of row `n` into `GetData()`.
     size_t GetOffset(size_t n) const;
