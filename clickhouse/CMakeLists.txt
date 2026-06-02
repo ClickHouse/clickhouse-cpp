@@ -222,6 +222,7 @@ INSTALL(FILES base/endpoints_iterator.h DESTINATION include/clickhouse/base/)
 
 # columns
 INSTALL(FILES columns/array.h DESTINATION include/clickhouse/columns/)
+INSTALL(FILES columns/bool.h DESTINATION include/clickhouse/columns/)
 INSTALL(FILES columns/column.h DESTINATION include/clickhouse/columns/)
 INSTALL(FILES columns/date.h DESTINATION include/clickhouse/columns/)
 INSTALL(FILES columns/decimal.h DESTINATION include/clickhouse/columns/)
