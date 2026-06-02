@@ -167,6 +167,18 @@ ColumnRef ColumnArray::GetData() {
     return data_;
 }
 
+std::shared_ptr<const Column> ColumnArray::GetData() const {
+    return data_;
+}
+
+std::shared_ptr<ColumnUInt64>& ColumnArray::GetOffsets() {
+    return offsets_;
+}
+
+std::shared_ptr<const ColumnUInt64> ColumnArray::GetOffsets() const {
+    return offsets_;
+}
+
 void ColumnArray::Reset() {
     data_.reset();
     offsets_.reset();

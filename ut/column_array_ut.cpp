@@ -436,3 +436,47 @@ TEST(ColumnArrayT, const_right_value_no_move) {
         EXPECT_EQ(values[2], value2);
     }
 }
+
+TEST(ColumnArray, GetData) {
+    auto col = std::make_shared<ColumnArray>(std::make_shared<ColumnUInt64>());
+    col->AppendAsColumn(std::make_shared<ColumnUInt64>(std::vector<uint64_t>{1, 2, 3}));
+    col->AppendAsColumn(std::make_shared<ColumnUInt64>(std::vector<uint64_t>{4, 5}));
+
+    ColumnRef data = col->GetData();
+    EXPECT_EQ(data->Size(), 5u);
+
+    const auto& ccol = *col;
+    std::shared_ptr<const Column> cdata = ccol.GetData();
+    EXPECT_EQ(cdata->Size(), 5u);
+}
+
+TEST(ColumnArray, GetOffsets) {
+    auto col = std::make_shared<ColumnArray>(std::make_shared<ColumnUInt64>());
+    col->AppendAsColumn(std::make_shared<ColumnUInt64>(std::vector<uint64_t>{1, 2, 3}));
+    col->AppendAsColumn(std::make_shared<ColumnUInt64>(std::vector<uint64_t>{4, 5}));
+
+    auto& offsets = col->GetOffsets();
+    ASSERT_EQ(offsets->Size(), 2u);
+    EXPECT_EQ((*offsets)[0], 3u);
+    EXPECT_EQ((*offsets)[1], 5u);
+
+    const auto& ccol = *col;
+    std::shared_ptr<const ColumnUInt64> coffsets = ccol.GetOffsets();
+    EXPECT_EQ((*coffsets)[0], 3u);
+    EXPECT_EQ((*coffsets)[1], 5u);
+}
+
+TEST(ColumnArray, GetOffsetAndSize) {
+    auto col = std::make_shared<ColumnArray>(std::make_shared<ColumnUInt64>());
+    col->AppendAsColumn(std::make_shared<ColumnUInt64>(std::vector<uint64_t>{10, 20}));
+    col->AppendAsColumn(std::make_shared<ColumnUInt64>(std::vector<uint64_t>{30}));
+    col->AppendAsColumn(std::make_shared<ColumnUInt64>(std::vector<uint64_t>{}));
+
+    EXPECT_EQ(col->GetOffset(0), 0u);
+    EXPECT_EQ(col->GetOffset(1), 2u);
+    EXPECT_EQ(col->GetOffset(2), 3u);
+
+    EXPECT_EQ(col->GetSize(0), 2u);
+    EXPECT_EQ(col->GetSize(1), 1u);
+    EXPECT_EQ(col->GetSize(2), 0u);
+}

@@ -78,14 +78,26 @@ public:
 
     void OffsetsIncrease(size_t);
 
+    /// Gets the backing data array of the Array's. This does not include any Array Bounds.
+    ColumnRef GetData();
+    std::shared_ptr<const Column> GetData() const;
+
+    /// Gets all offsets denoting the list boundaries overlayed GetData.
+    /// The layout is [size_i, ...] where `i` is the row.
+    std::shared_ptr<ColumnUInt64>& GetOffsets();
+    std::shared_ptr<const ColumnUInt64> GetOffsets() const;
+
+    /// Gets the offset of the start of row `n` into `GetData()`.
+    size_t GetOffset(size_t n) const;
+
+    /// Gets the element count of row `n`.
+    size_t GetSize(size_t n) const;
+
 protected:
     template<typename T> friend class ColumnArrayT;
 
     ColumnArray(ColumnArray&& array);
 
-    size_t GetOffset(size_t n) const;
-    size_t GetSize(size_t n) const;
-    ColumnRef GetData();
     void AddOffset(size_t n);
     void Reset();
 
@@ -262,11 +274,9 @@ public:
     template <typename Container>
     inline void Append(Container&& container) {
         using container_type = decltype(container);
-        if constexpr (std::is_lvalue_reference_v<container_type> || 
-            std::is_const_v<std::remove_reference_t<container_type>>) {
+        if constexpr (std::is_lvalue_reference_v<container_type> || std::is_const_v<std::remove_reference_t<container_type>>) {
             Append(std::begin(container), std::end(container));
-        }
-        else {
+        } else {
             Append(std::make_move_iterator(std::begin(container)),
                 std::make_move_iterator(std::end(container)));
         }
