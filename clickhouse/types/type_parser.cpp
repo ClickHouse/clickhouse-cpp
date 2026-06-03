@@ -173,6 +173,7 @@ bool TypeParser::Parse(TypeAst* type) {
                 type_->code = Type::String;
                 break;
             }
+            case Token::QuotedIdentifier:
             case Token::Name:
                 if (!type_->name.empty()) {
                     // A second Name token on the same element means the
@@ -259,6 +260,35 @@ TypeParser::Token TypeParser::NextToken() {
                     }
                 }
                 return Token{Token::QuotedString, StringView(cur_++, 1)};
+            }
+            case '"':
+            case '`':
+            {
+                const auto quote = *cur_;
+                ++cur_;
+                // Two escape forms are recognised, both quote-specific (e.g.
+                // inside a backtick-quoted identifier only backtick escapes
+                // apply; a doubled double-quote is treated as two literals):
+                //   \q  – backslash followed by the opening quote character
+                //   qq  – two consecutive opening quote characters
+                scratch_.clear();
+                for (; cur_ < end_; ++cur_) {
+                    if (*cur_ == '\\' && cur_ + 1 < end_ && *(cur_ + 1) == quote) {
+                        scratch_ += quote;
+                        ++cur_;
+                    } else if (*cur_ == quote) {
+                        if (cur_ + 1 < end_ && *(cur_ + 1) == quote) {
+                            scratch_ += quote;
+                            ++cur_;
+                        } else {
+                            ++cur_;
+                            return Token{Token::QuotedIdentifier, StringView{scratch_}};
+                        }
+                    } else {
+                        scratch_ += *cur_;
+                    }
+                }
+                return Token{Token::Invalid, StringView()};
             }
 
             default: {

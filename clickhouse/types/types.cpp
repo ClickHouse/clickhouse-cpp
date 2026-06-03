@@ -473,24 +473,46 @@ LowCardinalityType::LowCardinalityType(TypeRef nested_type) : Type(LowCardinalit
 LowCardinalityType::~LowCardinalityType() {
 }
 
+// Checks if `name` is a valid plain identifier (must not be quoted).
+// The condition for this is a match against `^[a-zA-Z_][0-9a-zA-Z_]*$`
+static bool IsPlainIdentifier(const std::string& name) {
+    if (name.empty()) return false;
+    auto is_alpha_or_under = [](char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'; };
+    auto is_alnum_or_under = [&is_alpha_or_under](char c) { return is_alpha_or_under(c) || (c >= '0' && c <= '9'); };
+    if (!is_alpha_or_under(name[0])) return false;
+    for (size_t i = 1; i < name.size(); ++i)
+        if (!is_alnum_or_under(name[i])) return false;
+    return true;
+}
+
+// Appends a fieldname, potentially quoting it and escaping backticks.
+static void AppendFieldname(const std::string& name, std::string& out) {
+    if (IsPlainIdentifier(name)) {
+        out += name;
+        return;
+    }
+    out += '`';
+    for (char c : name) {
+        if (c == '`')
+            out += "``";
+        else
+            out += c;
+    }
+    out += '`';
+}
+
 std::string TupleType::GetName() const {
     std::string result("Tuple(");
     bool has_complete_names = !item_names_.empty();
 
-    if (!item_types_.empty()) {
+    for (size_t i = 0; i < item_types_.size(); ++i) {
+        if (i > 0)
+            result += ", ";
         if (has_complete_names) {
-            result += item_names_[0] + " " + item_types_[0]->GetName();
-        } else {
-            result += item_types_[0]->GetName();
+            AppendFieldname(item_names_[i], result);
+            result += ' ';
         }
-    }
-
-    for (size_t i = 1; i < item_types_.size(); ++i) {
-        if (has_complete_names) {
-            result += ", " + item_names_[i] + " " + item_types_[i]->GetName();
-        } else {
-            result += ", " + item_types_[i]->GetName();
-        }
+        result += item_types_[i]->GetName();
     }
 
     result += ")";

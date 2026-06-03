@@ -74,8 +74,20 @@ INSTANTIATE_TEST_SUITE_P(ClientColumnNames, AbnormalColumnNamesClientTest,
             .SetSendRetries(1)
             .SetPingBeforeQuery(true)
             .SetCompressionMethod(CompressionMethod::None),
-            {"select 123,231,113", "select 'ABC','AAA','BBB','CCC'"},
-            {"123,231,113", "'ABC','AAA','BBB','CCC'"},
+            /* queries = */ {
+                "select 123,231,113",
+                "select 'ABC','AAA','BBB','CCC'",
+                "select 'A.B','C.D'",
+                "select 'A`B','C``D'",
+                "select 'A\\`B','C\\`\\`D'"
+            },
+            /* expected column names = */ {
+                "123,231,113",
+                "'ABC','AAA','BBB','CCC'",
+                "'A.B','C.D'",
+                "'A`B','C``D'",
+                "'A`B','C``D'"
+            },
     }
 ));
 
