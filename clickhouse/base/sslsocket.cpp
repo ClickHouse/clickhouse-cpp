@@ -2,6 +2,7 @@
 #include "../client.h"
 #include "../exceptions.h"
 
+#include <iostream>
 #include <stdexcept>
 
 #include <openssl/ssl.h>
@@ -51,11 +52,22 @@ void throwSSLError(SSL * ssl, int error, const char * /*location*/, const char *
 
 void configureSSL(const clickhouse::SSLParams::ConfigurationType & configuration, SSL * ssl, SSL_CTX * context = nullptr) {
 #ifdef USE_BORINGSSL
-    // BoringSSL doesn't ship the SSL_CONF_* command API, so this becomes
-    // a no-op. The configuration vector is ignored.
-    (void)configuration;
+    // BoringSSL doesn't ship the SSL_CONF_* command API, so the
+    // configuration vector cannot be applied. Warn (once per process)
+    // instead of failing, since the remaining TLS defaults are still
+    // sane; users who rely on SSL_CONF commands should build against
+    // OpenSSL (e.g. --@clickhouse_cpp//:tls=openssl with Bazel).
     (void)ssl;
     (void)context;
+    if (!configuration.empty()) {
+        static const bool warned = [] {
+            std::cerr << "clickhouse-cpp: warning: SSLParams::configuration is ignored "
+                         "when built against BoringSSL (no SSL_CONF_* API); "
+                         "build against OpenSSL to apply these settings." << std::endl;
+            return true;
+        }();
+        (void)warned;
+    }
 #else
     std::unique_ptr<SSL_CONF_CTX, decltype(&SSL_CONF_CTX_free)> conf_ctx_holder(SSL_CONF_CTX_new(), SSL_CONF_CTX_free);
     auto conf_ctx = conf_ctx_holder.get();
