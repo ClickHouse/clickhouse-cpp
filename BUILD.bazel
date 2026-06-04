@@ -12,10 +12,8 @@ load("@rules_cc//cc:cc_library.bzl", "cc_library")
 #     instead. `USE_BORINGSSL` ifdef-guards the two OpenSSL-only
 #     surfaces (`SSL_CONF_*` command API and `SSL_read_ex`) that
 #     BoringSSL doesn't provide; see clickhouse/base/sslsocket.cpp.
-#   * lz4 / zstd / abseil come from BCR modules instead of contrib/;
-#     the contrib/ trees are only used by the CMake build. The
-#     vendored cityhash under contrib/cityhash/cityhash IS used here
-#     because cityhash isn't in BCR.
+#   * cityhash / lz4 / zstd / abseil come from BCR modules instead of
+#     contrib/; the contrib/ trees are only used by the CMake build.
 
 # Selects the TLS implementation: `--@clickhouse_cpp//:tls=boringssl`
 # (default) or `--@clickhouse_cpp//:tls=openssl`. Both come from BCR
@@ -37,22 +35,6 @@ config_setting(
 config_setting(
     name = "tls_openssl",
     flag_values = {":tls": "openssl"},
-)
-
-# Vendored cityhash from contrib/. Exposed only to :clickhouse because
-# nothing else should be linking against this directly — callers should
-# use the public :clickhouse target.
-cc_library(
-    name = "cityhash",
-    srcs = ["contrib/cityhash/cityhash/city.cc"],
-    hdrs = [
-        "contrib/cityhash/cityhash/city.h",
-        "contrib/cityhash/cityhash/citycrc.h",
-        "contrib/cityhash/cityhash/config.h",
-    ],
-    # types.cpp / lowcardinality.cpp use `#include <city.h>`.
-    strip_include_prefix = "contrib/cityhash/cityhash",
-    visibility = ["//visibility:private"],
 )
 
 # The main clickhouse-cpp library. Downstream callers use
@@ -87,8 +69,8 @@ cc_library(
     strip_include_prefix = "/",
     visibility = ["//visibility:public"],
     deps = [
-        ":cityhash",
         "@abseil-cpp//absl/numeric:int128",
+        "@cityhash//:cityhash",
         "@lz4//:lz4",
         "@zstd//:zstd",
     ] + select({
