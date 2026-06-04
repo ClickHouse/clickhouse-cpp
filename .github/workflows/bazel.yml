@@ -18,7 +18,13 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-latest]
+        tls: [boringssl, openssl]
+
+    runs-on: ${{ matrix.os }}
 
     steps:
       - uses: actions/checkout@v6
@@ -34,4 +40,4 @@ jobs:
           repository-cache: true
 
       - name: Build project
-        run: bazel build //...
+        run: bazel build //... --@clickhouse_cpp//:tls=${{ matrix.tls }}
