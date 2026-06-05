@@ -36,7 +36,11 @@ cc_test(
     ],
     # Some tests include support headers via the angled
     # `#include <ut/utils.h>` form; expose the repo root for those.
-    copts = ["-I."],
+    # /bigobj mirrors CMake's MSVC handling for this test binary.
+    copts = ["-I."] + select({
+        "@platforms//os:windows": ["/bigobj"],
+        "//conditions:default": [],
+    }),
     deps = [
         "//:clickhouse",
         "@abseil-cpp//absl/numeric:int128",

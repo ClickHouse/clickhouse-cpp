@@ -81,6 +81,16 @@ cc_library(
         ":tls_openssl": ["WITH_OPENSSL"],
         ":tls_no": [],
     }),
+    # Winsock, required by base/socket.cpp et al. Mirrors CMake's
+    # `IF (WIN32 OR MINGW)` link block. (The BoringSSL backend already
+    # propagates ws2_32 itself; declare it explicitly so the openssl
+    # and no-TLS configurations link too.)
+    linkopts = select({
+        "@platforms//os:windows": [
+            "-DEFAULTLIB:ws2_32.lib",
+        ],
+        "//conditions:default": [],
+    }),
     # Expose headers at their workspace path so both internal
     # (`#include "client.h"` from clickhouse/*.cpp via quote-form
     # source-dir search) and external (`#include <clickhouse/client.h>`)
