@@ -22,7 +22,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-24.04, macos-latest]
-        tls: [boringssl, openssl]
+        tls: [boringssl, openssl, 'no']
 
     runs-on: ${{ matrix.os }}
 
