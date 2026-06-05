@@ -1,0 +1,45 @@
+load("@rules_cc//cc:cc_test.bzl", "cc_test")
+
+# Hermetic subset of the googletest suite in this directory: only the
+# tests that do not need a running ClickHouse server. The remaining
+# files (client_ut.cpp, roundtrip_tests.cpp, Column_ut.cpp, ...) connect
+# to $CLICKHOUSE_HOST and stay CMake-only for now, where CI provides a
+# server via docker-compose (see .github/workflows/linux.yml).
+#
+# socket_ut.cpp is included: it spins up its own LocalTcpServer on
+# localhost, which works inside the Bazel test sandbox.
+cc_test(
+    name = "unit_tests",
+    size = "small",
+    srcs = [
+        # Test cases.
+        "CreateColumnByType_ut.cpp",
+        "block_ut.cpp",
+        "column_array_ut.cpp",
+        "columns_ut.cpp",
+        "itemview_ut.cpp",
+        "socket_ut.cpp",
+        "stream_ut.cpp",
+        "type_parser_ut.cpp",
+        "types_ut.cpp",
+        "utils_ut.cpp",
+        # Test entry point and shared support code.
+        "main.cpp",
+        "tcp_server.cpp",
+        "tcp_server.h",
+        "utils.cpp",
+        "utils.h",
+        "utils_comparison.h",
+        "utils_meta.h",
+        "value_generators.cpp",
+        "value_generators.h",
+    ],
+    # Some tests include support headers via the angled
+    # `#include <ut/utils.h>` form; expose the repo root for those.
+    copts = ["-I."],
+    deps = [
+        "//:clickhouse",
+        "@abseil-cpp//absl/numeric:int128",
+        "@googletest//:gtest",
+    ],
+)
