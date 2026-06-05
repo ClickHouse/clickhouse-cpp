@@ -175,12 +175,12 @@ might change as we improve and update the setup.
 
 Most importantly, the project includes settings that were added for compatibility with older
 versions of the library and its API, and to preserve old behavior. These settings will not be part
-of the Bazel configuration. This means that even when updating to a minor version of the library,
-your build might break.
+of the Bazel configuration. This means that even when only the minor version changes your build
+still might break.
 
-By default, the library is built with BoringSSL and not OpenSSL because it builds reliably across
-platforms on BCR today and matches what many Bazel workspaces, such as gRPC and Envoy, already link
-against.
+Additionally, by default, the library is built with BoringSSL and not OpenSSL because it builds
+reliably across platforms on BCR today and matches what many Bazel workspaces, such as gRPC and
+Envoy, already link against.
 
 It is still possible to build the library with OpenSSL by using the `tls=openssl` option. TLS
 support can be completely omitted with the `tls=no` option.
