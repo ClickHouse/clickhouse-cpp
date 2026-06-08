@@ -33,7 +33,12 @@ cc_test(
         "utils_meta.h",
         "value_generators.cpp",
         "value_generators.h",
-    ],
+    ] + select({
+        # Link guard for the TLS code path; sslsocket.cpp (and the
+        # system libs it needs) only exist when TLS is enabled.
+        "//:tls_no": [],
+        "//conditions:default": ["ssl_link_ut.cpp"],
+    }),
     # Some tests include support headers via the angled
     # `#include <ut/utils.h>` form; expose the repo root for those.
     # /bigobj mirrors CMake's MSVC handling for this test binary.
