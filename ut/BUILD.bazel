@@ -82,6 +82,14 @@ cc_test(
 cc_test(
     name = "e2e_tests",
     size = "large",
+    # The suite finishes in seconds on Linux/macOS, but on Windows it runs
+    # against the server through WSL2's localhost forwarding, where each
+    # reconnect / connection-failure test pays a multi-second timeout and
+    # the whole suite exceeds the 900s `large` budget. `timeout` is an
+    # upper bound, not a fixed wait, so raising it costs nothing on the
+    # fast platforms. (The CMake Windows job runs the same tests with no
+    # Bazel timeout at all.)
+    timeout = "eternal",
     srcs = [
         # Test cases.
         "abnormal_column_names_test.cpp",
