@@ -44,3 +44,36 @@ jobs:
 
       - name: Run unit tests
         run: bazel test //ut:unit_tests --@clickhouse_cpp//:tls=${{ matrix.tls }} --test_output=errors
+
+      # //ut:e2e_tests is tagged `manual`, so `bazel build //...` above
+      # skips it; build it explicitly for compile/link coverage on every
+      # platform (the server run below only happens on Linux).
+      - name: Build e2e tests
+        run: bazel build //ut:e2e_tests --@clickhouse_cpp//:tls=${{ matrix.tls }}
+
+      # End-to-end tests need a live server; run them on Linux against a
+      # ClickHouse started via docker-compose, mirroring the CMake build's
+      # Linux workflow.
+      - name: Start ClickHouse in Docker
+        if: runner.os == 'Linux'
+        uses: hoverkraft-tech/compose-action@v2.0.1
+        with:
+          compose-file: ci/docker-compose.yml
+          down-flags: --volumes
+
+      - name: Wait for ClickHouse
+        if: runner.os == 'Linux'
+        run: |
+          for i in {1..60}; do
+            if curl -fsS http://localhost:8123/ > /dev/null; then
+              echo "ClickHouse is ready"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "ClickHouse failed to start"
+          exit 1
+
+      - name: Run e2e tests
+        if: runner.os == 'Linux'
+        run: bazel test //ut:e2e_tests --@clickhouse_cpp//:tls=${{ matrix.tls }} --test_output=errors
