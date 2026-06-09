@@ -1139,6 +1139,53 @@ TEST(ColumnsCase, ColumnTupleT_Empty) {
     EXPECT_EQ(col.Size(), 0u);
 }
 
+TEST(ColumnsCase, ColumnTupleT_WithNames) {
+    using TestTuple = ColumnTupleT<ColumnUInt64, ColumnString>;
+
+    TestTuple col(
+        std::make_tuple(
+            std::make_shared<ColumnUInt64>(),
+            std::make_shared<ColumnString>()
+        ),
+        std::vector<std::string>{"id", "name"}
+    );
+    EXPECT_EQ(col.Type()->GetName(), "Tuple(id UInt64, name String)");
+
+    col.Append(std::make_tuple(uint64_t(42), std::string("hello")));
+    EXPECT_EQ(col.At(0), std::make_tuple(uint64_t(42), std::string_view("hello")));
+}
+
+TEST(ColumnsCase, ColumnTupleT_Wrap_PreservesNames) {
+    ColumnTuple base(
+        {std::make_shared<ColumnUInt64>(), std::make_shared<ColumnString>()},
+        {"id", "name"}
+    );
+
+    using TestTuple = ColumnTupleT<ColumnUInt64, ColumnString>;
+    auto wrapped = TestTuple::Wrap(std::move(base));
+    EXPECT_EQ(wrapped->Type()->GetName(), "Tuple(id UInt64, name String)");
+}
+
+TEST(ColumnsCase, ColumnTupleT_Slice_PreservesNames) {
+    using TestTuple = ColumnTupleT<ColumnUInt64, ColumnString>;
+
+    auto col = std::make_shared<TestTuple>(
+        std::make_tuple(
+            std::make_shared<ColumnUInt64>(),
+            std::make_shared<ColumnString>()
+        ),
+        std::vector<std::string>{"id", "name"}
+    );
+    col->Append(std::make_tuple(uint64_t(1), std::string("a")));
+    col->Append(std::make_tuple(uint64_t(2), std::string("b")));
+
+    auto sliced = col->Slice(0, 1);
+    EXPECT_EQ(sliced->Type()->GetName(), "Tuple(id UInt64, name String)");
+
+    auto cloned = col->CloneEmpty();
+    EXPECT_EQ(cloned->Type()->GetName(), "Tuple(id UInt64, name String)");
+}
+
 TEST(ColumnsCase, ColumnMapT) {
     ColumnMapT<ColumnUInt64, ColumnString> col(
             std::make_shared<ColumnUInt64>(),
