@@ -40,16 +40,16 @@ jobs:
           repository-cache: true
 
       - name: Build project
-        run: bazel build //... --@clickhouse_cpp//:tls=${{ matrix.tls }}
+        run: bazel build //... --@clickhouse-cpp-client//:tls=${{ matrix.tls }}
 
       - name: Run unit tests
-        run: bazel test //ut:unit_tests --@clickhouse_cpp//:tls=${{ matrix.tls }} --test_output=errors
+        run: bazel test //ut:unit_tests --@clickhouse-cpp-client//:tls=${{ matrix.tls }} --test_output=errors
 
       # //ut:e2e_tests is tagged `manual`, so `bazel build //...` above
       # skips it; build it explicitly so the run step below doesn't pay
       # for compilation under the running-server timeout.
       - name: Build e2e tests
-        run: bazel build //ut:e2e_tests --@clickhouse_cpp//:tls=${{ matrix.tls }}
+        run: bazel build //ut:e2e_tests --@clickhouse-cpp-client//:tls=${{ matrix.tls }}
 
       # The e2e suite needs a live server on localhost:9000. Each OS starts
       # one the same way the CMake build's per-OS workflows do, since hosted
@@ -117,4 +117,4 @@ jobs:
           exit 1
 
       - name: Run e2e tests
-        run: bazel test //ut:e2e_tests --@clickhouse_cpp//:tls=${{ matrix.tls }} --test_output=errors
+        run: bazel test //ut:e2e_tests --@clickhouse-cpp-client//:tls=${{ matrix.tls }} --test_output=errors
