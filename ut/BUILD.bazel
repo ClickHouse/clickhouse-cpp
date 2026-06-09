@@ -1,12 +1,36 @@
 load("@rules_cc//cc:cc_test.bzl", "cc_test")
 
-# Hermetic subset of the googletest suite in this directory: only the
-# tests that do not need a running ClickHouse server. The remaining
-# files (client_ut.cpp, roundtrip_tests.cpp, Column_ut.cpp, ...) connect
-# to $CLICKHOUSE_HOST and stay CMake-only for now, where CI provides a
-# server via docker-compose (see .github/workflows/linux.yml).
+# The googletest suite in this directory is split into two targets:
 #
-# socket_ut.cpp is included: it spins up its own LocalTcpServer on
+#   //ut:unit_tests  — hermetic; no external server. Runs in the sandbox
+#                      under `bazel test`, part of every CI matrix job.
+#   //ut:e2e_tests   — needs a live ClickHouse server on $CLICKHOUSE_HOST
+#                      (default localhost:9000). Tagged `manual`, so it is
+#                      excluded from `bazel test //...` and must be run
+#                      explicitly: `bazel run //ut:e2e_tests` (or
+#                      `bazel test //ut:e2e_tests`). CI starts a server via
+#                      docker-compose first, mirroring the CMake build's
+#                      Linux workflow.
+#
+# ssl_ut.cpp is in neither target yet: it connects to an external secure
+# endpoint (play.clickhouse.com:9440) with OS-specific CA paths, which the
+# local docker server doesn't provide. It stays CMake-only for now.
+
+# Compile flags shared by both test binaries. -I. lets tests include
+# support headers via the angled `#include <ut/utils.h>` form; /bigobj
+# mirrors CMake's MSVC handling (Column_ut/client_ut have many symbols).
+_UT_COPTS = ["-I."] + select({
+    "@platforms//os:windows": ["/bigobj"],
+    "//conditions:default": [],
+})
+
+_UT_DEPS = [
+    "//:clickhouse",
+    "@abseil-cpp//absl/numeric:int128",
+    "@googletest//:gtest",
+]
+
+# socket_ut.cpp is included here: it spins up its own LocalTcpServer on
 # localhost, which works inside the Bazel test sandbox.
 cc_test(
     name = "unit_tests",
@@ -39,16 +63,62 @@ cc_test(
         "//:tls_no": [],
         "//conditions:default": ["ssl_link_ut.cpp"],
     }),
-    # Some tests include support headers via the angled
-    # `#include <ut/utils.h>` form; expose the repo root for those.
-    # /bigobj mirrors CMake's MSVC handling for this test binary.
-    copts = ["-I."] + select({
-        "@platforms//os:windows": ["/bigobj"],
-        "//conditions:default": [],
-    }),
-    deps = [
-        "//:clickhouse",
-        "@abseil-cpp//absl/numeric:int128",
-        "@googletest//:gtest",
+    copts = _UT_COPTS,
+    deps = _UT_DEPS,
+)
+
+# Server-dependent end-to-end tests. These connect to a ClickHouse
+# instance ($CLICKHOUSE_HOST / _PORT / _USER / _PASSWORD / _DB, defaulting
+# to localhost:9000) and exercise the full client round-trip — the same
+# set the CMake build links into clickhouse-cpp-ut and runs against the
+# docker-compose server.
+#
+# Tagged `manual` + `external`: excluded from wildcard expansion (so a bare
+# `bazel test //...` stays hermetic and green without a server) and never
+# cached (results depend on live server state). Run it with:
+#
+#   bazel run //ut:e2e_tests
+#   CLICKHOUSE_HOST=my-host bazel test //ut:e2e_tests --test_output=all
+cc_test(
+    name = "e2e_tests",
+    size = "large",
+    # The suite finishes in seconds on Linux/macOS, but on Windows it runs
+    # against the server through WSL2's localhost forwarding, where each
+    # reconnect / connection-failure test pays a multi-second timeout and
+    # the whole suite exceeds the 900s `large` budget. `timeout` is an
+    # upper bound, not a fixed wait, so raising it costs nothing on the
+    # fast platforms. (The CMake Windows job runs the same tests with no
+    # Bazel timeout at all.)
+    timeout = "eternal",
+    srcs = [
+        # Test cases.
+        "abnormal_column_names_test.cpp",
+        "array_of_low_cardinality_tests.cpp",
+        "Column_ut.cpp",
+        "client_ut.cpp",
+        "connection_failed_client_test.cpp",
+        "connection_failed_client_test.h",
+        "low_cardinality_nullable_tests.cpp",
+        "performance_tests.cpp",
+        "readonly_client_test.cpp",
+        "readonly_client_test.h",
+        "roundtrip_tests.cpp",
+        # Test entry point and shared support code.
+        "main.cpp",
+        "roundtrip_column.cpp",
+        "roundtrip_column.h",
+        "utils.cpp",
+        "utils.h",
+        "utils_comparison.h",
+        "utils_meta.h",
+        "utils_performance.h",
+        "value_generators.cpp",
+        "value_generators.h",
     ],
+    copts = _UT_COPTS,
+    tags = [
+        "external",
+        "manual",
+    ],
+    deps = _UT_DEPS,
 )
