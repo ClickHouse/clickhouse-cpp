@@ -88,8 +88,8 @@ using ProfileCallback          = std::function<void(const Profile& profile)>;
 class Query : public QueryEvents {
 public:
      Query();
-     explicit Query(const char* query, const char* query_id = nullptr);
-     explicit Query(const std::string& query, const std::string& query_id = default_query_id);
+     Query(const char* query, const char* query_id = nullptr);
+     Query(const std::string& query, const std::string& query_id = default_query_id);
     ~Query() override;
 
     ///
