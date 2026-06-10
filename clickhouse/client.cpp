@@ -606,6 +606,13 @@ void Client::Impl::Ping() {
 }
 
 void Client::Impl::ResetConnection() {
+    // Clear the insert state BEFORE attempting to reconnect. If connect()
+    // throws (server at max_connections, ephemeral-port exhaustion, DNS blip,
+    // etc. — all cases where the original dirty socket may still be healthy),
+    // a still-Inserting state would make ~Impl's automatic EndInsert() fire
+    // on the old dirty wire and commit a partially-streamed insert.
+    state_ = State::Idle;
+
     InitializeStreams(socket_factory_->connect(options_, current_endpoint_.value()));
     state_ = State::Idle;
 
