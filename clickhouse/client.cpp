@@ -546,7 +546,7 @@ Block Client::Impl::BeginInsert(Query query) {
         return true;
     });
 
-    SendQuery(query.GetText());
+    SendQuery(query);
 
     // Wait for a data packet and return
     uint64_t server_packet = 0;
@@ -1373,12 +1373,8 @@ void Client::Insert(const std::string& table_name, const std::string& query_id, 
     impl_->Insert(table_name, query_id, block);
 }
 
-Block Client::BeginInsert(const std::string& query) {
-    return impl_->BeginInsert(Query(query));
-}
-
-Block Client::BeginInsert(const std::string& query, const std::string& query_id) {
-    return impl_->BeginInsert(Query(query, query_id));
+Block Client::BeginInsert(const Query& query) {
+    return impl_->BeginInsert(query);
 }
 
 void Client::SendInsertBlock(const Block& block) {
