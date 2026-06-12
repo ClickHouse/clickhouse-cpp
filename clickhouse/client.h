@@ -303,7 +303,8 @@ public:
 
     /// Start an \p INSERT statement, insert batches of data, then finish the insert.
     /// A bare string converts to a Query implicitly; use BeginInsert(const Query&)
-    /// for settings, params, callbacks etc.
+    /// to pass per-insert settings, params, and query_id. Event callbacks on the
+    /// Query are rejected (throws ValidationError): BeginInsert owns the data path.
     Block BeginInsert(const Query& query);
     Block BeginInsert(const std::string& query, const std::string& query_id);
 

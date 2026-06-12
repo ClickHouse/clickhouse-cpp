@@ -179,6 +179,14 @@ public:
         return *this;
     }
 
+    /// True if any server-event handler is installed. BeginInsert rejects such
+    /// a Query: it drives its own block-capture OnData and would otherwise let
+    /// the caller's handlers fire from the insert handshake's packet loop.
+    inline bool HasEventCallbacks() const {
+        return exception_cb_ || progress_cb_ || select_cb_ || select_cancelable_cb_
+            || select_server_log_cb_ || profile_events_callback_cb_ || profile_callback_cb_;
+    }
+
     static const std::string default_query_id;
 
 private:

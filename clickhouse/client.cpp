@@ -531,6 +531,10 @@ Block Client::Impl::BeginInsert(Query query) {
         throw ValidationError("cannot execute query while executing another operation");
     }
 
+    if (query.HasEventCallbacks()) {
+        throw ValidationError("Query callbacks are not supported in BeginInsert");
+    }
+
     EnsureNull en(static_cast<QueryEvents*>(&query), &events_);
 
     if (options_.ping_before_query) {

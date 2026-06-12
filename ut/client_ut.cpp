@@ -541,6 +541,45 @@ TEST_P(ClientCase, InsertData) {
     EXPECT_EQ(exp, row);
 }
 
+TEST_P(ClientCase, BeginInsertQuery) {
+    client_->Execute(
+            "CREATE TEMPORARY TABLE IF NOT EXISTS test_clickhouse_cpp_begin_insert_query (id UInt64)");
+
+    /// A Query carrying any event callback is rejected: BeginInsert drives its
+    /// own data path and the caller's handlers would otherwise fire from the
+    /// insert handshake's packet loop.
+    {
+        Query q("INSERT INTO test_clickhouse_cpp_begin_insert_query VALUES");
+        q.OnException([](const Exception&) {});
+        EXPECT_THROW(client_->BeginInsert(q), ValidationError);
+    }
+
+    /// A Query with per-insert settings and a query_id (no callbacks) streams
+    /// normally through the overload.
+    {
+        Query q("INSERT INTO test_clickhouse_cpp_begin_insert_query VALUES", "begin-insert-query-id");
+        q.SetSetting("max_block_size", {"100"});
+
+        auto block = client_->BeginInsert(q);
+        ASSERT_EQ(size_t(1), block.GetColumnCount());
+
+        auto id = block[0]->As<ColumnUInt64>();
+        id->Append(42);
+        block.RefreshRowCount();
+        client_->SendInsertBlock(block);
+        client_->EndInsert();
+    }
+
+    size_t row = 0;
+    client_->Select("SELECT id FROM test_clickhouse_cpp_begin_insert_query",
+        [&row](const Block& block) {
+            for (size_t c = 0; c < block.GetRowCount(); ++c, ++row) {
+                EXPECT_EQ(uint64_t(42), (*block[0]->As<ColumnUInt64>())[c]);
+            }
+        });
+    EXPECT_EQ(size_t(1), row);
+}
+
 TEST_P(ClientCase, Nullable) {
     /// Create a table.
     client_->Execute(
