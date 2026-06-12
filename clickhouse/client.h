@@ -302,8 +302,10 @@ public:
     void Insert(const std::string& table_name, const std::string& query_id, const Block& block);
 
     /// Start an \p INSERT statement, insert batches of data, then finish the insert.
-    /// Use BeginInsert(const Query&) for settings, query_id, callbacks etc.
+    /// A bare string converts to a Query implicitly; use BeginInsert(const Query&)
+    /// for settings, params, callbacks etc.
     Block BeginInsert(const Query& query);
+    Block BeginInsert(const std::string& query, const std::string& query_id);
 
     /// Insert data using a \p block returned by \p BeginInsert.
     void SendInsertBlock(const Block& block);
