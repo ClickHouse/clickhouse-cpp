@@ -1328,6 +1328,10 @@ void Client::SelectWithExternalDataCancelable(const std::string& query, const st
     impl_->SelectWithExternalData(Query(query, query_id).OnDataCancelable(std::move(cb)), external_tables);
 }
 
+void Client::SelectWithExternalData(const Query& query, const ExternalTables& external_tables) {
+    impl_->SelectWithExternalData(query, external_tables);
+}
+
 void Client::BeginExecute(const Query& query) {
     impl_->BeginExecuteQuery(query);
 }
