@@ -78,13 +78,13 @@ cc_library(
     name = "cityhash",
     srcs = [
         "contrib/cityhash/cityhash/city.cc",
-        "contrib/cityhash/cityhash/config.h",
+        "contrib/cityhash/cityhash/city_config.h",
     ],
     hdrs = [
         "contrib/cityhash/cityhash/city.h",
         "contrib/cityhash/cityhash/citycrc.h",
     ],
-    # config.h gates __builtin_expect off with `#if WIN32 || WIN64`, but
+    # city_config.h gates __builtin_expect off with `#if WIN32 || WIN64`, but
     # MSVC only predefines `_WIN32`/`_WIN64` — under CMake it's CMake that
     # defines WIN32, which Bazel's MSVC toolchain doesn't. Define it here
     # so the GCC/Clang-only builtin isn't used on MSVC.
