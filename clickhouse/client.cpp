@@ -546,7 +546,7 @@ Block Client::Impl::BeginInsert(Query query) {
         return true;
     });
 
-    SendQuery(query.GetText());
+    SendQuery(query);
 
     // Wait for a data packet and return
     uint64_t server_packet = 0;
