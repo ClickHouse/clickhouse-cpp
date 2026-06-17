@@ -306,9 +306,8 @@ public:
     void Insert(const std::string& table_name, const std::string& query_id, const Block& block);
 
     /// Start an \p INSERT statement, insert batches of data, then finish the insert.
-    /// A bare string converts to a Query implicitly; use BeginInsert(const Query&)
-    /// to pass per-insert settings, params, and query_id. Event callbacks on the
-    /// Query are rejected (throws ValidationError): BeginInsert owns the data path.
+    /// Queries with event callbacks are not allowed.If the query has any event callbacks set, this
+    /// call throws ValidationError.
     Block BeginInsert(const Query& query);
     Block BeginInsert(const std::string& query, const std::string& query_id);
 

@@ -541,43 +541,42 @@ TEST_P(ClientCase, InsertData) {
     EXPECT_EQ(exp, row);
 }
 
-TEST_P(ClientCase, BeginInsertQuery) {
+TEST_P(ClientCase, BeginInsertDoesNotAllowCallbacks) {
     client_->Execute(
-            "CREATE TEMPORARY TABLE IF NOT EXISTS test_clickhouse_cpp_begin_insert_query (id UInt64)");
+            "CREATE TEMPORARY TABLE IF NOT EXISTS test_clickhouse_cpp_begin_insert_callback (id UInt64)");
 
-    /// A Query carrying any event callback is rejected: BeginInsert drives its
-    /// own data path and the caller's handlers would otherwise fire from the
-    /// insert handshake's packet loop.
-    {
-        Query q("INSERT INTO test_clickhouse_cpp_begin_insert_query VALUES");
-        q.OnException([](const Exception&) {});
-        EXPECT_THROW(client_->BeginInsert(q), ValidationError);
-    }
+    Query prototype("INSERT INTO test_clickhouse_cpp_begin_insert_callback VALUES");
+    Query query = prototype;
+    client_->BeginInsert(query); // this should not throw any exceptions
+    client_->EndInsert();
 
-    /// A Query with per-insert settings and a query_id (no callbacks) streams
-    /// normally through the overload.
-    {
-        Query q("INSERT INTO test_clickhouse_cpp_begin_insert_query VALUES", "begin-insert-query-id");
-        q.SetSetting("max_block_size", {"100"});
+    query = prototype;
+    query.OnData([](const Block &){ std::terminate(); });
+    EXPECT_THROW(client_->BeginInsert(query), ValidationError);
 
-        auto block = client_->BeginInsert(q);
-        ASSERT_EQ(size_t(1), block.GetColumnCount());
+    query = prototype;
+    query.OnDataCancelable([](const Block &){ return false; });
+    EXPECT_THROW(client_->BeginInsert(query), ValidationError);
 
-        auto id = block[0]->As<ColumnUInt64>();
-        id->Append(42);
-        block.RefreshRowCount();
-        client_->SendInsertBlock(block);
-        client_->EndInsert();
-    }
+    query = prototype;
+    query.OnException([](const Exception &){ std::terminate(); });
+    EXPECT_THROW(client_->BeginInsert(query), ValidationError);
 
-    size_t row = 0;
-    client_->Select("SELECT id FROM test_clickhouse_cpp_begin_insert_query",
-        [&row](const Block& block) {
-            for (size_t c = 0; c < block.GetRowCount(); ++c, ++row) {
-                EXPECT_EQ(uint64_t(42), (*block[0]->As<ColumnUInt64>())[c]);
-            }
-        });
-    EXPECT_EQ(size_t(1), row);
+    query = prototype;
+    query.OnProgress([](const Progress &){ std::terminate(); });
+    EXPECT_THROW(client_->BeginInsert(query), ValidationError);
+
+    query = prototype;
+    query.OnServerLog([](const Block &){ return false; });
+    EXPECT_THROW(client_->BeginInsert(query), ValidationError);
+
+    query = prototype;
+    query.OnProfileEvents([](const Block &){ return false; });
+    EXPECT_THROW(client_->BeginInsert(query), ValidationError);
+
+    query = prototype;
+    query.OnProfile([](const Profile &){ return false; });
+    EXPECT_THROW(client_->BeginInsert(query), ValidationError);
 }
 
 TEST_P(ClientCase, Nullable) {
