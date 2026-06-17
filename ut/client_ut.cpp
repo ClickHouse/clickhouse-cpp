@@ -541,6 +541,44 @@ TEST_P(ClientCase, InsertData) {
     EXPECT_EQ(exp, row);
 }
 
+TEST_P(ClientCase, BeginInsertDoesNotAllowCallbacks) {
+    client_->Execute(
+            "CREATE TEMPORARY TABLE IF NOT EXISTS test_clickhouse_cpp_begin_insert_callback (id UInt64)");
+
+    Query prototype("INSERT INTO test_clickhouse_cpp_begin_insert_callback VALUES");
+    Query query = prototype;
+    client_->BeginInsert(query); // this should not throw any exceptions
+    client_->EndInsert();
+
+    query = prototype;
+    query.OnData([](const Block &){ std::terminate(); });
+    EXPECT_THROW(client_->BeginInsert(query), ValidationError);
+
+    query = prototype;
+    query.OnDataCancelable([](const Block &){ return false; });
+    EXPECT_THROW(client_->BeginInsert(query), ValidationError);
+
+    query = prototype;
+    query.OnException([](const Exception &){ std::terminate(); });
+    EXPECT_THROW(client_->BeginInsert(query), ValidationError);
+
+    query = prototype;
+    query.OnProgress([](const Progress &){ std::terminate(); });
+    EXPECT_THROW(client_->BeginInsert(query), ValidationError);
+
+    query = prototype;
+    query.OnServerLog([](const Block &){ return false; });
+    EXPECT_THROW(client_->BeginInsert(query), ValidationError);
+
+    query = prototype;
+    query.OnProfileEvents([](const Block &){ return false; });
+    EXPECT_THROW(client_->BeginInsert(query), ValidationError);
+
+    query = prototype;
+    query.OnProfile([](const Profile &){ return false; });
+    EXPECT_THROW(client_->BeginInsert(query), ValidationError);
+}
+
 TEST_P(ClientCase, Nullable) {
     /// Create a table.
     client_->Execute(

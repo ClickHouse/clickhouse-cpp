@@ -531,6 +531,10 @@ Block Client::Impl::BeginInsert(Query query) {
         throw ValidationError("cannot execute query while executing another operation");
     }
 
+    if (query.HasEventCallbacks()) {
+        throw ValidationError("Query callbacks are not supported in BeginInsert");
+    }
+
     EnsureNull en(static_cast<QueryEvents*>(&query), &events_);
 
     if (options_.ping_before_query) {
@@ -1377,8 +1381,8 @@ void Client::Insert(const std::string& table_name, const std::string& query_id, 
     impl_->Insert(table_name, query_id, block);
 }
 
-Block Client::BeginInsert(const std::string& query) {
-    return impl_->BeginInsert(Query(query));
+Block Client::BeginInsert(const Query& query) {
+    return impl_->BeginInsert(query);
 }
 
 Block Client::BeginInsert(const std::string& query, const std::string& query_id) {
