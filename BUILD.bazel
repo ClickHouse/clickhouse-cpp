@@ -9,16 +9,16 @@ load("@rules_cc//cc:cc_library.bzl", "cc_library")
 #
 # Differences from the CMake build that callers should be aware of:
 #   * TLS links against BoringSSL (`@boringssl`) by default; pass
-#     `--@clickhouse-cpp-client//:tls=openssl` to use the BCR OpenSSL module
-#     instead, or `--@clickhouse-cpp-client//:tls=no` to disable TLS
+#     `--@clickhouse-cpp//:tls=openssl` to use the BCR OpenSSL module
+#     instead, or `--@clickhouse-cpp//:tls=no` to disable TLS
 #     entirely. `USE_BORINGSSL` ifdef-guards the two OpenSSL-only
 #     surfaces (`SSL_CONF_*` command API and `SSL_read_ex`) that
 #     BoringSSL doesn't provide; see clickhouse/base/sslsocket.cpp.
 #   * lz4 / zstd / abseil / cityhash come from BCR modules instead of contrib/.
 
-# Selects the TLS implementation: `--@clickhouse-cpp-client//:tls=boringssl`
-# (default), `--@clickhouse-cpp-client//:tls=openssl`, or
-# `--@clickhouse-cpp-client//:tls=no` to disable TLS entirely (matching
+# Selects the TLS implementation: `--@clickhouse-cpp//:tls=boringssl`
+# (default), `--@clickhouse-cpp//:tls=openssl`, or
+# `--@clickhouse-cpp//:tls=no` to disable TLS entirely (matching
 # CMake's `WITH_OPENSSL=OFF` default). The two TLS libraries come from
 # BCR modules and are linked statically, keeping the build hermetic.
 string_flag(
@@ -31,19 +31,26 @@ string_flag(
     ],
 )
 
+# Public visibility so the config_setting can be referenced from other
+# packages (e.g. ut/BUILD.bazel's `select()` on `//:tls_no`); Bazel's
+# config-setting visibility enforcement rejects the private default
+# across packages.
 config_setting(
     name = "tls_boringssl",
     flag_values = {":tls": "boringssl"},
+    visibility = ["//visibility:public"],
 )
 
 config_setting(
     name = "tls_openssl",
     flag_values = {":tls": "openssl"},
+    visibility = ["//visibility:public"],
 )
 
 config_setting(
     name = "tls_no",
     flag_values = {":tls": "no"},
+    visibility = ["//visibility:public"],
 )
 
 # OpenSSL on Windows pulls in Win32 system libraries (the cert store via
@@ -58,7 +65,7 @@ selects.config_setting_group(
 )
 
 # The main clickhouse-cpp library. Downstream callers use
-# `#include <clickhouse/client.h>` and link `@clickhouse-cpp-client//:clickhouse`.
+# `#include <clickhouse/client.h>` and link `@clickhouse-cpp//:clickhouse`.
 cc_library(
     name = "clickhouse",
     srcs = glob(

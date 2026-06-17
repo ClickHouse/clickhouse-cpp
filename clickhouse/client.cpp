@@ -531,6 +531,10 @@ Block Client::Impl::BeginInsert(Query query) {
         throw ValidationError("cannot execute query while executing another operation");
     }
 
+    if (query.HasEventCallbacks()) {
+        throw ValidationError("Query callbacks are not supported in BeginInsert");
+    }
+
     EnsureNull en(static_cast<QueryEvents*>(&query), &events_);
 
     if (options_.ping_before_query) {
@@ -546,7 +550,7 @@ Block Client::Impl::BeginInsert(Query query) {
         return true;
     });
 
-    SendQuery(query.GetText());
+    SendQuery(query);
 
     // Wait for a data packet and return
     uint64_t server_packet = 0;
@@ -1328,6 +1332,10 @@ void Client::SelectWithExternalDataCancelable(const std::string& query, const st
     impl_->SelectWithExternalData(Query(query, query_id).OnDataCancelable(std::move(cb)), external_tables);
 }
 
+void Client::SelectWithExternalData(const Query& query, const ExternalTables& external_tables) {
+    impl_->SelectWithExternalData(query, external_tables);
+}
+
 void Client::BeginExecute(const Query& query) {
     impl_->BeginExecuteQuery(query);
 }
@@ -1373,8 +1381,8 @@ void Client::Insert(const std::string& table_name, const std::string& query_id, 
     impl_->Insert(table_name, query_id, block);
 }
 
-Block Client::BeginInsert(const std::string& query) {
-    return impl_->BeginInsert(Query(query));
+Block Client::BeginInsert(const Query& query) {
+    return impl_->BeginInsert(query);
 }
 
 Block Client::BeginInsert(const std::string& query, const std::string& query_id) {
