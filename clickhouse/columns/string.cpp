@@ -3,6 +3,8 @@
 
 #include "../base/wire_format.h"
 
+#include <cstring>
+
 namespace {
 
 constexpr size_t DEFAULT_BLOCK_SIZE = 4096;

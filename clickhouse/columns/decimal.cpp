@@ -1,101 +1,60 @@
 #include "decimal.h"
+#include "clickhouse/exceptions.h"
 
-namespace
+namespace {
+
+using clickhouse::ValidationError;
+
+void ValidateDecimalString(const std::string& value, size_t precision, size_t scale)
 {
-using namespace clickhouse;
-
-#ifdef ABSL_HAVE_INTRINSIC_INT128
-template <typename T>
-inline bool addOverflow(const Int128 & l, const T & r, Int128 * result)
-{
-    __int128 res;
-    const auto ret_value = __builtin_add_overflow(static_cast<__int128>(l), static_cast<__int128>(r), &res);
-
-    *result = res;
-    return ret_value;
-}
-
-template <typename T>
-inline bool mulOverflow(const Int128 & l, const T & r, Int128 * result)
-{
-    __int128 res;
-    const auto ret_value = __builtin_mul_overflow(static_cast<__int128>(l), static_cast<__int128>(r), &res);
-
-    *result = res;
-    return ret_value;
-}
-
-#else
-template <typename T>
-inline bool getSignBit(const T & v)
-{
-    return v < static_cast<T>(0);
-}
-
-inline bool getSignBit(const Int128 & v)
-{
-//    static constexpr Int128 zero {};
-//    return v < zero;
-
-    // Sign of the whole absl::int128 value is determined by sign of higher 64 bits.
-    return absl::Int128High64(v) < 0;
-}
-
-inline bool addOverflow(const Int128 & l, const Int128 & r, Int128 * result)
-{
-    //    *result = l + r;
-    //    const auto result_sign = getSignBit(*result);
-    //    return l_sign == r_sign && l_sign != result_sign;
-
-    // Based on code from:
-    // https://wiki.sei.cmu.edu/confluence/display/c/INT32-C.+Ensure+that+operations+on+signed+integers+do+not+result+in+overflow#INT32C.Ensurethatoperationsonsignedintegersdonotresultinoverflow-CompliantSolution
-    const auto r_positive = !getSignBit(r);
-
-    if ((r_positive && (l > (std::numeric_limits<Int128>::max() - r))) ||
-        (!r_positive && (l < (std::numeric_limits<Int128>::min() - r)))) {
-        return true;
+    // Although some of the strings can already be parsed by the existing algorithm without
+    // any changes, we do not want to worry about backward-compatibility with weird strings
+    // when refactoring and improving the algorithm.
+    if (value.empty() || value == "." || value == "-" || value == "-.") {
+        throw ValidationError("bad string " + value);
     }
-    *result = l + r;
 
-    return false;
-}
+    auto it = value.begin();
+    auto end = value.end();
+    bool dot_found = false;
+    bool padding = true;
+    size_t digits = 0;
 
-template <typename T>
-inline bool mulOverflow(const Int128 & l, const T & r, Int128 * result)
-{
-    // Based on code from:
-    // https://wiki.sei.cmu.edu/confluence/display/c/INT32-C.+Ensure+that+operations+on+signed+integers+do+not+result+in+overflow#INT32C.Ensurethatoperationsonsignedintegersdonotresultinoverflow-CompliantSolution.3
-    const auto l_positive = !getSignBit(l);
-    const auto r_positive = !getSignBit(r);
+    if (it < end && *it == '-') {
+        ++it;
+    }
 
-    if (l_positive) {
-        if (r_positive) {
-            if (r != 0 && l > (std::numeric_limits<Int128>::max() / r)) {
-                return true;
-            }
-        } else {
-            if (l != 0 && r < (std::numeric_limits<Int128>::min() / l)) {
-                return true;
-            }
+    for (; it < end; ++it) {
+        if (*it == '.' && !dot_found) {
+            dot_found = true;
         }
-    } else {
-        if (r_positive) {
-            if (r != 0 && l < (std::numeric_limits<Int128>::min() / r)) {
-                return true;
-            }
-        } else {
-            if (l != 0 && (r < (std::numeric_limits<Int128>::max() / l))) {
-                return true;
-            }
+        else if(*it < '0' || *it > '9') {
+            throw ValidationError(
+                    std::string("unexpected symbol '") + (*it) + "' in decimal value");
+        }
+        else {
+            // start counting digits starting from the first non-0 and until we reached the '.'
+            padding &= *it == '0';
+            digits += !dot_found & !padding;
         }
     }
 
-    *result = l * r;
-    return false;
-}
-#endif
+    if (dot_found) {
+        // when the '.' is not present, then we assume that the last `scale` digits of this
+        // string are decimal values. This might not be a good assumption, but we keep it here
+        // for backward compatibility with the original version of the library.
+        digits += scale;
+    }
 
+    if (digits > precision) {
+        throw ValidationError(
+                std::string("Value ") + value + " is too large for"
+                " scale=" + std::to_string(scale) +
+                " precision=" + std::to_string(precision));
+    }
 }
+
+} // anonymous namespace
 
 namespace clickhouse {
 
@@ -122,10 +81,10 @@ ColumnDecimal::ColumnDecimal(TypeRef type, ColumnRef data)
 void ColumnDecimal::Append(const Int128& value) {
     switch (data_type_code_) {
         case Type::Int32:
-            static_cast<ColumnInt32*>(data_.get())->Append(static_cast<int32_t>(value));
+            static_cast<ColumnInt32*>(data_.get())->Append(static_cast<int32_t>(Bignum::Int128Low64(value)));
             break;
         case Type::Int64:
-            static_cast<ColumnInt64*>(data_.get())->Append(static_cast<int64_t>(value));
+            static_cast<ColumnInt64*>(data_.get())->Append(static_cast<int64_t>(Bignum::Int128Low64(value)));
             break;
         default:
             static_cast<ColumnInt128*>(data_.get())->Append(static_cast<Int128>(value));
@@ -134,54 +93,53 @@ void ColumnDecimal::Append(const Int128& value) {
 }
 
 void ColumnDecimal::Append(const std::string& value) {
-    Int128 int_value = 0;
-    auto c = value.begin();
-    auto end = value.end();
-    bool sign = true;
-    bool has_dot = false;
+    auto scale = type_->As<DecimalType>()->GetScale();
+    auto precision = type_->As<DecimalType>()->GetPrecision();
 
-    size_t zeros = 0;
+    ValidateDecimalString(value, precision, scale);
 
-    while (c != end) {
-        if (*c == '-') {
-            sign = false;
-            if (c != value.begin()) {
-                break;
-            }
-        } else if (*c == '.' && !has_dot) {
-            size_t distance = std::distance(c, end) - 1;
-            auto scale = type_->As<DecimalType>()->GetScale();
+    // Normalize the string - produce a string that would be used to be parsed
+    // as Int128. In other words, the value must be scaled, such that number of digits after
+    // the '.' match the scale. If there less digits - pad them with zeros, if there are more
+    // digits - just truncate them. Then the dot must also be removed.
+    // WARNING: When the string does not contain any dots, that means it is already normalized,
+    // no zeros must be padded.
+    // This is highly debatable behavior, but it has been since beginning of the library
+    // and we leave it here for backward compatibility.
+    std::string cleaned{};
+    cleaned.reserve(precision + 1); // extra byte for the '-' sign
 
-            if (distance <= scale) {
-                zeros = scale - distance;
-            } else {
-                std::advance(end, scale - distance);
-            }
+    int64_t pad_len = 0;
+    auto it = value.cbegin();
+    auto end = value.cend();
 
-            has_dot = true;
-        } else if (*c >= '0' && *c <= '9') {
-            if (mulOverflow(int_value, 10, &int_value) ||
-                addOverflow(int_value, *c - '0', &int_value)) {
-                throw AssertionError("value is too big for 128-bit integer");
-            }
-        } else {
-            throw ValidationError(std::string("unexpected symbol '") + (*c) + "' in decimal value");
+    if (*it == '-') {
+        cleaned.push_back('-');
+        ++it;
+    }
+
+    for (; it < end && *it != '.'; ++it) {
+        cleaned.push_back(*it);
+    }
+
+    if (it < end && *it == '.') {
+        ++it;
+        auto input_scale = std::distance(it, end);
+        pad_len = (int64_t)scale - input_scale;
+        auto real_end = end;
+        if (pad_len <= 0) {
+            real_end = it + (int64_t)scale;
         }
-        ++c;
-    }
-
-    if (c != end) {
-        throw ValidationError("unexpected symbol '-' in decimal value");
-    }
-
-    while (zeros) {
-        if (mulOverflow(int_value, 10, &int_value)) {
-            throw AssertionError("value is too big for 128-bit integer");
+        for(; it < real_end; ++it) {
+            cleaned.push_back(*it);
         }
-        --zeros;
+
+        if (pad_len > 0) {
+            cleaned.append((size_t)pad_len, '0');
+        }
     }
 
-    Append(sign ? int_value : -int_value);
+    Append(Bignum::StringToInt128(cleaned));
 }
 
 Int128 ColumnDecimal::At(size_t i) const {
