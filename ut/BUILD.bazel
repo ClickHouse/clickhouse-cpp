@@ -26,7 +26,6 @@ _UT_COPTS = ["-I."] + select({
 
 _UT_DEPS = [
     "//:clickhouse",
-    "@abseil-cpp//absl/numeric:int128",
     "@googletest//:gtest",
 ]
 
