@@ -1,6 +1,9 @@
 SET ( clickhouse-cpp-ut-src
     main.cpp
 
+    bignum_string_ut.cpp
+    bignum_ut.cpp
+    bignum_round_trip.cpp
     block_ut.cpp
     client_ut.cpp
     columns_ut.cpp
@@ -23,9 +26,11 @@ SET ( clickhouse-cpp-ut-src
     roundtrip_column.cpp
     roundtrip_tests.cpp
 
+    bignum_samples.cpp
     utils.cpp
     value_generators.cpp
     low_cardinality_nullable_tests.cpp
+
 )
 
 IF (WITH_OPENSSL)

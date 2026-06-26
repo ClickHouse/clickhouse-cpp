@@ -26,7 +26,6 @@ _UT_COPTS = ["-I."] + select({
 
 _UT_DEPS = [
     "//:clickhouse",
-    "@abseil-cpp//absl/numeric:int128",
     "@googletest//:gtest",
 ]
 
@@ -38,6 +37,10 @@ cc_test(
     srcs = [
         # Test cases.
         "CreateColumnByType_ut.cpp",
+        "bignum_samples.h",
+        "bignum_samples.cpp",
+        "bignum_string_ut.cpp",
+        "bignum_ut.cpp",
         "block_ut.cpp",
         "column_array_ut.cpp",
         "columns_ut.cpp",
@@ -94,6 +97,9 @@ cc_test(
         # Test cases.
         "abnormal_column_names_test.cpp",
         "array_of_low_cardinality_tests.cpp",
+        "bignum_samples.h",
+        "bignum_samples.cpp",
+        "bignum_round_trip.cpp",
         "Column_ut.cpp",
         "client_ut.cpp",
         "connection_failed_client_test.cpp",

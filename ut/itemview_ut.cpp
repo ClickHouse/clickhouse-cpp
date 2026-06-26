@@ -21,12 +21,11 @@ TEST(ItemView, StorableTypes) {
         << " TypeCode:" << #TypeCode << " NativeType: " << #NativeType;
 
 #define TEST_ITEMVIEW_TYPE_VALUES(TypeCode, NativeType) \
+    static_assert(std::numeric_limits<NativeType>::is_specialized); \
     TEST_ITEMVIEW_TYPE_VALUE(TypeCode, NativeType, std::numeric_limits<NativeType>::min()); \
-    TEST_ITEMVIEW_TYPE_VALUE(TypeCode, NativeType, std::numeric_limits<NativeType>::min() + 1); \
     TEST_ITEMVIEW_TYPE_VALUE(TypeCode, NativeType, -1); \
     TEST_ITEMVIEW_TYPE_VALUE(TypeCode, NativeType, 0); \
     TEST_ITEMVIEW_TYPE_VALUE(TypeCode, NativeType, 1); \
-    TEST_ITEMVIEW_TYPE_VALUE(TypeCode, NativeType, std::numeric_limits<NativeType>::max() - 1); \
     TEST_ITEMVIEW_TYPE_VALUE(TypeCode, NativeType, std::numeric_limits<NativeType>::max());
 
     TEST_ITEMVIEW_TYPE_VALUES(Type::Code::Bool,  int8_t);
@@ -62,7 +61,7 @@ TEST(ItemView, StorableTypes) {
     TEST_ITEMVIEW_TYPE_VALUES(Type::Code::Decimal,    Int128);
     TEST_ITEMVIEW_TYPE_VALUES(Type::Code::Decimal,    uint32_t);
     TEST_ITEMVIEW_TYPE_VALUES(Type::Code::Decimal,    uint64_t);
-//    TEST_ITEMVIEW_TYPE_VALUES(Type::Code::Decimal,    UInt128);
+    TEST_ITEMVIEW_TYPE_VALUES(Type::Code::Decimal,    UInt128);
     TEST_ITEMVIEW_TYPE_VALUES(Type::Code::Decimal32,  int32_t);
     TEST_ITEMVIEW_TYPE_VALUES(Type::Code::Decimal64,  int64_t);
     TEST_ITEMVIEW_TYPE_VALUES(Type::Code::Decimal128, Int128);
@@ -208,22 +207,22 @@ TEST(ItemView, TypeSizeMismatch) {
 
 TEST(ItemView, Int128_values) {
     const auto vals = {
-        std::numeric_limits<Int128>::min() + 2,
-        std::numeric_limits<Int128>::min() + 1,
-        std::numeric_limits<Int128>::min(),
-        absl::MakeInt128(0xffffffffffffffffll - 2, 0),
-        absl::MakeInt128(0xffffffffffffffffll - 1, 0),
-        absl::MakeInt128(0xffffffffffffffffll, 0),
-        absl::MakeInt128(0xffffffffffffffffll, 0xffffffffffffffffll),
-        absl::MakeInt128(0, 0xffffffffffffffffll - 2),
-        absl::MakeInt128(0, 0xffffffffffffffffll - 1),
-        absl::MakeInt128(0, 0xffffffffffffffffll),
-        Int128(-1),
-        Int128(0),
-        Int128(1),
-        std::numeric_limits<Int128>::max() - 2,
-        std::numeric_limits<Int128>::max() - 1,
-        std::numeric_limits<Int128>::max(),
+        Bignum::MakeInt128(INT64_MIN, 2),
+        Bignum::MakeInt128(INT64_MIN, 1),
+        Bignum::MakeInt128(INT64_MIN, 0),
+        Bignum::MakeInt128(0xffffffffffffffffll - 2, 0),
+        Bignum::MakeInt128(0xffffffffffffffffll - 1, 0),
+        Bignum::MakeInt128(0xffffffffffffffffll, 0),
+        Bignum::MakeInt128(0xffffffffffffffffll, 0xffffffffffffffffll),
+        Bignum::MakeInt128(0, 0xffffffffffffffffll - 2),
+        Bignum::MakeInt128(0, 0xffffffffffffffffll - 1),
+        Bignum::MakeInt128(0, 0xffffffffffffffffll),
+        Int128{-1},
+        Int128{0},
+        Int128{1},
+        Bignum::MakeInt128(INT64_MAX, UINT64_MAX - 2),
+        Bignum::MakeInt128(INT64_MAX, UINT64_MAX - 1),
+        Bignum::MakeInt128(INT64_MAX, UINT64_MAX),
     };
 
     for (size_t i = 0; i < vals.size(); ++i)

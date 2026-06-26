@@ -14,10 +14,10 @@ load("@rules_cc//cc:cc_library.bzl", "cc_library")
 #     entirely. `USE_BORINGSSL` ifdef-guards the two OpenSSL-only
 #     surfaces (`SSL_CONF_*` command API and `SSL_read_ex`) that
 #     BoringSSL doesn't provide; see clickhouse/base/sslsocket.cpp.
-#   * lz4 / zstd / abseil come from BCR modules instead of contrib/.
-#     cityhash is the exception: it is built from contrib/ because the
-#     wire protocol needs ClickHouse's frozen CityHash variant, which
-#     differs from the stock BCR module (see the :cityhash target).
+#   * lz4 / zstd come from BCR modules instead of contrib/. cityhash is
+#     the exception: it is built from contrib/ because the wire protocol
+#     needs ClickHouse's frozen CityHash variant, which differs from the
+#     stock BCR module (see the :cityhash target).
 
 # Selects the TLS implementation: `--@clickhouse-cpp//:tls=boringssl`
 # (default), `--@clickhouse-cpp//:tls=openssl`, or
@@ -119,7 +119,15 @@ cc_library(
         "clickhouse/columns/*.h",
         "clickhouse/types/*.h",
     ]),
-    defines = select({
+    defines = [
+        # Abseil fallback is not enabled in the Bazel build. This fallback will be removed in the
+        # near future. The Bazel build always uses the self-contained fallback for wide (128-bit)
+        # integers and never depends on Abseil. This mirrors CMake's
+        # `CH_USE_ABSEIL_FOR_BIGNUM=OFF` option and keeps the build free of any Abseil dependency.
+        # Users are free to include Abseil in their own projects and convert values produced by this
+        # library to the corresponding Abseil types.
+        "CH_USE_ABSEIL_FOR_BIGNUM=0",
+    ] + select({
         # `WITH_OPENSSL` enables the TLS code paths in client.cpp /
         # sslsocket.cpp (same macro as the CMake option). `USE_BORINGSSL`
         # takes the BoringSSL-compatible branches in sslsocket.cpp.
@@ -146,6 +154,7 @@ cc_library(
         ":tls_openssl_on_windows": [
             "-DEFAULTLIB:crypt32.lib",
             "-DEFAULTLIB:user32.lib",
+            "-DEFAULTLIB:advapi32.lib",
         ],
         "//conditions:default": [],
     }),
@@ -156,7 +165,6 @@ cc_library(
     strip_include_prefix = "/",
     visibility = ["//visibility:public"],
     deps = [
-        "@abseil-cpp//absl/numeric:int128",
         ":cityhash",
         "@lz4//:lz4",
         "@zstd//:zstd",

@@ -4,7 +4,7 @@
 
 #include <city.h>
 
-#include <stdexcept>
+#include <cassert>
 
 namespace clickhouse {
 

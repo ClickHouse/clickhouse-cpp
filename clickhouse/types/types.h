@@ -1,18 +1,15 @@
 #pragma once
 
-#include "absl/numeric/int128.h"
+#include "clickhouse/types/bignum.h"
 
 #include <atomic>
 #include <map>
 #include <memory>
 #include <string>
 #include <vector>
-#include <stdexcept>
 
 namespace clickhouse {
 
-using Int128 = absl::int128;
-using UInt128 = absl::uint128;
 using Int64 = int64_t;
 
 using TypeRef = std::shared_ptr<class Type>;

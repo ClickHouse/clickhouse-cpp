@@ -2,6 +2,7 @@
 #include <clickhouse/columns/bool.h>
 
 #include "clickhouse/base/socket.h"
+#include "clickhouse/types/bignum.h"
 #include "clickhouse/version.h"
 #include "clickhouse/error_codes.h"
 
@@ -852,6 +853,16 @@ TEST_P(ClientCase, Decimal) {
         auto d6 = std::make_shared<ColumnDecimal>(38, 19);
 
         EXPECT_THROW(
+            // 10 digits vs precision=9
+            d1->Append("1000000000"),
+            ValidationError
+        );
+        EXPECT_THROW(
+            // 6 digits + implicit 4 decimals (total 10) vs precision=9
+            d1->Append("100000.0"),
+            ValidationError
+        );
+        EXPECT_THROW(
             d1->Append("1234567890123456789012345678901234567890"),
             std::runtime_error
         );
@@ -900,7 +911,6 @@ TEST_P(ClientCase, Decimal) {
         d5->Append(-999999999999999999);
         d6->Append(-999999999999999999);
 
-        // Check strings with decimal point
         id->Append(4);
         d1->Append("12345.6789");
         d2->Append("123456789.012345678");
@@ -909,8 +919,17 @@ TEST_P(ClientCase, Decimal) {
         d5->Append("123456789.012345678");
         d6->Append("1234567890123456789.0123456789012345678");
 
-        // Check strings with minus sign and without decimal point
+        // Check strings with decimal point
         id->Append(5);
+        d1->Append("12345.6789");
+        d2->Append("123456789.012345678");
+        d3->Append("1234567890123456789.0123456789012345678");
+        d4->Append("12345.6789");
+        d5->Append("123456789.012345678");
+        d6->Append("1234567890123456789.0123456789012345678");
+
+        // Check strings with minus sign and without decimal point
+        id->Append(6);
         d1->Append("-12345.6789");
         d2->Append("-123456789012345678");
         d3->Append("-12345678901234567890123456789012345678");
@@ -918,7 +937,7 @@ TEST_P(ClientCase, Decimal) {
         d5->Append("-123456789012345678");
         d6->Append("-12345678901234567890123456789012345678");
 
-        id->Append(6);
+        id->Append(7);
         d1->Append("12345.678");
         d2->Append("123456789.0123456789");
         d3->Append("1234567890123456789.0123456789012345678");
@@ -942,83 +961,67 @@ TEST_P(ClientCase, Decimal) {
             return;
         }
 
-        ASSERT_EQ(6u, b.GetRowCount());
-
-        auto int128_to_string = [](Int128 value) {
-            std::string result;
-            const bool sign = value >= 0;
-
-            if (!sign) {
-                value = -value;
-            }
-
-            while (value) {
-                result += static_cast<char>(value % 10) + '0';
-                value /= 10;
-            }
-
-            if (result.empty()) {
-                result = "0";
-            } else if (!sign) {
-                result.push_back('-');
-            }
-
-            std::reverse(result.begin(), result.end());
-
-            return result;
-        };
+        ASSERT_EQ(7u, b.GetRowCount());
 
         auto decimal = [&b](size_t column, size_t row) {
             return b[column]->As<ColumnDecimal>()->At(row);
         };
 
         EXPECT_EQ(1u, b[0]->As<ColumnUInt64>()->At(0));
-        EXPECT_EQ("123456789", int128_to_string(decimal(1, 0)));
-        EXPECT_EQ("123456789012345678", int128_to_string(decimal(2, 0)));
-        EXPECT_EQ("1234567890123456789", int128_to_string(decimal(3, 0)));
-        EXPECT_EQ("123456789", int128_to_string(decimal(4, 0)));
-        EXPECT_EQ("123456789012345678", int128_to_string(decimal(5, 0)));
-        EXPECT_EQ("1234567890123456789", int128_to_string(decimal(6, 0)));
+        EXPECT_EQ("123456789",Bignum::Int128ToString(decimal(1, 0)));
+        EXPECT_EQ("123456789012345678",Bignum::Int128ToString(decimal(2, 0)));
+        EXPECT_EQ("1234567890123456789",Bignum::Int128ToString(decimal(3, 0)));
+        EXPECT_EQ("123456789",Bignum::Int128ToString(decimal(4, 0)));
+        EXPECT_EQ("123456789012345678",Bignum::Int128ToString(decimal(5, 0)));
+        EXPECT_EQ("1234567890123456789",Bignum::Int128ToString(decimal(6, 0)));
 
         EXPECT_EQ(2u, b[0]->As<ColumnUInt64>()->At(1));
-        EXPECT_EQ("999999999", int128_to_string(decimal(1, 1)));
-        EXPECT_EQ("999999999999999999", int128_to_string(decimal(2, 1)));
-        EXPECT_EQ("999999999999999999", int128_to_string(decimal(3, 1)));
-        EXPECT_EQ("999999999", int128_to_string(decimal(4, 1)));
-        EXPECT_EQ("999999999999999999", int128_to_string(decimal(5, 1)));
-        EXPECT_EQ("999999999999999999", int128_to_string(decimal(6, 1)));
+        EXPECT_EQ("999999999",Bignum::Int128ToString(decimal(1, 1)));
+        EXPECT_EQ("999999999999999999",Bignum::Int128ToString(decimal(2, 1)));
+        EXPECT_EQ("999999999999999999",Bignum::Int128ToString(decimal(3, 1)));
+        EXPECT_EQ("999999999",Bignum::Int128ToString(decimal(4, 1)));
+        EXPECT_EQ("999999999999999999",Bignum::Int128ToString(decimal(5, 1)));
+        EXPECT_EQ("999999999999999999",Bignum::Int128ToString(decimal(6, 1)));
 
         EXPECT_EQ(3u, b[0]->As<ColumnUInt64>()->At(2));
-        EXPECT_EQ("-999999999", int128_to_string(decimal(1, 2)));
-        EXPECT_EQ("-999999999999999999", int128_to_string(decimal(2, 2)));
-        EXPECT_EQ("-999999999999999999", int128_to_string(decimal(3, 2)));
-        EXPECT_EQ("-999999999", int128_to_string(decimal(4, 2)));
-        EXPECT_EQ("-999999999999999999", int128_to_string(decimal(5, 2)));
-        EXPECT_EQ("-999999999999999999", int128_to_string(decimal(6, 2)));
+        EXPECT_EQ("-999999999",Bignum::Int128ToString(decimal(1, 2)));
+        EXPECT_EQ("-999999999999999999",Bignum::Int128ToString(decimal(2, 2)));
+        EXPECT_EQ("-999999999999999999",Bignum::Int128ToString(decimal(3, 2)));
+        EXPECT_EQ("-999999999",Bignum::Int128ToString(decimal(4, 2)));
+        EXPECT_EQ("-999999999999999999",Bignum::Int128ToString(decimal(5, 2)));
+        EXPECT_EQ("-999999999999999999",Bignum::Int128ToString(decimal(6, 2)));
 
         EXPECT_EQ(4u, b[0]->As<ColumnUInt64>()->At(3));
-        EXPECT_EQ("123456789", int128_to_string(decimal(1, 3)));
-        EXPECT_EQ("123456789012345678", int128_to_string(decimal(2, 3)));
-        EXPECT_EQ("12345678901234567890123456789012345678", int128_to_string(decimal(3, 3)));
-        EXPECT_EQ("123456789", int128_to_string(decimal(4, 3)));
-        EXPECT_EQ("123456789012345678", int128_to_string(decimal(5, 3)));
-        EXPECT_EQ("12345678901234567890123456789012345678", int128_to_string(decimal(6, 3)));
+        EXPECT_EQ("123456789",Bignum::Int128ToString(decimal(1, 3)));
+        EXPECT_EQ("123456789012345678",Bignum::Int128ToString(decimal(2, 3)));
+        EXPECT_EQ("12345678901234567890123456789012345678",Bignum::Int128ToString(decimal(3, 3)));
+        EXPECT_EQ("123456789",Bignum::Int128ToString(decimal(4, 3)));
+        EXPECT_EQ("123456789012345678",Bignum::Int128ToString(decimal(5, 3)));
+        EXPECT_EQ("12345678901234567890123456789012345678",Bignum::Int128ToString(decimal(6, 3)));
 
         EXPECT_EQ(5u, b[0]->As<ColumnUInt64>()->At(4));
-        EXPECT_EQ("-123456789", int128_to_string(decimal(1, 4)));
-        EXPECT_EQ("-123456789012345678", int128_to_string(decimal(2, 4)));
-        EXPECT_EQ("-12345678901234567890123456789012345678", int128_to_string(decimal(3, 4)));
-        EXPECT_EQ("-123456789", int128_to_string(decimal(4, 4)));
-        EXPECT_EQ("-123456789012345678", int128_to_string(decimal(5, 4)));
-        EXPECT_EQ("-12345678901234567890123456789012345678", int128_to_string(decimal(6, 4)));
+        EXPECT_EQ("123456789",Bignum::Int128ToString(decimal(1, 4)));
+        EXPECT_EQ("123456789012345678",Bignum::Int128ToString(decimal(2, 4)));
+        EXPECT_EQ("12345678901234567890123456789012345678",Bignum::Int128ToString(decimal(3, 4)));
+        EXPECT_EQ("123456789",Bignum::Int128ToString(decimal(4, 4)));
+        EXPECT_EQ("123456789012345678",Bignum::Int128ToString(decimal(5, 4)));
+        EXPECT_EQ("12345678901234567890123456789012345678",Bignum::Int128ToString(decimal(6, 4)));
 
         EXPECT_EQ(6u, b[0]->As<ColumnUInt64>()->At(5));
-        EXPECT_EQ("123456780", int128_to_string(decimal(1, 5)));
-        EXPECT_EQ("123456789012345678", int128_to_string(decimal(2, 5)));
-        EXPECT_EQ("12345678901234567890123456789012345678", int128_to_string(decimal(3, 5)));
-        EXPECT_EQ("123456789", int128_to_string(decimal(4, 5)));
-        EXPECT_EQ("123456789012345678", int128_to_string(decimal(5, 5)));
-        EXPECT_EQ("12345678901234567890123456789012345678", int128_to_string(decimal(6, 5)));
+        EXPECT_EQ("-123456789",Bignum::Int128ToString(decimal(1, 5)));
+        EXPECT_EQ("-123456789012345678",Bignum::Int128ToString(decimal(2, 5)));
+        EXPECT_EQ("-12345678901234567890123456789012345678",Bignum::Int128ToString(decimal(3, 5)));
+        EXPECT_EQ("-123456789",Bignum::Int128ToString(decimal(4, 5)));
+        EXPECT_EQ("-123456789012345678",Bignum::Int128ToString(decimal(5, 5)));
+        EXPECT_EQ("-12345678901234567890123456789012345678",Bignum::Int128ToString(decimal(6, 5)));
+
+        EXPECT_EQ(7u, b[0]->As<ColumnUInt64>()->At(6));
+        EXPECT_EQ("123456780",Bignum::Int128ToString(decimal(1, 6)));
+        EXPECT_EQ("123456789012345678",Bignum::Int128ToString(decimal(2, 6)));
+        EXPECT_EQ("12345678901234567890123456789012345678",Bignum::Int128ToString(decimal(3, 6)));
+        EXPECT_EQ("123456789",Bignum::Int128ToString(decimal(4, 6)));
+        EXPECT_EQ("123456789012345678",Bignum::Int128ToString(decimal(5, 6)));
+        EXPECT_EQ("12345678901234567890123456789012345678",Bignum::Int128ToString(decimal(6, 6)));
     });
 }
 

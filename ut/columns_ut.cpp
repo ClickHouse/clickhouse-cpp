@@ -11,6 +11,7 @@
 #include <clickhouse/columns/uuid.h>
 #include <clickhouse/columns/ip4.h>
 #include <clickhouse/columns/ip6.h>
+#include <clickhouse/types/bignum.h>
 #include <clickhouse/base/input.h>
 #include <clickhouse/base/output.h>
 #include <clickhouse/base/socket.h> // for ipv4-ipv6 platform-specific stuff
@@ -19,10 +20,9 @@
 #include "utils.h"
 #include "value_generators.h"
 
+#include <memory>
 #include <string_view>
-#include <sstream>
 #include <vector>
-#include <random>
 
 namespace {
 
@@ -37,7 +37,112 @@ static const auto LOWCARDINALITY_STRING_FOOBAR_10_ITEMS_BINARY =
         "\x04\x07\x08\x04"sv;
 }
 
-// TODO: add tests for ColumnDecimal.
+class ColumnDecimalFromString : public ::testing::TestWithParam<std::pair<size_t, size_t>> {};
+
+TEST_P(ColumnDecimalFromString, DecimalFromGoodString)
+{
+    const auto [precision, scale] = GetParam();
+    size_t whole = precision - scale;
+    std::vector<std::pair<std::string, std::string>> values = {
+        {"0", "0"},
+        {"-0", "0"},
+        {"0.", "0"},
+        {"-0.", "0"},
+        {"1", "1"},
+        {"-1", "-1"},
+        {"1.0", "1" + std::string(scale, '0')},
+        {"-1.0", "-1" + std::string(scale, '0')},
+        {"1.", "1" + std::string(scale, '0')},
+        {"-1.", "-1" + std::string(scale, '0')},
+        {std::string(whole, '9') + ".", std::string(whole, '9') + std::string(scale, '0')},
+        {"-" + std::string(whole, '9') + ".", "-" + std::string(whole, '9') + std::string(scale, '0')},
+        {std::string(precision, '9'), std::string(precision, '9')},
+        {"-" + std::string(precision, '9'), "-" + std::string(precision, '9')},
+    };
+
+    for (auto & [value, expect] : values) {
+        auto col = std::make_shared<ColumnDecimal>(precision, scale);
+        EXPECT_NO_THROW(col->Append(value)) << "exception for value \"" << value << "\"";
+        ASSERT_EQ(expect, Bignum::Int128ToString(col->At(0)));
+    }
+}
+
+TEST_P(ColumnDecimalFromString, DecimalFromBadString)
+{
+    const auto [precision, scale] = GetParam();
+    size_t whole = precision - scale;
+
+    std::vector<std::string> values = {
+        "",
+        ".",
+        " ",
+        "-.",
+        "--0",
+        "1.2222x",
+        "0-",
+        ".0.",
+        "+5",
+        " 5",
+        "50 000",
+        "1e3",
+        "0x1",
+        "1,1234.5",
+
+        std::string(whole + 1, '9') + "." + std::string(scale, '0'),
+    };
+    for (auto value : values) {
+        auto col = std::make_shared<ColumnDecimal>(precision, scale);
+        EXPECT_THROW(
+            col->Append(value),
+            ValidationError
+        ) << "got \"" << Bignum::Int128ToString(col->At(0)) << "\" for value \"" << value << "\"";
+    }
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    ColumnCase,
+    ColumnDecimalFromString,
+    ::testing::Values(
+        std::make_pair<size_t, size_t>(9, 0),
+        std::make_pair<size_t, size_t>(9, 4),
+        std::make_pair<size_t, size_t>(18, 6),
+        std::make_pair<size_t, size_t>(15, 2),
+        std::make_pair<size_t, size_t>(38, 0),
+        std::make_pair<size_t, size_t>(38, 4)
+    ),
+    [](const ::testing::TestParamInfo<std::pair<size_t, size_t>>& info) {
+        return "p" + std::to_string(info.param.first)
+             + "_s" + std::to_string(info.param.second);
+    });
+
+TEST(ColumnsCase, DecimalStringValueMapping) {
+    struct TestSample {
+        size_t precision;
+        size_t scale;
+        std::string str;
+        Int128 expect;
+    };
+    
+    std::vector<TestSample> samples = {
+        {18, 0, "0.123", Int128(0)},
+        {18, 0, "123", Int128(123)},
+        {18, 3, "0.123", Int128(123)},
+        {18, 3, "1234", Int128(1234)},
+        {18, 3, "1.234", Int128(1234)},
+        {18, 3, "0.1234", Int128(123)},
+        {18, 3, "12", Int128(12)},
+        {18, 3, "12.0", Int128(12000)},
+        {18, 3, "12.", Int128(12000)},
+    };
+
+    for (auto & [precision, scale, str, expect] : samples) {
+        auto col = std::make_shared<ColumnDecimal>(precision, scale);
+        EXPECT_NO_THROW(col->Append(str)) << "exception for value \"" << str << "\"";
+        auto value = col->At(0);
+        EXPECT_EQ(value, expect);
+    }
+
+}
 
 TEST(ColumnsCase, NumericInit) {
     auto col = std::make_shared<ColumnUInt32>(MakeNumbers());
@@ -649,46 +754,46 @@ TEST(ColumnsCase, UUIDSlice) {
 
 TEST(ColumnsCase, Int128) {
     auto col = std::make_shared<ColumnInt128>(std::vector<Int128>{
-            absl::MakeInt128(0xffffffffffffffffll, 0xffffffffffffffffll), // -1
-            absl::MakeInt128(0, 0xffffffffffffffffll),  // 2^64
-            absl::MakeInt128(0xffffffffffffffffll, 0),
-            absl::MakeInt128(0x8000000000000000ll, 0),
+            Bignum::MakeInt128(0xffffffffffffffffll, 0xffffffffffffffffll), // -1
+            Bignum::MakeInt128(0, 0xffffffffffffffffll),  // 2^64
+            Bignum::MakeInt128(0xffffffffffffffffll, 0),
+            Bignum::MakeInt128(0x8000000000000000ll, 0),
             Int128(0)
     });
 
-    EXPECT_EQ(-1, col->At(0));
+    EXPECT_EQ(Int128(-1), col->At(0));
 
-    EXPECT_EQ(absl::MakeInt128(0, 0xffffffffffffffffll), col->At(1));
-    EXPECT_EQ(0ll,                   absl::Int128High64(col->At(1)));
-    EXPECT_EQ(0xffffffffffffffffull, absl::Int128Low64(col->At(1)));
+    EXPECT_EQ(Bignum::MakeInt128(0, 0xffffffffffffffffll), col->At(1));
+    EXPECT_EQ(0ll,                   Bignum::Int128High64(col->At(1)));
+    EXPECT_EQ(0xffffffffffffffffull, Bignum::Int128Low64(col->At(1)));
 
-    EXPECT_EQ(absl::MakeInt128(0xffffffffffffffffll, 0), col->At(2));
-    EXPECT_EQ(static_cast<int64_t>(0xffffffffffffffffll),  absl::Int128High64(col->At(2)));
-    EXPECT_EQ(0ull,                  absl::Int128Low64(col->At(2)));
+    EXPECT_EQ(Bignum::MakeInt128(0xffffffffffffffffll, 0), col->At(2));
+    EXPECT_EQ(static_cast<int64_t>(0xffffffffffffffffll),  Bignum::Int128High64(col->At(2)));
+    EXPECT_EQ(0ull,                  Bignum::Int128Low64(col->At(2)));
 
-    EXPECT_EQ(0, col->At(4));
+    EXPECT_EQ(Int128(0), col->At(4));
 }
 
 TEST(ColumnsCase, UInt128) {
     auto col = std::make_shared<ColumnUInt128>(std::vector<UInt128>{
-            absl::MakeUint128(0xffffffffffffffffll, 0xffffffffffffffffll), // 2^128 - 1
-            absl::MakeUint128(0, 0xffffffffffffffffll),  // 2^64 - 1
-            absl::MakeUint128(0xffffffffffffffffll, 0),  // 2^128 - 2^64
-            absl::MakeUint128(0x8000000000000000ll, 0),
+            Bignum::MakeUInt128(0xffffffffffffffffll, 0xffffffffffffffffll), // 2^128 - 1
+            Bignum::MakeUInt128(0, 0xffffffffffffffffll),  // 2^64 - 1
+            Bignum::MakeUInt128(0xffffffffffffffffll, 0),  // 2^128 - 2^64
+            Bignum::MakeUInt128(0x8000000000000000ll, 0),
             UInt128(0)
     });
 
-    EXPECT_EQ(absl::MakeUint128(0xffffffffffffffffll, 0xffffffffffffffffll), col->At(0));
+    EXPECT_EQ(Bignum::MakeUInt128(0xffffffffffffffffll, 0xffffffffffffffffll), col->At(0));
 
-    EXPECT_EQ(absl::MakeUint128(0, 0xffffffffffffffffll), col->At(1));
-    EXPECT_EQ(0ull,                  absl::Uint128High64(col->At(1)));
-    EXPECT_EQ(0xffffffffffffffffull, absl::Uint128Low64(col->At(1)));
+    EXPECT_EQ(Bignum::MakeUInt128(0, 0xffffffffffffffffll), col->At(1));
+    EXPECT_EQ(0ull,                  Bignum::UInt128High64(col->At(1)));
+    EXPECT_EQ(0xffffffffffffffffull, Bignum::UInt128Low64(col->At(1)));
 
-    EXPECT_EQ(absl::MakeUint128(0xffffffffffffffffll, 0), col->At(2));
-    EXPECT_EQ(static_cast<uint64_t>(0xffffffffffffffffull),  absl::Uint128High64(col->At(2)));
-    EXPECT_EQ(0ull,                  absl::Uint128Low64(col->At(2)));
+    EXPECT_EQ(Bignum::MakeUInt128(0xffffffffffffffffll, 0), col->At(2));
+    EXPECT_EQ(static_cast<uint64_t>(0xffffffffffffffffull),  Bignum::UInt128High64(col->At(2)));
+    EXPECT_EQ(0ull,                  Bignum::UInt128Low64(col->At(2)));
 
-    EXPECT_EQ(0, col->At(4));
+    EXPECT_EQ(UInt128(0), col->At(4));
 }
 
 TEST(ColumnsCase, ColumnIPv4)
@@ -885,15 +990,15 @@ TEST(ColumnsCase, ColumnIPv6_construct_from_data)
     EXPECT_ANY_THROW(ColumnIPv6(ColumnRef(std::make_shared<ColumnString>())));
 }
 
-TEST(ColumnsCase, ColumnDecimal128_from_string) {
+TEST(ColumnsCase, ColumnDecimal128FromString) {
     auto col = std::make_shared<ColumnDecimal>(38, 0);
 
     const auto values = {
+        Bignum::StringToInt128('-' + std::string(38, '9')),
         Int128(0),
         Int128(-1),
         Int128(1),
-        std::numeric_limits<Int128>::min() + 1,
-        std::numeric_limits<Int128>::max(),
+        Bignum::StringToInt128(std::string(38, '9')),
     };
 
     for (size_t i = 0; i < values.size(); ++i) {
