@@ -124,6 +124,7 @@ TEST(ColumnsCase, DecimalStringValueMapping) {
     };
     
     std::vector<TestSample> samples = {
+        {18, 0, "0.0", Int128(0)},
         {18, 0, "0.123", Int128(0)},
         {18, 0, "123", Int128(123)},
         {18, 3, "0.123", Int128(123)},
@@ -139,6 +140,45 @@ TEST(ColumnsCase, DecimalStringValueMapping) {
         auto col = std::make_shared<ColumnDecimal>(precision, scale);
         EXPECT_NO_THROW(col->Append(str)) << "exception for value \"" << str << "\"";
         auto value = col->At(0);
+        EXPECT_EQ(value, expect);
+    }
+
+}
+
+TEST(ColumnsCase, DecimalStringAt) {
+    struct TestSample {
+        size_t precision;
+        size_t scale;
+        std::string str;
+        std::string expect;
+    };
+
+    std::vector<TestSample> samples = {
+        {18, 0, "0", "0"},
+        {18, 0, "123", "123"},
+        {18, 0, "-123", "-123"},
+        {18, 3, "0", "0.000"},
+        {18, 3, "1", "0.001"},
+        {18, 3, "12", "0.012"},
+        {18, 3, "123", "0.123"},
+        {18, 3, "-123", "-0.123"},
+        {18, 3, "0.123", "0.123"},
+        {18, 3, "1234", "1.234"},
+        {18, 3, "-1234", "-1.234"},
+        {18, 3, "-1.234", "-1.234"},
+        {18, 3, "123.0", "123.000"},
+        {18, 3, "123.", "123.000"},
+        {18, 3, "123000", "123.000"},
+        // Large values that do not fit in 64 bits.
+        {38, 4, "12345678901234567890.1234", "12345678901234567890.1234"},
+        {38, 4, "-12345678901234567890.1234", "-12345678901234567890.1234"},
+        {38, 0, "99999999999999999999999999999999999999", "99999999999999999999999999999999999999"},
+    };
+
+    for (auto & [precision, scale, str, expect] : samples) {
+        auto col = std::make_shared<ColumnDecimal>(precision, scale);
+        EXPECT_NO_THROW(col->Append(str)) << "exception for value \"" << str << "\"";
+        auto value = col->StringAt(0);
         EXPECT_EQ(value, expect);
     }
 
