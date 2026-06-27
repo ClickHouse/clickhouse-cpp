@@ -37,7 +37,7 @@ a future release.
 ## Dependencies
 In the most basic case one needs only:
 - a C++-17-complaint compiler,
-- `cmake` (3.12 or newer), and
+- `cmake` (3.13 or newer), and
 - `ninja`
 
 Optional dependencies:
@@ -150,7 +150,7 @@ int main()
 - `touch CMakeLists.txt`, then copy the following CMake code into that file
 
 ```cmake
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.13)
 project(application-example)
 
 set(CMAKE_CXX_STANDARD 17)
