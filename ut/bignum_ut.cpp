@@ -2,6 +2,7 @@
 #include <gtest/gtest.h>
 
 #include <limits>
+#include <vector>
 
 using clickhouse::Bignum;
 using clickhouse::Int128;
@@ -135,3 +136,57 @@ TEST(BignumCompare, Int128Limits) {
     EXPECT_TRUE(min <= min);
     EXPECT_TRUE(max >= max);
 }
+
+#if CH_CPP_HAS_INT128
+
+using i128 = __int128;
+using u128 = unsigned __int128;
+
+constexpr u128 u128_max = ~u128{0};                                                  
+constexpr i128 i128_max = static_cast<i128>(u128_max >> 1);                          
+constexpr i128 i128_min = -i128_max - 1;                                                
+
+TEST(BignumCompare, Int128CastToNative) {
+
+    struct TestSample {
+        std::string str;
+        i128 expect;
+    };
+
+    std::vector<TestSample> samples {
+        {"0", 0},
+        {"-1", -1},
+        {"1", 1},
+        {"99999999999999999999999999999999999999",   (i128)10000000000000000000UL * 10000000000000000000UL - 1},
+        {"-99999999999999999999999999999999999999", -(i128)10000000000000000000UL * 10000000000000000000UL + 1},
+        {"170141183460469231731687303715884105727", i128_max},
+        {"-170141183460469231731687303715884105728", i128_min},
+    };
+
+    for (size_t i = 0; i < samples.size(); ++i) {
+        auto x = Bignum::StringToInt128(samples[i].str);
+        EXPECT_TRUE(static_cast<i128>(x) == samples[i].expect);
+    }
+}
+
+TEST(BignumCompare, UInt128CastToNative) {
+
+    struct TestSample {
+        std::string str;
+        u128 expect;
+    };
+
+    std::vector<TestSample> samples {
+        {"0", 0},
+        {"1", 1},
+        {"99999999999999999999999999999999999999",   (i128)10000000000000000000UL * 10000000000000000000UL - 1},
+        {"170141183460469231731687303715884105727", (u128)i128_max},
+        {"340282366920938463463374607431768211455", u128_max},
+    };
+
+    for (size_t i = 0; i < samples.size(); ++i) {
+        auto x = Bignum::StringToUInt128(samples[i].str);
+        EXPECT_TRUE(static_cast<u128>(x) == samples[i].expect);
+    }
+}
+#endif
