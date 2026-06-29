@@ -1,6 +1,9 @@
 #include "decimal.h"
 #include "clickhouse/exceptions.h"
 
+#include <algorithm>
+#include <iterator>
+
 namespace {
 
 using clickhouse::ValidationError;
@@ -153,6 +156,42 @@ Int128 ColumnDecimal::At(size_t i) const {
         default:
             throw ValidationError("Invalid data_ column type in ColumnDecimal");
     }
+}
+
+std::string ColumnDecimal::StringAt(size_t i) const {
+    auto scale = GetScale();
+
+    Int128 val = At(i);
+    std::string raw_str = Bignum::Int128ToString(val);
+    if (scale == 0) {
+        return raw_str;
+    }
+
+    std::string ret;
+    ret.reserve(GetPrecision() + 2); // extra space for '-' and '.';
+
+    auto it = raw_str.cbegin();
+    auto end = raw_str.cend();
+
+    if (it != end && *it == '-') {
+        ret.push_back(*it++);
+    }
+
+    int64_t str_len = std::distance(it, end);
+    int64_t integral_len = str_len - static_cast<int64_t>(scale);
+
+    if (integral_len > 0) {
+        std::copy(it, it + integral_len, std::back_inserter(ret));
+        it += integral_len;
+        ret.push_back('.');
+    }
+    else {
+        ret.append("0.");
+        ret.append(static_cast<size_t>(-integral_len), '0');
+    }
+    std::copy(it, end, std::back_inserter(ret));
+
+    return ret;
 }
 
 void ColumnDecimal::Reserve(size_t new_cap) {
