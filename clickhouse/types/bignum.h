@@ -4,6 +4,13 @@
 #include <string>
 #include <string_view>
 
+
+ #if defined(__SIZEOF_INT128__)                                                                       
+ #define CH_CPP_HAS_INT128 1                                                                  
+ #else                                                                                                
+ #define CH_CPP_HAS_INT128 0                                                                  
+ #endif                                                                                               
+
 /**
  * This file contains declarations and definitions of the types and API used for wide
  * (128-, 256- bit) integers. It first declares the Int128 and UInt128, implementation of which
@@ -66,6 +73,12 @@ struct UInt128 {
     bool operator<=(const UInt128& other) const { return !(other < *this); }
     bool operator>=(const UInt128& other) const { return !(*this < other); }
 
+#if CH_CPP_HAS_INT128
+    explicit operator unsigned __int128() const {
+        return ((unsigned __int128)limbs[1] << 64 | limbs[0]);
+    }
+#endif
+
     // The value as two 64-bit limbs in little-endian order:
     // `limbs[0]` is the low 64 bits and `limbs[1]` is the high 64 bits
     uint64_t limbs[2];
@@ -103,6 +116,12 @@ struct Int128 {
     bool operator>(const Int128& other) const { return other < *this; }
     bool operator<=(const Int128& other) const { return !(other < *this); }
     bool operator>=(const Int128& other) const { return !(*this < other); }
+
+#if CH_CPP_HAS_INT128
+    explicit operator __int128() const {
+        return (__int128)((unsigned __int128)limbs[1] << 64 | limbs[0]);
+    }
+#endif
 
     // The value as two 64-bit limbs in little-endian order:
     // `limbs[0]` is the low 64 bits and `limbs[1]` is the high 64 bits
