@@ -59,6 +59,10 @@ ColumnRef ColumnArray::GetAsColumn(size_t n) const {
     return data_->Slice(GetOffset(n), GetSize(n));
 }
 
+ColumnRef ColumnArray::NewColumn() const {
+    return data_->CloneEmpty();
+}
+
 ColumnRef ColumnArray::Slice(size_t begin, size_t size) const {
     if (size && begin + size > Size())
         throw ValidationError("Slice indexes are out of bounds");
