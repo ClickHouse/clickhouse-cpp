@@ -14,11 +14,11 @@ public:
 
     ColumnDecimal(size_t precision, size_t scale);
 
-    void Append(const Int128& value);
+    CH_ABSEIL_BIGNUM_DEPRECATED void Append(const Int128& value);
     void Append(const std::string& value);
 
-    Int128 At(size_t i) const;
-    inline auto operator[](size_t i) const { return At(i); }
+    CH_ABSEIL_BIGNUM_DEPRECATED Int128 At(size_t i) const;
+    CH_ABSEIL_BIGNUM_DEPRECATED Int128 operator[](size_t i) const;
 
     // Returns string representation of the decimal value
     std::string StringAt(size_t i) const;

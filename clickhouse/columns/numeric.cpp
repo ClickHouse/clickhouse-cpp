@@ -64,6 +64,11 @@ const T& ColumnVector<T>::At(size_t n) const {
 }
 
 template <typename T>
+const T& ColumnVector<T>::operator [] (size_t n) const {
+    return data_.at(n);
+}
+
+template <typename T>
 void ColumnVector<T>::Append(ColumnRef column) {
     if (auto col = column->As<ColumnVector<T>>()) {
         data_.insert(data_.end(), col->data_.begin(), col->data_.end());
@@ -106,6 +111,46 @@ void ColumnVector<T>::Swap(Column& other) {
 template <typename T>
 ItemView ColumnVector<T>::GetItem(size_t index) const  {
     return ItemView{type_->GetCode(), data_[index]};
+}
+
+template <>
+void ColumnVector<Int128>::Append(const Int128& value) {
+    data_.push_back(value);
+}
+
+template <>
+const Int128& ColumnVector<Int128>::At(size_t n) const {
+    return data_.at(n);
+}
+
+template <>
+const Int128& ColumnVector<Int128>::operator [] (size_t n) const {
+    return data_.at(n);
+}
+
+template <>
+std::vector<Int128>& ColumnVector<Int128>::GetWritableData() {
+    return data_;
+}
+
+template <>
+void ColumnVector<UInt128>::Append(const UInt128& value) {
+    data_.push_back(value);
+}
+
+template <>
+const UInt128& ColumnVector<UInt128>::At(size_t n) const {
+    return data_.at(n);
+}
+
+template <>
+const UInt128& ColumnVector<UInt128>::operator [] (size_t n) const {
+    return data_.at(n);
+}
+
+template <>
+std::vector<UInt128>& ColumnVector<UInt128>::GetWritableData() {
+    return data_;
 }
 
 template class ColumnVector<int8_t>;
