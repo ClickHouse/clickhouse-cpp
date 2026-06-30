@@ -20,6 +20,9 @@ public:
     Int128 At(size_t i) const;
     inline auto operator[](size_t i) const { return At(i); }
 
+    // Returns string representation of the decimal value
+    std::string StringAt(size_t i) const;
+
 public:
     /// Increase the capacity of the column for large block insertion.
     void Reserve(size_t new_cap) override;
