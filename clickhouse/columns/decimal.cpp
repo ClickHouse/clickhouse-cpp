@@ -158,6 +158,10 @@ Int128 ColumnDecimal::At(size_t i) const {
     }
 }
 
+Int128 ColumnDecimal::operator[](size_t i) const {
+    return At(i);
+}
+
 std::string ColumnDecimal::StringAt(size_t i) const {
     auto scale = GetScale();
 

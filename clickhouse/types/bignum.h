@@ -4,6 +4,13 @@
 #include <string>
 #include <string_view>
 
+#if CH_USE_ABSEIL_FOR_BIGNUM
+#define CH_ABSEIL_BIGNUM_DEPRECATED \
+    [[deprecated("clickhouse-cpp Abseil-backed Int128/UInt128 APIs are deprecated and will be removed soon; configure with -DCH_USE_ABSEIL_FOR_BIGNUM=OFF to use the non-Abseil implementation.")]]
+#else
+#define CH_ABSEIL_BIGNUM_DEPRECATED
+#endif
+
 
  #if defined(__SIZEOF_INT128__)                                                                       
  #define CH_CPP_HAS_INT128 1                                                                  
@@ -157,36 +164,36 @@ namespace clickhouse {
 class Bignum {
 public:
 
-    static Int128 StringToInt128(std::string_view str);
-    static UInt128 StringToUInt128(std::string_view str);
+    CH_ABSEIL_BIGNUM_DEPRECATED static Int128 StringToInt128(std::string_view str);
+    CH_ABSEIL_BIGNUM_DEPRECATED static UInt128 StringToUInt128(std::string_view str);
 
-    static std::string Int128ToString(const Int128 x);
-    static std::string UInt128ToString(const UInt128 x);
+    CH_ABSEIL_BIGNUM_DEPRECATED static std::string Int128ToString(const Int128 x);
+    CH_ABSEIL_BIGNUM_DEPRECATED static std::string UInt128ToString(const UInt128 x);
 
 
 #if CH_USE_ABSEIL_FOR_BIGNUM
 
-    static inline Int128 MakeInt128(int64_t hi, uint64_t lo) {
+    CH_ABSEIL_BIGNUM_DEPRECATED static inline Int128 MakeInt128(int64_t hi, uint64_t lo) {
         return absl::MakeInt128(hi, lo);
     }
 
-    static inline UInt128 MakeUInt128(uint64_t hi, uint64_t lo) {
+    CH_ABSEIL_BIGNUM_DEPRECATED static inline UInt128 MakeUInt128(uint64_t hi, uint64_t lo) {
         return absl::MakeUint128(hi, lo);
     }
 
-    static inline uint64_t Int128Low64(Int128 v) {
+    CH_ABSEIL_BIGNUM_DEPRECATED static inline uint64_t Int128Low64(Int128 v) {
         return absl::Int128Low64(v);
     }
 
-    static inline int64_t Int128High64(Int128 v) {
+    CH_ABSEIL_BIGNUM_DEPRECATED static inline int64_t Int128High64(Int128 v) {
         return absl::Int128High64(v);
     }
 
-    static inline uint64_t UInt128Low64(UInt128 v) {
+    CH_ABSEIL_BIGNUM_DEPRECATED static inline uint64_t UInt128Low64(UInt128 v) {
         return absl::Uint128Low64(v);
     }
 
-    static inline uint64_t UInt128High64(UInt128 v) {
+    CH_ABSEIL_BIGNUM_DEPRECATED static inline uint64_t UInt128High64(UInt128 v) {
         return absl::Uint128High64(v);
     }
 
