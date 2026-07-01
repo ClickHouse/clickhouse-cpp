@@ -1962,6 +1962,29 @@ TEST_P(ClientCase, QueryParameters) {
     client_->Execute("DROP TEMPORARY TABLE " + table_name);
 }
 
+TEST_P(ClientCase, QueryParametersNullable) {
+    const std::string table_name = "test_clickhouse_cpp_nullable_query_parameter";
+    client_->Execute("CREATE TEMPORARY TABLE IF NOT EXISTS " + table_name + " ("
+        " id UInt64,"
+        " name Nullable(String))");
+
+    Query query("insert into " + table_name + " values ({id: UInt64}, {name: Nullable(String)})");
+    query.SetParam("id", "1").SetParam("name", std::nullopt);
+    client_->Execute(query);
+
+    size_t count = 0;
+    client_->BeginSelect("SELECT name FROM " + table_name + "");
+    while (auto block = client_->NextBlock()) {
+        auto col_name = block->At(0)->AsStrict<ColumnNullable>();
+        for (size_t i = 0; i < block->GetRowCount(); ++i) {
+            EXPECT_TRUE(col_name->Nulls()->AsStrict<ColumnUInt8>()->At(i));
+            ++count;
+        }
+    }
+    EXPECT_GT(count, 0UL);
+
+    client_->Execute("DROP TEMPORARY TABLE " + table_name);
+}
 TEST_P(ClientCase, ClientName) {
     const auto server_info = client_->GetServerInfo();
 
