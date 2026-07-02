@@ -77,12 +77,12 @@ selects.config_setting_group(
 cc_library(
     name = "cityhash",
     srcs = [
-        "contrib/cityhash/cityhash/city.cc",
-        "contrib/cityhash/cityhash/city_config.h",
+        "clickhouse/cityhash/city.cc",
+        "clickhouse/cityhash/city_config.h",
     ],
     hdrs = [
-        "contrib/cityhash/cityhash/city.h",
-        "contrib/cityhash/cityhash/citycrc.h",
+        "clickhouse/cityhash/city.h",
+        "clickhouse/cityhash/citycrc.h",
     ],
     # city_config.h gates __builtin_expect off with `#if WIN32 || WIN64`, but
     # MSVC only predefines `_WIN32`/`_WIN64` — under CMake it's CMake that
@@ -92,7 +92,7 @@ cc_library(
         "@platforms//os:windows": ["/DWIN32"],
         "//conditions:default": [],
     }),
-    strip_include_prefix = "contrib/cityhash/cityhash",
+    strip_include_prefix = "clickhouse/cityhash",
 )
 
 # The main clickhouse-cpp library. Downstream callers use

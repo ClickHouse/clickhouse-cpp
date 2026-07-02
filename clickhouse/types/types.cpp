@@ -179,7 +179,7 @@ uint64_t Type::GetTypeUniqueId() const {
 
             if (type_unique_id_.load(std::memory_order_relaxed) == 0) {
                 const auto name = GetName();
-                type_unique_id_.store(CityHash64WithSeed(name.c_str(), name.size(), code_), std::memory_order_relaxed);
+                type_unique_id_.store(cityhash::CityHash64WithSeed(name.c_str(), name.size(), code_), std::memory_order_relaxed);
             }
 
             return type_unique_id_;

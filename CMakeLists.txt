@@ -19,7 +19,6 @@ OPTION (CH_USE_ABSEIL_FOR_BIGNUM "Use Google Abseil for wide (128-bit) integers"
 OPTION (WITH_SYSTEM_ABSEIL "Use system Google Abseil, otherwise vendored part part of Google Abseil will be used" OFF)
 
 OPTION (WITH_SYSTEM_LZ4 "Use system LZ4" OFF)
-OPTION (WITH_SYSTEM_CITYHASH "Use system cityhash" OFF)
 OPTION (WITH_SYSTEM_ZSTD "Use system ZSTD" OFF)
 OPTION (DEBUG_DEPENDENCIES "Print debug info about dependencies duting build" ON)
 OPTION (CHECK_VERSION "Check that version number corresponds to git tag, usefull in CI/CD to validate that new version published on GitHub has same version in sources" OFF)
@@ -97,12 +96,8 @@ ELSE ()
     SUBDIRS (contrib/lz4/lz4)
 ENDIF ()
 
-IF (WITH_SYSTEM_CITYHASH)
-    FIND_PACKAGE(cityhash REQUIRED)
-ELSE ()
-    INCLUDE_DIRECTORIES (contrib/cityhash/cityhash)
-    SUBDIRS (contrib/cityhash/cityhash)
-ENDIF ()
+INCLUDE_DIRECTORIES (clickhouse/cityhash)
+SUBDIRS (clickhouse/cityhash)
 
 IF (WITH_SYSTEM_ZSTD)
     FIND_PACKAGE(zstd REQUIRED)
