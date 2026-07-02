@@ -55,7 +55,7 @@ size_t CompressedInput::DoNext(const void** ptr, size_t len) {
 }
 
 bool CompressedInput::Decompress() {
-    uint128 hash;
+    cityhash::uint128 hash;
     uint32_t compressed = 0;
     uint32_t original = 0;
     uint8_t method = 0;
@@ -96,7 +96,7 @@ bool CompressedInput::Decompress() {
     if (!WireFormat::ReadBytes(*input_, tmp.data() + HEADER_SIZE, compressed - HEADER_SIZE)) {
         return false;
     } else {
-        if (hash != CityHash128((const char*)tmp.data(), compressed)) {
+        if (hash != cityhash::CityHash128((const char*)tmp.data(), compressed)) {
             throw CompressionError("data was corrupted");
         }
     }
@@ -190,7 +190,7 @@ void CompressedOutput::Compress(const void * data, size_t len) {
             WriteUnaligned(header + 5, static_cast<uint32_t>(len));
         }
 
-        WireFormat::WriteFixed(*destination_, CityHash128((const char*)compressed_buffer_.data(), compressed_size + HEADER_SIZE));
+        WireFormat::WriteFixed(*destination_, cityhash::CityHash128((const char*)compressed_buffer_.data(), compressed_size + HEADER_SIZE));
         WireFormat::WriteBytes(*destination_, compressed_buffer_.data(), compressed_size + HEADER_SIZE);
         break;
     }
@@ -215,7 +215,7 @@ void CompressedOutput::Compress(const void * data, size_t len) {
             WriteUnaligned(header + 5, static_cast<uint32_t>(len));
         }
 
-        WireFormat::WriteFixed(*destination_, CityHash128((const char*)compressed_buffer_.data(), compressed_size + HEADER_SIZE));
+        WireFormat::WriteFixed(*destination_, cityhash::CityHash128((const char*)compressed_buffer_.data(), compressed_size + HEADER_SIZE));
         WireFormat::WriteBytes(*destination_, compressed_buffer_.data(), compressed_size + HEADER_SIZE);
         break;
     }

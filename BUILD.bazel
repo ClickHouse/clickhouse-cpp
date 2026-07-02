@@ -15,9 +15,6 @@ load("@rules_cc//cc:cc_library.bzl", "cc_library")
 #     surfaces (`SSL_CONF_*` command API and `SSL_read_ex`) that
 #     BoringSSL doesn't provide; see clickhouse/base/sslsocket.cpp.
 #   * lz4 / zstd come from BCR modules instead of contrib/. cityhash is
-#     the exception: it is built from contrib/ because the wire protocol
-#     needs ClickHouse's frozen CityHash variant, which differs from the
-#     stock BCR module (see the :cityhash target).
 
 # Selects the TLS implementation: `--@clickhouse-cpp//:tls=boringssl`
 # (default), `--@clickhouse-cpp//:tls=openssl`, or
@@ -67,34 +64,6 @@ selects.config_setting_group(
     ],
 )
 
-# Vendored CityHash from contrib/, NOT the BCR `@cityhash` module.
-# ClickHouse's wire protocol checksums compressed blocks with a specific
-# frozen CityHash128 variant (see clickhouse/base/compressed.cpp); the
-# stock Google CityHash 1.0.2 that BCR packages produces *different*
-# hashes, so a server rejects compressed blocks with "Checksum doesn't
-# match: corrupted data". This is the exact copy the CMake build uses,
-# guaranteeing byte-identical hashing and wire compatibility.
-cc_library(
-    name = "cityhash",
-    srcs = [
-        "contrib/cityhash/cityhash/city.cc",
-        "contrib/cityhash/cityhash/city_config.h",
-    ],
-    hdrs = [
-        "contrib/cityhash/cityhash/city.h",
-        "contrib/cityhash/cityhash/citycrc.h",
-    ],
-    # city_config.h gates __builtin_expect off with `#if WIN32 || WIN64`, but
-    # MSVC only predefines `_WIN32`/`_WIN64` — under CMake it's CMake that
-    # defines WIN32, which Bazel's MSVC toolchain doesn't. Define it here
-    # so the GCC/Clang-only builtin isn't used on MSVC.
-    copts = select({
-        "@platforms//os:windows": ["/DWIN32"],
-        "//conditions:default": [],
-    }),
-    strip_include_prefix = "contrib/cityhash/cityhash",
-)
-
 # The main clickhouse-cpp library. Downstream callers use
 # `#include <clickhouse/client.h>` and link `@clickhouse-cpp//:clickhouse`.
 cc_library(
@@ -109,7 +78,14 @@ cc_library(
         # Only compiled when TLS is enabled, mirroring CMake's
         # `IF (WITH_OPENSSL)` source-list append.
         exclude = ["clickhouse/base/sslsocket.cpp"],
-    ) + select({
+    ) + [
+        # Vendored CityHash, NOT the BCR `@cityhash` module. ClickHouse's
+        # wire protocol checksums compressed blocks with a specific frozen
+        # CityHash128 variant (see clickhouse/base/compressed.cpp)
+        # See clickhouse/cityhash/city.h for details
+        "clickhouse/cityhash/city.cc",
+        "clickhouse/cityhash/city_config.h",
+    ] + select({
         ":tls_no": [],
         "//conditions:default": ["clickhouse/base/sslsocket.cpp"],
     }),
@@ -118,7 +94,18 @@ cc_library(
         "clickhouse/base/*.h",
         "clickhouse/columns/*.h",
         "clickhouse/types/*.h",
-    ]),
+    ]) + [
+        "clickhouse/cityhash/city.h",
+        "clickhouse/cityhash/citycrc.h",
+    ],
+    # city_config.h gates __builtin_expect off with `#if WIN32 || WIN64`, but
+    # MSVC only predefines `_WIN32`/`_WIN64` — under CMake it's CMake that
+    # defines WIN32, which Bazel's MSVC toolchain doesn't. Define it here
+    # so the GCC/Clang-only builtin isn't used on MSVC.
+    copts = select({
+        "@platforms//os:windows": ["/DWIN32"],
+        "//conditions:default": [],
+    }),
     defines = [
         # Abseil fallback is not enabled in the Bazel build. This fallback will be removed in the
         # near future. The Bazel build always uses the self-contained fallback for wide (128-bit)
@@ -158,6 +145,11 @@ cc_library(
         ],
         "//conditions:default": [],
     }),
+    # Expose the vendored CityHash headers on the include path so the
+    # `#include <city.h>` form used by compressed.cpp / lowcardinality.cpp /
+    # types.cpp resolves (mirrors the old :cityhash target's
+    # `strip_include_prefix = "clickhouse/cityhash"`).
+    includes = ["clickhouse/cityhash"],
     # Expose headers at their workspace path so both internal
     # (`#include "client.h"` from clickhouse/*.cpp via quote-form
     # source-dir search) and external (`#include <clickhouse/client.h>`)
@@ -165,7 +157,6 @@ cc_library(
     strip_include_prefix = "/",
     visibility = ["//visibility:public"],
     deps = [
-        ":cityhash",
         "@lz4//:lz4",
         "@zstd//:zstd",
     ] + select({

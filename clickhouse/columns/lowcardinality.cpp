@@ -271,7 +271,7 @@ details::LowCardinalityHashKey ColumnLowCardinality::computeHashKey(const ItemVi
     }
 
     const auto hash1 = hasher(item.data);
-    const auto hash2 = CityHash64(item.data.data(), item.data.size());
+    const auto hash2 = cityhash::CityHash64(item.data.data(), item.data.size());
 
     return details::LowCardinalityHashKey{hash1, hash2};
 }

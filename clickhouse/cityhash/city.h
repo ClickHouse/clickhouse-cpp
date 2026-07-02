@@ -40,17 +40,23 @@
 // of a+b is easily derived from the hashes of a and b.  This property
 // doesn't hold for any hash functions in this file.
 
-#ifndef CITY_HASH_H_
-#define CITY_HASH_H_
+// This is a slightly modified version of Google CityHash 1.0.1.
+// https://github.com/google/cityhash/commit/8eded14d8e7cabfcdb10d4be35d521683edc0407
+// The API is hidden behind a separate namespace to avoid naming conflicts with other
+// projects that use CityHash and also import clickhouse-cpp.
+
+#pragma once
 
 #include <stdlib.h>  // for size_t.
 #include <stdint.h>
 #include <utility>
 
-typedef uint8_t uint8;
-typedef uint32_t uint32;
-typedef uint64_t uint64;
-typedef std::pair<uint64, uint64> uint128;
+namespace clickhouse::cityhash {
+
+using uint8 = uint8_t;
+using uint32 = uint32_t;
+using uint64 = uint64_t;
+using uint128  = std::pair<uint64, uint64>;
 
 inline uint64 Uint128Low64(const uint128& x) { return x.first; }
 inline uint64 Uint128High64(const uint128& x) { return x.second; }
@@ -87,4 +93,4 @@ inline uint64 Hash128to64(const uint128& x) {
   return b;
 }
 
-#endif  // CITY_HASH_H_
+}
