@@ -265,13 +265,6 @@ paket-files/
 __pycache__/
 *.pyc
 
-# Buck
-/buck-out/
-/.buckd/
-/buckaroo/
-.buckconfig.local
-BUCKAROO_DEPS
-
 # Visual Studio Code
 /.vscode/
 
