@@ -8,6 +8,7 @@ SET ( clickhouse-cpp-lib-src
     base/endpoints_iterator.cpp
 
     columns/array.cpp
+    columns/bool.cpp
     columns/column.cpp
     columns/date.cpp
     columns/decimal.cpp
@@ -16,16 +17,19 @@ SET ( clickhouse-cpp-lib-src
     columns/geo.cpp
     columns/ip4.cpp
     columns/ip6.cpp
+    columns/json.cpp
     columns/lowcardinality.cpp
     columns/nullable.cpp
     columns/numeric.cpp
     columns/map.cpp
     columns/string.cpp
     columns/tuple.cpp
+    columns/time.cpp
     columns/uuid.cpp
 
     columns/itemview.cpp
 
+    types/bignum.cpp
     types/type_parser.cpp
     types/types.cpp
 
@@ -34,6 +38,7 @@ SET ( clickhouse-cpp-lib-src
     query.cpp
 
     # Headers
+    base/bignum_string.h
     base/buffer.h
     base/compressed.h
     base/endpoints_iterator.h
@@ -51,6 +56,7 @@ SET ( clickhouse-cpp-lib-src
     base/wire_format.h
 
     columns/array.h
+    columns/bool.h
     columns/column.h
     columns/date.h
     columns/decimal.h
@@ -59,6 +65,7 @@ SET ( clickhouse-cpp-lib-src
     columns/geo.h
     columns/ip4.h
     columns/ip6.h
+    columns/json.h
     columns/itemview.h
     columns/lowcardinality.h
     columns/lowcardinalityadaptor.h
@@ -67,10 +74,12 @@ SET ( clickhouse-cpp-lib-src
     columns/nullable.h
     columns/numeric.h
     columns/string.h
+    columns/time.h
     columns/tuple.h
     columns/utils.h
     columns/uuid.h
 
+    types/bignum.h
     types/type_parser.h
     types/types.h
 
@@ -110,14 +119,29 @@ SET_TARGET_PROPERTIES (clickhouse-cpp-lib
     VERSION ${CLICKHOUSE_CPP_VERSION}
 )
 TARGET_LINK_LIBRARIES (clickhouse-cpp-lib
-    absl::int128
     cityhash::cityhash
     lz4::lz4
     zstd::zstd
 )
+IF (CH_USE_ABSEIL_FOR_BIGNUM)
+    TARGET_LINK_LIBRARIES (clickhouse-cpp-lib absl::int128)
+ENDIF()
+
 TARGET_INCLUDE_DIRECTORIES (clickhouse-cpp-lib
     PUBLIC ${PROJECT_SOURCE_DIR}
 )
+IF (CH_MAP_BOOL_TO_UINT8)
+    TARGET_COMPILE_DEFINITIONS (clickhouse-cpp-lib PUBLIC CH_MAP_BOOL_TO_UINT8=1)
+ELSE ()
+    TARGET_COMPILE_DEFINITIONS (clickhouse-cpp-lib PUBLIC CH_MAP_BOOL_TO_UINT8=0)
+ENDIF ()
+
+if (CH_USE_ABSEIL_FOR_BIGNUM) 
+    TARGET_COMPILE_DEFINITIONS (clickhouse-cpp-lib PUBLIC CH_USE_ABSEIL_FOR_BIGNUM=1)
+ELSE ()
+    TARGET_COMPILE_DEFINITIONS (clickhouse-cpp-lib PUBLIC CH_USE_ABSEIL_FOR_BIGNUM=0)
+ENDIF ()
+
 
 IF (NOT BUILD_SHARED_LIBS)
     ADD_LIBRARY (clickhouse-cpp-lib-static ALIAS clickhouse-cpp-lib)
@@ -175,11 +199,13 @@ IF (NOT BUILD_SHARED_LIBS)
             LIBRARY DESTINATION lib
         )
     ENDIF()
-    IF (NOT WITH_SYSTEM_ABSEIL)
-        INSTALL (TARGETS absl_int128
-            ARCHIVE DESTINATION lib
-            LIBRARY DESTINATION lib
-        )
+    IF (CH_USE_ABSEIL_FOR_BIGNUM) 
+        IF (NOT WITH_SYSTEM_ABSEIL)
+            INSTALL (TARGETS absl_int128
+                ARCHIVE DESTINATION lib
+                LIBRARY DESTINATION lib
+            )
+        ENDIF()
     ENDIF()
 ENDIF()
 
@@ -194,6 +220,7 @@ INSTALL(FILES query.h DESTINATION include/clickhouse/)
 INSTALL(FILES version.h DESTINATION include/clickhouse/)
 
 # base
+INSTALL(FILES base/bignum_string.h DESTINATION include/clickhouse/base/)
 INSTALL(FILES base/buffer.h DESTINATION include/clickhouse/base/)
 INSTALL(FILES base/compressed.h DESTINATION include/clickhouse/base/)
 INSTALL(FILES base/input.h DESTINATION include/clickhouse/base/)
@@ -211,6 +238,7 @@ INSTALL(FILES base/endpoints_iterator.h DESTINATION include/clickhouse/base/)
 
 # columns
 INSTALL(FILES columns/array.h DESTINATION include/clickhouse/columns/)
+INSTALL(FILES columns/bool.h DESTINATION include/clickhouse/columns/)
 INSTALL(FILES columns/column.h DESTINATION include/clickhouse/columns/)
 INSTALL(FILES columns/date.h DESTINATION include/clickhouse/columns/)
 INSTALL(FILES columns/decimal.h DESTINATION include/clickhouse/columns/)
@@ -219,6 +247,7 @@ INSTALL(FILES columns/factory.h DESTINATION include/clickhouse/columns/)
 INSTALL(FILES columns/geo.h DESTINATION include/clickhouse/columns/)
 INSTALL(FILES columns/ip4.h DESTINATION include/clickhouse/columns/)
 INSTALL(FILES columns/ip6.h DESTINATION include/clickhouse/columns/)
+INSTALL(FILES columns/json.h DESTINATION include/clickhouse/columns/)
 INSTALL(FILES columns/itemview.h DESTINATION include/clickhouse/columns/)
 INSTALL(FILES columns/lowcardinality.h DESTINATION include/clickhouse/columns/)
 INSTALL(FILES columns/nothing.h DESTINATION include/clickhouse/columns/)
@@ -226,11 +255,13 @@ INSTALL(FILES columns/nullable.h DESTINATION include/clickhouse/columns/)
 INSTALL(FILES columns/numeric.h DESTINATION include/clickhouse/columns/)
 INSTALL(FILES columns/map.h DESTINATION include/clickhouse/columns/)
 INSTALL(FILES columns/string.h DESTINATION include/clickhouse/columns/)
+INSTALL(FILES columns/time.h DESTINATION include/clickhouse/columns/)
 INSTALL(FILES columns/tuple.h DESTINATION include/clickhouse/columns/)
 INSTALL(FILES columns/utils.h DESTINATION include/clickhouse/columns/)
 INSTALL(FILES columns/uuid.h DESTINATION include/clickhouse/columns/)
 
 # types
+INSTALL(FILES types/bignum.h DESTINATION include/clickhouse/types/)
 INSTALL(FILES types/type_parser.h DESTINATION include/clickhouse/types/)
 INSTALL(FILES types/types.h DESTINATION include/clickhouse/types/)
 

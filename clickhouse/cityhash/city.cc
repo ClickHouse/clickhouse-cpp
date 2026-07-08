@@ -27,11 +27,13 @@
 // possible hash functions, by using SIMD instructions, or by
 // compromising on hash quality.
 
-#include "config.h"
+#include "city_config.h"
 #include "city.h"
 
 #include <algorithm>
 #include <string.h>  // for memcpy and memset
+
+namespace clickhouse::cityhash {
 
 using namespace std;
 
@@ -47,7 +49,7 @@ static uint32 UNALIGNED_LOAD32(const char *p) {
   return result;
 }
 
-#if !defined(WORDS_BIGENDIAN)
+#if !defined(CITY_WORDS_BIGENDIAN)
 
 #define uint32_in_expected_order(x) (x)
 #define uint64_in_expected_order(x) (x)
@@ -72,10 +74,10 @@ static uint32 UNALIGNED_LOAD32(const char *p) {
 #define uint32_in_expected_order(x) (bswap_32(x))
 #define uint64_in_expected_order(x) (bswap_64(x))
 
-#endif  // WORDS_BIGENDIAN
+#endif  // CITY_WORDS_BIGENDIAN
 
 #if !defined(LIKELY)
-#if HAVE_BUILTIN_EXPECT
+#if CITY_HAVE_BUILTIN_EXPECT
 #define LIKELY(x) (__builtin_expect(!!(x), 1))
 #else
 #define LIKELY(x) (x)
@@ -467,3 +469,5 @@ uint128 CityHashCrc128(const char *s, size_t len) {
 }
 
 #endif
+
+}

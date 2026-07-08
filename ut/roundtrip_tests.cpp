@@ -255,6 +255,65 @@ TEST_P(RoundtripCase, TupleTNullableString) {
     EXPECT_TRUE(CompareRecursive(*col, *result_typed));
 }
 
+TEST_P(RoundtripCase, TupleWithQuotedFieldNames) {
+    auto col_a =  std::make_shared<ColumnInt8>(std::vector<int8_t>{1});
+    auto col_b = std::make_shared<ColumnInt16>(std::vector<int16_t>{2});
+    auto col_c = std::make_shared<ColumnInt32>(std::vector<int32_t>{3});
+    auto col = std::make_shared<ColumnTuple>(
+        std::vector<ColumnRef>({col_a, col_b, col_c}),
+        std::vector<std::string>{"a.a", "b`b", "c``c"}
+    );
+
+    auto result = RoundtripColumnValues(*client_, col)->AsStrict<ColumnTuple>();
+    EXPECT_TRUE(CompareRecursive(*col->At(0), *result->At(0)));
+    EXPECT_TRUE(CompareRecursive(*col->At(1), *result->At(1)));
+    EXPECT_TRUE(CompareRecursive(*col->At(2), *result->At(2)));
+
+    const auto& names = result->Type()->As<TupleType>()->GetItemNames();
+    ASSERT_EQ(names.size(), 3u);
+    EXPECT_EQ(names[0], "a.a");
+    EXPECT_EQ(names[1], "b`b");
+    EXPECT_EQ(names[2], "c``c");
+}
+
+TEST_P(RoundtripCase, SelectTupleByFieldNames) {
+    auto col_a =  std::make_shared<ColumnInt8>(std::vector<int8_t>{1});
+    auto col_b = std::make_shared<ColumnInt16>(std::vector<int16_t>{2});
+    auto col_c = std::make_shared<ColumnInt32>(std::vector<int32_t>{3});
+    auto col = std::make_shared<ColumnTuple>(
+        std::vector<ColumnRef>({col_a, col_b, col_c}),
+        std::vector<std::string>{"a.a", "b`b", "c``c"}
+    );
+
+    // skip result, we will do it manually with a separate SELECT statement
+    RoundtripColumnValues(*client_, col)->AsStrict<ColumnTuple>();
+
+    // NOTE: Each backtick must be escaped with either "\\" (double "\\" so the compiler
+    // turns it into "\") or a double backtick, "``". When we create or receive the columns,
+    // this escaping is done automatically by the type parser, but when we write queries
+    // ourselves, the escaping has to be done manually.
+    client_->BeginSelect(
+            "SELECT "
+            "    col.`a.a`, "
+            "    col.`b``b`, col.`b\\`b`, "
+            "    col.`c````c`, col.`c\\`\\`c` "
+            "FROM temporary_roundtrip_table "
+            "ORDER BY id");
+
+    Block last_block;
+    while (auto tmp = client_->NextBlock()) {
+        if (tmp->GetRowCount() > 0) {
+            last_block = *tmp;
+        }
+    }
+
+    EXPECT_TRUE(CompareRecursive(*col->At(0), *last_block.At(0)));
+    EXPECT_TRUE(CompareRecursive(*col->At(1), *last_block.At(1)));
+    EXPECT_TRUE(CompareRecursive(*col->At(1), *last_block.At(2)));
+    EXPECT_TRUE(CompareRecursive(*col->At(2), *last_block.At(3)));
+    EXPECT_TRUE(CompareRecursive(*col->At(2), *last_block.At(4)));
+}
+
 TEST_P(RoundtripCase, Map_TString_TNullableString) {
     using Key =  ColumnString;
     using Value = ColumnNullableT<ColumnString>;

@@ -1,6 +1,8 @@
 #include <clickhouse/client.h>
+#include <clickhouse/columns/bool.h>
 
 #include "clickhouse/base/socket.h"
+#include "clickhouse/types/bignum.h"
 #include "clickhouse/version.h"
 #include "clickhouse/error_codes.h"
 
@@ -21,6 +23,22 @@
 #include <chrono>
 
 using namespace clickhouse;
+
+#if CH_MAP_BOOL_TO_UINT8
+using ClientBoolColumn = ColumnUInt8;
+using ClientBoolValue = uint8_t;
+#else
+using ClientBoolColumn = ColumnBool;
+using ClientBoolValue = bool;
+#endif
+
+ClientBoolValue MakeClientBoolValue(bool value) {
+#if CH_MAP_BOOL_TO_UINT8
+    return static_cast<uint8_t>(value);
+#else
+    return value;
+#endif
+}
 
 template <typename T>
 std::shared_ptr<T> createTableWithOneColumn(Client & client, const std::string & table_name, const std::string & column_name)
@@ -153,6 +171,81 @@ TEST_P(ClientCase, Array) {
     );
 
     EXPECT_EQ(4U, row);
+}
+
+TEST_P(ClientCase, Time) {
+    Block b;
+
+    client_->Execute("CREATE TEMPORARY TABLE IF NOT EXISTS test_clickhouse_cpp_time (t Time) "
+                     "ENGINE = Memory "
+                     "SETTINGS enable_time_time64_type = 1");
+    auto t = std::make_shared<ColumnTime>();
+
+    int32_t ts = 3600 * 15 + 60 * 4 + 5;
+    t->Append(ts);
+    b.AppendColumn("t", t);
+    client_->Insert("test_clickhouse_cpp_time", b);
+
+    size_t total_rows = 0; 
+    client_->Select("SELECT t, toString(t) FROM test_clickhouse_cpp_time", [ts, &total_rows](const Block& block)
+        {
+            if (block.GetRowCount() == 0) {
+                    return;
+            }
+            EXPECT_EQ(ts, block[0]->As<ColumnTime>()->At(0));
+            EXPECT_EQ("15:04:05", block[1]->As<ColumnString>()->At(0));
+            total_rows += block.GetRowCount();
+        });
+    EXPECT_EQ(total_rows, 1UL);
+}
+
+TEST_P(ClientCase, Time64) {
+    Block b;
+
+    client_->Execute("CREATE TEMPORARY TABLE IF NOT EXISTS test_clickhouse_cpp_time64 "
+                     "(t0 Time64(0), t3 Time64(3), t6 Time64(6)) "
+                     "ENGINE = Memory "
+                     "SETTINGS enable_time_time64_type = 1");
+    auto t0 = std::make_shared<ColumnTime64>(0);
+    auto t3 = std::make_shared<ColumnTime64>(3);
+    auto t6 = std::make_shared<ColumnTime64>(6);
+
+    int64_t ts0 = 3600 * 15 + 60 * 4 + 5;
+    int64_t ts3 = ts0 * 1000 + 123;
+    int64_t ts6 = ts0 * 1000000 + 123456;
+    t0->Append(ts0);
+    t3->Append(ts3);
+    t6->Append(ts6);
+    b.AppendColumn("t0", t0);
+    b.AppendColumn("t3", t3);
+    b.AppendColumn("t6", t6);
+    client_->Insert("test_clickhouse_cpp_time64", b);
+
+    size_t total_rows = 0;
+    client_->Select("SELECT "
+                    "t0, toString(t0), "
+                    "t3, toString(t3), "
+                    "t6, toString(t6) "
+                    "FROM test_clickhouse_cpp_time64",
+        [ts0, ts3, ts6, &total_rows](const Block& block)
+        {
+            if (block.GetRowCount() == 0) {
+                return;
+            }
+            EXPECT_EQ(ts0, block[0]->As<ColumnTime64>()->At(0));
+            EXPECT_EQ(0UL, block[0]->As<ColumnTime64>()->GetPrecision());
+            EXPECT_EQ("15:04:05", block[1]->As<ColumnString>()->At(0));
+
+            EXPECT_EQ(ts3, block[2]->As<ColumnTime64>()->At(0));
+            EXPECT_EQ(3UL, block[2]->As<ColumnTime64>()->GetPrecision());
+            EXPECT_EQ("15:04:05.123", block[3]->As<ColumnString>()->At(0));
+
+            EXPECT_EQ(ts6, block[4]->As<ColumnTime64>()->At(0));
+            EXPECT_EQ(6UL, block[4]->As<ColumnTime64>()->GetPrecision());
+            EXPECT_EQ("15:04:05.123456", block[5]->As<ColumnString>()->At(0));
+            total_rows += block.GetRowCount();
+        });
+    EXPECT_EQ(total_rows, 1UL);
 }
 
 TEST_P(ClientCase, Date) {
@@ -325,11 +418,11 @@ TEST_P(ClientCase, Generic) {
 
         auto id = std::make_shared<ColumnUInt64>();
         auto name = std::make_shared<ColumnString>();
-        auto f = std::make_shared<ColumnUInt8> ();
+        auto f = std::make_shared<ClientBoolColumn>();
         for (auto const& td : TEST_DATA) {
             id->Append(td.id);
             name->Append(td.name);
-            f->Append(td.f);
+            f->Append(MakeClientBoolValue(td.f));
         }
 
         block.AppendColumn("id"  , id);
@@ -351,7 +444,7 @@ TEST_P(ClientCase, Generic) {
             for (size_t c = 0; c < block.GetRowCount(); ++c, ++row) {
                 EXPECT_EQ(TEST_DATA[row].id, (*block[0]->As<ColumnUInt64>())[c]);
                 EXPECT_EQ(TEST_DATA[row].name, (*block[1]->As<ColumnString>())[c]);
-                EXPECT_EQ(TEST_DATA[row].f, (*block[2]->As<ColumnUInt8>())[c]);
+                EXPECT_EQ(MakeClientBoolValue(TEST_DATA[row].f), (*block[2]->As<ClientBoolColumn>())[c]);
             }
         }
     );
@@ -393,13 +486,13 @@ TEST_P(ClientCase, InsertData) {
         // Fetch the derived columns.
         auto id = block[0]->As<ColumnUInt64>();
         auto name = block[1]->As<ColumnString>();
-        auto f = block[2]->As<ColumnUInt8>();
+        auto f = block[2]->As<ClientBoolColumn>();
 
         // Insert some values.
         for (auto const& td : TEST_DATA) {
             id->Append(td.id);
             name->Append(td.name);
-            f->Append(td.f);
+            f->Append(MakeClientBoolValue(td.f));
         }
         block.RefreshRowCount();
         client_->SendInsertBlock(block);
@@ -409,7 +502,7 @@ TEST_P(ClientCase, InsertData) {
         for (auto const& td : TEST_DATA2) {
             id->Append(td.id);
             name->Append(td.name);
-            f->Append(td.f);
+            f->Append(MakeClientBoolValue(td.f));
         }
         block.RefreshRowCount();
         client_->SendInsertBlock(block);
@@ -434,19 +527,57 @@ TEST_P(ClientCase, InsertData) {
                 for (size_t c = 0; c < block.GetRowCount(); ++c, ++row) {
                     EXPECT_EQ(TEST_DATA[row].id, (*block[0]->As<ColumnUInt64>())[c]);
                     EXPECT_EQ(TEST_DATA[row].name, (*block[1]->As<ColumnString>())[c]);
-                    EXPECT_EQ(TEST_DATA[row].f, (*block[2]->As<ColumnUInt8>())[c]);
+                    EXPECT_EQ(MakeClientBoolValue(TEST_DATA[row].f), (*block[2]->As<ClientBoolColumn>())[c]);
                 }
             } else {
                 for (size_t c = 0; c < block.GetRowCount(); ++c, ++row) {
                     EXPECT_EQ(TEST_DATA2[row-block_two_row_num].id, (*block[0]->As<ColumnUInt64>())[c]);
                     EXPECT_EQ(TEST_DATA2[row-block_two_row_num].name, (*block[1]->As<ColumnString>())[c]);
-                    EXPECT_EQ(TEST_DATA2[row-block_two_row_num].f, (*block[2]->As<ColumnUInt8>())[c]);
+                    EXPECT_EQ(MakeClientBoolValue(TEST_DATA2[row-block_two_row_num].f), (*block[2]->As<ClientBoolColumn>())[c]);
                 }
             }
         }
     );
     auto exp = sizeof(TEST_DATA)/sizeof(TEST_DATA[0]) + sizeof(TEST_DATA2)/sizeof(TEST_DATA2[0]);
     EXPECT_EQ(exp, row);
+}
+
+TEST_P(ClientCase, BeginInsertDoesNotAllowCallbacks) {
+    client_->Execute(
+            "CREATE TEMPORARY TABLE IF NOT EXISTS test_clickhouse_cpp_begin_insert_callback (id UInt64)");
+
+    Query prototype("INSERT INTO test_clickhouse_cpp_begin_insert_callback VALUES");
+    Query query = prototype;
+    client_->BeginInsert(query); // this should not throw any exceptions
+    client_->EndInsert();
+
+    query = prototype;
+    query.OnData([](const Block &){ std::terminate(); });
+    EXPECT_THROW(client_->BeginInsert(query), ValidationError);
+
+    query = prototype;
+    query.OnDataCancelable([](const Block &){ return false; });
+    EXPECT_THROW(client_->BeginInsert(query), ValidationError);
+
+    query = prototype;
+    query.OnException([](const Exception &){ std::terminate(); });
+    EXPECT_THROW(client_->BeginInsert(query), ValidationError);
+
+    query = prototype;
+    query.OnProgress([](const Progress &){ std::terminate(); });
+    EXPECT_THROW(client_->BeginInsert(query), ValidationError);
+
+    query = prototype;
+    query.OnServerLog([](const Block &){ return false; });
+    EXPECT_THROW(client_->BeginInsert(query), ValidationError);
+
+    query = prototype;
+    query.OnProfileEvents([](const Block &){ return false; });
+    EXPECT_THROW(client_->BeginInsert(query), ValidationError);
+
+    query = prototype;
+    query.OnProfile([](const Profile &){ return false; });
+    EXPECT_THROW(client_->BeginInsert(query), ValidationError);
 }
 
 TEST_P(ClientCase, Nullable) {
@@ -722,6 +853,16 @@ TEST_P(ClientCase, Decimal) {
         auto d6 = std::make_shared<ColumnDecimal>(38, 19);
 
         EXPECT_THROW(
+            // 10 digits vs precision=9
+            d1->Append("1000000000"),
+            ValidationError
+        );
+        EXPECT_THROW(
+            // 6 digits + implicit 4 decimals (total 10) vs precision=9
+            d1->Append("100000.0"),
+            ValidationError
+        );
+        EXPECT_THROW(
             d1->Append("1234567890123456789012345678901234567890"),
             std::runtime_error
         );
@@ -770,7 +911,6 @@ TEST_P(ClientCase, Decimal) {
         d5->Append(-999999999999999999);
         d6->Append(-999999999999999999);
 
-        // Check strings with decimal point
         id->Append(4);
         d1->Append("12345.6789");
         d2->Append("123456789.012345678");
@@ -779,8 +919,17 @@ TEST_P(ClientCase, Decimal) {
         d5->Append("123456789.012345678");
         d6->Append("1234567890123456789.0123456789012345678");
 
-        // Check strings with minus sign and without decimal point
+        // Check strings with decimal point
         id->Append(5);
+        d1->Append("12345.6789");
+        d2->Append("123456789.012345678");
+        d3->Append("1234567890123456789.0123456789012345678");
+        d4->Append("12345.6789");
+        d5->Append("123456789.012345678");
+        d6->Append("1234567890123456789.0123456789012345678");
+
+        // Check strings with minus sign and without decimal point
+        id->Append(6);
         d1->Append("-12345.6789");
         d2->Append("-123456789012345678");
         d3->Append("-12345678901234567890123456789012345678");
@@ -788,7 +937,7 @@ TEST_P(ClientCase, Decimal) {
         d5->Append("-123456789012345678");
         d6->Append("-12345678901234567890123456789012345678");
 
-        id->Append(6);
+        id->Append(7);
         d1->Append("12345.678");
         d2->Append("123456789.0123456789");
         d3->Append("1234567890123456789.0123456789012345678");
@@ -812,83 +961,67 @@ TEST_P(ClientCase, Decimal) {
             return;
         }
 
-        ASSERT_EQ(6u, b.GetRowCount());
-
-        auto int128_to_string = [](Int128 value) {
-            std::string result;
-            const bool sign = value >= 0;
-
-            if (!sign) {
-                value = -value;
-            }
-
-            while (value) {
-                result += static_cast<char>(value % 10) + '0';
-                value /= 10;
-            }
-
-            if (result.empty()) {
-                result = "0";
-            } else if (!sign) {
-                result.push_back('-');
-            }
-
-            std::reverse(result.begin(), result.end());
-
-            return result;
-        };
+        ASSERT_EQ(7u, b.GetRowCount());
 
         auto decimal = [&b](size_t column, size_t row) {
             return b[column]->As<ColumnDecimal>()->At(row);
         };
 
         EXPECT_EQ(1u, b[0]->As<ColumnUInt64>()->At(0));
-        EXPECT_EQ("123456789", int128_to_string(decimal(1, 0)));
-        EXPECT_EQ("123456789012345678", int128_to_string(decimal(2, 0)));
-        EXPECT_EQ("1234567890123456789", int128_to_string(decimal(3, 0)));
-        EXPECT_EQ("123456789", int128_to_string(decimal(4, 0)));
-        EXPECT_EQ("123456789012345678", int128_to_string(decimal(5, 0)));
-        EXPECT_EQ("1234567890123456789", int128_to_string(decimal(6, 0)));
+        EXPECT_EQ("123456789",Bignum::Int128ToString(decimal(1, 0)));
+        EXPECT_EQ("123456789012345678",Bignum::Int128ToString(decimal(2, 0)));
+        EXPECT_EQ("1234567890123456789",Bignum::Int128ToString(decimal(3, 0)));
+        EXPECT_EQ("123456789",Bignum::Int128ToString(decimal(4, 0)));
+        EXPECT_EQ("123456789012345678",Bignum::Int128ToString(decimal(5, 0)));
+        EXPECT_EQ("1234567890123456789",Bignum::Int128ToString(decimal(6, 0)));
 
         EXPECT_EQ(2u, b[0]->As<ColumnUInt64>()->At(1));
-        EXPECT_EQ("999999999", int128_to_string(decimal(1, 1)));
-        EXPECT_EQ("999999999999999999", int128_to_string(decimal(2, 1)));
-        EXPECT_EQ("999999999999999999", int128_to_string(decimal(3, 1)));
-        EXPECT_EQ("999999999", int128_to_string(decimal(4, 1)));
-        EXPECT_EQ("999999999999999999", int128_to_string(decimal(5, 1)));
-        EXPECT_EQ("999999999999999999", int128_to_string(decimal(6, 1)));
+        EXPECT_EQ("999999999",Bignum::Int128ToString(decimal(1, 1)));
+        EXPECT_EQ("999999999999999999",Bignum::Int128ToString(decimal(2, 1)));
+        EXPECT_EQ("999999999999999999",Bignum::Int128ToString(decimal(3, 1)));
+        EXPECT_EQ("999999999",Bignum::Int128ToString(decimal(4, 1)));
+        EXPECT_EQ("999999999999999999",Bignum::Int128ToString(decimal(5, 1)));
+        EXPECT_EQ("999999999999999999",Bignum::Int128ToString(decimal(6, 1)));
 
         EXPECT_EQ(3u, b[0]->As<ColumnUInt64>()->At(2));
-        EXPECT_EQ("-999999999", int128_to_string(decimal(1, 2)));
-        EXPECT_EQ("-999999999999999999", int128_to_string(decimal(2, 2)));
-        EXPECT_EQ("-999999999999999999", int128_to_string(decimal(3, 2)));
-        EXPECT_EQ("-999999999", int128_to_string(decimal(4, 2)));
-        EXPECT_EQ("-999999999999999999", int128_to_string(decimal(5, 2)));
-        EXPECT_EQ("-999999999999999999", int128_to_string(decimal(6, 2)));
+        EXPECT_EQ("-999999999",Bignum::Int128ToString(decimal(1, 2)));
+        EXPECT_EQ("-999999999999999999",Bignum::Int128ToString(decimal(2, 2)));
+        EXPECT_EQ("-999999999999999999",Bignum::Int128ToString(decimal(3, 2)));
+        EXPECT_EQ("-999999999",Bignum::Int128ToString(decimal(4, 2)));
+        EXPECT_EQ("-999999999999999999",Bignum::Int128ToString(decimal(5, 2)));
+        EXPECT_EQ("-999999999999999999",Bignum::Int128ToString(decimal(6, 2)));
 
         EXPECT_EQ(4u, b[0]->As<ColumnUInt64>()->At(3));
-        EXPECT_EQ("123456789", int128_to_string(decimal(1, 3)));
-        EXPECT_EQ("123456789012345678", int128_to_string(decimal(2, 3)));
-        EXPECT_EQ("12345678901234567890123456789012345678", int128_to_string(decimal(3, 3)));
-        EXPECT_EQ("123456789", int128_to_string(decimal(4, 3)));
-        EXPECT_EQ("123456789012345678", int128_to_string(decimal(5, 3)));
-        EXPECT_EQ("12345678901234567890123456789012345678", int128_to_string(decimal(6, 3)));
+        EXPECT_EQ("123456789",Bignum::Int128ToString(decimal(1, 3)));
+        EXPECT_EQ("123456789012345678",Bignum::Int128ToString(decimal(2, 3)));
+        EXPECT_EQ("12345678901234567890123456789012345678",Bignum::Int128ToString(decimal(3, 3)));
+        EXPECT_EQ("123456789",Bignum::Int128ToString(decimal(4, 3)));
+        EXPECT_EQ("123456789012345678",Bignum::Int128ToString(decimal(5, 3)));
+        EXPECT_EQ("12345678901234567890123456789012345678",Bignum::Int128ToString(decimal(6, 3)));
 
         EXPECT_EQ(5u, b[0]->As<ColumnUInt64>()->At(4));
-        EXPECT_EQ("-123456789", int128_to_string(decimal(1, 4)));
-        EXPECT_EQ("-123456789012345678", int128_to_string(decimal(2, 4)));
-        EXPECT_EQ("-12345678901234567890123456789012345678", int128_to_string(decimal(3, 4)));
-        EXPECT_EQ("-123456789", int128_to_string(decimal(4, 4)));
-        EXPECT_EQ("-123456789012345678", int128_to_string(decimal(5, 4)));
-        EXPECT_EQ("-12345678901234567890123456789012345678", int128_to_string(decimal(6, 4)));
+        EXPECT_EQ("123456789",Bignum::Int128ToString(decimal(1, 4)));
+        EXPECT_EQ("123456789012345678",Bignum::Int128ToString(decimal(2, 4)));
+        EXPECT_EQ("12345678901234567890123456789012345678",Bignum::Int128ToString(decimal(3, 4)));
+        EXPECT_EQ("123456789",Bignum::Int128ToString(decimal(4, 4)));
+        EXPECT_EQ("123456789012345678",Bignum::Int128ToString(decimal(5, 4)));
+        EXPECT_EQ("12345678901234567890123456789012345678",Bignum::Int128ToString(decimal(6, 4)));
 
         EXPECT_EQ(6u, b[0]->As<ColumnUInt64>()->At(5));
-        EXPECT_EQ("123456780", int128_to_string(decimal(1, 5)));
-        EXPECT_EQ("123456789012345678", int128_to_string(decimal(2, 5)));
-        EXPECT_EQ("12345678901234567890123456789012345678", int128_to_string(decimal(3, 5)));
-        EXPECT_EQ("123456789", int128_to_string(decimal(4, 5)));
-        EXPECT_EQ("123456789012345678", int128_to_string(decimal(5, 5)));
-        EXPECT_EQ("12345678901234567890123456789012345678", int128_to_string(decimal(6, 5)));
+        EXPECT_EQ("-123456789",Bignum::Int128ToString(decimal(1, 5)));
+        EXPECT_EQ("-123456789012345678",Bignum::Int128ToString(decimal(2, 5)));
+        EXPECT_EQ("-12345678901234567890123456789012345678",Bignum::Int128ToString(decimal(3, 5)));
+        EXPECT_EQ("-123456789",Bignum::Int128ToString(decimal(4, 5)));
+        EXPECT_EQ("-123456789012345678",Bignum::Int128ToString(decimal(5, 5)));
+        EXPECT_EQ("-12345678901234567890123456789012345678",Bignum::Int128ToString(decimal(6, 5)));
+
+        EXPECT_EQ(7u, b[0]->As<ColumnUInt64>()->At(6));
+        EXPECT_EQ("123456780",Bignum::Int128ToString(decimal(1, 6)));
+        EXPECT_EQ("123456789012345678",Bignum::Int128ToString(decimal(2, 6)));
+        EXPECT_EQ("12345678901234567890123456789012345678",Bignum::Int128ToString(decimal(3, 6)));
+        EXPECT_EQ("123456789",Bignum::Int128ToString(decimal(4, 6)));
+        EXPECT_EQ("123456789012345678",Bignum::Int128ToString(decimal(5, 6)));
+        EXPECT_EQ("12345678901234567890123456789012345678",Bignum::Int128ToString(decimal(6, 6)));
     });
 }
 
@@ -1310,6 +1443,190 @@ TEST_P(ClientCase, SelectAggregateFunction) {
 }
 
 
+// ============================================================================
+// Interactive (pull-based) Select API tests
+// ============================================================================
+
+TEST_P(ClientCase, InteractiveSelect_Basic) {
+    client_->Execute("CREATE TEMPORARY TABLE IF NOT EXISTS test_interactive_basic (id UInt64)");
+
+    {
+        Block block;
+        auto id = std::make_shared<ColumnUInt64>();
+        id->Append(1);
+        id->Append(2);
+        id->Append(3);
+        block.AppendColumn("id", id);
+        client_->Insert("test_interactive_basic", block);
+    }
+
+    // Initially not selecting.
+    EXPECT_FALSE(client_->IsSelecting());
+
+    client_->BeginSelect("SELECT id FROM test_interactive_basic ORDER BY id");
+    EXPECT_TRUE(client_->IsSelecting());
+
+    std::vector<uint64_t> values;
+    while (auto block = client_->NextBlock()) {
+        if (block->GetRowCount() == 0) continue;
+        auto col = block->At(0)->AsStrict<ColumnUInt64>();
+        for (size_t i = 0; i < block->GetRowCount(); ++i) {
+            values.push_back(col->At(i));
+        }
+    }
+
+    EXPECT_FALSE(client_->IsSelecting());
+    ASSERT_EQ(3u, values.size());
+    EXPECT_EQ(1u, values[0]);
+    EXPECT_EQ(2u, values[1]);
+    EXPECT_EQ(3u, values[2]);
+
+    // Client is reusable after drain.
+    client_->BeginSelect("SELECT CAST(42, 'UInt64') AS val");
+    {
+        uint64_t val = 0;
+        size_t rows = 0;
+        while (auto b = client_->NextBlock()) {
+            for (size_t i = 0; i < b->GetRowCount(); ++i) {
+                val = b->At(0)->AsStrict<ColumnUInt64>()->At(i);
+                rows++;
+            }
+        }
+        EXPECT_EQ(1u, rows);
+        EXPECT_EQ(42u, val);
+    }
+    EXPECT_FALSE(client_->IsSelecting());
+}
+
+TEST_P(ClientCase, InteractiveSelect_MultipleBlocks) {
+    Query query("SELECT number FROM system.numbers LIMIT 10");
+    query.SetSetting("max_block_size", {"2"});
+
+    client_->BeginSelect(query);
+
+    size_t block_count = 0;
+    std::vector<uint64_t> values;
+    while (auto block = client_->NextBlock()) {
+        if (block->GetRowCount() == 0) continue;
+        EXPECT_LE(block->GetRowCount(), 2u);
+        block_count++;
+        auto col = block->At(0)->AsStrict<ColumnUInt64>();
+        for (size_t i = 0; i < block->GetRowCount(); ++i) {
+            values.push_back(col->At(i));
+        }
+    }
+
+    EXPECT_EQ(10u, values.size());
+    EXPECT_GE(block_count, 2u);
+    for (size_t i = 0; i < values.size(); ++i) {
+        EXPECT_EQ(i, values[i]);
+    }
+}
+
+TEST_P(ClientCase, InteractiveSelect_Cancel) {
+    // Cancel mid-stream on a large result set with small blocks to ensure
+    // we don't receive all data in a single block.
+    Query query("SELECT number FROM system.numbers LIMIT 100000");
+    query.SetSetting("max_block_size", {"100"});
+
+    client_->BeginSelect(query);
+    // Consume one block of data, skipping any blocks with 0 rows.
+    size_t rows_before_cancel = 0;
+    while (auto b = client_->NextBlock()) {
+        if (b->GetRowCount() == 0) continue;
+        rows_before_cancel = b->GetRowCount();
+        break;
+    }
+    ASSERT_GT(rows_before_cancel, 0u);
+    ASSERT_LT(rows_before_cancel, 100000u);
+    EXPECT_TRUE(client_->IsSelecting());
+
+    EXPECT_NO_THROW(client_->Cancel());
+    EXPECT_FALSE(client_->IsSelecting());
+
+    // Client is reusable after cancel.
+    client_->BeginSelect("SELECT 99 AS val");
+    {
+        size_t rows = 0;
+        while (auto b = client_->NextBlock()) {
+            for (size_t i = 0; i < b->GetRowCount(); ++i) {
+                EXPECT_EQ(99u, b->At(0)->AsStrict<ColumnUInt8>()->At(i));
+                rows++;
+            }
+        }
+        EXPECT_EQ(1u, rows);
+    }
+
+}
+
+TEST_P(ClientCase, InteractiveSelect_StateErrors) {
+    // NextBlock while idle.
+    EXPECT_THROW(client_->NextBlock(), ValidationError);
+
+    // Cancel while idle.
+    EXPECT_THROW(client_->Cancel(), ValidationError);
+
+    // Double BeginSelect.
+    client_->BeginSelect("SELECT 1");
+    EXPECT_THROW(client_->BeginSelect("SELECT 2"), ValidationError);
+    client_->Cancel();
+
+    // Server error (non-existent table) resets state back to Idle.
+    client_->BeginSelect("SELECT * FROM non_existent_table_xyz_clickhouse_cpp_test");
+    EXPECT_THROW(client_->NextBlock(), ServerException);
+    EXPECT_FALSE(client_->IsSelecting());
+
+    // Client is usable after server error.
+    client_->BeginSelect("SELECT 1 AS val");
+    {
+        size_t rows = 0;
+        while (auto b = client_->NextBlock()) {
+            for (size_t i = 0; i < b->GetRowCount(); ++i) {
+                EXPECT_EQ(1u, b->At(0)->AsStrict<ColumnUInt8>()->At(i));
+                rows++;
+            }
+        }
+        EXPECT_EQ(1u, rows);
+    }
+}
+
+TEST_P(ClientCase, InteractiveSelect_WithCallbacks) {
+    client_->Execute("CREATE TEMPORARY TABLE IF NOT EXISTS test_interactive_cb (id UInt64)");
+
+    {
+        Block block;
+        auto id = std::make_shared<ColumnUInt64>();
+        for (uint64_t i = 0; i < 100; ++i) {
+            id->Append(i);
+        }
+        block.AppendColumn("id", id);
+        client_->Insert("test_interactive_cb", block);
+    }
+
+    size_t callback_rows = 0;
+    bool progress_received = false;
+
+    Query query("SELECT id FROM test_interactive_cb");
+    query.OnData([&](const Block& block) {
+        callback_rows += block.GetRowCount();
+    });
+    query.OnProgress([&](const Progress&) {
+        progress_received = true;
+    });
+
+    client_->BeginSelect(query);
+
+    size_t nextblock_rows = 0;
+    while (auto block = client_->NextBlock()) {
+        nextblock_rows += block->GetRowCount();
+    }
+
+    EXPECT_EQ(100u, nextblock_rows);
+    // OnData fires for non-empty blocks too — both methods see the data.
+    EXPECT_GT(callback_rows, 0u);
+    EXPECT_TRUE(progress_received);
+}
+
 const auto LocalHostEndpoint = ClientOptions()
         .SetHost(           getEnvOrDefault("CLICKHOUSE_HOST",     "localhost"))
         .SetPort(   getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "9000"))
@@ -1333,7 +1650,7 @@ using namespace clickhouse;
 const auto QUERIES = std::vector<std::string>{
     "SELECT version()",
     "SELECT fqdn()",
-    "SELECT buildId()",
+    "SELECT blockSize()",
     "SELECT uptime()",
     "SELECT now()"
 };
@@ -1645,6 +1962,29 @@ TEST_P(ClientCase, QueryParameters) {
     client_->Execute("DROP TEMPORARY TABLE " + table_name);
 }
 
+TEST_P(ClientCase, QueryParametersNullable) {
+    const std::string table_name = "test_clickhouse_cpp_nullable_query_parameter";
+    client_->Execute("CREATE TEMPORARY TABLE IF NOT EXISTS " + table_name + " ("
+        " id UInt64,"
+        " name Nullable(String))");
+
+    Query query("insert into " + table_name + " values ({id: UInt64}, {name: Nullable(String)})");
+    query.SetParam("id", "1").SetParam("name", std::nullopt);
+    client_->Execute(query);
+
+    size_t count = 0;
+    client_->BeginSelect("SELECT name FROM " + table_name + "");
+    while (auto block = client_->NextBlock()) {
+        auto col_name = block->At(0)->AsStrict<ColumnNullable>();
+        for (size_t i = 0; i < block->GetRowCount(); ++i) {
+            EXPECT_TRUE(col_name->Nulls()->AsStrict<ColumnUInt8>()->At(i));
+            ++count;
+        }
+    }
+    EXPECT_GT(count, 0UL);
+
+    client_->Execute("DROP TEMPORARY TABLE " + table_name);
+}
 TEST_P(ClientCase, ClientName) {
     const auto server_info = client_->GetServerInfo();
 

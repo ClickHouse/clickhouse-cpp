@@ -7,13 +7,16 @@
 #include "geo.h"
 #include "ip4.h"
 #include "ip6.h"
+#include "json.h"
 #include "lowcardinality.h"
 #include "lowcardinalityadaptor.h"
 #include "map.h"
 #include "nothing.h"
 #include "nullable.h"
+#include "bool.h"
 #include "numeric.h"
 #include "string.h"
+#include "./time.h" // `./` avoids possible conflicts with standard C time.h
 #include "tuple.h"
 #include "uuid.h"
 
@@ -48,6 +51,8 @@ static ColumnRef CreateTerminalColumn(const TypeAst& ast) {
     case Type::Void:
         return std::make_shared<ColumnNothing>();
 
+    case Type::Bool:
+        return std::make_shared<ColumnBool>();
     case Type::UInt8:
         return std::make_shared<ColumnUInt8>();
     case Type::UInt16:
@@ -108,7 +113,6 @@ static ColumnRef CreateTerminalColumn(const TypeAst& ast) {
         return std::make_shared<ColumnDate>();
     case Type::Date32:
         return std::make_shared<ColumnDate32>();
-
     case Type::IPv4:
         return std::make_shared<ColumnIPv4>();
     case Type::IPv6:
@@ -129,6 +133,15 @@ static ColumnRef CreateTerminalColumn(const TypeAst& ast) {
     case Type::MultiPolygon:
         return std::make_shared<ColumnMultiPolygon>();
 
+    case Type::Time:
+        return std::make_shared<ColumnTime>();
+    case Type::Time64:
+        if (ast.elements.empty()) {
+            return nullptr;
+        }
+        return std::make_shared<ColumnTime64>(GetASTChildElement(ast, 0).value);
+    case Type::JSON:
+        return std::make_shared<ColumnJSON>();
     default:
         return nullptr;
     }
@@ -155,16 +168,26 @@ static ColumnRef CreateColumnFromAst(const TypeAst& ast, CreateColumnByTypeSetti
 
         case TypeAst::Tuple: {
             std::vector<ColumnRef> columns;
+            std::vector<std::string> names;
 
             columns.reserve(ast.elements.size());
+            names.reserve(ast.elements.size());
+            bool any_named = false;
             for (const auto& elem : ast.elements) {
                 if (auto col = CreateColumnFromAst(elem, settings)) {
                     columns.push_back(col);
+                    names.push_back(elem.element_name);
+                    if (!elem.element_name.empty()) {
+                        any_named = true;
+                    }
                 } else {
                     return nullptr;
                 }
             }
 
+            if (any_named) {
+                return std::make_shared<ColumnTuple>(columns, std::move(names));
+            }
             return std::make_shared<ColumnTuple>(columns);
         }
 

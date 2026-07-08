@@ -37,7 +37,8 @@ ColumnRef RoundtripColumnValues(Client& client, ColumnRef expected) {
     const std::string type_name = result->GetType().GetName();
     client.Execute("DROP TEMPORARY TABLE IF EXISTS temporary_roundtrip_table;");
     // id column is to have the same order of rows on SELECT
-    client.Execute("CREATE TEMPORARY TABLE IF NOT EXISTS temporary_roundtrip_table (id UInt32, col " + type_name + ");");
+    client.Execute("CREATE TEMPORARY TABLE IF NOT EXISTS temporary_roundtrip_table (id UInt32, col " + type_name + ") "
+                   "ENGINE = Memory SETTINGS enable_time_time64_type = 1");
     {
         Block block;
         block.AppendColumn("col", expected);
@@ -46,7 +47,9 @@ ColumnRef RoundtripColumnValues(Client& client, ColumnRef expected) {
         client.Insert("temporary_roundtrip_table", block);
     }
 
-    client.Select("SELECT col FROM temporary_roundtrip_table ORDER BY id", [&result](const Block& b) {
+    std::string query = "SELECT col FROM temporary_roundtrip_table ORDER BY id "
+                        "SETTINGS output_format_native_write_json_as_string=1";
+    client.Select(query, [&result](const Block& b) {
         if (b.GetRowCount() == 0)
             return;
 

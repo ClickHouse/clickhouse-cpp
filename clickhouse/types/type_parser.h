@@ -31,6 +31,9 @@ struct TypeAst {
     /// Type's name.
     /// Need to cache TypeAst, so can't use StringView for name.
     std::string name;
+    /// Name of this element inside its parent (e.g. field name inside a named
+    /// Tuple). Empty for unnamed elements.
+    std::string element_name;
     /// Value associated with the node,
     /// used for fixed-width types and enum values.
     int64_t value = 0;
@@ -59,6 +62,7 @@ class TypeParser {
             RPar,
             Comma,
             QuotedString, // string with quotation marks included
+            QuotedIdentifier,
             EOS,
         };
 
@@ -81,6 +85,11 @@ private:
 
     TypeAst* type_;
     std::stack<TypeAst*> open_elements_;
+    // Backing storage for unescaped QuotedIdentifier token values. When a
+    // quoted identifier contains escape sequences the unescaped content is
+    // written here and the returned StringView points into this string.
+    // Valid only until the next NextToken() call.
+    std::string scratch_;
 };
 
 

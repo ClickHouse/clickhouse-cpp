@@ -227,6 +227,29 @@ TEST(ColumnArrayT, SimpleFixedString) {
     EXPECT_EQ("world\0"sv, (*array)[0][1]);
 }
 
+TEST(ColumnArrayT, JSON) {
+    using namespace std::literals;
+    auto i1 = R"({"item": 1})"sv;
+    auto i2 = R"({"item": 2})"sv;
+    auto i3 = R"({"item": 3})"sv;
+    auto array = std::make_shared<ColumnArrayT<ColumnJSON>>();
+    array->Append({i1});
+    array->Append({i2, i3});
+
+    EXPECT_EQ(i1, array->At(0).At(0));
+    EXPECT_EQ(i2, array->At(1).At(0));
+    EXPECT_EQ(i3, array->At(1).At(1));
+
+    auto r1 = array->At(0);
+    EXPECT_EQ(1u, r1.Size());
+    EXPECT_EQ(i1, r1.At(0));
+
+    auto r2 = array->At(1);
+    EXPECT_EQ(2u, r2.Size());
+    EXPECT_EQ(i2, r2.At(0));
+    EXPECT_EQ(i3, r2.At(1));
+}
+
 TEST(ColumnArrayT, SimpleUInt64_2D) {
     // Nested 2D-arrays are supported too:
     auto array = std::make_shared<ColumnArrayT<ColumnArrayT<ColumnUInt64>>>();
@@ -314,6 +337,19 @@ TEST(ColumnArrayT, Wrap_UInt64_2D) {
     EXPECT_TRUE(CompareRecursive(values, array));
 }
 
+TEST(ColumnArrayT, Bool) {
+    // Check inserting\reading back data from clickhouse::ColumnArrayT<ColumnBool>
+
+    const std::vector<std::vector<uint8_t>> values = {
+        {1u, 0u, 0u},
+        {0u, 1u, 1u, 0u, 1u, 0u},
+        {0u},
+        {},
+        {1u, 0u}
+    };
+    CreateAndTestColumnArrayT<ColumnBool>(values);
+}
+
 TEST(ColumnArrayT, left_value_no_move) {
     std::string value0 = "000000000000000000";
     std::string value1 = "111111111111111111";
@@ -399,4 +435,48 @@ TEST(ColumnArrayT, const_right_value_no_move) {
         EXPECT_EQ(values[1], value1);
         EXPECT_EQ(values[2], value2);
     }
+}
+
+TEST(ColumnArray, GetData) {
+    auto col = std::make_shared<ColumnArray>(std::make_shared<ColumnUInt64>());
+    col->AppendAsColumn(std::make_shared<ColumnUInt64>(std::vector<uint64_t>{1, 2, 3}));
+    col->AppendAsColumn(std::make_shared<ColumnUInt64>(std::vector<uint64_t>{4, 5}));
+
+    ColumnRef data = col->GetData();
+    EXPECT_EQ(data->Size(), 5u);
+
+    const auto& ccol = *col;
+    std::shared_ptr<const Column> cdata = ccol.GetData();
+    EXPECT_EQ(cdata->Size(), 5u);
+}
+
+TEST(ColumnArray, GetOffsets) {
+    auto col = std::make_shared<ColumnArray>(std::make_shared<ColumnUInt64>());
+    col->AppendAsColumn(std::make_shared<ColumnUInt64>(std::vector<uint64_t>{1, 2, 3}));
+    col->AppendAsColumn(std::make_shared<ColumnUInt64>(std::vector<uint64_t>{4, 5}));
+
+    auto& offsets = col->GetOffsets();
+    ASSERT_EQ(offsets->Size(), 2u);
+    EXPECT_EQ((*offsets)[0], 3u);
+    EXPECT_EQ((*offsets)[1], 5u);
+
+    const auto& ccol = *col;
+    std::shared_ptr<const ColumnUInt64> coffsets = ccol.GetOffsets();
+    EXPECT_EQ((*coffsets)[0], 3u);
+    EXPECT_EQ((*coffsets)[1], 5u);
+}
+
+TEST(ColumnArray, GetOffsetAndSize) {
+    auto col = std::make_shared<ColumnArray>(std::make_shared<ColumnUInt64>());
+    col->AppendAsColumn(std::make_shared<ColumnUInt64>(std::vector<uint64_t>{10, 20}));
+    col->AppendAsColumn(std::make_shared<ColumnUInt64>(std::vector<uint64_t>{30}));
+    col->AppendAsColumn(std::make_shared<ColumnUInt64>(std::vector<uint64_t>{}));
+
+    EXPECT_EQ(col->GetOffset(0), 0u);
+    EXPECT_EQ(col->GetOffset(1), 2u);
+    EXPECT_EQ(col->GetOffset(2), 3u);
+
+    EXPECT_EQ(col->GetSize(0), 2u);
+    EXPECT_EQ(col->GetSize(1), 1u);
+    EXPECT_EQ(col->GetSize(2), 0u);
 }

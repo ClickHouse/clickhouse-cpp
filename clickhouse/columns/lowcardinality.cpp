@@ -158,7 +158,8 @@ namespace clickhouse {
 ColumnLowCardinality::ColumnLowCardinality(ColumnRef dictionary_column)
     : Column(Type::CreateLowCardinality(dictionary_column->Type())),
       dictionary_column_(dictionary_column->CloneEmpty()), // safe way to get an column of the same type.
-      index_column_(std::make_shared<ColumnUInt32>())
+      index_column_(std::make_shared<ColumnUInt32>()),
+      index_type_code_(Type::UInt32)
 {
     Setup(dictionary_column);
 }
@@ -166,7 +167,8 @@ ColumnLowCardinality::ColumnLowCardinality(ColumnRef dictionary_column)
 ColumnLowCardinality::ColumnLowCardinality(std::shared_ptr<ColumnNullable> dictionary_column)
     : Column(Type::CreateLowCardinality(dictionary_column->Type())),
       dictionary_column_(dictionary_column->CloneEmpty()), // safe way to get an column of the same type.
-      index_column_(std::make_shared<ColumnUInt32>())
+      index_column_(std::make_shared<ColumnUInt32>()),
+      index_type_code_(Type::UInt32)
 {
     AppendNullItem();
     Setup(dictionary_column);
@@ -200,22 +202,65 @@ void ColumnLowCardinality::Setup(ColumnRef dictionary_column) {
 }
 
 std::uint64_t ColumnLowCardinality::getDictionaryIndex(std::uint64_t item_index) const {
-    return VisitIndexColumn([item_index](const auto & arg) -> std::uint64_t {
-        return arg[item_index];
-    }, *index_column_);
+    switch (index_type_code_) {
+        case Type::UInt8:
+            return static_cast<const ColumnUInt8&>(*index_column_)[item_index];
+        case Type::UInt16:
+            return static_cast<const ColumnUInt16&>(*index_column_)[item_index];
+        case Type::UInt32:
+            return static_cast<const ColumnUInt32&>(*index_column_)[item_index];
+        case Type::UInt64:
+            return static_cast<const ColumnUInt64&>(*index_column_)[item_index];
+        default:
+            throw ValidationError("Invalid index column type");
+    }
 }
 
 void ColumnLowCardinality::appendIndex(std::uint64_t item_index) {
     // TODO (nemkov): handle case when index should go from UInt8 to UInt16, etc.
-    VisitIndexColumn([item_index](auto & arg) {
-        arg.Append(static_cast<typename std::decay_t<decltype(arg)>::DataType>(item_index));
-    }, *index_column_);
+    switch (index_type_code_) {
+        case Type::UInt8:
+            static_cast<ColumnUInt8&>(*index_column_).Append(static_cast<uint8_t>(item_index));
+            break;
+        case Type::UInt16:
+            static_cast<ColumnUInt16&>(*index_column_).Append(static_cast<uint16_t>(item_index));
+            break;
+        case Type::UInt32:
+            static_cast<ColumnUInt32&>(*index_column_).Append(static_cast<uint32_t>(item_index));
+            break;
+        case Type::UInt64:
+            static_cast<ColumnUInt64&>(*index_column_).Append(static_cast<uint64_t>(item_index));
+            break;
+        default:
+            throw ValidationError("Invalid index column type");
+    }
 }
 
 void ColumnLowCardinality::removeLastIndex() {
-    VisitIndexColumn([](auto & arg) {
-        arg.Erase(arg.Size() - 1);
-    }, *index_column_);
+    switch (index_type_code_) {
+        case Type::UInt8: {
+            auto& col = static_cast<ColumnUInt8&>(*index_column_);
+            col.Erase(col.Size() - 1);
+            break;
+        }
+        case Type::UInt16: {
+            auto& col = static_cast<ColumnUInt16&>(*index_column_);
+            col.Erase(col.Size() - 1);
+            break;
+        }
+        case Type::UInt32: {
+            auto& col = static_cast<ColumnUInt32&>(*index_column_);
+            col.Erase(col.Size() - 1);
+            break;
+        }
+        case Type::UInt64: {
+            auto& col = static_cast<ColumnUInt64&>(*index_column_);
+            col.Erase(col.Size() - 1);
+            break;
+        }
+        default:
+            throw ValidationError("Invalid index column type");
+    }
 }
 
 details::LowCardinalityHashKey ColumnLowCardinality::computeHashKey(const ItemView & item) {
@@ -226,7 +271,7 @@ details::LowCardinalityHashKey ColumnLowCardinality::computeHashKey(const ItemVi
     }
 
     const auto hash1 = hasher(item.data);
-    const auto hash2 = CityHash64(item.data.data(), item.data.size());
+    const auto hash2 = cityhash::CityHash64(item.data.data(), item.data.size());
 
     return details::LowCardinalityHashKey{hash1, hash2};
 }
@@ -337,6 +382,7 @@ bool ColumnLowCardinality::LoadBody(InputStream* input, size_t rows) {
         dictionary_column_->Swap(*new_dictionary);
         index_column_.swap(new_index);
         unique_items_map_.swap(new_unique_items_map);
+        index_type_code_ = index_column_->Type()->GetCode();
 
         return true;
     } catch (...) {
@@ -350,7 +396,8 @@ void ColumnLowCardinality::SavePrefix(OutputStream* output) {
 }
 
 void ColumnLowCardinality::SaveBody(OutputStream* output) {
-    const uint64_t index_serialization_type = indexTypeFromIndexColumn(*index_column_) | IndexFlag::HasAdditionalKeysBit;
+    const uint64_t index_serialization_type =
+        static_cast<uint64_t>(indexTypeFromIndexColumn(*index_column_)) | IndexFlag::HasAdditionalKeysBit;
     WireFormat::WriteFixed(*output, index_serialization_type);
 
     const uint64_t number_of_keys = dictionary_column_->Size();
@@ -411,6 +458,7 @@ void ColumnLowCardinality::Swap(Column& other) {
 
     index_column_.swap(col.index_column_);
     unique_items_map_.swap(col.unique_items_map_);
+    std::swap(index_type_code_, col.index_type_code_);
 }
 
 ItemView ColumnLowCardinality::GetItem(size_t index) const {

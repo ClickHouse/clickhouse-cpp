@@ -44,6 +44,7 @@ void ItemView::ValidateData(Type::Code type, DataType data) {
         case Type::Code::Int8:
         case Type::Code::UInt8:
         case Type::Code::Enum8:
+        case Type::Code::Bool:
             return AssertSize({1});
 
         case Type::Code::Int16:
@@ -59,6 +60,7 @@ void ItemView::ValidateData(Type::Code type, DataType data) {
         case Type::Code::Date32:
         case Type::Code::IPv4:
         case Type::Code::Decimal32:
+        case Type::Code::Time:
             return AssertSize({4});
 
         case Type::Code::Int64:
@@ -66,10 +68,12 @@ void ItemView::ValidateData(Type::Code type, DataType data) {
         case Type::Code::Float64:
         case Type::Code::DateTime64:
         case Type::Code::Decimal64:
+        case Type::Code::Time64:
             return AssertSize({8});
 
         case Type::Code::String:
         case Type::Code::FixedString:
+        case Type::Code::JSON:
             // value can be of any size
             return;
 

@@ -4,7 +4,7 @@
 
 #include <city.h>
 
-#include <stdexcept>
+#include <cassert>
 
 namespace clickhouse {
 
@@ -52,6 +52,10 @@ const char* Type::TypeName(Type::Code code) {
         case Type::Code::Ring:           return "Ring";
         case Type::Code::Polygon:        return "Polygon";
         case Type::Code::MultiPolygon:   return "MultiPolygon";
+        case Type::Code::Time:           return "Time";
+        case Type::Code::Time64:         return "Time64";
+        case Type::Code::JSON:           return "JSON";
+        case Type::Code::Bool:           return "Bool";
     }
 
     return "Unknown type";
@@ -78,11 +82,16 @@ std::string Type::GetName() const {
         case IPv6:
         case Date:
         case Date32:
+        case Time:
         case Point:
         case Ring:
         case Polygon:
         case MultiPolygon:
+        case JSON:
+        case Bool:
             return TypeName(code_);
+        case Time64:
+            return As<Time64Type>()->GetName();
         case FixedString:
             return As<FixedStringType>()->GetName();
         case DateTime:
@@ -133,6 +142,7 @@ uint64_t Type::GetTypeUniqueId() const {
         case Float32:
         case Float64:
         case String:
+        case JSON:
         case IPv4:
         case IPv6:
         case Date:
@@ -141,10 +151,13 @@ uint64_t Type::GetTypeUniqueId() const {
         case Ring:
         case Polygon:
         case MultiPolygon:
+        case Bool:
             // For simple types, unique ID is the same as Type::Code
             return code_;
 
         case FixedString:
+        case Time:
+        case Time64:
         case DateTime:
         case DateTime64:
         case Array:
@@ -166,7 +179,7 @@ uint64_t Type::GetTypeUniqueId() const {
 
             if (type_unique_id_.load(std::memory_order_relaxed) == 0) {
                 const auto name = GetName();
-                type_unique_id_.store(CityHash64WithSeed(name.c_str(), name.size(), code_), std::memory_order_relaxed);
+                type_unique_id_.store(cityhash::CityHash64WithSeed(name.c_str(), name.size(), code_), std::memory_order_relaxed);
             }
 
             return type_unique_id_;
@@ -186,6 +199,14 @@ TypeRef Type::CreateDate() {
 
 TypeRef Type::CreateDate32() {
     return TypeRef(new Type(Type::Date32));
+}
+
+TypeRef Type::CreateTime() {
+    return TypeRef(new Type(Type::Time));
+}
+
+TypeRef Type::CreateTime64(size_t precision) {
+    return TypeRef(new Time64Type(precision));
 }
 
 TypeRef Type::CreateDateTime(std::string timezone) {
@@ -224,8 +245,9 @@ TypeRef Type::CreateString(size_t n) {
     return TypeRef(new FixedStringType(n));
 }
 
-TypeRef Type::CreateTuple(const std::vector<TypeRef>& item_types) {
-    return TypeRef(new TupleType(item_types));
+TypeRef Type::CreateTuple(const std::vector<TypeRef>& item_types,
+                          std::vector<std::string> item_names) {
+    return TypeRef(new TupleType(item_types, std::move(item_names)));
 }
 
 TypeRef Type::CreateEnum8(const std::vector<EnumItem>& enum_items) {
@@ -262,6 +284,10 @@ TypeRef Type::CreatePolygon() {
 
 TypeRef Type::CreateMultiPolygon() {
     return TypeRef(new Type(Type::MultiPolygon));
+}
+
+TypeRef Type::CreateJSON() {
+    return TypeRef(new Type(Type::JSON));
 }
 
 /// class ArrayType
@@ -366,6 +392,18 @@ const std::string & TypeWithTimeZoneMixin::Timezone() const {
 }
 }
 
+/// class Time64
+Time64Type::Time64Type(size_t precision)
+    : Type(Time64), precision_{precision} {
+    if (precision_ > 9) {
+        throw ValidationError("Time64 precision is > 9");
+    }
+}
+
+std::string Time64Type::GetName() const {
+    return "Time64(" + std::to_string(precision_) + ")";
+}
+
 /// class DateTimeType
 DateTimeType::DateTimeType(std::string timezone)
     : Type(DateTime), details::TypeWithTimeZoneMixin(std::move(timezone)) {
@@ -415,9 +453,17 @@ FixedStringType::FixedStringType(size_t n) : Type(FixedString), size_(n) {
 NullableType::NullableType(TypeRef nested_type) : Type(Nullable), nested_type_(nested_type) {
 }
 
-/// class TupleType
-
-TupleType::TupleType(const std::vector<TypeRef>& item_types) : Type(Tuple), item_types_(item_types) {
+TupleType::TupleType(const std::vector<TypeRef>& item_types,
+                     std::vector<std::string> item_names)
+    : Type(Tuple), item_types_(item_types), item_names_(std::move(item_names)) {
+    if (!item_names_.empty() && item_names_.size() != item_types_.size()) {
+        throw ValidationError("Tuple field names count doesn't match tuple element count");
+    }
+    for (const auto& item_name : item_names_) {
+        if (item_name.empty()) {
+            throw ValidationError("Tuple field names can't be empty");
+        }
+    }
 }
 
 /// class LowCardinalityType
@@ -427,15 +473,46 @@ LowCardinalityType::LowCardinalityType(TypeRef nested_type) : Type(LowCardinalit
 LowCardinalityType::~LowCardinalityType() {
 }
 
+// Checks if `name` is a valid plain identifier (must not be quoted).
+// The condition for this is a match against `^[a-zA-Z_][0-9a-zA-Z_]*$`
+static bool IsPlainIdentifier(const std::string& name) {
+    if (name.empty()) return false;
+    auto is_alpha_or_under = [](char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'; };
+    auto is_alnum_or_under = [&is_alpha_or_under](char c) { return is_alpha_or_under(c) || (c >= '0' && c <= '9'); };
+    if (!is_alpha_or_under(name[0])) return false;
+    for (size_t i = 1; i < name.size(); ++i)
+        if (!is_alnum_or_under(name[i])) return false;
+    return true;
+}
+
+// Appends a fieldname, potentially quoting it and escaping backticks.
+static void AppendFieldname(const std::string& name, std::string& out) {
+    if (IsPlainIdentifier(name)) {
+        out += name;
+        return;
+    }
+    out += '`';
+    for (char c : name) {
+        if (c == '`')
+            out += "``";
+        else
+            out += c;
+    }
+    out += '`';
+}
+
 std::string TupleType::GetName() const {
     std::string result("Tuple(");
+    bool has_complete_names = !item_names_.empty();
 
-    if (!item_types_.empty()) {
-        result += item_types_[0]->GetName();
-    }
-
-    for (size_t i = 1; i < item_types_.size(); ++i) {
-        result += ", " + item_types_[i]->GetName();
+    for (size_t i = 0; i < item_types_.size(); ++i) {
+        if (i > 0)
+            result += ", ";
+        if (has_complete_names) {
+            AppendFieldname(item_names_[i], result);
+            result += ' ';
+        }
+        result += item_types_[i]->GetName();
     }
 
     result += ")";

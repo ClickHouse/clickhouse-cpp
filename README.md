@@ -1,11 +1,168 @@
-ClickHouse C++ client [![Linux](https://github.com/ClickHouse/clickhouse-cpp/actions/workflows/linux.yml/badge.svg)](https://github.com/ClickHouse/clickhouse-cpp/actions/workflows/linux.yml) [![macOS](https://github.com/ClickHouse/clickhouse-cpp/actions/workflows/macos.yml/badge.svg)](https://github.com/ClickHouse/clickhouse-cpp/actions/workflows/macos.yml) [![Windows MSVC](https://github.com/ClickHouse/clickhouse-cpp/actions/workflows/windows_msvc.yml/badge.svg)](https://github.com/ClickHouse/clickhouse-cpp/actions/workflows/windows_msvc.yml) [![Windows mingw](https://github.com/ClickHouse/clickhouse-cpp/actions/workflows/windows_mingw.yml/badge.svg)](https://github.com/ClickHouse/clickhouse-cpp/actions/workflows/windows_mingw.yml)
-=====
+<h1 align="center">
+<img src=".static/clickhouse-logo.svg" width="50px" align="center" style="margin-bottom: 10px;">
+ClickHouse C++ Client
+</h1>
 
-C++ client for [ClickHouse](https://clickhouse.com/).
+<p align="center">
+C++17 client library for <a href="https://clickhouse.com/">ClickHouse</a> using the native ClickHouse protocol.
+</p>
+
+`clickhouse-cpp` provides a small, direct API for connecting to ClickHouse, executing SQL queries,
+inserting and selecting columnar `Block` data, and working with ClickHouse data types from C++. It
+builds on Linux, macOS, and Windows with CMake or Bazel. It supports TLS and compression.
+
+<br/>
+
+<p align="center">
+<a href="https://github.com/ClickHouse/clickhouse-cpp/actions/workflows/linux.yml"><img src="https://github.com/ClickHouse/clickhouse-cpp/actions/workflows/linux.yml/badge.svg" alt="Linux"></a>
+<a href="https://github.com/ClickHouse/clickhouse-cpp/actions/workflows/macos.yml"><img src="https://github.com/ClickHouse/clickhouse-cpp/actions/workflows/macos.yml/badge.svg" alt="macOS"></a>
+<a href="https://github.com/ClickHouse/clickhouse-cpp/actions/workflows/windows_msvc.yml"><img src="https://github.com/ClickHouse/clickhouse-cpp/actions/workflows/windows_msvc.yml/badge.svg" alt="Windows MSVC"></a>
+<a href="https://github.com/ClickHouse/clickhouse-cpp/actions/workflows/windows_mingw.yml"><img src="https://github.com/ClickHouse/clickhouse-cpp/actions/workflows/windows_mingw.yml/badge.svg" alt="Windows mingw"></a>
+<a href="https://github.com/ClickHouse/clickhouse-cpp/actions/workflows/bazel.yml"><img src="https://github.com/ClickHouse/clickhouse-cpp/actions/workflows/bazel.yml/badge.svg" alt="Windows mingw"></a>
+</p>
+
+
+## Building
+
+Here is an example with recommended settings;
+
+```sh
+$ mkdir build .
+$ cd build
+$ cmake .. -DCH_USE_ABSEIL_FOR_BIGNUM=NO -DCH_MAP_BOOL_TO_UINT8=NO
+$ make
+```
+
+The command above disables two legacy CMake defaults, `CH_USE_ABSEIL_FOR_BIGNUM`  and
+`CH_MAP_BOOL_TO_UINT8`. New projects should set both options to `OFF`. Existing projects can keep
+the defaults temporarily, but should migrate to this configuration as this behavior will be removed
+in the future versions of the library.
+
+Please refer to the workflows for the reference on dependencies/build options
+- https://github.com/ClickHouse/clickhouse-cpp/blob/master/.github/workflows/linux.yml
+- https://github.com/ClickHouse/clickhouse-cpp/blob/master/.github/workflows/windows_msvc.yml
+- https://github.com/ClickHouse/clickhouse-cpp/blob/master/.github/workflows/windows_mingw.yml
+- https://github.com/ClickHouse/clickhouse-cpp/blob/master/.github/workflows/macos.yml
+- https://github.com/ClickHouse/clickhouse-cpp/blob/master/.github/workflows/bazel.yml
+
+## Backwards compatibility
+
+We aim to keep the public API compatible across releases within the same major version, so regular
+source-level upgrades should not require application code changes unless explicitly documented.
+
+ABI compatibility is not guaranteed yet, because the library is still actively evolving. If you
+upgrade clickhouse-cpp, rebuild your application against the new library version, including for
+minor version updates.
+
+## Including clickhouse-cpp in your project
+
+Here a simple example (`app.cpp`) of an application using `clickhouse-cpp`
+
+```cpp
+#include <clickhouse/client.h>
+#include <iostream>
+
+namespace ch = clickhouse;
+
+int main()
+{
+    ch::Client client{ch::ClientOptions{}.SetHost("localhost")};
+
+    client.BeginSelect("SELECT 'Hello from ClickHouse :)");
+    
+    while (auto block = client.NextBlock()) {
+        auto col_msg = block->At(0)->AsStrict<ch::ColumnString>();
+        
+        for (size_t i = 0; i < block->GetRowCount(); ++i) {
+            std::cout << col_msg->At(i) << "\n";
+        }
+    }
+}
+```
+
+You can include `clickhouse-cpp` into your project by using one of the following methods.
+
+### CMake with a git submodule
+
+Add clickhouse-cpp as a submodule, for example under `contrib/clickhouse-cpp`:
+
+```sh
+git submodule add https://github.com/ClickHouse/clickhouse-cpp.git contrib/clickhouse-cpp
+```
+
+Then include it from your `CMakeLists.txt`:
+
+```cmake
+cmake_minimum_required(VERSION 3.13)
+project(application-example LANGUAGES CXX)
+
+set(CH_USE_ABSEIL_FOR_BIGNUM OFF)
+set(CH_MAP_BOOL_TO_UINT8 OFF)
+
+add_subdirectory(contrib/clickhouse-cpp)
+
+add_executable(application-example app.cpp)
+target_link_libraries(application-example PRIVATE clickhouse-cpp-lib)
+```
+
+### CMake with FetchContent
+
+You can also let CMake download clickhouse-cpp during configuration:
+
+```cmake
+cmake_minimum_required(VERSION 3.14)
+project(application-example LANGUAGES CXX)
+
+include(FetchContent)
+
+set(CH_USE_ABSEIL_FOR_BIGNUM OFF)
+set(CH_MAP_BOOL_TO_UINT8 OFF)
+
+FetchContent_Declare(
+    clickhouse_cpp
+    GIT_REPOSITORY https://github.com/ClickHouse/clickhouse-cpp.git
+    GIT_TAG v2.6.2
+)
+FetchContent_MakeAvailable(clickhouse_cpp)
+
+add_executable(application-example app.cpp)
+target_link_libraries(application-example PRIVATE clickhouse-cpp-lib)
+```
+
+### Bazel
+
+Bazel support is experimental and uses bzlmod. Add clickhouse-cpp to your `MODULE.bazel`:
+
+```bzl
+bazel_dep(name = "clickhouse-cpp", version = "2.6.2")
+```
+
+Then depend on the library from your `BUILD.bazel`:
+
+```bzl
+cc_binary(
+    name = "application-example",
+    srcs = ["app.cpp"],
+    deps = ["@clickhouse-cpp//:clickhouse"],
+)
+```
+
+By default, the Bazel build uses BoringSSL for TLS because it builds reliably across platforms on
+BCR and matches what many Bazel workspaces already link against. Use `--@clickhouse-cpp//:tls=openssl`
+to build with OpenSSL, or `--@clickhouse-cpp//:tls=no` to build without TLS support.
+
+Please keep in mind that Bazel support is currently experimental and is still being refined.
+This means things might change as we improve and update the setup.
+
+Most importantly, the project includes settings that were added for compatibility with older
+versions of the library and its API, and to preserve old behavior. These settings will not be part
+of the Bazel configuration. This means that even when only the minor version changes your build
+still might break.
 
 ## Supported data types
 
 * Array(T)
+* Bool
 * Date
 * DateTime, DateTime64
 * DateTime([timezone]), DateTime64(N, [timezone])
@@ -23,150 +180,23 @@ C++ client for [ClickHouse](https://clickhouse.com/).
 * UUID
 * Map
 * Point, Ring, Polygon, MultiPolygon
+* JSON
 
-## Dependencies
-In the most basic case one needs only:
-- a C++-17-complaint compiler,
-- `cmake` (3.12 or newer), and
-- `ninja`
-
-Optional dependencies:
-- openssl
-- liblz4
-- libabsl
-- libzstd
-
-## Building
-
-```sh
-$ mkdir build .
-$ cd build
-$ cmake .. [-DBUILD_TESTS=ON]
-$ make
-```
-
-Please refer to the workflows for the reference on dependencies/build options
-- https://github.com/ClickHouse/clickhouse-cpp/blob/master/.github/workflows/linux.yml
-- https://github.com/ClickHouse/clickhouse-cpp/blob/master/.github/workflows/windows_msvc.yml
-- https://github.com/ClickHouse/clickhouse-cpp/blob/master/.github/workflows/windows_mingw.yml
-- https://github.com/ClickHouse/clickhouse-cpp/blob/master/.github/workflows/macos.yml
-
-
-## Example application build with clickhouse-cpp
-
-There are various ways to integrate clickhouse-cpp with the build system of an application. Below example uses the simple approach based on
-submodules presented in https://www.youtube.com/watch?v=ED-WUk440qc .
-
-- `mkdir clickhouse-app && cd clickhouse-app && git init`
-- `git submodule add https://github.com/ClickHouse/clickhouse-cpp.git contribs/clickhouse-cpp`
-- `touch app.cpp`, then copy the following C++ code into that file
-
-```cpp
-#include <iostream>
-#include <clickhouse/client.h>
-
-using namespace clickhouse;
-
-int main()
-{
-    /// Initialize client connection.
-    Client client(ClientOptions().SetHost("localhost"));
-
-    /// Create a table.
-    client.Execute("CREATE TABLE IF NOT EXISTS default.numbers (id UInt64, name String) ENGINE = Memory");
-
-    /// Insert some values.
-    {
-        Block block;
-
-        auto id = std::make_shared<ColumnUInt64>();
-        id->Append(1);
-        id->Append(7);
-
-        auto name = std::make_shared<ColumnString>();
-        name->Append("one");
-        name->Append("seven");
-
-        block.AppendColumn("id"  , id);
-        block.AppendColumn("name", name);
-
-        client.Insert("default.numbers", block);
-    }
-
-    /// Select values inserted in the previous step.
-    client.Select("SELECT id, name FROM default.numbers", [] (const Block& block)
-        {
-            for (size_t i = 0; i < block.GetRowCount(); ++i) {
-                std::cout << block[0]->As<ColumnUInt64>()->At(i) << " "
-                          << block[1]->As<ColumnString>()->At(i) << "\n";
-            }
-        }
-    );
-
-    /// Select values inserted in the previous step using external data feature
-    /// See https://clickhouse.com/docs/engines/table-engines/special/external-data
-    {
-        Block block1, block2;
-        auto id = std::make_shared<ColumnUInt64>();
-        id->Append(1);
-        block1.AppendColumn("id"  , id);
-
-        auto name = std::make_shared<ColumnString>();
-        name->Append("seven");
-        block2.AppendColumn("name", name);
-
-        const std::string _1 = "_1";
-        const std::string _2 = "_2";
-
-        const ExternalTables external = {{_1, block1}, {_2, block2}};
-        client.SelectWithExternalData("SELECT id, name FROM default.numbers where id in (_1) or name in (_2)",
-                                      external, [] (const Block& block)
-            {
-                for (size_t i = 0; i < block.GetRowCount(); ++i) {
-                    std::cout << block[0]->As<ColumnUInt64>()->At(i) << " "
-                              << block[1]->As<ColumnString>()->At(i) << "\n";
-                }
-            }
-        );
-    }
-
-    /// Delete table.
-    client.Execute("DROP TABLE default.numbers");
-
-    return 0;
-}
-```
-
-- `touch CMakeLists.txt`, then copy the following CMake code into that file
-
-```cmake
-cmake_minimum_required(VERSION 3.12)
-project(application-example)
-
-set(CMAKE_CXX_STANDARD 17)
-
-add_subdirectory(contribs/clickhouse-cpp)
-
-add_executable(${PROJECT_NAME} "app.cpp")
-
-target_include_directories(${PROJECT_NAME} PRIVATE contribs/clickhouse-cpp/ contribs/clickhouse-cpp/contrib/absl)
-
-target_link_libraries(${PROJECT_NAME} PRIVATE clickhouse-cpp-lib)
-```
-
-- run `rm -rf build && cmake -B build -S . && cmake --build build -j32` to remove remainders of the previous builds, run CMake and build the
-  application. The generated binary is located in location `build/application-example`.
+Important notes:
+- With CMake Bool type is mapped to `clickhouse::ColumnUInt8` by default for backwards compatibility. Use
+`-DCH_MAP_BOOL_TO_UINT8=OFF` to map Bool to `clickhouse::ColumnBool`.
+- JSON requires requires setting `output_format_native_write_json_as_string=1 enabled for the query.
 
 ## Batch Insertion
 
 In addition to the `Insert` method, which inserts all the data in a block in a
-single call, you can use the `BeginInsert` / `InsertData` / `EndInsert`
+single call, you can use the `BeginInsert` / `SendInsertBlock` / `EndInsert`
 pattern to insert batches of data. This can be useful for managing larger data
 sets without inflating memory with the entire set.
 
 To use it pass `BeginInsert` an `INSERT` statement ending in `VALUES` but with
 no actual values. Use the resulting `Block` to append batches of data, sending
-each to the sever with `InsertData`. Finally, call `EndInsert` (or let the
+each to the sever with `SendInsertBlock`. Finally, call `EndInsert` (or let the
 client go out of scope) to signal the server that insertion is complete.
 Example:
 
@@ -186,7 +216,7 @@ col2.Append("naomi");
 
 // Send those records.
 block.RefreshRowCount();
-client->InsertData(block);
+client->SendInsertBlock(block);
 block.Clear();
 
 // Add another record.
@@ -195,7 +225,7 @@ col2.Append("amos");
 
 // Send it and finish.
 block.RefreshRowCount();
-client->EndInsert(block);
+client->EndInsert();
 ```
 
 ## Thread-safety
@@ -256,5 +286,3 @@ client.Insert("default.test", block);
 ```sql
 ALTER USER insert_account SETTINGS async_insert=1,wait_for_async_insert=1,async_insert_use_adaptive_busy_timeout=0,async_insert_busy_timeout_ms=5000,async_insert_max_data_size=104857600
 ```
-
-

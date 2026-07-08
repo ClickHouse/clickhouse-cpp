@@ -8,10 +8,12 @@
 
 #include "columns/factory.h"
 
-#include <assert.h>
-#include <system_error>
-#include <vector>
+#include <cassert>
+#include <optional>
 #include <sstream>
+#include <system_error>
+#include <variant>
+#include <vector>
 
 #if defined(WITH_OPENSSL)
 #include "base/sslsocket.h"
@@ -125,6 +127,48 @@ ClientOptions& ClientOptions::SetSSLOptions(ClientOptions::SSLOptions options)
 
 namespace {
 
+// Compared to std::visit this is a more convenient way to unpack std::variant values. The
+// `VariantIndex` trait allows to get index of the variant by type. This way, the variant can be
+// unpacked using the old and simple `switch` statement. While the standard way of doing do is
+// std::visit, using it is very inconvenient, it's semantics are often unclear and it lead to
+// bizarre and hard to parse errors.
+template <typename T>
+struct VariantIndexTag {};
+template <typename T, typename V>
+struct VariantIndex;
+template <typename T, typename... Ts>
+struct VariantIndex<T, std::variant<Ts...>>
+    : std::integral_constant<size_t, std::variant<VariantIndexTag<Ts>...>{VariantIndexTag<T>{}}.index()>
+{
+};
+
+struct Pong {
+};
+struct Hello {
+};
+struct Log {
+    Block block;
+};
+struct TableColumns {
+};
+struct ProfileEvents {
+    Block block;
+};
+struct EndOfStream {
+};
+using DecodedPacket = std::variant<
+    std::monostate,
+    Block,
+    ServerException,
+    Profile,
+    Progress,
+    Pong,
+    Hello,
+    Log,
+    TableColumns,
+    ProfileEvents,
+    EndOfStream>;
+
 std::unique_ptr<SocketFactory> GetSocketFactory(const ClientOptions& opts) {
     (void)opts;
 #if defined(WITH_OPENSSL)
@@ -144,7 +188,7 @@ std::unique_ptr<EndpointsIteratorBase> GetEndpointsIterator(const ClientOptions&
     return std::make_unique<RoundRobinEndpointsIterator>(opts.endpoints);
 }
 
-}
+} // anonymous namespace
 
 class Client::Impl {
 public:
@@ -154,10 +198,18 @@ public:
     ~Impl();
 
     void ExecuteQuery(Query query);
+    void BeginExecuteQuery(const Query& query, bool finalize = true);
+    
+    // Note, next block returns the block, but also notifies `query.OnData()` if it is set.
+    std::optional<Block> NextBlock();
 
     void SelectWithExternalData(Query query, const ExternalTables& external_tables);
 
     void SendCancel();
+
+    void Cancel();
+
+    bool IsSelecting() const { return state_ == State::Selecting; }
 
     void Insert(const std::string& table_name, const std::string& query_id, const Block& block);
 
@@ -166,6 +218,8 @@ public:
     void SendInsertBlock(const Block& block);
 
     void EndInsert();
+
+    bool IsInserting() const { return state_ == State::Inserting; }
 
     void Ping();
 
@@ -180,7 +234,9 @@ public:
 private:
     bool Handshake();
 
-    bool ReceivePacket(uint64_t* server_packet = nullptr);
+    DecodedPacket ReceivePacket(uint64_t* server_packet = nullptr);
+    bool ProcessPacket(uint64_t* server_packet = nullptr);
+    void ResetState();
 
     void SendQuery(const Query& query, bool finalize = true);
     void FinalizeQuery();
@@ -197,10 +253,10 @@ private:
     bool ReceiveHello();
 
     /// Reads data packet form input stream.
-    bool ReceiveData();
+    bool ReceiveData(Block & block);
 
     /// Reads exception packet form input stream.
-    bool ReceiveException(bool rethrow = false);
+    bool ReceiveException(bool rethrow = false, ServerError * error = nullptr);
 
     void WriteBlock(const Block& block, OutputStream& output);
 
@@ -221,6 +277,12 @@ private:
     void RetryConnectToTheEndpoint(std::function<void()>& func);
 
 private:
+    enum class State : uint8_t {
+        Idle = 0,
+        Selecting = 1,
+        Inserting = 2,
+    };
+
     class EnsureNull {
     public:
         inline EnsureNull(QueryEvents* ev, QueryEvents** ptr)
@@ -244,6 +306,7 @@ private:
 
 
     const ClientOptions options_;
+    Query query_;
     QueryEvents* events_;
     int compression_ = CompressionState::Disable;
 
@@ -258,7 +321,7 @@ private:
 
     ServerInfo server_info_;
 
-    bool inserting_;
+    State state_ = State::Idle;
 };
 
 ClientOptions modifyClientOptions(ClientOptions opts)
@@ -290,50 +353,91 @@ Client::Impl::Impl(const ClientOptions& opts,
 
 Client::Impl::~Impl() {
     try {
-        EndInsert();
+        if (state_ == State::Inserting) {
+            EndInsert();
+        }
     } catch (...) {
     }
 }
 
-void Client::Impl::ExecuteQuery(Query query) {
-    if (inserting_) {
-        throw ValidationError("cannot execute query while inserting");
+void Client::Impl::BeginExecuteQuery(const Query& query, bool finalize) {
+    if (state_ != State::Idle) {
+        throw ValidationError("cannot execute query while executing another operation");
     }
-
-    EnsureNull en(static_cast<QueryEvents*>(&query), &events_);
 
     if (options_.ping_before_query) {
         RetryGuard([this]() { Ping(); });
     }
 
-    SendQuery(query);
+    query_ = query;
+    events_ = static_cast<QueryEvents*>(&query_);
+    state_ = State::Selecting;
 
-    while (ReceivePacket()) {
+    try {
+        SendQuery(query_, finalize);
+    }
+    catch (...) {
+        ResetState();
+        throw;
+    }
+}
+
+std::optional<Block> Client::Impl::NextBlock() {
+    if (state_ != State::Selecting) {
+        throw ValidationError("cannot execute NextBlock while not selecting");
+    }
+
+    try {
+        while (true) {
+            auto packet = ReceivePacket();
+            switch (packet.index()) {
+            case VariantIndex<Block, decltype(packet)>(): {
+                Block & block = std::get<Block>(packet);
+                if (block.GetColumnCount() == 0) {
+                    continue;
+                }
+                return {std::move(block)};
+            }
+            case VariantIndex<ServerError, decltype(packet)>():
+            case VariantIndex<std::monostate, decltype(packet)>():
+            case VariantIndex<EndOfStream, decltype(packet)>():
+                ResetState();
+                return std::nullopt;
+            default:
+                continue;
+            }
+        }
+    }
+    catch (...) {
+        ResetState();
+        throw;
+    }
+}
+
+void Client::Impl::ExecuteQuery(Query query) {
+    BeginExecuteQuery(query);
+    while (NextBlock().has_value()) {
         ;
     }
 }
 
 
 void Client::Impl::SelectWithExternalData(Query query, const ExternalTables& external_tables) {
-    if (inserting_) {
-        throw ValidationError("cannot execute query while inserting");
-    }
-
     if (server_info_.revision < DBMS_MIN_REVISION_WITH_TEMPORARY_TABLES) {
        throw UnimplementedError("This version of ClickHouse server doesn't support temporary tables");
     }
 
-    EnsureNull en(static_cast<QueryEvents*>(&query), &events_);
-
-    if (options_.ping_before_query) {
-        RetryGuard([this]() { Ping(); });
+    BeginExecuteQuery(query, /*finalize=*/ false);
+    try {
+        SendExternalData(external_tables);
+        FinalizeQuery();
+    }
+    catch (...) {
+        ResetState();
+        throw;
     }
 
-    SendQuery(query, false);
-    SendExternalData(external_tables);
-    FinalizeQuery();
-
-    while (ReceivePacket()) {
+    while (NextBlock().has_value()) {
         ;
     }
 }
@@ -382,15 +486,18 @@ std::string NameToQueryString(const std::string &input)
 }
 
 void Client::Impl::Insert(const std::string& table_name, const std::string& query_id, const Block& block) {
-    if (inserting_) {
+    if (state_ == State::Inserting) {
         throw ValidationError("cannot execute query while inserting, use SendInsertData instead");
+    }
+    if (state_ != State::Idle) {
+        throw ValidationError("cannot execute query while executing another operation");
     }
 
     if (options_.ping_before_query) {
         RetryGuard([this]() { Ping(); });
     }
 
-    inserting_ = true;
+    state_ = State::Inserting;
 
     std::stringstream fields_section;
     const auto num_columns = block.GetColumnCount();
@@ -408,7 +515,7 @@ void Client::Impl::Insert(const std::string& table_name, const std::string& quer
 
     // Wait for a data packet and return
     uint64_t server_packet = 0;
-    while (ReceivePacket(&server_packet)) {
+    while (ProcessPacket(&server_packet)) {
         if (server_packet == ServerCodes::Data) {
             SendData(block);
             EndInsert();
@@ -420,8 +527,12 @@ void Client::Impl::Insert(const std::string& table_name, const std::string& quer
 }
 
 Block Client::Impl::BeginInsert(Query query) {
-    if (inserting_) {
-        throw ValidationError("cannot execute query while inserting");
+    if (state_ != State::Idle) {
+        throw ValidationError("cannot execute query while executing another operation");
+    }
+
+    if (query.HasEventCallbacks()) {
+        throw ValidationError("Query callbacks are not supported in BeginInsert");
     }
 
     EnsureNull en(static_cast<QueryEvents*>(&query), &events_);
@@ -430,7 +541,7 @@ Block Client::Impl::BeginInsert(Query query) {
         RetryGuard([this]() { Ping(); });
     }
 
-    inserting_ = true;
+    state_ = State::Inserting;
 
     // Create a callback to extract the block with the proper query columns.
     Block block;
@@ -439,11 +550,11 @@ Block Client::Impl::BeginInsert(Query query) {
         return true;
     });
 
-    SendQuery(query.GetText());
+    SendQuery(query);
 
     // Wait for a data packet and return
     uint64_t server_packet = 0;
-    while (ReceivePacket(&server_packet)) {
+    while (ProcessPacket(&server_packet)) {
         if (server_packet == ServerCodes::Data) {
             return block;
         }
@@ -453,15 +564,15 @@ Block Client::Impl::BeginInsert(Query query) {
 }
 
 void Client::Impl::SendInsertBlock(const Block& block) {
-    if (!inserting_) {
-        throw ValidationError("illegal call to InsertData without first calling BeginInsert");
+    if (state_ != State::Inserting) {
+        throw ValidationError("illegal to send insert data without first calling BeginInsert");
     }
 
     SendData(block);
 }
 
 void Client::Impl::EndInsert() {
-    if (!inserting_) {
+    if (state_ != State::Inserting) {
         return;
     }
 
@@ -470,7 +581,7 @@ void Client::Impl::EndInsert() {
 
     // Wait for EOS.
     uint64_t eos_packet{0};
-    while (ReceivePacket(&eos_packet)) {
+    while (ProcessPacket(&eos_packet)) {
         ;
     }
 
@@ -479,19 +590,19 @@ void Client::Impl::EndInsert() {
         throw ProtocolError(std::string{"unexpected packet from server while receiving end of query, expected (expected Exception, EndOfStream or Log, got: "}
                             + (eos_packet ? std::to_string(eos_packet) : "nothing") + ")");
     }
-    inserting_ = false;
+    state_ = State::Idle;
 }
 
 void Client::Impl::Ping() {
-    if (inserting_) {
-        throw ValidationError("cannot execute query while inserting");
+    if (state_ != State::Idle) {
+        throw ValidationError("cannot execute query while executing another operation");
     }
 
     WireFormat::WriteUInt64(*output_, ClientCodes::Ping);
     output_->Flush();
 
     uint64_t server_packet;
-    const bool ret = ReceivePacket(&server_packet);
+    const bool ret = ProcessPacket(&server_packet);
 
     if (!ret || server_packet != ServerCodes::Pong) {
         throw ProtocolError("fail to ping server");
@@ -500,7 +611,7 @@ void Client::Impl::Ping() {
 
 void Client::Impl::ResetConnection() {
     InitializeStreams(socket_factory_->connect(options_, current_endpoint_.value()));
-    inserting_ = false;
+    state_ = State::Idle;
 
     if (!Handshake()) {
         throw ProtocolError("fail to connect to " + options_.host);
@@ -569,11 +680,11 @@ bool Client::Impl::Handshake() {
     return true;
 }
 
-bool Client::Impl::ReceivePacket(uint64_t* server_packet) {
+DecodedPacket Client::Impl::ReceivePacket(uint64_t* server_packet) {
     uint64_t packet_type = 0;
 
     if (!WireFormat::ReadVarint64(*input_, &packet_type)) {
-        return false;
+        return {};
     }
     if (server_packet) {
         *server_packet = packet_type;
@@ -581,143 +692,166 @@ bool Client::Impl::ReceivePacket(uint64_t* server_packet) {
 
     switch (packet_type) {
     case ServerCodes::Data: {
-        if (!ReceiveData()) {
+        Block ret{};
+        if (!ReceiveData(ret)) {
             throw ProtocolError("can't read data packet from input stream");
         }
-        return true;
+        return ret;
     }
 
     case ServerCodes::Exception: {
-        ReceiveException();
-        return false;
+        ServerError ret{std::make_shared<Exception>()};
+        if (!ReceiveException(false, &ret)) {
+            throw ProtocolError("can't read exception packet from input stream");
+        }
+        return ret;
     }
 
     case ServerCodes::ProfileInfo: {
-        Profile profile;
+        Profile ret{};
 
-        if (!WireFormat::ReadUInt64(*input_, &profile.rows)) {
-            return false;
+        if (!WireFormat::ReadUInt64(*input_, &ret.rows)) {
+            return {};
         }
-        if (!WireFormat::ReadUInt64(*input_, &profile.blocks)) {
-            return false;
+        if (!WireFormat::ReadUInt64(*input_, &ret.blocks)) {
+            return {};
         }
-        if (!WireFormat::ReadUInt64(*input_, &profile.bytes)) {
-            return false;
+        if (!WireFormat::ReadUInt64(*input_, &ret.bytes)) {
+            return {};
         }
-        if (!WireFormat::ReadFixed(*input_, &profile.applied_limit)) {
-            return false;
+        if (!WireFormat::ReadFixed(*input_, &ret.applied_limit)) {
+            return {};
         }
-        if (!WireFormat::ReadUInt64(*input_, &profile.rows_before_limit)) {
-            return false;
+        if (!WireFormat::ReadUInt64(*input_, &ret.rows_before_limit)) {
+            return {};
         }
-        if (!WireFormat::ReadFixed(*input_, &profile.calculated_rows_before_limit)) {
-            return false;
+        if (!WireFormat::ReadFixed(*input_, &ret.calculated_rows_before_limit)) {
+            return {};
         }
 
         if (events_) {
-            events_->OnProfile(profile);
+            events_->OnProfile(ret);
         }
 
-        return true;
+        return ret;
     }
 
     case ServerCodes::Progress: {
-        Progress info;
+        Progress ret{};
 
-        if (!WireFormat::ReadUInt64(*input_, &info.rows)) {
-            return false;
+        if (!WireFormat::ReadUInt64(*input_, &ret.rows)) {
+            return {};
         }
-        if (!WireFormat::ReadUInt64(*input_, &info.bytes)) {
-            return false;
+        if (!WireFormat::ReadUInt64(*input_, &ret.bytes)) {
+            return {};
         }
         if constexpr(DMBS_PROTOCOL_REVISION >= DBMS_MIN_REVISION_WITH_TOTAL_ROWS_IN_PROGRESS) {
-            if (!WireFormat::ReadUInt64(*input_, &info.total_rows)) {
-                return false;
+            if (!WireFormat::ReadUInt64(*input_, &ret.total_rows)) {
+                return {};
             }
         }
         if (server_info_.revision >= DBMS_MIN_REVISION_WITH_CLIENT_WRITE_INFO)
         {
-            if (!WireFormat::ReadUInt64(*input_, &info.written_rows)) {
-                return false;
+            if (!WireFormat::ReadUInt64(*input_, &ret.written_rows)) {
+                return {};
             }
-            if (!WireFormat::ReadUInt64(*input_, &info.written_bytes)) {
-                return false;
+            if (!WireFormat::ReadUInt64(*input_, &ret.written_bytes)) {
+                return {};
             }
         }
 
         if (events_) {
-            events_->OnProgress(info);
+            events_->OnProgress(ret);
         }
 
-        return true;
+        return ret;
     }
 
     case ServerCodes::Pong: {
-        return true;
+        return Pong{};
     }
 
     case ServerCodes::Hello: {
-        return true;
+        return Hello{};
     }
 
     case ServerCodes::EndOfStream: {
         if (events_) {
             events_->OnFinish();
         }
-        return false;
+        return EndOfStream{};
     }
 
     case ServerCodes::Log: {
         // log tag
         if (!WireFormat::SkipString(*input_)) {
-            return false;
+            return {};
         }
-        Block block;
+        Log ret;
 
         // Use uncompressed stream since log blocks usually contain only one row
-        if (!ReadBlock(*input_, &block)) {
-            return false;
+        if (!ReadBlock(*input_, &ret.block)) {
+            return {};
         }
 
         if (events_) {
-            events_->OnServerLog(block);
+            events_->OnServerLog(ret.block);
         }
-        return true;
+        return ret;
     }
 
     case ServerCodes::TableColumns: {
         // external table name
         if (!WireFormat::SkipString(*input_)) {
-            return false;
+            return {};
         }
 
         //  columns metadata
         if (!WireFormat::SkipString(*input_)) {
-            return false;
+            return {};
         }
-        return true;
+        return TableColumns{};
     }
 
     case ServerCodes::ProfileEvents: {
         if (!WireFormat::SkipString(*input_)) {
-            return false;
+            return {};
         }
 
-        Block block;
-        if (!ReadBlock(*input_, &block)) {
-            return false;
+        ProfileEvents ret;
+        if (!ReadBlock(*input_, &ret.block)) {
+            return {};
         }
 
         if (events_) {
-            events_->OnProfileEvents(block);
+            events_->OnProfileEvents(ret.block);
         }
-        return true;
+        return ret;
     }
 
     default:
         throw UnimplementedError("unimplemented " + std::to_string((int)packet_type));
         break;
     }
+}
+
+bool Client::Impl::ProcessPacket(uint64_t* server_packet) {
+    auto packet = ReceivePacket(server_packet);
+    switch (packet.index()) {
+    case VariantIndex<ServerError, decltype(packet)>():
+    case VariantIndex<std::monostate, decltype(packet)>():
+    case VariantIndex<EndOfStream, decltype(packet)>():
+        return false;
+    default:
+        return true;
+    }
+}
+
+void Client::Impl::ResetState()
+{
+    state_ = State::Idle;
+    query_ = {};
+    events_ = nullptr;
 }
 
 bool Client::Impl::ReadBlock(InputStream& input, Block* block) {
@@ -793,8 +927,7 @@ bool Client::Impl::ReadBlock(InputStream& input, Block* block) {
     return true;
 }
 
-bool Client::Impl::ReceiveData() {
-    Block block;
+bool Client::Impl::ReceiveData(Block & block) {
 
     if (server_info_.revision >= DBMS_MIN_REVISION_WITH_TEMPORARY_TABLES) {
         if (!WireFormat::SkipString(*input_)) {
@@ -823,42 +956,16 @@ bool Client::Impl::ReceiveData() {
     return true;
 }
 
-bool Client::Impl::ReceiveException(bool rethrow) {
+bool Client::Impl::ReceiveException(bool rethrow, ServerError * error) {
     std::shared_ptr<Exception> e(new Exception);
-    Exception* current = e.get();
+    bool has_nested = false; // obsolete: https://github.com/ClickHouse/ClickHouse/blob/ef11941cf5a/src/IO/ReadHelpers.cpp#L2017
 
-    bool exception_received = true;
-    do {
-        bool has_nested = false;
-
-        if (!WireFormat::ReadFixed(*input_, &current->code)) {
-           exception_received = false;
-           break;
-        }
-        if (!WireFormat::ReadString(*input_, &current->name)) {
-            exception_received = false;
-            break;
-        }
-        if (!WireFormat::ReadString(*input_, &current->display_text)) {
-            exception_received = false;
-            break;
-        }
-        if (!WireFormat::ReadString(*input_, &current->stack_trace)) {
-            exception_received = false;
-            break;
-        }
-        if (!WireFormat::ReadFixed(*input_, &has_nested)) {
-            exception_received = false;
-            break;
-        }
-
-        if (has_nested) {
-            current->nested.reset(new Exception);
-            current = current->nested.get();
-        } else {
-            break;
-        }
-    } while (true);
+    bool exception_received =
+        WireFormat::ReadFixed(*input_, &e->code)
+        && WireFormat::ReadString(*input_, &e->name)
+        && WireFormat::ReadString(*input_, &e->display_text)
+        && WireFormat::ReadString(*input_, &e->stack_trace)
+        && WireFormat::ReadFixed(*input_, &has_nested);
 
     if (events_) {
         events_->OnServerException(*e);
@@ -868,12 +975,25 @@ bool Client::Impl::ReceiveException(bool rethrow) {
         throw ServerError(e);
     }
 
+    if (exception_received && error != nullptr) {
+        *error = ServerError(e);
+    }
     return exception_received;
 }
 
 void Client::Impl::SendCancel() {
     WireFormat::WriteUInt64(*output_, ClientCodes::Cancel);
     output_->Flush();
+}
+
+void Client::Impl::Cancel() {
+    if (state_ != State::Selecting) {
+        throw ValidationError("cannot cancel while not executing a query");
+    }
+    SendCancel();
+    while (NextBlock().has_value()) {
+        ;
+    }
 }
 
 void Client::Impl::SendQuery(const Query& query, bool finalize) {
@@ -1176,6 +1296,10 @@ void Client::Execute(const Query& query) {
     impl_->ExecuteQuery(query);
 }
 
+void Client::Select(const Query& query) {
+    Execute(query);
+}
+
 void Client::Select(const std::string& query, SelectCallback cb) {
     Execute(Query(query).OnData(std::move(cb)));
 }
@@ -1190,10 +1314,6 @@ void Client::SelectCancelable(const std::string& query, SelectCancelableCallback
 
 void Client::SelectCancelable(const std::string& query, const std::string& query_id, SelectCancelableCallback cb) {
     Execute(Query(query, query_id).OnDataCancelable(std::move(cb)));
-}
-
-void Client::Select(const Query& query) {
-    Execute(query);
 }
 
 void Client::SelectWithExternalData(const std::string& query, const ExternalTables& external_tables, SelectCallback cb) {
@@ -1212,6 +1332,47 @@ void Client::SelectWithExternalDataCancelable(const std::string& query, const st
     impl_->SelectWithExternalData(Query(query, query_id).OnDataCancelable(std::move(cb)), external_tables);
 }
 
+void Client::SelectWithExternalData(const Query& query, const ExternalTables& external_tables) {
+    impl_->SelectWithExternalData(query, external_tables);
+}
+
+void Client::BeginExecute(const Query& query) {
+    impl_->BeginExecuteQuery(query);
+}
+
+void Client::BeginSelect(const Query& query) {
+    impl_->BeginExecuteQuery(query);
+}
+
+void Client::BeginSelect(const char* query)
+{
+    BeginExecute(Query(query));
+}
+
+void Client::BeginSelect(const std::string& query)
+{
+    BeginExecute(Query(query));
+}
+
+void Client::BeginSelect(const std::string& query, const std::string& query_id)
+{
+    BeginExecute(Query(query, query_id));
+}
+
+std::optional<Block> Client::NextBlock() {
+    return impl_->NextBlock();
+}
+
+void Client::Cancel()
+{
+    impl_->Cancel();
+}
+
+bool Client::IsSelecting() const
+{
+    return impl_->IsSelecting();
+}
+
 void Client::Insert(const std::string& table_name, const Block& block) {
     impl_->Insert(table_name, Query::default_query_id, block);
 }
@@ -1220,8 +1381,8 @@ void Client::Insert(const std::string& table_name, const std::string& query_id, 
     impl_->Insert(table_name, query_id, block);
 }
 
-Block Client::BeginInsert(const std::string& query) {
-    return impl_->BeginInsert(Query(query));
+Block Client::BeginInsert(const Query& query) {
+    return impl_->BeginInsert(query);
 }
 
 Block Client::BeginInsert(const std::string& query, const std::string& query_id) {
@@ -1234,6 +1395,10 @@ void Client::SendInsertBlock(const Block& block) {
 
 void Client::EndInsert() {
     impl_->EndInsert();
+}
+
+bool Client::IsInserting() const {
+    return impl_->IsInserting();
 }
 
 void Client::Ping() {

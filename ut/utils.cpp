@@ -26,9 +26,7 @@
 #include <stdexcept>
 #include <type_traits>
 #include "clickhouse/types/types.h"
-#include "absl/numeric/int128.h"
-
-
+#include "clickhouse/base/bignum_string.h"
 
 namespace {
 using namespace clickhouse;
@@ -166,6 +164,7 @@ std::ostream & printColumnValue(const ColumnRef& c, const size_t row, std::ostre
     const auto r = false
         || doPrintValue<ColumnString>(c, row, ostr)
         || doPrintValue<ColumnFixedString>(c, row, ostr)
+        || doPrintValue<ColumnJSON>(c, row, ostr)
         || doPrintValue<ColumnUInt8, unsigned int>(c, row, ostr)
         || doPrintValue<ColumnUInt32>(c, row, ostr)
         || doPrintValue<ColumnUInt16>(c, row, ostr)
@@ -361,6 +360,9 @@ std::ostream& operator<<(std::ostream& ostr, const ItemView& item_view) {
         case Type::UInt8:
             ostr << static_cast<unsigned int>(item_view.get<uint8_t>());
             break;
+        case Type::Bool:
+            ostr << (item_view.get<bool>() ? "true" : "false");
+            break;
         case Type::UInt16:
             ostr << static_cast<unsigned int>(item_view.get<uint16_t>());
             break;
@@ -378,6 +380,7 @@ std::ostream& operator<<(std::ostream& ostr, const ItemView& item_view) {
             break;
         case Type::String:
         case Type::FixedString:
+        case Type::JSON:
             ostr << "\"" << item_view.data << "\" (" << item_view.data.size() << " bytes)";
             break;
         case Type::Date:
@@ -397,13 +400,19 @@ std::ostream& operator<<(std::ostream& ostr, const ItemView& item_view) {
                 ostr << DateTimeValue(item_view.get<int64_t>());
             }
             else if (item_view.data.size() == sizeof(Int128)) {
-                ostr << DateTimeValue(item_view.get<Int128>());
+                ostr << DateTimeValue(Bignum::Int128Low64(item_view.get<Int128>()));
             }
             else {
                 throw std::runtime_error("Invalid data size of ItemView of type DateTime64");
             }
             break;
         }
+        case Type::Time:
+            ostr << item_view.get<int32_t>();
+            break;
+        case Type::Time64:
+            ostr << item_view.get<int64_t>();
+            break;
         case Type::Enum8:
             ostr << static_cast<int>(item_view.get<int8_t>());
             break;
@@ -452,7 +461,7 @@ std::ostream& operator<<(std::ostream& ostr, const ItemView& item_view) {
             ostr << DateTimeValue(item_view.get<int64_t>());
             break;
         case Type::Decimal128:
-            ostr << DateTimeValue(item_view.get<Int128>());
+            ostr << DateTimeValue(Bignum::Int128Low64(item_view.get<Int128>()));
             break;
         // Unsupported types. i.e. there shouldn't be `ItemView`s of those types in practice.
         // either because GetItem() is not implemented for corresponding column type

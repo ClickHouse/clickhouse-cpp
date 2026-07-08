@@ -1,7 +1,9 @@
+#include <clickhouse/columns/bool.h>
 #include <clickhouse/columns/factory.h>
 #include <clickhouse/columns/date.h>
 #include <clickhouse/columns/numeric.h>
 #include <clickhouse/columns/string.h>
+#include <clickhouse/columns/json.h>
 
 #include <gtest/gtest.h>
 
@@ -62,7 +64,15 @@ class CreateColumnByTypeWithName : public ::testing::TestWithParam<const char* /
 TEST(CreateColumnByType, Bool) {
     const auto col = CreateColumnByType("Bool");
     ASSERT_NE(nullptr, col);
+#if CH_MAP_BOOL_TO_UINT8
     EXPECT_EQ(col->GetType().GetName(), "UInt8");
+    EXPECT_EQ(col->GetType().GetCode(), Type::UInt8);
+    EXPECT_NE(nullptr, col->As<ColumnUInt8>());
+#else
+    EXPECT_EQ(col->GetType().GetName(), "Bool");
+    EXPECT_EQ(col->GetType().GetCode(), Type::Bool);
+    EXPECT_NE(nullptr, col->As<ColumnBool>());
+#endif
 }
 
 TEST_P(CreateColumnByTypeWithName, CreateColumnByType)
@@ -78,6 +88,9 @@ INSTANTIATE_TEST_SUITE_P(Basic, CreateColumnByTypeWithName, ::testing::Values(
     "String", "Date", "DateTime",
     "UUID", "Int128", "UInt128"
 ));
+#if !CH_MAP_BOOL_TO_UINT8
+INSTANTIATE_TEST_SUITE_P(BasicBool, CreateColumnByTypeWithName, ::testing::Values("Bool"));
+#endif
 
 INSTANTIATE_TEST_SUITE_P(Parametrized, CreateColumnByTypeWithName, ::testing::Values(
     "FixedString(0)", "FixedString(10000)",

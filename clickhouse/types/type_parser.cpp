@@ -22,7 +22,9 @@ bool TypeAst::operator==(const TypeAst & other) const {
     return meta == other.meta
         && code == other.code
         && name == other.name
+        && element_name == other.element_name
         && value == other.value
+        && value_string == other.value_string
         && std::equal(elements.begin(), elements.end(), other.elements.begin(), other.elements.end());
 }
 
@@ -32,7 +34,11 @@ static const std::unordered_map<std::string, Type::Code> kTypeCode = {
     { "Int16",       Type::Int16 },
     { "Int32",       Type::Int32 },
     { "Int64",       Type::Int64 },
+#if CH_MAP_BOOL_TO_UINT8
     { "Bool",        Type::UInt8 },
+#else
+    { "Bool",        Type::Bool },
+#endif
     { "UInt8",       Type::UInt8 },
     { "UInt16",      Type::UInt16 },
     { "UInt32",      Type::UInt32 },
@@ -65,6 +71,9 @@ static const std::unordered_map<std::string, Type::Code> kTypeCode = {
     { "Ring",        Type::Ring },
     { "Polygon",     Type::Polygon },
     { "MultiPolygon", Type::MultiPolygon },
+    { "Time",        Type::Time },
+    { "Time64",      Type::Time64 },
+    { "JSON",        Type::JSON },
 };
 
 template <typename L, typename R>
@@ -164,7 +173,14 @@ bool TypeParser::Parse(TypeAst* type) {
                 type_->code = Type::String;
                 break;
             }
+            case Token::QuotedIdentifier:
             case Token::Name:
+                if (!type_->name.empty()) {
+                    // A second Name token on the same element means the
+                    // previous one was a field name in a named-tuple element
+                    // (e.g. "a" in "Tuple(a Int32, …)").
+                    type_->element_name = std::move(type_->name);
+                }
                 type_->meta = GetTypeMeta(token.value);
                 type_->name = token.value.to_string();
                 type_->code = GetTypeCode(type_->name);
@@ -244,6 +260,35 @@ TypeParser::Token TypeParser::NextToken() {
                     }
                 }
                 return Token{Token::QuotedString, StringView(cur_++, 1)};
+            }
+            case '"':
+            case '`':
+            {
+                const auto quote = *cur_;
+                ++cur_;
+                // Two escape forms are recognised, both quote-specific (e.g.
+                // inside a backtick-quoted identifier only backtick escapes
+                // apply; a doubled double-quote is treated as two literals):
+                //   \q  – backslash followed by the opening quote character
+                //   qq  – two consecutive opening quote characters
+                scratch_.clear();
+                for (; cur_ < end_; ++cur_) {
+                    if (*cur_ == '\\' && cur_ + 1 < end_ && *(cur_ + 1) == quote) {
+                        scratch_ += quote;
+                        ++cur_;
+                    } else if (*cur_ == quote) {
+                        if (cur_ + 1 < end_ && *(cur_ + 1) == quote) {
+                            scratch_ += quote;
+                            ++cur_;
+                        } else {
+                            ++cur_;
+                            return Token{Token::QuotedIdentifier, StringView{scratch_}};
+                        }
+                    } else {
+                        scratch_ += *cur_;
+                    }
+                }
+                return Token{Token::Invalid, StringView()};
             }
 
             default: {

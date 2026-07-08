@@ -13,6 +13,8 @@ namespace clickhouse {
 class ColumnTuple : public Column {
 public:
     ColumnTuple(const std::vector<ColumnRef>& columns);
+    ColumnTuple(const std::vector<ColumnRef>& columns,
+                std::vector<std::string> names);
 
     /// Returns count of columns in the tuple.
     size_t TupleSize() const;
@@ -69,11 +71,21 @@ public:
     ColumnTupleT(std::tuple<std::shared_ptr<Columns>...> columns)
         : ColumnTuple(TupleToVector(columns)), typed_columns_(std::move(columns)) {}
 
+    ColumnTupleT(std::tuple<std::shared_ptr<Columns>...> columns, std::vector<std::string> names)
+        : ColumnTuple(TupleToVector(columns), std::move(names)), typed_columns_(std::move(columns)) {}
+
     ColumnTupleT(std::vector<ColumnRef> columns)
         : ColumnTuple(columns), typed_columns_(VectorToTuple(std::move(columns))) {}
 
+    ColumnTupleT(std::vector<ColumnRef> columns, std::vector<std::string> names)
+        : ColumnTuple(columns, std::move(names)), typed_columns_(VectorToTuple(std::move(columns))) {}
+
     ColumnTupleT(const std::initializer_list<ColumnRef> columns)
         : ColumnTuple(columns), typed_columns_(VectorToTuple(std::move(columns))) {}
+
+    ColumnTupleT(std::initializer_list<ColumnRef> columns, std::vector<std::string> names)
+        : ColumnTuple(std::vector<ColumnRef>(columns), std::move(names))
+        , typed_columns_(VectorToTuple(std::vector<ColumnRef>(columns))) {}
 
     inline ValueType At(size_t index) const { return GetTupleOfValues(index); }
 
@@ -99,7 +111,8 @@ public:
         if (col.TupleSize() != std::tuple_size_v<TupleOfColumns>) {
             throw ValidationError("Can't wrap from " + col.GetType().GetName());
         }
-        return std::make_shared<ColumnTupleT<Columns...>>(VectorToTuple(std::move(col)));
+        auto names = col.Type()->As<TupleType>()->GetItemNames();
+        return std::make_shared<ColumnTupleT<Columns...>>(VectorToTuple(std::move(col)), std::move(names));
     }
 
     static auto Wrap(Column&& col) { return Wrap(std::move(dynamic_cast<ColumnTuple&&>(col))); }

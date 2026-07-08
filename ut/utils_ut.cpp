@@ -9,7 +9,6 @@
 #include "clickhouse/columns/uuid.h"
 #include "ut/value_generators.h"
 #include "utils.h"
-#include "absl/numeric/int128.h"
 
 #include <limits>
 #include <optional>
@@ -235,18 +234,21 @@ TEST(ItemView, OutputToOstream_VALID) {
     // Positive cases: output should be generated
     EXPECTED_SERIALIZATION("String : \"string\" (6 bytes)", ColumnString(), "string");
     EXPECTED_SERIALIZATION("FixedString : \"string\" (6 bytes)", ColumnFixedString(6), "string");
+    EXPECTED_SERIALIZATION(R"(JSON : "{"key": "value"}" (16 bytes))", ColumnJSON(), R"({"key": "value"})");
 
+    EXPECTED_SERIALIZATION("Bool : false", ColumnBool(), false);
+    EXPECTED_SERIALIZATION("Bool : true", ColumnBool(), true);
     EXPECTED_SERIALIZATION("Int8 : -123", ColumnInt8(), -123);
     EXPECTED_SERIALIZATION("Int16 : -1234", ColumnInt16(), -1234);
     EXPECTED_SERIALIZATION("Int32 : -12345", ColumnInt32(), -12345);
     EXPECTED_SERIALIZATION("Int64 : -123456", ColumnInt64(), -123456);
-    EXPECTED_SERIALIZATION("Int128 : -123456789", ColumnInt128(), absl::MakeInt128(-1, -123456789ll));
+    EXPECTED_SERIALIZATION("Int128 : -123456789", ColumnInt128(), Bignum::MakeInt128(-1, -123456789ll));
 
     EXPECTED_SERIALIZATION("UInt8 : 123", ColumnUInt8(), 123);
     EXPECTED_SERIALIZATION("UInt16 : 1234", ColumnUInt16(), 1234);
     EXPECTED_SERIALIZATION("UInt32 : 12345", ColumnUInt32(), 12345);
     EXPECTED_SERIALIZATION("UInt64 : 1234567", ColumnUInt64(), 1234567);
-    EXPECTED_SERIALIZATION("UInt128 : 123456789", ColumnUInt128(), absl::MakeUint128(0, 123456789ll));
+    EXPECTED_SERIALIZATION("UInt128 : 123456789", ColumnUInt128(), Bignum::MakeUInt128(0, 123456789ll));
 
     EXPECTED_SERIALIZATION("Float32 : 1", ColumnFloat32(), 1);
     EXPECTED_SERIALIZATION("Float64 : 4", ColumnFloat64(), 4);
@@ -267,6 +269,9 @@ TEST(ItemView, OutputToOstream_VALID) {
     EXPECTED_SERIALIZATION("Decimal : 1234567", ColumnDecimal(12, 6), 1234567);
     EXPECTED_SERIALIZATION("Decimal : 1234567", ColumnDecimal(18, 0), 1234567);
     EXPECTED_SERIALIZATION("Decimal : 1234567", ColumnDecimal(18, 9), 1234567);
+
+    EXPECTED_SERIALIZATION("Time : 42", ColumnTime(), 42);
+    EXPECTED_SERIALIZATION("Time64 : 42", ColumnTime64(3), 42);
 
     EXPECTED_SERIALIZATION("Date : 1970-05-04 00:00:00", ColumnDate(), time_t(123) * 86400);
     EXPECTED_SERIALIZATION("DateTime : 1970-01-15 06:56:07", ColumnDateTime(), 1234567);

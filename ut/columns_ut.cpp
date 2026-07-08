@@ -11,6 +11,7 @@
 #include <clickhouse/columns/uuid.h>
 #include <clickhouse/columns/ip4.h>
 #include <clickhouse/columns/ip6.h>
+#include <clickhouse/types/bignum.h>
 #include <clickhouse/base/input.h>
 #include <clickhouse/base/output.h>
 #include <clickhouse/base/socket.h> // for ipv4-ipv6 platform-specific stuff
@@ -19,10 +20,9 @@
 #include "utils.h"
 #include "value_generators.h"
 
+#include <memory>
 #include <string_view>
-#include <sstream>
 #include <vector>
-#include <random>
 
 namespace {
 
@@ -37,7 +37,152 @@ static const auto LOWCARDINALITY_STRING_FOOBAR_10_ITEMS_BINARY =
         "\x04\x07\x08\x04"sv;
 }
 
-// TODO: add tests for ColumnDecimal.
+class ColumnDecimalFromString : public ::testing::TestWithParam<std::pair<size_t, size_t>> {};
+
+TEST_P(ColumnDecimalFromString, DecimalFromGoodString)
+{
+    const auto [precision, scale] = GetParam();
+    size_t whole = precision - scale;
+    std::vector<std::pair<std::string, std::string>> values = {
+        {"0", "0"},
+        {"-0", "0"},
+        {"0.", "0"},
+        {"-0.", "0"},
+        {"1", "1"},
+        {"-1", "-1"},
+        {"1.0", "1" + std::string(scale, '0')},
+        {"-1.0", "-1" + std::string(scale, '0')},
+        {"1.", "1" + std::string(scale, '0')},
+        {"-1.", "-1" + std::string(scale, '0')},
+        {std::string(whole, '9') + ".", std::string(whole, '9') + std::string(scale, '0')},
+        {"-" + std::string(whole, '9') + ".", "-" + std::string(whole, '9') + std::string(scale, '0')},
+        {std::string(precision, '9'), std::string(precision, '9')},
+        {"-" + std::string(precision, '9'), "-" + std::string(precision, '9')},
+    };
+
+    for (auto & [value, expect] : values) {
+        auto col = std::make_shared<ColumnDecimal>(precision, scale);
+        EXPECT_NO_THROW(col->Append(value)) << "exception for value \"" << value << "\"";
+        ASSERT_EQ(expect, Bignum::Int128ToString(col->At(0)));
+    }
+}
+
+TEST_P(ColumnDecimalFromString, DecimalFromBadString)
+{
+    const auto [precision, scale] = GetParam();
+    size_t whole = precision - scale;
+
+    std::vector<std::string> values = {
+        "",
+        ".",
+        " ",
+        "-.",
+        "--0",
+        "1.2222x",
+        "0-",
+        ".0.",
+        "+5",
+        " 5",
+        "50 000",
+        "1e3",
+        "0x1",
+        "1,1234.5",
+
+        std::string(whole + 1, '9') + "." + std::string(scale, '0'),
+    };
+    for (auto value : values) {
+        auto col = std::make_shared<ColumnDecimal>(precision, scale);
+        EXPECT_THROW(
+            col->Append(value),
+            ValidationError
+        ) << "got \"" << Bignum::Int128ToString(col->At(0)) << "\" for value \"" << value << "\"";
+    }
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    ColumnCase,
+    ColumnDecimalFromString,
+    ::testing::Values(
+        std::make_pair<size_t, size_t>(9, 0),
+        std::make_pair<size_t, size_t>(9, 4),
+        std::make_pair<size_t, size_t>(18, 6),
+        std::make_pair<size_t, size_t>(15, 2),
+        std::make_pair<size_t, size_t>(38, 0),
+        std::make_pair<size_t, size_t>(38, 4)
+    ),
+    [](const ::testing::TestParamInfo<std::pair<size_t, size_t>>& info) {
+        return "p" + std::to_string(info.param.first)
+             + "_s" + std::to_string(info.param.second);
+    });
+
+TEST(ColumnsCase, DecimalStringValueMapping) {
+    struct TestSample {
+        size_t precision;
+        size_t scale;
+        std::string str;
+        Int128 expect;
+    };
+    
+    std::vector<TestSample> samples = {
+        {18, 0, "0.0", Int128(0)},
+        {18, 0, "0.123", Int128(0)},
+        {18, 0, "123", Int128(123)},
+        {18, 3, "0.123", Int128(123)},
+        {18, 3, "1234", Int128(1234)},
+        {18, 3, "1.234", Int128(1234)},
+        {18, 3, "0.1234", Int128(123)},
+        {18, 3, "12", Int128(12)},
+        {18, 3, "12.0", Int128(12000)},
+        {18, 3, "12.", Int128(12000)},
+    };
+
+    for (auto & [precision, scale, str, expect] : samples) {
+        auto col = std::make_shared<ColumnDecimal>(precision, scale);
+        EXPECT_NO_THROW(col->Append(str)) << "exception for value \"" << str << "\"";
+        auto value = col->At(0);
+        EXPECT_EQ(value, expect);
+    }
+
+}
+
+TEST(ColumnsCase, DecimalStringAt) {
+    struct TestSample {
+        size_t precision;
+        size_t scale;
+        std::string str;
+        std::string expect;
+    };
+
+    std::vector<TestSample> samples = {
+        {18, 0, "0", "0"},
+        {18, 0, "123", "123"},
+        {18, 0, "-123", "-123"},
+        {18, 3, "0", "0.000"},
+        {18, 3, "1", "0.001"},
+        {18, 3, "12", "0.012"},
+        {18, 3, "123", "0.123"},
+        {18, 3, "-123", "-0.123"},
+        {18, 3, "0.123", "0.123"},
+        {18, 3, "1234", "1.234"},
+        {18, 3, "-1234", "-1.234"},
+        {18, 3, "-1.234", "-1.234"},
+        {18, 3, "123.0", "123.000"},
+        {18, 3, "123.", "123.000"},
+        {18, 3, "123000", "123.000"},
+        // Large values that do not fit in 64 bits.
+        {38, 4, "12345678901234567890.1234", "12345678901234567890.1234"},
+        {38, 4, "-12345678901234567890.1234", "-12345678901234567890.1234"},
+        {38, 0, "99999999999999999999999999999999999999", "99999999999999999999999999999999999999"},
+    };
+
+    for (auto & [precision, scale, str, expect] : samples) {
+        auto col = std::make_shared<ColumnDecimal>(precision, scale);
+        EXPECT_NO_THROW(col->Append(str)) << "exception for value \"" << str << "\"";
+        auto value = col->StringAt(0);
+        EXPECT_EQ(value, expect);
+    }
+
+}
 
 TEST(ColumnsCase, NumericInit) {
     auto col = std::make_shared<ColumnUInt32>(MakeNumbers());
@@ -137,6 +282,51 @@ TEST(ColumnsCase, StringAppend) {
     ASSERT_EQ(col->At(2), "11");
 }
 
+TEST(ColumnsCase, BoolInit)
+{
+    auto values = MakeBools();
+    auto col = std::make_shared<ColumnBool>(values);
+
+    ASSERT_EQ(col->Size(), values.size());
+    ASSERT_EQ(col->At(0), 1);
+    ASSERT_EQ(col->At(3), 0);
+}
+
+TEST(ColumnsCase, BoolAppend)
+{
+    auto col = std::make_shared<ColumnBool>();
+    col->Append(true);
+    col->Append(false);
+
+    ASSERT_EQ(col->Size(), 2u);
+    ASSERT_EQ(col->At(0), true);
+    ASSERT_EQ(col->At(1), false);
+}
+
+TEST(ColumnsCase, JSONInit) {
+    auto values = MakeJSONs();
+    auto col = std::make_shared<ColumnJSON>(values);
+
+    ASSERT_EQ(col->Size(), values.size());
+    ASSERT_EQ(col->At(1), values[1]);
+    ASSERT_EQ(col->At(2), values[2]);
+    ASSERT_EQ(col->At(3), values[3]);
+}
+
+TEST(ColumnsCase, JSONAppend) {
+    auto col = std::make_shared<ColumnJSON>();
+    const char* expected = "\"ufiudhf3493fyiudferyer3yrifhdflkdjfeuroe\"";
+    std::string data(expected);
+    col->Append(data);
+    col->Append(std::move(data));
+    col->Append("11");
+
+    ASSERT_EQ(col->Size(), 3u);
+    ASSERT_EQ(col->At(0), expected);
+    ASSERT_EQ(col->At(1), expected);
+    ASSERT_EQ(col->At(2), "11");
+}
+
 TEST(ColumnsCase, TupleAppend){
     auto tuple1 = std::make_shared<ColumnTuple>(std::vector<ColumnRef>({
                                 std::make_shared<ColumnUInt64>(),
@@ -152,6 +342,89 @@ TEST(ColumnsCase, TupleAppend){
 
     ASSERT_EQ((*tuple2)[0]->As<ColumnUInt64>()->At(0), 2u);
     ASSERT_EQ((*tuple2)[1]->As<ColumnString>()->At(0), "2");
+}
+
+TEST(ColumnsCase, TupleAppendWithSameFieldNames){
+    auto tuple1 = std::make_shared<ColumnTuple>(std::vector<ColumnRef>({
+                                std::make_shared<ColumnUInt64>(),
+                                std::make_shared<ColumnString>()
+                            }), std::vector<std::string>{"a", "b"});
+    auto tuple2 = std::make_shared<ColumnTuple>(std::vector<ColumnRef>({
+                                std::make_shared<ColumnUInt64>(),
+                                std::make_shared<ColumnString>()
+                            }), std::vector<std::string>{"a", "b"});
+    (*tuple1)[0]->As<ColumnUInt64>()->Append(2u);
+    (*tuple1)[1]->As<ColumnString>()->Append("2");
+    tuple2->Append(tuple1);
+
+    ASSERT_EQ((*tuple2)[0]->As<ColumnUInt64>()->At(0), 2u);
+    ASSERT_EQ((*tuple2)[1]->As<ColumnString>()->At(0), "2");
+}
+
+TEST(ColumnsCase, TupleAppendUnnamedSourceIntoNamedDestination){
+    auto tuple1 = std::make_shared<ColumnTuple>(std::vector<ColumnRef>({
+                                std::make_shared<ColumnUInt64>(),
+                                std::make_shared<ColumnString>()
+                            }));
+    auto tuple2 = std::make_shared<ColumnTuple>(std::vector<ColumnRef>({
+                                std::make_shared<ColumnUInt64>(),
+                                std::make_shared<ColumnString>()
+                            }), std::vector<std::string>{"a", "b"});
+    (*tuple1)[0]->As<ColumnUInt64>()->Append(2u);
+    (*tuple1)[1]->As<ColumnString>()->Append("2");
+    tuple2->Append(tuple1);
+
+    ASSERT_EQ((*tuple2)[0]->As<ColumnUInt64>()->At(0), 2u);
+    ASSERT_EQ((*tuple2)[1]->As<ColumnString>()->At(0), "2");
+}
+
+TEST(ColumnsCase, TupleAppendWithDifferentFieldNames){
+    auto tuple1 = std::make_shared<ColumnTuple>(std::vector<ColumnRef>({
+                                std::make_shared<ColumnUInt64>(),
+                                std::make_shared<ColumnString>()
+                            }), std::vector<std::string>{"x", "y"});
+    auto tuple2 = std::make_shared<ColumnTuple>(std::vector<ColumnRef>({
+                                std::make_shared<ColumnUInt64>(),
+                                std::make_shared<ColumnString>()
+                            }), std::vector<std::string>{"a", "b"});
+
+    (*tuple1)[0]->As<ColumnUInt64>()->Append(2u);
+    (*tuple1)[1]->As<ColumnString>()->Append("2");
+    tuple2->Append(tuple1);
+
+    ASSERT_EQ((*tuple2)[0]->As<ColumnUInt64>()->At(0), 2u);
+    ASSERT_EQ((*tuple2)[1]->As<ColumnString>()->At(0), "2");
+}
+
+TEST(ColumnsCase, TupleAppendNamedSourceIntoUnnamedDestination){
+    auto tuple1 = std::make_shared<ColumnTuple>(std::vector<ColumnRef>({
+                                std::make_shared<ColumnUInt64>(),
+                                std::make_shared<ColumnString>()
+                            }), std::vector<std::string>{"a", "b"});
+    auto tuple2 = std::make_shared<ColumnTuple>(std::vector<ColumnRef>({
+                                std::make_shared<ColumnUInt64>(),
+                                std::make_shared<ColumnString>()
+                            }));
+
+    (*tuple1)[0]->As<ColumnUInt64>()->Append(2u);
+    (*tuple1)[1]->As<ColumnString>()->Append("2");
+    tuple2->Append(tuple1);
+
+    ASSERT_EQ((*tuple2)[0]->As<ColumnUInt64>()->At(0), 2u);
+    ASSERT_EQ((*tuple2)[1]->As<ColumnString>()->At(0), "2");
+}
+
+TEST(ColumnsCase, TupleAppendRejectsIncompatibleStructure){
+    auto tuple1 = std::make_shared<ColumnTuple>(std::vector<ColumnRef>({
+                                std::make_shared<ColumnUInt64>(),
+                                std::make_shared<ColumnUInt64>()
+                            }));
+    auto tuple2 = std::make_shared<ColumnTuple>(std::vector<ColumnRef>({
+                                std::make_shared<ColumnUInt64>(),
+                                std::make_shared<ColumnString>()
+                            }));
+
+    EXPECT_THROW(tuple2->Append(tuple1), ValidationError);
 }
 
 TEST(ColumnsCase, TupleSlice){
@@ -170,6 +443,65 @@ TEST(ColumnsCase, TupleSlice){
     ASSERT_EQ((*tuple2)[1]->As<ColumnString>()->At(0), "3");
 }
 
+TEST(ColumnsCase, TupleWithQuotedFieldNames) {
+    auto col = CreateColumnByType("Tuple(`a.b` Int8, `c.d` String)");
+    ASSERT_NE(col, nullptr);
+    const auto& names = col->AsStrict<ColumnTuple>()->Type()->As<TupleType>()->GetItemNames();
+    ASSERT_EQ(names.size(), 2u);
+    EXPECT_EQ(names[0], "a.b");
+    EXPECT_EQ(names[1], "c.d");
+}
+
+TEST(ColumnsCase, TimeAppend) {
+    auto col = std::make_shared<ColumnTime>();
+    col->Append(1);
+    col->Append(60);
+    ASSERT_EQ(col->Size(), 2u);
+    ASSERT_EQ(col->At(0), 1);
+    ASSERT_EQ(col->At(1), 60);
+}
+
+TEST(ColumnsCase, Time_Int32_construct_from_rvalue_data) {
+    auto const expected = MakeNumbers<int32_t>();
+
+    auto data = expected;
+    auto col = std::make_shared<ColumnTime>(std::move(data));
+
+    ASSERT_EQ(col->Size(), expected.size());
+    for (size_t i = 0; i < expected.size(); ++i) {
+        ASSERT_EQ(col->At(i), expected[i]);
+    }
+}
+
+TEST(ColumnsCase, Time64Append) {
+    auto col = std::make_shared<ColumnTime64>(3);
+    col->Append(1);
+    col->Append(60);
+    ASSERT_EQ(col->Size(), 2u);
+    ASSERT_EQ(col->At(0), 1);
+    ASSERT_EQ(col->At(1), 60);
+}
+
+TEST(ColumnsCase, Time64_Int64_construct_from_rvalue_data) {
+    auto const expected = MakeNumbers<int64_t>();
+
+    auto data = expected;
+    auto col1 = std::make_shared<ColumnTime64>(3, std::move(data));
+
+    ASSERT_EQ(col1->Size(), expected.size());
+    for (size_t i = 0; i < expected.size(); ++i) {
+        ASSERT_EQ(col1->At(i), expected[i]);
+    }
+    ASSERT_EQ(col1->GetPrecision(), 3UL);
+}
+
+TEST(ColumnsCase, Time64SwapDifferentPrecision) {
+    auto col1 = std::make_shared<ColumnTime64>(3);
+    auto col2 = std::make_shared<ColumnTime64>(6);
+    col1->Append(1);
+    col1->Append(60);
+    EXPECT_THROW(col1->Swap(*col2), ValidationError) ;
+}
 
 TEST(ColumnsCase, DateAppend) {
     auto col1 = std::make_shared<ColumnDate>();
@@ -182,7 +514,6 @@ TEST(ColumnsCase, DateAppend) {
     ASSERT_EQ(col2->Size(), 1u);
     ASSERT_EQ(col2->At(0), (now / 86400) * 86400);
 }
-
 
 TEST(ColumnsCase, Date_UInt16_interface) {
     auto col1 = std::make_shared<ColumnDate>();
@@ -463,46 +794,46 @@ TEST(ColumnsCase, UUIDSlice) {
 
 TEST(ColumnsCase, Int128) {
     auto col = std::make_shared<ColumnInt128>(std::vector<Int128>{
-            absl::MakeInt128(0xffffffffffffffffll, 0xffffffffffffffffll), // -1
-            absl::MakeInt128(0, 0xffffffffffffffffll),  // 2^64
-            absl::MakeInt128(0xffffffffffffffffll, 0),
-            absl::MakeInt128(0x8000000000000000ll, 0),
+            Bignum::MakeInt128(0xffffffffffffffffll, 0xffffffffffffffffll), // -1
+            Bignum::MakeInt128(0, 0xffffffffffffffffll),  // 2^64
+            Bignum::MakeInt128(0xffffffffffffffffll, 0),
+            Bignum::MakeInt128(0x8000000000000000ll, 0),
             Int128(0)
     });
 
-    EXPECT_EQ(-1, col->At(0));
+    EXPECT_EQ(Int128(-1), col->At(0));
 
-    EXPECT_EQ(absl::MakeInt128(0, 0xffffffffffffffffll), col->At(1));
-    EXPECT_EQ(0ll,                   absl::Int128High64(col->At(1)));
-    EXPECT_EQ(0xffffffffffffffffull, absl::Int128Low64(col->At(1)));
+    EXPECT_EQ(Bignum::MakeInt128(0, 0xffffffffffffffffll), col->At(1));
+    EXPECT_EQ(0ll,                   Bignum::Int128High64(col->At(1)));
+    EXPECT_EQ(0xffffffffffffffffull, Bignum::Int128Low64(col->At(1)));
 
-    EXPECT_EQ(absl::MakeInt128(0xffffffffffffffffll, 0), col->At(2));
-    EXPECT_EQ(static_cast<int64_t>(0xffffffffffffffffll),  absl::Int128High64(col->At(2)));
-    EXPECT_EQ(0ull,                  absl::Int128Low64(col->At(2)));
+    EXPECT_EQ(Bignum::MakeInt128(0xffffffffffffffffll, 0), col->At(2));
+    EXPECT_EQ(static_cast<int64_t>(0xffffffffffffffffll),  Bignum::Int128High64(col->At(2)));
+    EXPECT_EQ(0ull,                  Bignum::Int128Low64(col->At(2)));
 
-    EXPECT_EQ(0, col->At(4));
+    EXPECT_EQ(Int128(0), col->At(4));
 }
 
 TEST(ColumnsCase, UInt128) {
     auto col = std::make_shared<ColumnUInt128>(std::vector<UInt128>{
-            absl::MakeUint128(0xffffffffffffffffll, 0xffffffffffffffffll), // 2^128 - 1
-            absl::MakeUint128(0, 0xffffffffffffffffll),  // 2^64 - 1
-            absl::MakeUint128(0xffffffffffffffffll, 0),  // 2^128 - 2^64
-            absl::MakeUint128(0x8000000000000000ll, 0),
+            Bignum::MakeUInt128(0xffffffffffffffffll, 0xffffffffffffffffll), // 2^128 - 1
+            Bignum::MakeUInt128(0, 0xffffffffffffffffll),  // 2^64 - 1
+            Bignum::MakeUInt128(0xffffffffffffffffll, 0),  // 2^128 - 2^64
+            Bignum::MakeUInt128(0x8000000000000000ll, 0),
             UInt128(0)
     });
 
-    EXPECT_EQ(absl::MakeUint128(0xffffffffffffffffll, 0xffffffffffffffffll), col->At(0));
+    EXPECT_EQ(Bignum::MakeUInt128(0xffffffffffffffffll, 0xffffffffffffffffll), col->At(0));
 
-    EXPECT_EQ(absl::MakeUint128(0, 0xffffffffffffffffll), col->At(1));
-    EXPECT_EQ(0ull,                  absl::Uint128High64(col->At(1)));
-    EXPECT_EQ(0xffffffffffffffffull, absl::Uint128Low64(col->At(1)));
+    EXPECT_EQ(Bignum::MakeUInt128(0, 0xffffffffffffffffll), col->At(1));
+    EXPECT_EQ(0ull,                  Bignum::UInt128High64(col->At(1)));
+    EXPECT_EQ(0xffffffffffffffffull, Bignum::UInt128Low64(col->At(1)));
 
-    EXPECT_EQ(absl::MakeUint128(0xffffffffffffffffll, 0), col->At(2));
-    EXPECT_EQ(static_cast<uint64_t>(0xffffffffffffffffull),  absl::Uint128High64(col->At(2)));
-    EXPECT_EQ(0ull,                  absl::Uint128Low64(col->At(2)));
+    EXPECT_EQ(Bignum::MakeUInt128(0xffffffffffffffffll, 0), col->At(2));
+    EXPECT_EQ(static_cast<uint64_t>(0xffffffffffffffffull),  Bignum::UInt128High64(col->At(2)));
+    EXPECT_EQ(0ull,                  Bignum::UInt128Low64(col->At(2)));
 
-    EXPECT_EQ(0, col->At(4));
+    EXPECT_EQ(UInt128(0), col->At(4));
 }
 
 TEST(ColumnsCase, ColumnIPv4)
@@ -699,15 +1030,15 @@ TEST(ColumnsCase, ColumnIPv6_construct_from_data)
     EXPECT_ANY_THROW(ColumnIPv6(ColumnRef(std::make_shared<ColumnString>())));
 }
 
-TEST(ColumnsCase, ColumnDecimal128_from_string) {
+TEST(ColumnsCase, ColumnDecimal128FromString) {
     auto col = std::make_shared<ColumnDecimal>(38, 0);
 
     const auto values = {
+        Bignum::StringToInt128('-' + std::string(38, '9')),
         Int128(0),
         Int128(-1),
         Int128(1),
-        std::numeric_limits<Int128>::min() + 1,
-        std::numeric_limits<Int128>::max(),
+        Bignum::StringToInt128(std::string(38, '9')),
     };
 
     for (size_t i = 0; i < values.size(); ++i) {
@@ -951,6 +1282,53 @@ TEST(ColumnsCase, ColumnTupleT_Empty) {
     const auto val = std::make_tuple();
     col.Append(val);
     EXPECT_EQ(col.Size(), 0u);
+}
+
+TEST(ColumnsCase, ColumnTupleT_WithNames) {
+    using TestTuple = ColumnTupleT<ColumnUInt64, ColumnString>;
+
+    TestTuple col(
+        std::make_tuple(
+            std::make_shared<ColumnUInt64>(),
+            std::make_shared<ColumnString>()
+        ),
+        std::vector<std::string>{"id", "name"}
+    );
+    EXPECT_EQ(col.Type()->GetName(), "Tuple(id UInt64, name String)");
+
+    col.Append(std::make_tuple(uint64_t(42), std::string("hello")));
+    EXPECT_EQ(col.At(0), std::make_tuple(uint64_t(42), std::string_view("hello")));
+}
+
+TEST(ColumnsCase, ColumnTupleT_Wrap_PreservesNames) {
+    ColumnTuple base(
+        {std::make_shared<ColumnUInt64>(), std::make_shared<ColumnString>()},
+        {"id", "name"}
+    );
+
+    using TestTuple = ColumnTupleT<ColumnUInt64, ColumnString>;
+    auto wrapped = TestTuple::Wrap(std::move(base));
+    EXPECT_EQ(wrapped->Type()->GetName(), "Tuple(id UInt64, name String)");
+}
+
+TEST(ColumnsCase, ColumnTupleT_Slice_PreservesNames) {
+    using TestTuple = ColumnTupleT<ColumnUInt64, ColumnString>;
+
+    auto col = std::make_shared<TestTuple>(
+        std::make_tuple(
+            std::make_shared<ColumnUInt64>(),
+            std::make_shared<ColumnString>()
+        ),
+        std::vector<std::string>{"id", "name"}
+    );
+    col->Append(std::make_tuple(uint64_t(1), std::string("a")));
+    col->Append(std::make_tuple(uint64_t(2), std::string("b")));
+
+    auto sliced = col->Slice(0, 1);
+    EXPECT_EQ(sliced->Type()->GetName(), "Tuple(id UInt64, name String)");
+
+    auto cloned = col->CloneEmpty();
+    EXPECT_EQ(cloned->Type()->GetName(), "Tuple(id UInt64, name String)");
 }
 
 TEST(ColumnsCase, ColumnMapT) {

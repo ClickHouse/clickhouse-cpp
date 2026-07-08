@@ -1,4 +1,4 @@
-CMAKE_MINIMUM_REQUIRED (VERSION 3.5.2)
+CMAKE_MINIMUM_REQUIRED (VERSION 3.13)
 
 LIST (APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
@@ -14,13 +14,16 @@ IF ("${CMAKE_CURRENT_SOURCE_DIR}" STREQUAL "${CMAKE_SOURCE_DIR}")
     OPTION (BUILD_SHARED_LIBS "Build shared libs" OFF)
 ENDIF ()
 OPTION (WITH_OPENSSL "Use OpenSSL for TLS connections" OFF)
-OPTION (WITH_SYSTEM_ABSEIL "Use system ABSEIL" OFF)
+
+OPTION (CH_USE_ABSEIL_FOR_BIGNUM "Use Google Abseil for wide (128-bit) integers" ON)
+OPTION (WITH_SYSTEM_ABSEIL "Use system Google Abseil, otherwise vendored part part of Google Abseil will be used" OFF)
+
 OPTION (WITH_SYSTEM_LZ4 "Use system LZ4" OFF)
-OPTION (WITH_SYSTEM_CITYHASH "Use system cityhash" OFF)
 OPTION (WITH_SYSTEM_ZSTD "Use system ZSTD" OFF)
 OPTION (DEBUG_DEPENDENCIES "Print debug info about dependencies duting build" ON)
 OPTION (CHECK_VERSION "Check that version number corresponds to git tag, usefull in CI/CD to validate that new version published on GitHub has same version in sources" OFF)
 OPTION (DISABLE_CLANG_LIBC_WORKAROUND "Disable linking compiler-rt & gcc_s if using clang & libstdc++" OFF)
+OPTION (CH_MAP_BOOL_TO_UINT8 "Map ClickHouse Bool type to UInt8 instead of exposing a distinct Bool API." ON)
 
 PROJECT (CLICKHOUSE-CLIENT
     VERSION "${CLICKHOUSE_CPP_VERSION}"
@@ -77,11 +80,13 @@ IF (CLANG_WITH_LIB_STDCXX)
     SET (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -lgcc_s")
 ENDIF ()
 
-IF (WITH_SYSTEM_ABSEIL)
-    FIND_PACKAGE(absl REQUIRED)
-ELSE ()
-    INCLUDE_DIRECTORIES (contrib/absl)
-    SUBDIRS (contrib/absl/absl)
+IF (CH_USE_ABSEIL_FOR_BIGNUM)
+    IF (WITH_SYSTEM_ABSEIL)
+        FIND_PACKAGE(absl REQUIRED)
+    ELSE ()
+        INCLUDE_DIRECTORIES (contrib/absl)
+        SUBDIRS (contrib/absl/absl)
+    ENDIF ()
 ENDIF ()
 
 IF (WITH_SYSTEM_LZ4)
@@ -91,12 +96,8 @@ ELSE ()
     SUBDIRS (contrib/lz4/lz4)
 ENDIF ()
 
-IF (WITH_SYSTEM_CITYHASH)
-    FIND_PACKAGE(cityhash REQUIRED)
-ELSE ()
-    INCLUDE_DIRECTORIES (contrib/cityhash/cityhash)
-    SUBDIRS (contrib/cityhash/cityhash)
-ENDIF ()
+INCLUDE_DIRECTORIES (clickhouse/cityhash)
+SUBDIRS (clickhouse/cityhash)
 
 IF (WITH_SYSTEM_ZSTD)
     FIND_PACKAGE(zstd REQUIRED)
@@ -150,7 +151,10 @@ if(DEBUG_DEPENDENCIES)
         )
     endfunction()
 
-    print_target_debug_info(absl::int128)
+    if (CH_USE_ABSEIL_FOR_BIGNUM)
+        print_target_debug_info(absl::int128)
+    endif()
+
     print_target_debug_info(cityhash::cityhash)
     print_target_debug_info(lz4::lz4)
     print_target_debug_info(zstd::zstd)

@@ -5,6 +5,7 @@
 
 #include "clickhouse/columns/itemview.h"
 #include "clickhouse/query.h"
+#include "clickhouse/types/types.h"
 #include "utils_meta.h"
 #include "utils_comparison.h"
 
@@ -13,7 +14,6 @@
 #include <ostream>
 #include <ratio>
 #include <string_view>
-#include <system_error>
 #include <type_traits>
 #include <vector>
 #include <cmath>

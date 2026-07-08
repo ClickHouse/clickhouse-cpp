@@ -3,6 +3,7 @@
 #include "server_exception.h"
 
 #include <stdexcept>
+#include <memory>
 
 namespace clickhouse {
 
