@@ -72,10 +72,15 @@ private:
 template <>
 inline void ColumnNullableT<ColumnJSON>::Append(std::optional<std::string_view> value) {
     ColumnNullable::Append(!value.has_value());
-    if (value.has_value()) {
-        typed_nested_data_->Append(*value);
-    } else {
-        typed_nested_data_->Append(std::string_view("{}"));
+    try {
+        if (value.has_value()) {
+            typed_nested_data_->Append(*value);
+        } else {
+            typed_nested_data_->Append(std::string_view("{}"));
+        }
+    } catch (...) {
+        Nulls()->AsStrict<ColumnUInt8>()->Erase(Size() - 1);
+        throw;
     }
 }
 
