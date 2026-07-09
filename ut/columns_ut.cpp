@@ -1381,3 +1381,73 @@ TEST(ColumnsCase, ColumnMapT_Wrap) {
     EXPECT_EQ("123", map_view.At(1));
     EXPECT_EQ("abc", map_view.At(2));
 }
+
+// Regression tests for general LowCardinality support over non-String inner
+// types (previously only String/FixedString were supported).
+TEST(ColumnLowCardinality, AppendAndReadNumeric) {
+    auto col = std::make_shared<ColumnLowCardinalityT<ColumnInt64>>();
+    col->Append(7);
+    col->Append(7);
+    col->Append(9);
+    col->Append(7);
+
+    ASSERT_EQ(4u, col->Size());
+    EXPECT_EQ(7, col->At(0));
+    EXPECT_EQ(7, col->At(1));
+    EXPECT_EQ(9, col->At(2));
+    EXPECT_EQ(7, col->At(3));
+    // Dictionary holds the default item plus the two distinct values {7, 9}.
+    EXPECT_EQ(3u, col->GetDictionarySize());
+
+    // GetItem returns the raw value with the correct type code.
+    const auto item = col->GetItem(2);
+    EXPECT_EQ(Type::Int64, item.type);
+    EXPECT_EQ(9, item.get<int64_t>());
+}
+
+TEST(ColumnLowCardinality, AppendAndReadNullableNumeric) {
+    auto col
+        = std::make_shared<ColumnLowCardinalityT<ColumnNullableT<ColumnInt64>>>();
+    col->Append(7);
+    col->Append(std::nullopt);
+    col->Append(7);
+    col->Append(9);
+    col->Append(std::nullopt);
+
+    ASSERT_EQ(5u, col->Size());
+    EXPECT_EQ(std::optional<int64_t>{7}, col->At(0));
+    EXPECT_EQ(std::nullopt, col->At(1));
+    EXPECT_EQ(std::optional<int64_t>{7}, col->At(2));
+    EXPECT_EQ(std::optional<int64_t>{9}, col->At(3));
+    EXPECT_EQ(std::nullopt, col->At(4));
+
+    // Null rows are represented by a Void ItemView.
+    EXPECT_EQ(Type::Void, col->GetItem(1).type);
+    EXPECT_EQ(Type::Int64, col->GetItem(0).type);
+}
+
+TEST(ColumnLowCardinality, NumericLoadAndSave) {
+    auto column_A = std::make_shared<ColumnLowCardinalityT<ColumnUInt64>>();
+    for (auto v : {1u, 2u, 1u, 3u, 2u, 1u}) {
+        column_A->Append(v);
+    }
+
+    const auto BufferSize = 64 * 1024;
+    std::unique_ptr<char[]> buffer = std::make_unique<char[]>(BufferSize);
+    memset(buffer.get(), 0, BufferSize);
+    {
+        ArrayOutput output(buffer.get(), BufferSize);
+        ASSERT_NO_THROW(column_A->Save(&output));
+    }
+
+    auto column_B = std::make_shared<ColumnLowCardinalityT<ColumnUInt64>>();
+    {
+        ArrayInput input(buffer.get(), BufferSize);
+        ASSERT_TRUE(column_B->Load(&input, column_A->Size()));
+    }
+
+    ASSERT_EQ(column_A->Size(), column_B->Size());
+    for (size_t i = 0; i < column_A->Size(); ++i) {
+        EXPECT_EQ(column_A->At(i), column_B->At(i)) << "row " << i;
+    }
+}

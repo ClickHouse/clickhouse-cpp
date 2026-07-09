@@ -246,8 +246,16 @@ static ColumnRef CreateColumnFromAst(const TypeAst& ast, CreateColumnByTypeSetti
                                 std::make_shared<ColumnUInt8>()
                             )
                         );
-                    default:
-                        throw UnimplementedError("LowCardinality(" + nested.name + ") is not supported");
+                    default: {
+                        // Generic LowCardinality(T): build the inner column and
+                        // wrap it. Works for any fixed-size dictionary type that
+                        // AppendToDictionary supports.
+                        auto inner = CreateColumnFromAst(nested, settings);
+                        if (!inner) {
+                            throw UnimplementedError("LowCardinality(" + nested.name + ") is not supported");
+                        }
+                        return std::make_shared<ColumnLowCardinality>(std::move(inner));
+                    }
                 }
             }
         }
