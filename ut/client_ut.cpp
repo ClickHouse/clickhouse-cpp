@@ -1998,7 +1998,7 @@ TEST_P(ClientCase, ClientName) {
 
     FlushLogs();
 
-    std::string query_log_query 
+    std::string query_log_query
         = "SELECT CAST(client_name, 'String') FROM system.query_log WHERE query_id = '" + query_id + "'";
 
     size_t total_rows = 0;
@@ -2010,4 +2010,55 @@ TEST_P(ClientCase, ClientName) {
         }
     });
     ASSERT_GT(total_rows, 0UL) << "Query with query_id " << query_id << " is not found";
+}
+
+TEST_P(ClientCase, ClientMoveConstructor) {
+    Client client{std::move(*client_.get())};
+
+    size_t total_rows = 0;
+    client.Select("SELECT 'foobar'", [&total_rows](const Block& block) {
+        total_rows += block.GetRowCount();
+        if (block.GetRowCount() == 0) {
+            return;
+        }
+
+        ASSERT_EQ(1U, block.GetColumnCount());
+        auto col = block[0]->As<ColumnString>();
+        ASSERT_TRUE(col);
+        ASSERT_EQ(1U, col->Size());
+        EXPECT_EQ("foobar", (*col)[0]);
+    });
+    ASSERT_EQ(total_rows, 1U);
+}
+
+TEST_P(ClientCase, ClientMoveAssign) {
+    client_->Execute("SET param_session_id = 'initial'");
+
+    ClientOptions opt = GetParam();
+    Client client{opt};
+    client.Execute("SET param_session_id = 'new'");
+
+    size_t total_rows = 0;
+    client.Select("SELECT {session_id:String}", [&total_rows](const Block& block) {
+        total_rows += block.GetRowCount();
+        for (size_t i = 0; i < block.GetRowCount(); ++i) {
+            EXPECT_EQ("new", block[0]->AsStrict<ColumnString>()->At(i));
+
+        }
+    });
+    ASSERT_EQ(total_rows, 1U);
+
+    client = std::move(*client_.get());
+
+    total_rows = 0;
+    client.Select("SELECT {session_id:String}", [&total_rows](const Block& block) {
+        total_rows += block.GetRowCount();
+        for (size_t i = 0; i < block.GetRowCount(); ++i) {
+            EXPECT_EQ("initial", block[0]->AsStrict<ColumnString>()->At(i));
+            //         ^
+            // The value has changed to the session id of the original client
+        }
+    });
+    ASSERT_EQ(total_rows, 1U);
+
 }
