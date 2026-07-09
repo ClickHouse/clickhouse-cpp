@@ -1277,15 +1277,13 @@ void Client::Impl::RetryGuard(std::function<void()> func) {
 }
 
 Client::Client(const ClientOptions& opts)
-    : options_(opts)
-    , impl_(new Impl(opts))
+    : impl_(new Impl(opts))
 {
 }
 
 Client::Client(const ClientOptions& opts,
                std::unique_ptr<SocketFactory> socket_factory)
-    : options_(opts)
-    , impl_(new Impl(opts, std::move(socket_factory)))
+    : impl_(new Impl(opts, std::move(socket_factory)))
 {
 }
 

@@ -352,8 +352,6 @@ public:
     static Version GetVersion();
 
 private:
-    ClientOptions options_;
-
     class Impl;
     std::unique_ptr<Impl> impl_;
 };
