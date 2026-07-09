@@ -247,8 +247,8 @@ public:
     ~Client();
 
     // movable only
-    Client(Client&&);
-    Client& operator=(Client&&);
+    Client(Client&&) noexcept;
+    Client& operator=(Client&&) noexcept;
     Client(const Client&) = delete;
     Client& operator=(const Client&) = delete;
 

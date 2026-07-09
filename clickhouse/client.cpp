@@ -1290,8 +1290,9 @@ Client::Client(const ClientOptions& opts,
 Client::~Client()
 { }
 
-Client::Client(Client&&) = default;
-Client& Client::operator=(Client&&) = default;
+
+Client::Client(Client&&) noexcept = default;
+Client& Client::operator=(Client&&) noexcept = default;
 
 void Client::Execute(const Query& query) {
     impl_->ExecuteQuery(query);
