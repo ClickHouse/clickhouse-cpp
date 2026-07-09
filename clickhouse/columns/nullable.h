@@ -96,10 +96,15 @@ public:
 
     inline void Append(ValueType value) {
         ColumnNullable::Append(!value.has_value());
-        if (value.has_value()) {
-            typed_nested_data_->Append(std::move(*value));
-        } else {
-            typed_nested_data_->Append(typename ValueType::value_type{});
+        try {
+            if (value.has_value()) {
+                typed_nested_data_->Append(std::move(*value));
+            } else {
+                typed_nested_data_->Append(typename ValueType::value_type{});
+            }
+        } catch (...) {
+            Nulls()->template As<ColumnUInt8>()->Erase(Size() - 1);
+            throw;
         }
     }
 
