@@ -5,8 +5,24 @@
 #include <city.h>
 
 #include <cassert>
+#include <array>
 
 namespace clickhouse {
+
+static constexpr auto kEscapeMap = []{
+    std::array<char, 256> m{};
+    // std::fill or m.fill are not yet constant expressions in C++17
+    for (auto& x : m) x = (char)-1;
+    m['\''] = '\'';
+    m['\0'] = '0';
+    m['\\'] = '\\';
+    m['\b'] = 'b';
+    m['\f'] = 'f';
+    m['\n'] = 'n';
+    m['\r'] = 'r';
+    m['\t'] = 't';
+    return m;
+}();
 
 Type::Type(const Code code)
     : code_(code)
@@ -304,6 +320,22 @@ DecimalType::DecimalType(size_t precision, size_t scale)
     // TODO: assert(precision <= 38 && precision > 0);
 }
 
+static std::string EscapeStringLiteral(std::string_view in)
+{
+    std::string ret{};
+    ret.reserve(in.size());
+    for (char c : in) {
+        if (kEscapeMap[(uint8_t)c] != (char)-1) {
+            ret.push_back('\\');
+            ret.push_back(kEscapeMap[(uint8_t)c]);
+        }
+        else {
+            ret.push_back(c);
+        }
+    }
+    return ret;
+}
+
 std::string DecimalType::GetName() const {
     switch (GetCode()) {
         case Decimal:
@@ -340,7 +372,7 @@ std::string EnumType::GetName() const {
 
     for (auto ei = value_to_name_.begin(); ei != value_to_name_.end();) {
         result += "'";
-        result += ei->second;
+        result += EscapeStringLiteral(ei->second);
         result += "' = ";
         result += std::to_string(ei->first);
 
@@ -413,7 +445,7 @@ std::string DateTimeType::GetName() const {
     std::string datetime_representation = "DateTime";
     const auto & timezone = Timezone();
     if (!timezone.empty())
-        datetime_representation += "('" + timezone + "')";
+        datetime_representation += "('" + EscapeStringLiteral(timezone) + "')";
 
     return datetime_representation;
 }
@@ -436,7 +468,7 @@ std::string DateTime64Type::GetName() const {
 
     const auto & timezone = Timezone();
     if (!timezone.empty()) {
-        datetime64_representation += ", '" + timezone + "'";
+        datetime64_representation += ", '" + EscapeStringLiteral(timezone) + "'";
     }
 
     datetime64_representation += ")";
