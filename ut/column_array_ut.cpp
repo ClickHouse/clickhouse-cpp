@@ -337,6 +337,33 @@ TEST(ColumnArrayT, Wrap_UInt64_2D) {
     EXPECT_TRUE(CompareRecursive(values, array));
 }
 
+TEST(ColumnArrayT, Wrap_AcceptsLvalue) {
+    // Wrap no longer requires an rvalue: lvalues and const sources are accepted.
+
+    const std::vector<std::vector<uint64_t>> values = {
+        {1u, 2u},
+        {3u},
+        {}
+    };
+
+    auto arr = CreateArray<ColumnUInt64>(values);
+
+    // Lvalue ColumnRef, no std::move required and not consumed.
+    ColumnRef ref = arr;
+    auto w1 = ColumnArrayT<ColumnUInt64>::Wrap(ref);
+    EXPECT_TRUE(CompareRecursive(values, *w1));
+    EXPECT_NE(ref, nullptr);
+
+    // Const lvalue concrete column.
+    const ColumnArray& cref = *arr;
+    auto w2 = ColumnArrayT<ColumnUInt64>::Wrap(cref);
+    EXPECT_TRUE(CompareRecursive(values, *w2));
+
+    // Non-const lvalue concrete column.
+    auto w3 = ColumnArrayT<ColumnUInt64>::Wrap(*arr);
+    EXPECT_TRUE(CompareRecursive(values, *w3));
+}
+
 TEST(ColumnArrayT, Wrap_DoesNotStealSource_UInt64) {
     // Wrap shares storage with the source ColumnArray and leaves its contents intact.
 

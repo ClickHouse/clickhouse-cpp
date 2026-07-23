@@ -1284,6 +1284,31 @@ TEST(ColumnsCase, ColumnNullableT_Wrap_DoesNotStealSource) {
     EXPECT_EQ(wrapped->At(2), std::optional<uint64_t>(42));
 }
 
+TEST(ColumnsCase, ColumnNullableT_Wrap_AcceptsLvalue) {
+    auto nested = std::make_shared<ColumnUInt64>();
+    auto nulls = std::make_shared<ColumnUInt8>();
+    ColumnNullable col(nested, nulls);
+    col.Append(false);
+    nested->Append(7);
+
+    using TestNullable = ColumnNullableT<ColumnUInt64>;
+
+    // Non-const lvalue concrete column, no std::move required.
+    auto w1 = TestNullable::Wrap(col);
+    EXPECT_EQ(w1->At(0), std::optional<uint64_t>(7));
+
+    // Const lvalue concrete column.
+    const ColumnNullable& cref = col;
+    auto w2 = TestNullable::Wrap(cref);
+    EXPECT_EQ(w2->At(0), std::optional<uint64_t>(7));
+
+    // Lvalue ColumnRef, no std::move required and not consumed.
+    ColumnRef ref = std::make_shared<ColumnNullable>(nested, nulls);
+    auto w3 = TestNullable::Wrap(ref);
+    EXPECT_EQ(w3->At(0), std::optional<uint64_t>(7));
+    EXPECT_NE(ref, nullptr);
+}
+
 TEST(ColumnsCase, ColumnTupleT_Wrap) {
     ColumnTuple col ({
             std::make_shared<ColumnUInt64>(),
@@ -1351,6 +1376,36 @@ TEST(ColumnsCase, ColumnTupleT_Wrap_DoesNotStealSource_PreservesNames) {
     // Source remains usable after Wrap (non-stealing).
     EXPECT_EQ(base.Type()->GetName(), "Tuple(id UInt64, name String)");
     EXPECT_EQ(base.TupleSize(), 2u);
+}
+
+TEST(ColumnsCase, ColumnTupleT_Wrap_AcceptsLvalue) {
+    ColumnTuple col({
+        std::make_shared<ColumnUInt64>(),
+        std::make_shared<ColumnString>()
+    });
+    col[0]->AsStrict<ColumnUInt64>()->Append(1);
+    col[1]->AsStrict<ColumnString>()->Append("a");
+
+    using TestTuple = ColumnTupleT<ColumnUInt64, ColumnString>;
+
+    // Non-const lvalue concrete column, no std::move required.
+    auto w1 = TestTuple::Wrap(col);
+    EXPECT_EQ(w1->At(0), std::make_tuple(uint64_t(1), std::string_view("a")));
+
+    // Const lvalue concrete column.
+    const ColumnTuple& cref = col;
+    auto w2 = TestTuple::Wrap(cref);
+    EXPECT_EQ(w2->At(0), std::make_tuple(uint64_t(1), std::string_view("a")));
+
+    // Lvalue ColumnRef, no std::move required and not consumed.
+    ColumnRef ref = std::make_shared<ColumnTuple>(std::vector<ColumnRef>{col[0], col[1]});
+    auto w3 = TestTuple::Wrap(ref);
+    EXPECT_EQ(w3->At(0), std::make_tuple(uint64_t(1), std::string_view("a")));
+    EXPECT_NE(ref, nullptr);
+
+    // Source column left intact.
+    EXPECT_EQ(col.TupleSize(), 2u);
+    EXPECT_EQ(col.Size(), 1u);
 }
 
 TEST(ColumnsCase, ColumnTupleT_Empty) {
@@ -1458,6 +1513,41 @@ TEST(ColumnsCase, ColumnMapT_Wrap) {
     EXPECT_THROW(map_view.At(0), ValidationError);
     EXPECT_EQ("123", map_view.At(1));
     EXPECT_EQ("abc", map_view.At(2));
+}
+
+TEST(ColumnsCase, ColumnMapT_Wrap_AcceptsLvalue) {
+    auto tupls = std::make_shared<ColumnTuple>(std::vector<ColumnRef>{
+            std::make_shared<ColumnUInt64>(),
+            std::make_shared<ColumnString>()});
+
+    auto data = std::make_shared<ColumnArray>(tupls);
+
+    auto val = tupls->CloneEmpty()->As<ColumnTuple>();
+    (*val)[0]->AsStrict<ColumnUInt64>()->Append(1);
+    (*val)[1]->AsStrict<ColumnString>()->Append("123");
+    data->AppendAsColumn(val);
+
+    ColumnMap col{data};
+
+    using TestMap = ColumnMapT<ColumnUInt64, ColumnString>;
+
+    // Non-const lvalue concrete column, no std::move required.
+    auto w1 = TestMap::Wrap(col);
+    EXPECT_EQ("123", w1->At(0).At(1));
+
+    // Const lvalue concrete column.
+    const ColumnMap& cref = col;
+    auto w2 = TestMap::Wrap(cref);
+    EXPECT_EQ("123", w2->At(0).At(1));
+
+    // Lvalue ColumnRef, no std::move required and not consumed.
+    ColumnRef ref = std::make_shared<ColumnMap>(data);
+    auto w3 = TestMap::Wrap(ref);
+    EXPECT_EQ("123", w3->At(0).At(1));
+    EXPECT_NE(ref, nullptr);
+
+    // Source column left intact.
+    EXPECT_EQ(col.Size(), 1u);
 }
 
 TEST(ColumnsCase, ColumnMapT_Wrap_DoesNotStealSource) {
