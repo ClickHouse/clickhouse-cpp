@@ -337,8 +337,8 @@ TEST(ColumnArrayT, Wrap_UInt64_2D) {
     EXPECT_TRUE(CompareRecursive(values, array));
 }
 
-TEST(ColumnArrayT, WrapShared_UInt64) {
-    // WrapShared shares storage with the original ColumnArray and leaves it intact.
+TEST(ColumnArrayT, Wrap_DoesNotStealSource_UInt64) {
+    // Wrap shares storage with the source ColumnArray and leaves its contents intact.
 
     const std::vector<std::vector<uint64_t>> values = {
         {1u, 2u, 3u},
@@ -349,24 +349,26 @@ TEST(ColumnArrayT, WrapShared_UInt64) {
     };
 
     auto original = CreateArray<ColumnUInt64>(values);
-    auto wrapped_array = ColumnArrayT<ColumnUInt64>::WrapShared(original);
+    // Keep an independent handle to the same underlying ColumnArray.
+    auto keep = original;
+    auto wrapped_array = ColumnArrayT<ColumnUInt64>::Wrap(std::move(original));
 
     // Wrapper sees the same data.
     EXPECT_TRUE(CompareRecursive(values, *wrapped_array));
 
-    // Original is left fully intact and usable (not stolen from).
-    EXPECT_EQ(original->Size(), values.size());
-    EXPECT_TRUE(CompareRecursive(values, *ColumnArrayT<ColumnUInt64>::WrapShared(original)));
+    // Source array contents are left intact (not stolen from).
+    ASSERT_NE(keep, nullptr);
+    EXPECT_EQ(keep->Size(), values.size());
 
-    // Storage is shared: appending a row through the original is visible via the wrapper.
-    original->AppendAsColumn(std::make_shared<ColumnUInt64>(std::vector<uint64_t>{42, 43}));
+    // Storage is shared: appending a row through the source is visible via the wrapper.
+    keep->AppendAsColumn(std::make_shared<ColumnUInt64>(std::vector<uint64_t>{42, 43}));
     EXPECT_EQ(wrapped_array->Size(), values.size() + 1);
     EXPECT_EQ(wrapped_array->At(values.size()).At(0), 42u);
     EXPECT_EQ(wrapped_array->At(values.size()).At(1), 43u);
 }
 
-TEST(ColumnArrayT, WrapShared_UInt64_2D) {
-    // WrapShared shares all nesting layers with the original.
+TEST(ColumnArrayT, Wrap_DoesNotStealSource_UInt64_2D) {
+    // Wrap shares all nesting layers with the source.
 
     const std::vector<std::vector<std::vector<uint64_t>>> values = {
         {{1u, 2u}, {3u}},
@@ -377,13 +379,15 @@ TEST(ColumnArrayT, WrapShared_UInt64_2D) {
     };
 
     auto original = Create2DArray<ColumnUInt64>(values);
-    auto wrapped_array = ColumnArrayT<ColumnArrayT<ColumnUInt64>>::WrapShared(original);
+    auto keep = original;
+    auto wrapped_array = ColumnArrayT<ColumnArrayT<ColumnUInt64>>::Wrap(std::move(original));
 
     EXPECT_TRUE(CompareRecursive(values, *wrapped_array));
 
-    // Original is left fully intact and usable (not stolen from).
-    EXPECT_EQ(original->Size(), values.size());
-    EXPECT_TRUE(CompareRecursive(values, *ColumnArrayT<ColumnArrayT<ColumnUInt64>>::WrapShared(original)));
+    // Source array contents are left intact (not stolen from).
+    ASSERT_NE(keep, nullptr);
+    EXPECT_EQ(keep->Size(), values.size());
+    EXPECT_TRUE(CompareRecursive(values, *ColumnArrayT<ColumnArrayT<ColumnUInt64>>::Wrap(std::move(keep))));
 }
 
 TEST(ColumnArrayT, Bool) {

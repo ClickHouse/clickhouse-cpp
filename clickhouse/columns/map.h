@@ -240,16 +240,6 @@ public:
         typed_data_->Append(Iterator{value.begin(), functor}, Iterator{value.end(), functor});
     }
 
-    static auto Wrap(ColumnMap&& col) {
-        auto data = ArrayColumnType::Wrap(std::move(col.data_));
-        return std::make_shared<ColumnMapT<K, V>>(std::move(data));
-    }
-
-    static auto Wrap(Column&& col) { return Wrap(std::move(dynamic_cast<ColumnMap&&>(col))); }
-
-    // Helper to simplify integration with other APIs
-    static auto Wrap(ColumnRef&& col) { return Wrap(std::move(*col->AsStrict<ColumnMap>())); }
-
     /** Create a ColumnMapT that SHARES the internals of `col` (its backing array of
      *  key/value tuples) via shared_ptr, WITHOUT stealing or copying them.
      *
@@ -259,13 +249,15 @@ public:
      *
      *  Throws if `col` is of the wrong type.
      */
-    static auto WrapShared(ColumnMap& col) {
-        auto data = ArrayColumnType::WrapShared(*col.data_);
+    static auto Wrap(const ColumnMap& col) {
+        auto data = ArrayColumnType::Wrap(*col.data_);
         return std::make_shared<ColumnMapT<K, V>>(std::move(data));
     }
 
+    static auto Wrap(const Column& col) { return Wrap(dynamic_cast<const ColumnMap&>(col)); }
+
     // Helper to simplify integration with other APIs
-    static auto WrapShared(const ColumnRef& col) { return WrapShared(*col->AsStrict<ColumnMap>()); }
+    static auto Wrap(const ColumnRef& col) { return Wrap(*col->AsStrict<ColumnMap>()); }
 
 private:
     std::shared_ptr<ArrayColumnType> typed_data_;

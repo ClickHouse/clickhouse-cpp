@@ -109,26 +109,6 @@ public:
         }
     }
 
-    /** Create a ColumnNullableT from a ColumnNullable, without copying data and offsets, but by
-     * 'stealing' those from `col`.
-     *
-     *  Ownership of column internals is transferred to returned object, original (argument) object
-     *  MUST NOT BE USED IN ANY WAY, it is only safe to dispose it.
-     *
-     *  Throws an exception if `col` is of wrong type, it is safe to use original col in this case.
-     *  This is a static method to make such conversion verbose.
-     */
-    static auto Wrap(ColumnNullable&& col) {
-        return std::make_shared<ColumnNullableT<NestedColumnType>>(
-            col.Nested()->AsStrict<NestedColumnType>(),
-            col.Nulls()->AsStrict<ColumnUInt8>()) ;
-    }
-
-    static auto Wrap(Column&& col) { return Wrap(std::move(dynamic_cast<ColumnNullable&&>(col))); }
-
-    // Helper to simplify integration with other APIs
-    static auto Wrap(ColumnRef&& col) { return Wrap(std::move(*col->AsStrict<ColumnNullable>())); }
-
     /** Create a ColumnNullableT that SHARES the internals of `col` (nested data and
      *  null map) via shared_ptr, WITHOUT stealing or copying them.
      *
@@ -136,16 +116,19 @@ public:
      *  returned wrapper reference the same underlying columns, so mutations through
      *  one are visible through the other.
      *
-     *  Throws if `col` is of the wrong type.
+     *  Throws an exception if `col` is of wrong type, it is safe to use original col
+     *  in this case. This is a static method to make such conversion verbose.
      */
-    static auto WrapShared(ColumnNullable& col) {
+    static auto Wrap(const ColumnNullable& col) {
         return std::make_shared<ColumnNullableT<NestedColumnType>>(
-            WrapColumnShared<NestedColumnType>(col.Nested()),
+            WrapColumn<NestedColumnType>(col.Nested()),
             col.Nulls()->AsStrict<ColumnUInt8>());
     }
 
+    static auto Wrap(const Column& col) { return Wrap(dynamic_cast<const ColumnNullable&>(col)); }
+
     // Helper to simplify integration with other APIs
-    static auto WrapShared(const ColumnRef& col) { return WrapShared(*col->AsStrict<ColumnNullable>()); }
+    static auto Wrap(const ColumnRef& col) { return Wrap(*col->AsStrict<ColumnNullable>()); }
 
     ColumnRef Slice(size_t begin, size_t size) const override {
         return Wrap(ColumnNullable::Slice(begin, size));

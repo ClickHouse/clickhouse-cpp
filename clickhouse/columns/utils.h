@@ -38,24 +38,4 @@ inline std::shared_ptr<T> WrapColumn(ColumnRef&& column) {
     }
 }
 
-template <typename T>
-struct HasWrapSharedMethod {
-private:
-    static int detect(...);
-    template <typename U>
-    static decltype(U::WrapShared(std::declval<const ColumnRef&>())) detect(const U&);
-
-public:
-    static constexpr bool value = !std::is_same<int, decltype(detect(std::declval<T>()))>::value;
-};
-
-template <typename T>
-inline std::shared_ptr<T> WrapColumnShared(const ColumnRef& column) {
-    if constexpr (HasWrapSharedMethod<T>::value) {
-        return T::WrapShared(column);
-    } else {
-        return column->template AsStrict<T>();
-    }
-}
-
 }
