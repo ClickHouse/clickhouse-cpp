@@ -250,6 +250,23 @@ public:
     // Helper to simplify integration with other APIs
     static auto Wrap(ColumnRef&& col) { return Wrap(std::move(*col->AsStrict<ColumnMap>())); }
 
+    /** Create a ColumnMapT that SHARES the internals of `col` (its backing array of
+     *  key/value tuples) via shared_ptr, WITHOUT stealing or copying them.
+     *
+     *  The original `col` remains fully valid and usable. Both the original and the
+     *  returned wrapper reference the same underlying columns, so mutations through
+     *  one are visible through the other.
+     *
+     *  Throws if `col` is of the wrong type.
+     */
+    static auto WrapShared(ColumnMap& col) {
+        auto data = ArrayColumnType::WrapShared(*col.data_);
+        return std::make_shared<ColumnMapT<K, V>>(std::move(data));
+    }
+
+    // Helper to simplify integration with other APIs
+    static auto WrapShared(const ColumnRef& col) { return WrapShared(*col->AsStrict<ColumnMap>()); }
+
 private:
     std::shared_ptr<ArrayColumnType> typed_data_;
 };

@@ -337,6 +337,55 @@ TEST(ColumnArrayT, Wrap_UInt64_2D) {
     EXPECT_TRUE(CompareRecursive(values, array));
 }
 
+TEST(ColumnArrayT, WrapShared_UInt64) {
+    // WrapShared shares storage with the original ColumnArray and leaves it intact.
+
+    const std::vector<std::vector<uint64_t>> values = {
+        {1u, 2u, 3u},
+        {4u, 5u, 6u, 7u, 8u, 9u},
+        {0u},
+        {},
+        {13, 14}
+    };
+
+    auto original = CreateArray<ColumnUInt64>(values);
+    auto wrapped_array = ColumnArrayT<ColumnUInt64>::WrapShared(original);
+
+    // Wrapper sees the same data.
+    EXPECT_TRUE(CompareRecursive(values, *wrapped_array));
+
+    // Original is left fully intact and usable (not stolen from).
+    EXPECT_EQ(original->Size(), values.size());
+    EXPECT_TRUE(CompareRecursive(values, *ColumnArrayT<ColumnUInt64>::WrapShared(original)));
+
+    // Storage is shared: appending a row through the original is visible via the wrapper.
+    original->AppendAsColumn(std::make_shared<ColumnUInt64>(std::vector<uint64_t>{42, 43}));
+    EXPECT_EQ(wrapped_array->Size(), values.size() + 1);
+    EXPECT_EQ(wrapped_array->At(values.size()).At(0), 42u);
+    EXPECT_EQ(wrapped_array->At(values.size()).At(1), 43u);
+}
+
+TEST(ColumnArrayT, WrapShared_UInt64_2D) {
+    // WrapShared shares all nesting layers with the original.
+
+    const std::vector<std::vector<std::vector<uint64_t>>> values = {
+        {{1u, 2u}, {3u}},
+        {{4u}, {5u, 6u, 7u}, {8u, 9u}, {}},
+        {{0u}},
+        {{}},
+        {{13}, {14, 15}}
+    };
+
+    auto original = Create2DArray<ColumnUInt64>(values);
+    auto wrapped_array = ColumnArrayT<ColumnArrayT<ColumnUInt64>>::WrapShared(original);
+
+    EXPECT_TRUE(CompareRecursive(values, *wrapped_array));
+
+    // Original is left fully intact and usable (not stolen from).
+    EXPECT_EQ(original->Size(), values.size());
+    EXPECT_TRUE(CompareRecursive(values, *ColumnArrayT<ColumnArrayT<ColumnUInt64>>::WrapShared(original)));
+}
+
 TEST(ColumnArrayT, Bool) {
     // Check inserting\reading back data from clickhouse::ColumnArrayT<ColumnBool>
 

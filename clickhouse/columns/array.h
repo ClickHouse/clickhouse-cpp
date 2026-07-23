@@ -150,6 +150,25 @@ public:
         return Wrap(std::move(*col->AsStrict<ColumnArray>()));
     }
 
+    /** Create a ColumnArrayT that SHARES the internals of `col` (nested data and
+     *  offsets) via shared_ptr, WITHOUT stealing or copying them.
+     *
+     *  The original `col` remains fully valid and usable. Both the original and the
+     *  returned wrapper reference the same underlying columns, so mutations through
+     *  one are visible through the other.
+     *
+     *  Throws if `col` is of the wrong type.
+     */
+    static auto WrapShared(ColumnArray& col) {
+        auto nested_data = WrapColumnShared<NestedColumnType>(col.GetData());
+        return std::make_shared<ColumnArrayT<NestedColumnType>>(nested_data, col.GetOffsets());
+    }
+
+    // Helper to simplify integration with other APIs
+    static auto WrapShared(const ColumnRef& col) {
+        return WrapShared(*col->AsStrict<ColumnArray>());
+    }
+
     /// A single (row) value of the Array-column, i.e. readonly array of items.
     class ArrayValueView {
         const std::shared_ptr<NestedColumnType> typed_nested_data_;

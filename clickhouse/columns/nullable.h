@@ -2,6 +2,7 @@
 
 #include "column.h"
 #include "numeric.h"
+#include "utils.h"
 
 #include <optional>
 
@@ -127,6 +128,24 @@ public:
 
     // Helper to simplify integration with other APIs
     static auto Wrap(ColumnRef&& col) { return Wrap(std::move(*col->AsStrict<ColumnNullable>())); }
+
+    /** Create a ColumnNullableT that SHARES the internals of `col` (nested data and
+     *  null map) via shared_ptr, WITHOUT stealing or copying them.
+     *
+     *  The original `col` remains fully valid and usable. Both the original and the
+     *  returned wrapper reference the same underlying columns, so mutations through
+     *  one are visible through the other.
+     *
+     *  Throws if `col` is of the wrong type.
+     */
+    static auto WrapShared(ColumnNullable& col) {
+        return std::make_shared<ColumnNullableT<NestedColumnType>>(
+            WrapColumnShared<NestedColumnType>(col.Nested()),
+            col.Nulls()->AsStrict<ColumnUInt8>());
+    }
+
+    // Helper to simplify integration with other APIs
+    static auto WrapShared(const ColumnRef& col) { return WrapShared(*col->AsStrict<ColumnNullable>()); }
 
     ColumnRef Slice(size_t begin, size_t size) const override {
         return Wrap(ColumnNullable::Slice(begin, size));

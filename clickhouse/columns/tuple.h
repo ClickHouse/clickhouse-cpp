@@ -120,6 +120,26 @@ public:
     // Helper to simplify integration with other APIs
     static auto Wrap(ColumnRef&& col) { return Wrap(std::move(*col->AsStrict<ColumnTuple>())); }
 
+    /** Create a ColumnTupleT that SHARES the internals of `col` (its element columns)
+     *  via shared_ptr, WITHOUT stealing or copying them.
+     *
+     *  The original `col` remains fully valid and usable. Both the original and the
+     *  returned wrapper reference the same underlying element columns, so mutations
+     *  through one are visible through the other.
+     *
+     *  Throws if `col` is of the wrong type.
+     */
+    static auto WrapShared(ColumnTuple& col) {
+        if (col.TupleSize() != std::tuple_size_v<TupleOfColumns>) {
+            throw ValidationError("Can't wrap from " + col.GetType().GetName());
+        }
+        auto names = col.Type()->As<TupleType>()->GetItemNames();
+        return std::make_shared<ColumnTupleT<Columns...>>(SharedTupleFrom(col), std::move(names));
+    }
+
+    // Helper to simplify integration with other APIs
+    static auto WrapShared(const ColumnRef& col) { return WrapShared(*col->AsStrict<ColumnTuple>()); }
+
     ColumnRef Slice(size_t begin, size_t size) const override {
         return Wrap(ColumnTuple::Slice(begin, size));
     }
@@ -156,6 +176,20 @@ private:
             auto result = TupleToVector<T, index - 1>(value);
             result.push_back(std::get<index - 1>(value));
             return result;
+        }
+    }
+
+    template <size_t column_index = std::tuple_size_v<TupleOfColumns>>
+    inline static auto SharedTupleFrom([[maybe_unused]] const ColumnTuple& col) {
+        static_assert(column_index <= std::tuple_size_v<TupleOfColumns>);
+        if constexpr (column_index == 0) {
+            return std::make_tuple();
+        } else {
+            using ColumnType =
+                typename std::tuple_element<column_index - 1, TupleOfColumns>::type::element_type;
+            auto column = WrapColumnShared<ColumnType>(col[column_index - 1]);
+            return std::tuple_cat(SharedTupleFrom<column_index - 1>(col),
+                                  std::make_tuple(std::move(column)));
         }
     }
 
