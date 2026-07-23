@@ -98,27 +98,28 @@ public:
         AppendTuple(std::move(value));
     }
 
-    /** Create a ColumnTupleT from a ColumnTuple, without copying data and offsets, but by
-     * 'stealing' those from `col`.
+    /** Create a ColumnTupleT that SHARES the internals of `col` (its element columns)
+     *  via shared_ptr, WITHOUT stealing or copying them.
      *
-     *  Ownership of column internals is transferred to returned object, original (argument) object
-     *  MUST NOT BE USED IN ANY WAY, it is only safe to dispose it.
+     *  The original `col` remains fully valid and usable. Both the original and the
+     *  returned wrapper reference the same underlying element columns, so mutations
+     *  through one are visible through the other.
      *
-     *  Throws an exception if `col` is of wrong type, it is safe to use original col in this case.
-     *  This is a static method to make such conversion verbose.
+     *  Throws an exception if `col` is of wrong type, it is safe to use original col
+     *  in this case. This is a static method to make such conversion verbose.
      */
-    static auto Wrap(ColumnTuple&& col) {
+    static auto Wrap(const ColumnTuple& col) {
         if (col.TupleSize() != std::tuple_size_v<TupleOfColumns>) {
             throw ValidationError("Can't wrap from " + col.GetType().GetName());
         }
         auto names = col.Type()->As<TupleType>()->GetItemNames();
-        return std::make_shared<ColumnTupleT<Columns...>>(VectorToTuple(std::move(col)), std::move(names));
+        return std::make_shared<ColumnTupleT<Columns...>>(TupleFromColumn(col), std::move(names));
     }
 
-    static auto Wrap(Column&& col) { return Wrap(std::move(dynamic_cast<ColumnTuple&&>(col))); }
+    static auto Wrap(const Column& col) { return Wrap(dynamic_cast<const ColumnTuple&>(col)); }
 
     // Helper to simplify integration with other APIs
-    static auto Wrap(ColumnRef&& col) { return Wrap(std::move(*col->AsStrict<ColumnTuple>())); }
+    static auto Wrap(const ColumnRef& col) { return Wrap(*col->AsStrict<ColumnTuple>()); }
 
     ColumnRef Slice(size_t begin, size_t size) const override {
         return Wrap(ColumnTuple::Slice(begin, size));
@@ -156,6 +157,20 @@ private:
             auto result = TupleToVector<T, index - 1>(value);
             result.push_back(std::get<index - 1>(value));
             return result;
+        }
+    }
+
+    template <size_t column_index = std::tuple_size_v<TupleOfColumns>>
+    inline static auto TupleFromColumn([[maybe_unused]] const ColumnTuple& col) {
+        static_assert(column_index <= std::tuple_size_v<TupleOfColumns>);
+        if constexpr (column_index == 0) {
+            return std::make_tuple();
+        } else {
+            using ColumnType =
+                typename std::tuple_element<column_index - 1, TupleOfColumns>::type::element_type;
+            auto column = WrapColumn<ColumnType>(col[column_index - 1]);
+            return std::tuple_cat(TupleFromColumn<column_index - 1>(col),
+                                  std::make_tuple(std::move(column)));
         }
     }
 

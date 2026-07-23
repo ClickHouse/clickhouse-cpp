@@ -128,26 +128,28 @@ public:
         : ColumnArrayT(std::make_shared<NestedColumnType>(std::forward<Args>(args)...))
     {}
 
-    /** Create a ColumnArrayT from a ColumnArray, without copying data and offsets, but by 'stealing' those from `col`.
+    /** Create a ColumnArrayT that SHARES the internals of `col` (nested data and
+     *  offsets) via shared_ptr, WITHOUT stealing or copying them.
      *
-     *  Ownership of column internals is transferred to returned object, original (argument) object
-     *  MUST NOT BE USED IN ANY WAY, it is only safe to dispose it.
+     *  The original `col` remains fully valid and usable. Both the original and the
+     *  returned wrapper reference the same underlying columns, so mutations through
+     *  one are visible through the other.
      *
-     *  Throws an exception if `col` is of wrong type, it is safe to use original col in this case.
-     *  This is a static method to make such conversion verbose.
+     *  Throws an exception if `col` is of wrong type, it is safe to use original col
+     *  in this case. This is a static method to make such conversion verbose.
      */
-    static auto Wrap(ColumnArray&& col) {
-        auto nested_data = WrapColumn<NestedColumnType>(col.GetData());
+    static auto Wrap(const ColumnArray& col) {
+        auto nested_data = WrapColumn<NestedColumnType>(ColumnRef{col.data_});
         return std::make_shared<ColumnArrayT<NestedColumnType>>(nested_data, col.offsets_);
     }
 
-    static auto Wrap(Column&& col) {
-        return Wrap(std::move(dynamic_cast<ColumnArray&&>(col)));
+    static auto Wrap(const Column& col) {
+        return Wrap(dynamic_cast<const ColumnArray&>(col));
     }
 
     // Helper to simplify integration with other APIs
-    static auto Wrap(ColumnRef&& col) {
-        return Wrap(std::move(*col->AsStrict<ColumnArray>()));
+    static auto Wrap(const ColumnRef& col) {
+        return Wrap(*col->AsStrict<ColumnArray>());
     }
 
     /// A single (row) value of the Array-column, i.e. readonly array of items.
