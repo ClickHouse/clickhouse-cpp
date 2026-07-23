@@ -835,6 +835,60 @@ TEST_P(ClientCase, Enum) {
     EXPECT_EQ(sizeof(TEST_DATA)/sizeof(TEST_DATA[0]), row);
 }
 
+// Live-server round-trip of escape sequences in an Enum type: hand-write a
+// CREATE TABLE whose Enum labels contain escape sequences, insert matching
+// values via the streaming BeginInsert/SendInsertBlock/EndInsert API (so the
+// inserted block's columns are derived from the server-reported schema), select
+// them back and verify the client decodes the labels unchanged.
+// NOTE: Includes backspace ('\b') and other escape sequences to verify the client unescapes Enum labels correctly.
+// NOTE: DateTime/DateTime64 are intentionally not covered here because the
+// server validates timezone names, so escaped/unknown timezones can't be
+// stored (those cases stay covered by the client-side unit tests).
+TEST_P(ClientCase, EscapeRoundtrip_Enum) {
+    const std::vector<Type::EnumItem> enum_items = {
+        {"q'q", 1}, {"bs\\bs", 2}, {"tab\ttab", 3}, {"nl\nnl", 4}, {"cr\rcr", 5}, {"bsp\bbsp", 6},
+    };
+
+    client_->Execute("DROP TEMPORARY TABLE IF EXISTS test_clickhouse_cpp_escape_enum;");
+    client_->Execute(
+        "CREATE TEMPORARY TABLE IF NOT EXISTS test_clickhouse_cpp_escape_enum "
+        "(id UInt64, e Enum8('q\\'q' = 1, 'bs\\\\bs' = 2, 'tab\\ttab' = 3, 'nl\\nnl' = 4, 'cr\\rcr' = 5, 'bsp\\bbsp' = 6))");
+
+    {
+        auto block = client_->BeginInsert("INSERT INTO test_clickhouse_cpp_escape_enum VALUES");
+        ASSERT_EQ(size_t(2), block.GetColumnCount());
+        auto id = block[0]->As<ColumnUInt64>();
+        auto e = block[1]->As<ColumnEnum8>();
+        for (const auto& [name, value] : enum_items) {
+            id->Append(static_cast<uint64_t>(value));
+            e->Append(name);
+        }
+        block.RefreshRowCount();
+        client_->SendInsertBlock(block);
+        client_->EndInsert();
+    }
+
+    size_t row = 0;
+    client_->Select("SELECT id, e FROM test_clickhouse_cpp_escape_enum ORDER BY id",
+        [&](const Block& block) {
+            if (block.GetRowCount() == 0) {
+                return;
+            }
+            const auto* enum_type = block[1]->Type()->As<EnumType>();
+            ASSERT_NE(nullptr, enum_type);
+            for (size_t i = 0; i < block.GetRowCount(); ++i, ++row) {
+                ASSERT_LT(row, enum_items.size());
+                const auto& [name, value] = enum_items[row];
+                EXPECT_EQ(static_cast<uint64_t>(value), (*block[0]->As<ColumnUInt64>())[i]);
+                EXPECT_EQ(value, block[1]->As<ColumnEnum8>()->At(i));
+                EXPECT_EQ(name, block[1]->As<ColumnEnum8>()->NameAt(i));
+                EXPECT_EQ(name, enum_type->GetEnumName(value));
+                EXPECT_EQ(value, enum_type->GetEnumValue(name));
+            }
+        });
+    EXPECT_EQ(enum_items.size(), row);
+}
+
 TEST_P(ClientCase, Decimal) {
     client_->Execute(
         "CREATE TEMPORARY TABLE IF NOT EXISTS "

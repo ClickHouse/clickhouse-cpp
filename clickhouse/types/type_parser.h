@@ -77,6 +77,7 @@ public:
     bool Parse(TypeAst* type);
 
 private:
+    // WARNING: The StringView in this token is only valid until the next NextToken() call.
     Token NextToken();
 
 private:
@@ -85,10 +86,11 @@ private:
 
     TypeAst* type_;
     std::stack<TypeAst*> open_elements_;
-    // Backing storage for unescaped QuotedIdentifier token values. When a
-    // quoted identifier contains escape sequences the unescaped content is
-    // written here and the returned StringView points into this string.
-    // Valid only until the next NextToken() call.
+
+    // Backing storage for identifiers with processed escape sequences. When an
+    // identifier contains escape sequences, the cleaned content is written here and
+    // the returned StringView points into this scratch.
+    // WARNING: Valid only until the next NextToken() call.
     std::string scratch_;
 };
 
