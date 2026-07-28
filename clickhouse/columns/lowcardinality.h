@@ -206,17 +206,55 @@ public:
      *  wrapper reference the same underlying storage, so mutations through one are visible through
      *  the other and remain coherent (the dedup map is shared as well).
      *
-     *  Throws an exception if `col` is of wrong type, it is safe to use original col in this case.
-     *  This is a static method to make such conversion verbose.
+     *  The two-argument overloads are non-throwing: on a type mismatch they return nullptr and,
+     *  if `error` is non-null, assign a description to `*error`. The single-argument overloads
+     *  throw ValidationError on a type mismatch instead.
      */
-    static auto Wrap(const ColumnLowCardinality& col) {
+    static std::shared_ptr<ColumnLowCardinalityT<WrappedColumnType>> Wrap(const ColumnLowCardinality& col, ValidationError* error) {
+        if (!col.dictionary_column_->template As<DictionaryColumnType>()) {
+            if (error) {
+                *error = ValidationError("Can't wrap LowCardinality column with dictionary of type "
+                                         + col.dictionary_column_->GetType().GetName());
+            }
+            return nullptr;
+        }
         return std::make_shared<ColumnLowCardinalityT<WrappedColumnType>>(col);
     }
 
-    static auto Wrap(const Column& col) { return Wrap(dynamic_cast<const ColumnLowCardinality&>(col)); }
+    static std::shared_ptr<ColumnLowCardinalityT<WrappedColumnType>> Wrap(const Column& col, ValidationError* error) {
+        if (auto* c = dynamic_cast<const ColumnLowCardinality*>(&col)) {
+            return Wrap(*c, error);
+        }
+        if (error) *error = ValidationError("Can't wrap column of type " + col.GetType().GetName() + " as LowCardinality");
+        return nullptr;
+    }
 
     // Helper to simplify integration with other APIs
-    static auto Wrap(const ColumnRef& col) { return Wrap(*col->AsStrict<ColumnLowCardinality>()); }
+    static std::shared_ptr<ColumnLowCardinalityT<WrappedColumnType>> Wrap(const ColumnRef& col, ValidationError* error) {
+        return Wrap(*col, error);
+    }
+
+    static auto Wrap(const ColumnLowCardinality& col) {
+        ValidationError error;
+        auto result = Wrap(col, &error);
+        if (!result) throw error;
+        return result;
+    }
+
+    static auto Wrap(const Column& col) {
+        ValidationError error;
+        auto result = Wrap(col, &error);
+        if (!result) throw error;
+        return result;
+    }
+
+    // Helper to simplify integration with other APIs
+    static auto Wrap(const ColumnRef& col) {
+        ValidationError error;
+        auto result = Wrap(col, &error);
+        if (!result) throw error;
+        return result;
+    }
 
     ColumnRef Slice(size_t begin, size_t size) const override {
         return Wrap(ColumnLowCardinality::Slice(begin, size));

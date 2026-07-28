@@ -135,21 +135,51 @@ public:
      *  returned wrapper reference the same underlying columns, so mutations through
      *  one are visible through the other.
      *
-     *  Throws an exception if `col` is of wrong type, it is safe to use original col
-     *  in this case. This is a static method to make such conversion verbose.
+     *  The two-argument overloads are non-throwing: on a type mismatch they return
+     *  nullptr and, if `error` is non-null, assign a description to `*error`. The
+     *  single-argument overloads throw ValidationError on a type mismatch instead.
      */
-    static auto Wrap(const ColumnArray& col) {
-        auto nested_data = WrapColumn<NestedColumnType>(col.data_);
+    static std::shared_ptr<ColumnArrayT<NestedColumnType>> Wrap(const ColumnArray& col, ValidationError* error) {
+        auto nested_data = WrapColumn<NestedColumnType>(col.data_, error);
+        if (!nested_data) {
+            return nullptr;
+        }
         return std::make_shared<ColumnArrayT<NestedColumnType>>(nested_data, col.offsets_);
     }
 
+    static std::shared_ptr<ColumnArrayT<NestedColumnType>> Wrap(const Column& col, ValidationError* error) {
+        if (auto* c = dynamic_cast<const ColumnArray*>(&col)) {
+            return Wrap(*c, error);
+        }
+        if (error) *error = ValidationError("Can't wrap column of type " + col.GetType().GetName() + " as Array");
+        return nullptr;
+    }
+
+    // Helper to simplify integration with other APIs
+    static std::shared_ptr<ColumnArrayT<NestedColumnType>> Wrap(const ColumnRef& col, ValidationError* error) {
+        return Wrap(*col, error);
+    }
+
+    static auto Wrap(const ColumnArray& col) {
+        ValidationError error;
+        auto result = Wrap(col, &error);
+        if (!result) throw error;
+        return result;
+    }
+
     static auto Wrap(const Column& col) {
-        return Wrap(dynamic_cast<const ColumnArray&>(col));
+        ValidationError error;
+        auto result = Wrap(col, &error);
+        if (!result) throw error;
+        return result;
     }
 
     // Helper to simplify integration with other APIs
     static auto Wrap(const ColumnRef& col) {
-        return Wrap(*col->AsStrict<ColumnArray>());
+        ValidationError error;
+        auto result = Wrap(col, &error);
+        if (!result) throw error;
+        return result;
     }
 
     /// A single (row) value of the Array-column, i.e. readonly array of items.

@@ -1653,3 +1653,103 @@ TEST(ColumnsCase, ColumnMapT_Wrap_DoesNotStealSource) {
     EXPECT_EQ(wrapped_col->Size(), 2u);
     EXPECT_EQ("xyz", wrapped_col->At(1).At(7));
 }
+
+// --- Wrap error-reporting overloads ---------------------------------------------------------
+// The two-argument Wrap(col, ValidationError*) returns nullptr (never throws) on a type
+// mismatch; the single-argument Wrap(col) throws ValidationError on the same mismatch.
+
+TEST(ColumnsCase, ColumnArrayT_Wrap_TypeMismatch) {
+    using TestArray = ColumnArrayT<ColumnUInt64>;
+
+    // Right kind (Array), wrong element type (String instead of UInt64).
+    ColumnRef bad_element = std::make_shared<ColumnArray>(std::make_shared<ColumnString>());
+    // Wrong kind entirely.
+    ColumnRef not_array = std::make_shared<ColumnUInt64>();
+
+    ValidationError error;
+    EXPECT_NO_THROW({
+        EXPECT_EQ(TestArray::Wrap(bad_element, &error), nullptr);
+    });
+    EXPECT_FALSE(std::string_view(error.what()).empty());
+
+    // Passing nullptr for the error is allowed and still non-throwing.
+    EXPECT_NO_THROW({
+        EXPECT_EQ(TestArray::Wrap(not_array, nullptr), nullptr);
+    });
+
+    // Single-argument overload throws on the same mismatches.
+    EXPECT_THROW(TestArray::Wrap(bad_element), ValidationError);
+    EXPECT_THROW(TestArray::Wrap(not_array), ValidationError);
+
+    // Sanity: a matching column wraps fine through both overloads.
+    ColumnRef good = std::make_shared<ColumnArray>(std::make_shared<ColumnUInt64>());
+    EXPECT_NE(TestArray::Wrap(good, nullptr), nullptr);
+    EXPECT_NE(TestArray::Wrap(good), nullptr);
+}
+
+TEST(ColumnsCase, ColumnNullableT_Wrap_TypeMismatch) {
+    using TestNullable = ColumnNullableT<ColumnUInt64>;
+
+    // Nullable of the wrong nested type.
+    ColumnRef bad_nested = std::make_shared<ColumnNullable>(
+        std::make_shared<ColumnString>(), std::make_shared<ColumnUInt8>());
+    ColumnRef not_nullable = std::make_shared<ColumnUInt64>();
+
+    ValidationError error;
+    EXPECT_EQ(TestNullable::Wrap(bad_nested, &error), nullptr);
+    EXPECT_FALSE(std::string_view(error.what()).empty());
+    EXPECT_EQ(TestNullable::Wrap(not_nullable, nullptr), nullptr);
+
+    EXPECT_THROW(TestNullable::Wrap(bad_nested), ValidationError);
+    EXPECT_THROW(TestNullable::Wrap(not_nullable), ValidationError);
+}
+
+TEST(ColumnsCase, ColumnTupleT_Wrap_TypeMismatch) {
+    using TestTuple = ColumnTupleT<ColumnUInt64, ColumnString>;
+
+    // Correct arity, wrong element type.
+    ColumnRef bad_element = std::make_shared<ColumnTuple>(std::vector<ColumnRef>{
+        std::make_shared<ColumnUInt64>(), std::make_shared<ColumnUInt64>()});
+    // Wrong arity.
+    ColumnRef bad_arity = std::make_shared<ColumnTuple>(std::vector<ColumnRef>{
+        std::make_shared<ColumnUInt64>()});
+    // Wrong kind.
+    ColumnRef not_tuple = std::make_shared<ColumnUInt64>();
+
+    ValidationError error;
+    EXPECT_EQ(TestTuple::Wrap(bad_element, &error), nullptr);
+    EXPECT_FALSE(std::string_view(error.what()).empty());
+    EXPECT_EQ(TestTuple::Wrap(bad_arity, nullptr), nullptr);
+    EXPECT_EQ(TestTuple::Wrap(not_tuple, nullptr), nullptr);
+
+    EXPECT_THROW(TestTuple::Wrap(bad_element), ValidationError);
+    EXPECT_THROW(TestTuple::Wrap(bad_arity), ValidationError);
+    EXPECT_THROW(TestTuple::Wrap(not_tuple), ValidationError);
+}
+
+TEST(ColumnsCase, ColumnMapT_Wrap_TypeMismatch) {
+    using TestMap = ColumnMapT<ColumnUInt64, ColumnString>;
+    ColumnRef not_map = std::make_shared<ColumnUInt64>();
+
+    ValidationError error;
+    EXPECT_EQ(TestMap::Wrap(not_map, &error), nullptr);
+    EXPECT_FALSE(std::string_view(error.what()).empty());
+    EXPECT_EQ(TestMap::Wrap(not_map, nullptr), nullptr);
+    EXPECT_THROW(TestMap::Wrap(not_map), ValidationError);
+}
+
+TEST(ColumnsCase, ColumnLowCardinalityT_Wrap_TypeMismatch) {
+    using TestLC = ColumnLowCardinalityT<ColumnString>;
+
+    // LowCardinality with the wrong (but valid) dictionary type.
+    ColumnRef bad_dict = std::make_shared<ColumnLowCardinality>(std::make_shared<ColumnFixedString>(4));
+    ColumnRef not_lc = std::make_shared<ColumnUInt64>();
+
+    ValidationError error;
+    EXPECT_EQ(TestLC::Wrap(bad_dict, &error), nullptr);
+    EXPECT_FALSE(std::string_view(error.what()).empty());
+    EXPECT_EQ(TestLC::Wrap(not_lc, nullptr), nullptr);
+
+    EXPECT_THROW(TestLC::Wrap(bad_dict), ValidationError);
+    EXPECT_THROW(TestLC::Wrap(not_lc), ValidationError);
+}

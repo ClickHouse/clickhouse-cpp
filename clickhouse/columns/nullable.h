@@ -116,19 +116,57 @@ public:
      *  returned wrapper reference the same underlying columns, so mutations through
      *  one are visible through the other.
      *
-     *  Throws an exception if `col` is of wrong type, it is safe to use original col
-     *  in this case. This is a static method to make such conversion verbose.
+     *  The two-argument overloads are non-throwing: on a type mismatch they return
+     *  nullptr and, if `error` is non-null, assign a description to `*error`. The
+     *  single-argument overloads throw ValidationError on a type mismatch instead.
      */
-    static auto Wrap(const ColumnNullable& col) {
-        return std::make_shared<ColumnNullableT<NestedColumnType>>(
-            WrapColumn<NestedColumnType>(col.Nested()),
-            col.Nulls()->AsStrict<ColumnUInt8>());
+    static std::shared_ptr<ColumnNullableT<NestedColumnType>> Wrap(const ColumnNullable& col, ValidationError* error) {
+        auto nested = WrapColumn<NestedColumnType>(col.Nested(), error);
+        if (!nested) {
+            return nullptr;
+        }
+        auto nulls = col.Nulls()->As<ColumnUInt8>();
+        if (!nulls) {
+            if (error) *error = ValidationError("Can't wrap Nullable column: unexpected null-map type");
+            return nullptr;
+        }
+        return std::make_shared<ColumnNullableT<NestedColumnType>>(nested, nulls);
     }
 
-    static auto Wrap(const Column& col) { return Wrap(dynamic_cast<const ColumnNullable&>(col)); }
+    static std::shared_ptr<ColumnNullableT<NestedColumnType>> Wrap(const Column& col, ValidationError* error) {
+        if (auto* c = dynamic_cast<const ColumnNullable*>(&col)) {
+            return Wrap(*c, error);
+        }
+        if (error) *error = ValidationError("Can't wrap column of type " + col.GetType().GetName() + " as Nullable");
+        return nullptr;
+    }
 
     // Helper to simplify integration with other APIs
-    static auto Wrap(const ColumnRef& col) { return Wrap(*col->AsStrict<ColumnNullable>()); }
+    static std::shared_ptr<ColumnNullableT<NestedColumnType>> Wrap(const ColumnRef& col, ValidationError* error) {
+        return Wrap(*col, error);
+    }
+
+    static auto Wrap(const ColumnNullable& col) {
+        ValidationError error;
+        auto result = Wrap(col, &error);
+        if (!result) throw error;
+        return result;
+    }
+
+    static auto Wrap(const Column& col) {
+        ValidationError error;
+        auto result = Wrap(col, &error);
+        if (!result) throw error;
+        return result;
+    }
+
+    // Helper to simplify integration with other APIs
+    static auto Wrap(const ColumnRef& col) {
+        ValidationError error;
+        auto result = Wrap(col, &error);
+        if (!result) throw error;
+        return result;
+    }
 
     ColumnRef Slice(size_t begin, size_t size) const override {
         return Wrap(ColumnNullable::Slice(begin, size));
