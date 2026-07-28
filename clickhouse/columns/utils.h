@@ -30,9 +30,9 @@ public:
 };
 
 template <typename T>
-inline std::shared_ptr<T> WrapColumn(ColumnRef&& column) {
+inline std::shared_ptr<T> WrapColumn(const ColumnRef& column) {
     if constexpr (HasWrapMethod<T>::value) {
-        return T::Wrap(std::move(column));
+        return T::Wrap(column);
     } else {
         return column->template AsStrict<T>();
     }

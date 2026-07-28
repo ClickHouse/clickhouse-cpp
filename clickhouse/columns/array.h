@@ -139,7 +139,7 @@ public:
      *  in this case. This is a static method to make such conversion verbose.
      */
     static auto Wrap(const ColumnArray& col) {
-        auto nested_data = WrapColumn<NestedColumnType>(ColumnRef{col.data_});
+        auto nested_data = WrapColumn<NestedColumnType>(col.data_);
         return std::make_shared<ColumnArrayT<NestedColumnType>>(nested_data, col.offsets_);
     }
 
