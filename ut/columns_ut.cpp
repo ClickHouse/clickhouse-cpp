@@ -1088,6 +1088,69 @@ TEST(ColumnsCase, ColumnLowCardinalityString_Append_and_Read) {
     }
 }
 
+TEST(ColumnsCase, ColumnLowCardinalityT_Wrap_DoesNotStealSource) {
+    // Populate via the typed column (the only ergonomic per-value insert path), then Wrap it
+    // through an untyped ColumnRef handle, as with a column received from a query.
+    auto source = std::make_shared<ColumnLowCardinalityT<ColumnString>>();
+    source->Append("a");
+    source->Append("b");
+    source->Append("a");
+
+    ColumnRef untyped = source;
+    auto wrapped = ColumnLowCardinalityT<ColumnString>::Wrap(untyped);
+
+    // Wrapper reads the same data.
+    ASSERT_EQ(wrapped->Size(), 3u);
+    EXPECT_EQ(wrapped->At(0), "a");
+    EXPECT_EQ(wrapped->At(1), "b");
+    EXPECT_EQ(wrapped->At(2), "a");
+
+    // Source (and the untyped handle) are left intact after Wrap (non-stealing).
+    EXPECT_NE(untyped, nullptr);
+    ASSERT_EQ(source->Size(), 3u);
+    EXPECT_EQ(source->At(0), "a");
+    EXPECT_EQ(source->At(2), "a");
+
+    // Storage (dictionary + index + dedup map) is shared and stays coherent:
+    // a new unique value appended via the source, and a repeat appended via the wrapper.
+    const auto dict_before = source->GetDictionarySize();
+    source->Append("c");     // new unique -> dictionary grows, visible via the wrapper
+    wrapped->Append("a");    // repeat -> deduped against the shared map, no dictionary growth
+
+    EXPECT_EQ(source->Size(), 5u);
+    EXPECT_EQ(wrapped->Size(), 5u);
+    EXPECT_EQ(wrapped->At(3), "c");
+    EXPECT_EQ(wrapped->At(4), "a");
+    EXPECT_EQ(source->At(4), "a");
+    // "c" added exactly one dictionary entry; "a" added none (shared dedup map).
+    EXPECT_EQ(source->GetDictionarySize(), dict_before + 1);
+    EXPECT_EQ(wrapped->GetDictionarySize(), dict_before + 1);
+}
+
+TEST(ColumnsCase, ColumnLowCardinalityT_Wrap_AcceptsLvalue) {
+    auto source = std::make_shared<ColumnLowCardinalityT<ColumnString>>();
+    source->Append("x");
+    source->Append("y");
+
+    using LC = ColumnLowCardinalityT<ColumnString>;
+
+    // Non-const lvalue (untyped base reference), no std::move required.
+    ColumnLowCardinality& base = *source;
+    auto w1 = LC::Wrap(base);
+    EXPECT_EQ(w1->At(0), "x");
+
+    // Const lvalue.
+    const ColumnLowCardinality& cref = *source;
+    auto w2 = LC::Wrap(cref);
+    EXPECT_EQ(w2->At(1), "y");
+
+    // Lvalue ColumnRef, no std::move required and not consumed.
+    ColumnRef ref = source;
+    auto w3 = LC::Wrap(ref);
+    EXPECT_EQ(w3->Size(), 2u);
+    EXPECT_NE(ref, nullptr);
+}
+
 TEST(ColumnsCase, ColumnLowCardinalityString_Clear_and_Append) {
     const size_t items_count = 11;
     ColumnLowCardinalityT<ColumnString> col;

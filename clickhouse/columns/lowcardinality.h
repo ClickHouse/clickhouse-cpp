@@ -50,7 +50,15 @@ private:
     // so make sure to NOT change address of the dictionary object (with reset(), swap()) or with anything else.
     ColumnRef dictionary_column_;
     ColumnRef index_column_;
-    UniqueItems unique_items_map_;
+    // Shared so that a wrapped (ColumnLowCardinalityT::Wrap) column shares the same dedup map as its
+    // source, keeping dictionary/index/map coherent across both holders (same semantics as other columns).
+    std::shared_ptr<UniqueItems> unique_items_map_;
+
+protected:
+    // Shallow copy: shares dictionary_column_, index_column_ and unique_items_map_ (all shared_ptr),
+    // copies index_type_code_ and the base type. Used by ColumnLowCardinalityT::Wrap to create a
+    // non-destructive, storage-sharing view of `col`.
+    ColumnLowCardinality(const ColumnLowCardinality& col) = default;
 
 public:
     ColumnLowCardinality(ColumnLowCardinality&& col) = default;
@@ -136,6 +144,15 @@ public:
     {
     }
 
+    // Shares the internals of `col` (dictionary, index and dedup map) via shared_ptr, WITHOUT
+    // stealing or copying them. Used by Wrap to create a non-destructive, storage-sharing view.
+    explicit ColumnLowCardinalityT(const ColumnLowCardinality& col)
+        : ColumnLowCardinality(col)
+        ,  typed_dictionary_(dynamic_cast<DictionaryColumnType &>(*GetDictionary()))
+        ,  type_(GetTypeCode(typed_dictionary_))
+    {
+    }
+
     template <typename ...Args>
     explicit ColumnLowCardinalityT(Args &&... args)
         : ColumnLowCardinalityT(std::make_shared<DictionaryColumnType>(std::forward<Args>(args)...))
@@ -182,23 +199,24 @@ public:
         }
     }
 
-    /** Create a ColumnLowCardinalityT from a ColumnLowCardinality, without copying data and offsets, but by
-     * 'stealing' those from `col`.
+    /** Create a ColumnLowCardinalityT that SHARES the internals of `col` (dictionary, index and
+     *  dedup map) via shared_ptr, WITHOUT stealing or copying them.
      *
-     *  Ownership of column internals is transferred to returned object, original (argument) object
-     *  MUST NOT BE USED IN ANY WAY, it is only safe to dispose it.
+     *  The original `col` remains fully valid and usable. Both the original and the returned
+     *  wrapper reference the same underlying storage, so mutations through one are visible through
+     *  the other and remain coherent (the dedup map is shared as well).
      *
      *  Throws an exception if `col` is of wrong type, it is safe to use original col in this case.
      *  This is a static method to make such conversion verbose.
      */
-    static auto Wrap(ColumnLowCardinality&& col) {
-        return std::make_shared<ColumnLowCardinalityT<WrappedColumnType>>(std::move(col));
+    static auto Wrap(const ColumnLowCardinality& col) {
+        return std::make_shared<ColumnLowCardinalityT<WrappedColumnType>>(col);
     }
 
-    static auto Wrap(Column&& col) { return Wrap(std::move(dynamic_cast<ColumnLowCardinality&&>(col))); }
+    static auto Wrap(const Column& col) { return Wrap(dynamic_cast<const ColumnLowCardinality&>(col)); }
 
     // Helper to simplify integration with other APIs
-    static auto Wrap(ColumnRef&& col) { return Wrap(std::move(*col->AsStrict<ColumnLowCardinality>())); }
+    static auto Wrap(const ColumnRef& col) { return Wrap(*col->AsStrict<ColumnLowCardinality>()); }
 
     ColumnRef Slice(size_t begin, size_t size) const override {
         return Wrap(ColumnLowCardinality::Slice(begin, size));

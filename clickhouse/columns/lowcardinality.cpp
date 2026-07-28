@@ -159,6 +159,7 @@ ColumnLowCardinality::ColumnLowCardinality(ColumnRef dictionary_column)
     : Column(Type::CreateLowCardinality(dictionary_column->Type())),
       dictionary_column_(dictionary_column->CloneEmpty()), // safe way to get an column of the same type.
       index_column_(std::make_shared<ColumnUInt32>()),
+      unique_items_map_(std::make_shared<UniqueItems>()),
       index_type_code_(Type::UInt32)
 {
     Setup(dictionary_column);
@@ -168,6 +169,7 @@ ColumnLowCardinality::ColumnLowCardinality(std::shared_ptr<ColumnNullable> dicti
     : Column(Type::CreateLowCardinality(dictionary_column->Type())),
       dictionary_column_(dictionary_column->CloneEmpty()), // safe way to get an column of the same type.
       index_column_(std::make_shared<ColumnUInt32>()),
+      unique_items_map_(std::make_shared<UniqueItems>()),
       index_type_code_(Type::UInt32)
 {
     AppendNullItem();
@@ -381,7 +383,7 @@ bool ColumnLowCardinality::LoadBody(InputStream* input, size_t rows) {
 
         dictionary_column_->Swap(*new_dictionary);
         index_column_.swap(new_index);
-        unique_items_map_.swap(new_unique_items_map);
+        unique_items_map_->swap(new_unique_items_map);
         index_type_code_ = index_column_->Type()->GetCode();
 
         return true;
@@ -418,7 +420,7 @@ void ColumnLowCardinality::SaveBody(OutputStream* output) {
 void ColumnLowCardinality::Clear() {
     index_column_->Clear();
     dictionary_column_->Clear();
-    unique_items_map_.clear();
+    unique_items_map_->clear();
 
     if (auto columnNullable = dictionary_column_->As<ColumnNullable>()) {
         AppendNullItem();
@@ -457,7 +459,7 @@ void ColumnLowCardinality::Swap(Column& other) {
     dictionary_column_->Swap(*col.dictionary_column_);
 
     index_column_.swap(col.index_column_);
-    unique_items_map_.swap(col.unique_items_map_);
+    unique_items_map_->swap(*col.unique_items_map_);
     std::swap(index_type_code_, col.index_type_code_);
 }
 
@@ -480,7 +482,7 @@ void ColumnLowCardinality::AppendUnsafe(const ItemView & value) {
     const auto key = computeHashKey(value);
     const auto initial_index_size = index_column_->Size();
     // If the value is unique, then we are going to append it to a dictionary, hence new index is Size().
-    auto [iterator, is_new_item] = unique_items_map_.try_emplace(key, dictionary_column_->Size());
+    auto [iterator, is_new_item] = unique_items_map_->try_emplace(key, dictionary_column_->Size());
     try {
         // Order is important, adding to dictionary last, since it is much (MUCH!!!!) harder
         // to remove item from dictionary column than from index column
@@ -497,7 +499,7 @@ void ColumnLowCardinality::AppendUnsafe(const ItemView & value) {
         if (index_column_->Size() != initial_index_size)
             removeLastIndex();
         if (is_new_item)
-            unique_items_map_.erase(iterator);
+            unique_items_map_->erase(iterator);
 
         throw;
     }
@@ -507,13 +509,13 @@ void ColumnLowCardinality::AppendNullItem()
 {
     const auto null_item = GetNullItemForDictionary(dictionary_column_);
     AppendToDictionary(*dictionary_column_, null_item);
-    unique_items_map_.emplace(computeHashKey(null_item), 0);
+    unique_items_map_->emplace(computeHashKey(null_item), 0);
 }
 
 void ColumnLowCardinality::AppendDefaultItem()
 {
     const auto defaultItem = GetDefaultItemForDictionary(dictionary_column_);
-    unique_items_map_.emplace(computeHashKey(defaultItem), dictionary_column_->Size());
+    unique_items_map_->emplace(computeHashKey(defaultItem), dictionary_column_->Size());
     AppendToDictionary(*dictionary_column_, defaultItem);
 }
 
