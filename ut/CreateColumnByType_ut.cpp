@@ -8,6 +8,8 @@
 
 #include <gtest/gtest.h>
 
+#include <tuple>
+
 namespace {
 using namespace clickhouse;
 }
@@ -19,6 +21,33 @@ TEST(CreateColumnByType, CreateSimpleAggregateFunction) {
     ASSERT_EQ(Type::Int32, col->Type()->GetCode());
     ASSERT_NE(nullptr, col->As<ColumnInt32>());
 }
+
+// SimpleAggregateFunction is transparent on the wire: the created column must
+// match its value (inner) type. The inner type may itself be a wrapper such as
+// LowCardinality, Nullable, Array or Map, which previously produced a nullptr
+// because only terminal inner types were handled (issue #540).
+class CreateColumnBySimpleAggregateFunctionType
+    : public ::testing::TestWithParam<std::tuple<const char* /*type*/, const char* /*expected inner type name*/>>
+{};
+
+TEST_P(CreateColumnBySimpleAggregateFunctionType, CreateColumnByType) {
+    const auto & [type_name, expected_inner_name] = GetParam();
+    const auto col = CreateColumnByType(type_name);
+    ASSERT_NE(nullptr, col) << "CreateColumnByType returned nullptr for " << type_name;
+    EXPECT_EQ(expected_inner_name, col->GetType().GetName());
+}
+
+INSTANTIATE_TEST_SUITE_P(InnerType, CreateColumnBySimpleAggregateFunctionType, ::testing::Values(
+    // Terminal inner type — handled before the fix; must stay unchanged.
+    std::make_tuple("SimpleAggregateFunction(sum, UInt64)", "UInt64"),
+    // Non-terminal (wrapper) inner types — returned nullptr before the fix.
+    std::make_tuple("SimpleAggregateFunction(anyLast, LowCardinality(String))", "LowCardinality(String)"),
+    std::make_tuple("SimpleAggregateFunction(anyLast, Nullable(String))", "Nullable(String)"),
+    std::make_tuple("SimpleAggregateFunction(groupArrayArray, Array(UInt64))", "Array(UInt64)"),
+    std::make_tuple("SimpleAggregateFunction(sumMap, Map(String, UInt64))", "Map(String, UInt64)"),
+    std::make_tuple("SimpleAggregateFunction(anyLast, Enum8('a' = 1, 'b' = 2))", "Enum8('a' = 1, 'b' = 2)"),
+    std::make_tuple("SimpleAggregateFunction(anyLast, Tuple(UInt64, String))", "Tuple(UInt64, String)")
+));
 
 TEST(CreateColumnByType, UnmatchedBrackets) {
     // When type string has unmatched brackets, CreateColumnByType must return nullptr.
