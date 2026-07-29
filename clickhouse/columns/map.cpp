@@ -3,7 +3,6 @@
 #include <stdexcept>
 
 #include "../exceptions.h"
-#include "utils.h"
 
 namespace {
 

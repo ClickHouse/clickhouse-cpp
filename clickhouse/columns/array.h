@@ -2,7 +2,6 @@
 
 #include "column.h"
 #include "numeric.h"
-#include "utils.h"
 
 #include <memory>
 

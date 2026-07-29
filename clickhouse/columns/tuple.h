@@ -1,7 +1,6 @@
 #pragma once
 
 #include "column.h"
-#include "utils.h"
 
 #include <tuple>
 #include <vector>
