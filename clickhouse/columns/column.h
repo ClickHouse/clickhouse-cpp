@@ -26,26 +26,25 @@ public:
     virtual ~Column() {}
 
     /// Downcast pointer to the specific column's subtype.
+    ///
+    /// If T is a "wrappable" typed column (one exposing a static Wrap method, e.g.
+    /// ColumnArrayT/ColumnTupleT/ColumnMapT/ColumnNullableT/ColumnLowCardinalityT) and the
+    /// column is not already exactly T, this attempts to Wrap it as T (a storage-sharing
+    /// typed view). Returns nullptr when neither an exact cast nor a wrap is possible.
+    /// (Definitions are out-of-line below, after WrapColumn is declared.)
     template <typename T>
-    inline std::shared_ptr<T> As() {
-        return std::dynamic_pointer_cast<T>(shared_from_this());
-    }
+    inline std::shared_ptr<T> As();
 
-    /// Downcast pointer to the specific column's subtype.
+    /// Const overload. Unlike the non-const As(), this does NOT wrap: it only performs an
+    /// exact downcast and returns nullptr on mismatch (even for a wrappable T). Wrapping is
+    /// intentionally disabled here because it would synthesize a mutable, storage-sharing
+    /// view from a const column (requiring a const_cast), which is not const-correct.
     template <typename T>
-    inline std::shared_ptr<const T> As() const {
-        return std::dynamic_pointer_cast<const T>(shared_from_this());
-    }
+    inline std::shared_ptr<const T> As() const;
 
-    /// Downcast pointer to the specific column's subtype.
+    /// Like As(), but throws ValidationError instead of returning nullptr on failure.
     template <typename T>
-    inline std::shared_ptr<T> AsStrict() {
-        auto result = std::dynamic_pointer_cast<T>(shared_from_this());
-        if (!result) {
-            throw ValidationError("Can't cast from " + type_->GetName());
-        }
-        return result;
-    }
+    inline std::shared_ptr<T> AsStrict();
 
     /// Get type object of the column.
     inline TypeRef Type() const { return type_; }
@@ -153,6 +152,40 @@ inline std::shared_ptr<T> WrapColumn(const ColumnRef& column) {
         throw error;
     }
     return result;
+}
+
+template <typename T>
+inline std::shared_ptr<T> Column::As() {
+    if constexpr (HasWrapMethod<T>::value) {
+        if (auto exact = std::dynamic_pointer_cast<T>(shared_from_this())) {
+            return exact;
+        }
+        return WrapColumn<T>(shared_from_this(), nullptr);
+    } else {
+        return std::dynamic_pointer_cast<T>(shared_from_this());
+    }
+}
+
+template <typename T>
+inline std::shared_ptr<const T> Column::As() const {
+    // No wrapping for the const overload (see declaration): exact downcast only.
+    return std::dynamic_pointer_cast<const T>(shared_from_this());
+}
+
+template <typename T>
+inline std::shared_ptr<T> Column::AsStrict() {
+    if constexpr (HasWrapMethod<T>::value) {
+        if (auto exact = std::dynamic_pointer_cast<T>(shared_from_this())) {
+            return exact;
+        }
+        return WrapColumn<T>(shared_from_this());
+    } else {
+        auto result = std::dynamic_pointer_cast<T>(shared_from_this());
+        if (!result) {
+            throw ValidationError("Can't cast from " + type_->GetName());
+        }
+        return result;
+    }
 }
 
 }  // namespace clickhouse

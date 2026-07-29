@@ -211,7 +211,11 @@ public:
      *  throw ValidationError on a type mismatch instead.
      */
     static std::shared_ptr<ColumnLowCardinalityT<WrappedColumnType>> Wrap(const ColumnLowCardinality& col, ValidationError* error) {
-        if (!col.dictionary_column_->template As<DictionaryColumnType>()) {
+        // Strict (non-wrapping) check on purpose: the constructor binds typed_dictionary_ as a
+        // DictionaryColumnType& via a reference dynamic_cast, so the stored dictionary must be
+        // exactly DictionaryColumnType. Using the wrapping As<> here could pass for a base
+        // dictionary and then make that reference cast throw std::bad_cast.
+        if (!std::dynamic_pointer_cast<DictionaryColumnType>(col.dictionary_column_)) {
             if (error) {
                 *error = ValidationError("Can't wrap LowCardinality column with dictionary of type "
                                          + col.dictionary_column_->GetType().GetName());
