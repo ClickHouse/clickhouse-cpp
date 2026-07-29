@@ -1,6 +1,7 @@
 #include <clickhouse/columns/bool.h>
 #include <clickhouse/columns/factory.h>
 #include <clickhouse/columns/date.h>
+#include <clickhouse/columns/lowcardinality.h>
 #include <clickhouse/columns/numeric.h>
 #include <clickhouse/columns/string.h>
 #include <clickhouse/columns/tuple.h>
@@ -43,6 +44,28 @@ TEST(CreateColumnByType, LowCardinalityAsWrappedColumn) {
 
     ASSERT_EQ(Type::FixedString, CreateColumnByType("LowCardinality(FixedString(10000))", create_column_settings)->GetType().GetCode());
     ASSERT_EQ(Type::FixedString, CreateColumnByType("LowCardinality(FixedString(10000))", create_column_settings)->As<ColumnFixedString>()->GetType().GetCode());
+}
+
+TEST(CreateColumnByType, LowCardinality) {
+    // In the default (non-wrapped) mode, LowCardinality(String)/LowCardinality(FixedString) map to
+    // the base ColumnLowCardinality (like Array/Nullable/Tuple/Map do), and the strongly-typed
+    // ColumnLowCardinalityT<...> view is obtained on demand via the wrapping As<>.
+    {
+        auto col = CreateColumnByType("LowCardinality(String)");
+        ASSERT_NE(nullptr, col);
+        EXPECT_EQ("LowCardinality(String)", col->GetType().GetName());
+        // Concrete type is the base ColumnLowCardinality, not ColumnLowCardinalityT<...>.
+        EXPECT_NE(nullptr, col->As<ColumnLowCardinality>());
+        // The wrapping As<> yields the strongly-typed view.
+        EXPECT_NE(nullptr, col->As<ColumnLowCardinalityT<ColumnString>>());
+    }
+    {
+        auto col = CreateColumnByType("LowCardinality(FixedString(10000))");
+        ASSERT_NE(nullptr, col);
+        EXPECT_EQ("LowCardinality(FixedString(10000))", col->GetType().GetName());
+        EXPECT_NE(nullptr, col->As<ColumnLowCardinality>());
+        EXPECT_NE(nullptr, col->As<ColumnLowCardinalityT<ColumnFixedString>>());
+    }
 }
 
 TEST(CreateColumnByType, DateTime) {
@@ -162,6 +185,8 @@ INSTANTIATE_TEST_SUITE_P(Parametrized, CreateColumnByTypeWithName, ::testing::Va
 
 INSTANTIATE_TEST_SUITE_P(Nested, CreateColumnByTypeWithName, ::testing::Values(
     "Nullable(FixedString(10000))",
+    "LowCardinality(String)",
+    "LowCardinality(FixedString(10000))",
     "Nullable(LowCardinality(FixedString(10000)))",
     "Array(Nullable(LowCardinality(FixedString(10000))))",
     "Array(Enum8('ONE' = 1, 'TWO' = 2))"
