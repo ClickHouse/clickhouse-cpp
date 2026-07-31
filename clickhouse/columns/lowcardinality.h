@@ -119,6 +119,10 @@ private:
     void AppendDefaultItem();
 
     Type::Code index_type_code_;
+    // Dictionary item type code (for a Nullable dictionary, the code of the innermost
+    // non-nullable type; otherwise the dictionary's own type code). Computed once in Setup()
+    // and used by ColumnLowCardinalityT to build ItemView on Append.
+    Type::Code item_type_code_;
 
 public:
     static details::LowCardinalityHashKey computeHashKey(const ItemView &);
@@ -130,7 +134,6 @@ template <typename DictionaryColumnType>
 class ColumnLowCardinalityT : public ColumnLowCardinality, public WrappableColumn<ColumnLowCardinalityT<DictionaryColumnType>, ColumnLowCardinality> {
 
     DictionaryColumnType& typed_dictionary_;
-    const Type::Code type_;
 
 public:
     using WrappedColumnType = DictionaryColumnType;
@@ -140,7 +143,6 @@ public:
     explicit ColumnLowCardinalityT(ColumnLowCardinality&& col)
         : ColumnLowCardinality(std::move(col))
         ,  typed_dictionary_(dynamic_cast<DictionaryColumnType &>(*GetDictionary()))
-        ,  type_(GetTypeCode(typed_dictionary_))
     {
     }
 
@@ -149,7 +151,6 @@ public:
     explicit ColumnLowCardinalityT(const ColumnLowCardinality& col)
         : ColumnLowCardinality(col)
         ,  typed_dictionary_(dynamic_cast<DictionaryColumnType &>(*GetDictionary()))
-        ,  type_(GetTypeCode(typed_dictionary_))
     {
     }
 
@@ -162,7 +163,6 @@ public:
     explicit ColumnLowCardinalityT(std::shared_ptr<DictionaryColumnType> dictionary_col)
         : ColumnLowCardinality(dictionary_col)
         , typed_dictionary_(dynamic_cast<DictionaryColumnType &>(*GetDictionary()))
-        , type_(GetTypeCode(typed_dictionary_))
     {}
 
     /// Extended interface to simplify reading/adding individual items.
@@ -183,12 +183,12 @@ public:
     inline void Append(const ValueType & value) {
         if constexpr (IsNullable<WrappedColumnType>) {
             if (value.has_value()) {
-                AppendUnsafe(ItemView{type_, *value});
+                AppendUnsafe(ItemView{item_type_code_, *value});
             } else {
                 AppendUnsafe(ItemView{});
             }
         } else {
-            AppendUnsafe(ItemView{type_, value});
+            AppendUnsafe(ItemView{item_type_code_, value});
         }
     }
 
@@ -248,17 +248,6 @@ public:
     }
 
     ColumnRef CloneEmpty() const override { return Wrap(ColumnLowCardinality::CloneEmpty()); }
-
-private:
-
-    template <typename T>
-    static auto GetTypeCode(T& column) {
-        if constexpr (IsNullable<T>) {
-            return GetTypeCode(*column.Nested()->template AsStrict<typename T::NestedColumnType>());
-        } else {
-            return column.Type()->GetCode();
-        }
-    }
 };
 
 }

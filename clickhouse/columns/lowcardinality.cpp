@@ -188,6 +188,15 @@ void ColumnLowCardinality::Reserve(size_t new_cap) {
 }
 
 void ColumnLowCardinality::Setup(ColumnRef dictionary_column) {
+    // Cache the dictionary item type code: for a Nullable dictionary it is the code of the
+    // innermost non-nullable type, otherwise the dictionary's own type code. The dictionary
+    // type is invariant after construction, so this stays valid.
+    if (auto nullable = dictionary_column_->As<ColumnNullable>()) {
+        item_type_code_ = nullable->Nested()->Type()->GetCode();
+    } else {
+        item_type_code_ = dictionary_column_->Type()->GetCode();
+    }
+
     AppendDefaultItem();
 
     if (dictionary_column->Size() != 0) {
