@@ -69,7 +69,7 @@ private:
 };
 
 template <typename K, typename V>
-class ColumnMapT : public ColumnMap {
+class ColumnMapT : public ColumnMap, public WrappableColumn<ColumnMapT<K, V>, ColumnMap> {
 public:
     using KeyColumnType   = K;
     using ValueColumnType = V;
@@ -276,33 +276,8 @@ public:
         return Wrap(*col, error);
     }
 
-    static auto Wrap(const ColumnMap& col) {
-        ValidationError error;
-        auto result = Wrap(col, &error);
-        if (!result) {
-            throw error;
-        }
-        return result;
-    }
-
-    static auto Wrap(const Column& col) {
-        ValidationError error;
-        auto result = Wrap(col, &error);
-        if (!result) {
-            throw error;
-        }
-        return result;
-    }
-
-    // Helper to simplify integration with other APIs
-    static auto Wrap(const ColumnRef& col) {
-        ValidationError error;
-        auto result = Wrap(col, &error);
-        if (!result) {
-            throw error;
-        }
-        return result;
-    }
+    // Throwing single-argument overloads (concrete type / Column& / ColumnRef&).
+    using WrappableColumn<ColumnMapT<K, V>, ColumnMap>::Wrap;
 
 private:
     std::shared_ptr<ArrayColumnType> typed_data_;

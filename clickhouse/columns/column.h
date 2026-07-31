@@ -154,6 +154,40 @@ inline std::shared_ptr<T> WrapColumn(const ColumnRef& column) {
     return result;
 }
 
+// Provides the throwing single-argument Wrap overloads for typed columns.
+// Derived must supply the non-throwing two-argument Wrap(col, ValidationError*) overloads.
+// BaseColumn is Derived's concrete base (e.g. ColumnArray) so an already-typed
+// argument takes the direct path instead of the dynamic_cast'ing Column& overload.
+template <typename Derived, typename BaseColumn>
+struct WrappableColumn {
+    static auto Wrap(const BaseColumn& col) {
+        ValidationError error;
+        auto result = Derived::Wrap(col, &error);
+        if (!result) {
+            throw error;
+        }
+        return result;
+    }
+
+    static auto Wrap(const Column& col) {
+        ValidationError error;
+        auto result = Derived::Wrap(col, &error);
+        if (!result) {
+            throw error;
+        }
+        return result;
+    }
+
+    static auto Wrap(const ColumnRef& col) {
+        ValidationError error;
+        auto result = Derived::Wrap(col, &error);
+        if (!result) {
+            throw error;
+        }
+        return result;
+    }
+};
+
 template <typename T>
 inline std::shared_ptr<T> Column::As() {
     if constexpr (HasWrapMethod<T>::value) {

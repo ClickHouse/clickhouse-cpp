@@ -106,7 +106,7 @@ private:
 };
 
 template <typename ColumnType>
-class ColumnArrayT : public ColumnArray {
+class ColumnArrayT : public ColumnArray, public WrappableColumn<ColumnArrayT<ColumnType>, ColumnArray> {
 public:
     class ArrayValueView;
     using ValueType = ArrayValueView;
@@ -161,33 +161,8 @@ public:
         return Wrap(*col, error);
     }
 
-    static auto Wrap(const ColumnArray& col) {
-        ValidationError error;
-        auto result = Wrap(col, &error);
-        if (!result) {
-            throw error;
-        }
-        return result;
-    }
-
-    static auto Wrap(const Column& col) {
-        ValidationError error;
-        auto result = Wrap(col, &error);
-        if (!result) {
-            throw error;
-        }
-        return result;
-    }
-
-    // Helper to simplify integration with other APIs
-    static auto Wrap(const ColumnRef& col) {
-        ValidationError error;
-        auto result = Wrap(col, &error);
-        if (!result) {
-            throw error;
-        }
-        return result;
-    }
+    // Throwing single-argument overloads (concrete type / Column& / ColumnRef&).
+    using WrappableColumn<ColumnArrayT<ColumnType>, ColumnArray>::Wrap;
 
     /// A single (row) value of the Array-column, i.e. readonly array of items.
     class ArrayValueView {

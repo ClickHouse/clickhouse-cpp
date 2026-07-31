@@ -64,7 +64,7 @@ private:
 };
 
 template <typename ColumnType>
-class ColumnNullableT : public ColumnNullable {
+class ColumnNullableT : public ColumnNullable, public WrappableColumn<ColumnNullableT<ColumnType>, ColumnNullable> {
 public:
     using NestedColumnType = ColumnType;
     using ValueType = std::optional<std::decay_t<decltype(std::declval<NestedColumnType>().At(0))>>;
@@ -149,33 +149,8 @@ public:
         return Wrap(*col, error);
     }
 
-    static auto Wrap(const ColumnNullable& col) {
-        ValidationError error;
-        auto result = Wrap(col, &error);
-        if (!result) {
-            throw error;
-        }
-        return result;
-    }
-
-    static auto Wrap(const Column& col) {
-        ValidationError error;
-        auto result = Wrap(col, &error);
-        if (!result) {
-            throw error;
-        }
-        return result;
-    }
-
-    // Helper to simplify integration with other APIs
-    static auto Wrap(const ColumnRef& col) {
-        ValidationError error;
-        auto result = Wrap(col, &error);
-        if (!result) {
-            throw error;
-        }
-        return result;
-    }
+    // Throwing single-argument overloads (concrete type / Column& / ColumnRef&).
+    using WrappableColumn<ColumnNullableT<ColumnType>, ColumnNullable>::Wrap;
 
     ColumnRef Slice(size_t begin, size_t size) const override {
         return Wrap(ColumnNullable::Slice(begin, size));

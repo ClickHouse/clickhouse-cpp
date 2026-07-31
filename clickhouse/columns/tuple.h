@@ -62,7 +62,7 @@ private:
 };
 
 template <typename... Columns>
-class ColumnTupleT : public ColumnTuple {
+class ColumnTupleT : public ColumnTuple, public WrappableColumn<ColumnTupleT<Columns...>, ColumnTuple> {
 public:
     using TupleOfColumns = std::tuple<std::shared_ptr<Columns>...>;
 
@@ -141,33 +141,8 @@ public:
         return Wrap(*col, error);
     }
 
-    static auto Wrap(const ColumnTuple& col) {
-        ValidationError error;
-        auto result = Wrap(col, &error);
-        if (!result) {
-            throw error;
-        }
-        return result;
-    }
-
-    static auto Wrap(const Column& col) {
-        ValidationError error;
-        auto result = Wrap(col, &error);
-        if (!result) {
-            throw error;
-        }
-        return result;
-    }
-
-    // Helper to simplify integration with other APIs
-    static auto Wrap(const ColumnRef& col) {
-        ValidationError error;
-        auto result = Wrap(col, &error);
-        if (!result) {
-            throw error;
-        }
-        return result;
-    }
+    // Throwing single-argument overloads (concrete type / Column& / ColumnRef&).
+    using WrappableColumn<ColumnTupleT<Columns...>, ColumnTuple>::Wrap;
 
     ColumnRef Slice(size_t begin, size_t size) const override {
         return Wrap(ColumnTuple::Slice(begin, size));
