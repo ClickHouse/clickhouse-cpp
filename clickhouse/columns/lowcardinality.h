@@ -229,7 +229,9 @@ public:
         if (auto* c = dynamic_cast<const ColumnLowCardinality*>(&col)) {
             return Wrap(*c, error);
         }
-        if (error) *error = ValidationError("Can't wrap column of type " + col.GetType().GetName() + " as LowCardinality");
+        if (error) {
+            *error = ValidationError("Can't wrap column of type " + col.GetType().GetName() + " as LowCardinality");
+        }
         return nullptr;
     }
 
@@ -241,14 +243,18 @@ public:
     static auto Wrap(const ColumnLowCardinality& col) {
         ValidationError error;
         auto result = Wrap(col, &error);
-        if (!result) throw error;
+        if (!result) {
+            throw error;
+        }
         return result;
     }
 
     static auto Wrap(const Column& col) {
         ValidationError error;
         auto result = Wrap(col, &error);
-        if (!result) throw error;
+        if (!result) {
+            throw error;
+        }
         return result;
     }
 
@@ -256,7 +262,9 @@ public:
     static auto Wrap(const ColumnRef& col) {
         ValidationError error;
         auto result = Wrap(col, &error);
-        if (!result) throw error;
+        if (!result) {
+            throw error;
+        }
         return result;
     }
 

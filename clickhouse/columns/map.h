@@ -119,7 +119,9 @@ public:
 
         inline auto At(const Key& key) const {
             auto it = Find(key);
-            if (it == end()) throw ValidationError("ColumnMap value key not found");
+            if (it == end()) {
+                throw ValidationError("ColumnMap value key not found");
+            }
             return (*it).second;
         }
 
@@ -263,7 +265,9 @@ public:
         if (auto* c = dynamic_cast<const ColumnMap*>(&col)) {
             return Wrap(*c, error);
         }
-        if (error) *error = ValidationError("Can't wrap column of type " + col.GetType().GetName() + " as Map");
+        if (error) {
+            *error = ValidationError("Can't wrap column of type " + col.GetType().GetName() + " as Map");
+        }
         return nullptr;
     }
 
@@ -275,14 +279,18 @@ public:
     static auto Wrap(const ColumnMap& col) {
         ValidationError error;
         auto result = Wrap(col, &error);
-        if (!result) throw error;
+        if (!result) {
+            throw error;
+        }
         return result;
     }
 
     static auto Wrap(const Column& col) {
         ValidationError error;
         auto result = Wrap(col, &error);
-        if (!result) throw error;
+        if (!result) {
+            throw error;
+        }
         return result;
     }
 
@@ -290,7 +298,9 @@ public:
     static auto Wrap(const ColumnRef& col) {
         ValidationError error;
         auto result = Wrap(col, &error);
-        if (!result) throw error;
+        if (!result) {
+            throw error;
+        }
         return result;
     }
 

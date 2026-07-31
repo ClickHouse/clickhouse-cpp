@@ -126,7 +126,9 @@ public:
         }
         auto nulls = col.Nulls()->As<ColumnUInt8>();
         if (!nulls) {
-            if (error) *error = ValidationError("Can't wrap Nullable column: unexpected null-map type");
+            if (error) {
+                *error = ValidationError("Can't wrap Nullable column: unexpected null-map type");
+            }
             return nullptr;
         }
         return std::make_shared<ColumnNullableT<NestedColumnType>>(nested, nulls);
@@ -136,7 +138,9 @@ public:
         if (auto* c = dynamic_cast<const ColumnNullable*>(&col)) {
             return Wrap(*c, error);
         }
-        if (error) *error = ValidationError("Can't wrap column of type " + col.GetType().GetName() + " as Nullable");
+        if (error) {
+            *error = ValidationError("Can't wrap column of type " + col.GetType().GetName() + " as Nullable");
+        }
         return nullptr;
     }
 
@@ -148,14 +152,18 @@ public:
     static auto Wrap(const ColumnNullable& col) {
         ValidationError error;
         auto result = Wrap(col, &error);
-        if (!result) throw error;
+        if (!result) {
+            throw error;
+        }
         return result;
     }
 
     static auto Wrap(const Column& col) {
         ValidationError error;
         auto result = Wrap(col, &error);
-        if (!result) throw error;
+        if (!result) {
+            throw error;
+        }
         return result;
     }
 
@@ -163,7 +171,9 @@ public:
     static auto Wrap(const ColumnRef& col) {
         ValidationError error;
         auto result = Wrap(col, &error);
-        if (!result) throw error;
+        if (!result) {
+            throw error;
+        }
         return result;
     }
 

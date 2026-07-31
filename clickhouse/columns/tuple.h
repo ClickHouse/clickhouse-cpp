@@ -111,7 +111,9 @@ public:
      */
     static std::shared_ptr<ColumnTupleT<Columns...>> Wrap(const ColumnTuple& col, ValidationError* error) {
         if (col.TupleSize() != std::tuple_size_v<TupleOfColumns>) {
-            if (error) *error = ValidationError("Can't wrap from " + col.GetType().GetName());
+            if (error) {
+                *error = ValidationError("Can't wrap from " + col.GetType().GetName());
+            }
             return nullptr;
         }
         auto columns = TupleFromColumn(col, error);
@@ -128,7 +130,9 @@ public:
         if (auto* c = dynamic_cast<const ColumnTuple*>(&col)) {
             return Wrap(*c, error);
         }
-        if (error) *error = ValidationError("Can't wrap column of type " + col.GetType().GetName() + " as Tuple");
+        if (error) {
+            *error = ValidationError("Can't wrap column of type " + col.GetType().GetName() + " as Tuple");
+        }
         return nullptr;
     }
 
@@ -140,14 +144,18 @@ public:
     static auto Wrap(const ColumnTuple& col) {
         ValidationError error;
         auto result = Wrap(col, &error);
-        if (!result) throw error;
+        if (!result) {
+            throw error;
+        }
         return result;
     }
 
     static auto Wrap(const Column& col) {
         ValidationError error;
         auto result = Wrap(col, &error);
-        if (!result) throw error;
+        if (!result) {
+            throw error;
+        }
         return result;
     }
 
@@ -155,7 +163,9 @@ public:
     static auto Wrap(const ColumnRef& col) {
         ValidationError error;
         auto result = Wrap(col, &error);
-        if (!result) throw error;
+        if (!result) {
+            throw error;
+        }
         return result;
     }
 

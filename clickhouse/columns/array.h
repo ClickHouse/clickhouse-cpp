@@ -150,7 +150,9 @@ public:
         if (auto* c = dynamic_cast<const ColumnArray*>(&col)) {
             return Wrap(*c, error);
         }
-        if (error) *error = ValidationError("Can't wrap column of type " + col.GetType().GetName() + " as Array");
+        if (error) {
+            *error = ValidationError("Can't wrap column of type " + col.GetType().GetName() + " as Array");
+        }
         return nullptr;
     }
 
@@ -162,14 +164,18 @@ public:
     static auto Wrap(const ColumnArray& col) {
         ValidationError error;
         auto result = Wrap(col, &error);
-        if (!result) throw error;
+        if (!result) {
+            throw error;
+        }
         return result;
     }
 
     static auto Wrap(const Column& col) {
         ValidationError error;
         auto result = Wrap(col, &error);
-        if (!result) throw error;
+        if (!result) {
+            throw error;
+        }
         return result;
     }
 
@@ -177,7 +183,9 @@ public:
     static auto Wrap(const ColumnRef& col) {
         ValidationError error;
         auto result = Wrap(col, &error);
-        if (!result) throw error;
+        if (!result) {
+            throw error;
+        }
         return result;
     }
 
