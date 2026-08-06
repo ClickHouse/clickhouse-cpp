@@ -1845,6 +1845,62 @@ TEST(ColumnsCase, DeepMapArrayLowCardinality_Clear_VisibleThroughAlias) {
     EXPECT_EQ(arr[0], std::optional<std::string_view>("z"));
 }
 
+// --- const As()/AsStrict() wrap like their non-const counterparts ---
+
+TEST(ColumnsCase, Const_As_WrapsWrappableColumn) {
+    using TestArray = ColumnArrayT<ColumnUInt64>;
+
+    auto arr = std::make_shared<TestArray>();
+    arr->Append(std::vector<uint64_t>{1, 2, 3});
+
+    // View the column only through a const handle.
+    std::shared_ptr<const Column> c = arr;
+    auto view = c->As<TestArray>();
+    ASSERT_NE(view, nullptr);
+    static_assert(std::is_same_v<decltype(view), std::shared_ptr<const TestArray>>,
+                  "const As() must yield shared_ptr<const T>");
+
+    // Read access reflects the same shared storage.
+    ASSERT_EQ(view->Size(), 1u);
+    auto row = view->At(0);
+    ASSERT_EQ(row.Size(), 3u);
+    EXPECT_EQ(row[0], 1u);
+    EXPECT_EQ(row[2], 3u);
+}
+
+TEST(ColumnsCase, Const_As_ExactDowncastStillWorks) {
+    auto leaf = std::make_shared<ColumnUInt64>();
+    leaf->Append(42u);
+
+    std::shared_ptr<const Column> c = leaf;
+    auto exact = c->As<ColumnUInt64>();
+    ASSERT_NE(exact, nullptr);
+    ASSERT_EQ(exact->Size(), 1u);
+    EXPECT_EQ(exact->At(0), 42u);
+
+    // Non-wrappable mismatch returns nullptr (no throw).
+    EXPECT_EQ(c->As<ColumnString>(), nullptr);
+}
+
+TEST(ColumnsCase, Const_AsStrict_WrapsAndThrows) {
+    using TestArray = ColumnArrayT<ColumnUInt64>;
+
+    auto arr = std::make_shared<TestArray>();
+    arr->Append(std::vector<uint64_t>{7, 8});
+
+    std::shared_ptr<const Column> c = arr;
+    auto view = c->AsStrict<TestArray>();
+    ASSERT_NE(view, nullptr);
+    static_assert(std::is_same_v<decltype(view), std::shared_ptr<const TestArray>>,
+                  "const AsStrict() must yield shared_ptr<const T>");
+    ASSERT_EQ(view->At(0).Size(), 2u);
+
+    // Wrappable-but-incompatible element type throws.
+    EXPECT_THROW((void)c->AsStrict<ColumnArrayT<ColumnString>>(), ValidationError);
+    // Non-wrappable mismatch throws too.
+    EXPECT_THROW((void)c->AsStrict<ColumnString>(), ValidationError);
+}
+
 TEST(ColumnsCase, ColumnTupleT_Slice_PreservesNames) {
     using TestTuple = ColumnTupleT<ColumnUInt64, ColumnString>;
 
