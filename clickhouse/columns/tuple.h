@@ -152,8 +152,9 @@ public:
 
     void Swap(Column& other) override {
         auto& col = dynamic_cast<ColumnTupleT<Columns...>&>(other);
-        typed_columns_.swap(col.typed_columns_);
-        ColumnTuple::Swap(other);
+        // Base swaps element contents in place, preserving object identity, so the cached
+        // typed_columns_ still point at the correct objects and must NOT be repointed.
+        ColumnTuple::Swap(col);
     }
 
 private:

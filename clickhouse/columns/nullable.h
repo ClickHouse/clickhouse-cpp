@@ -160,8 +160,9 @@ public:
 
     void Swap(Column& other) override {
         auto& col = dynamic_cast<ColumnNullableT<NestedColumnType>&>(other);
-        typed_nested_data_.swap(col.typed_nested_data_);
-        ColumnNullable::Swap(other);
+        // Base swaps sub-column contents in place, preserving object identity, so the cached
+        // typed_nested_data_ still points at the correct object and must NOT be repointed.
+        ColumnNullable::Swap(col);
     }
 
 private:

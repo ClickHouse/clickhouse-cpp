@@ -326,8 +326,9 @@ public:
 
     void Swap(Column& other) override {
         auto & col = dynamic_cast<ColumnArrayT<NestedColumnType> &>(other);
-        typed_nested_data_.swap(col.typed_nested_data_);
-        ColumnArray::Swap(other);
+        // Base swaps sub-column contents in place, preserving object identity, so the cached
+        // typed_nested_data_ still points at the correct object and must NOT be repointed.
+        ColumnArray::Swap(col);
     }
 
 private:

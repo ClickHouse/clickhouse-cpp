@@ -96,8 +96,9 @@ public:
 
     void Swap(Column& other) override {
         auto& col = dynamic_cast<ColumnMapT<K, V>&>(other);
-        col.typed_data_.swap(typed_data_);
-        ColumnMap::Swap(other);
+        // Base swaps the backing array's contents in place, preserving object identity, so the
+        // cached typed_data_ still points at the correct object and must NOT be repointed.
+        ColumnMap::Swap(col);
     }
 
     /// A single (row) value of the Map-column i.e. read-only map.
