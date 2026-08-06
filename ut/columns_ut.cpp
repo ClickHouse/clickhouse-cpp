@@ -1127,6 +1127,69 @@ TEST(ColumnsCase, ColumnLowCardinalityT_Wrap_DoesNotStealSource) {
     EXPECT_EQ(wrapped->GetDictionarySize(), dict_before + 1);
 }
 
+TEST(ColumnsCase, ColumnLowCardinalityT_Swap_VisibleThroughAlias) {
+    auto a = std::make_shared<ColumnLowCardinalityT<ColumnString>>();
+    a->Append("a");
+    a->Append("b");
+    a->Append("a");
+    auto b = std::make_shared<ColumnLowCardinalityT<ColumnString>>();
+    b->Append("x");
+
+    // Typed view of `a`, created BEFORE the swap; shares a's dictionary and index bundle.
+    auto alias_a = ColumnLowCardinalityT<ColumnString>::Wrap(a);
+    ASSERT_NE(alias_a, nullptr);
+    ASSERT_EQ(alias_a->Size(), 3u);
+
+    a->Swap(*b);
+
+    // a now holds b's data, b holds a's data.
+    ASSERT_EQ(a->Size(), 1u);
+    EXPECT_EQ(a->At(0), "x");
+    ASSERT_EQ(b->Size(), 3u);
+    EXPECT_EQ(b->At(0), "a");
+    EXPECT_EQ(b->At(1), "b");
+
+    // The swap is visible through the pre-existing alias: dictionary swapped in place and the
+    // shared index bundle swapped, so alias_a reflects b's data (size flips 3 -> 1).
+    ASSERT_EQ(alias_a->Size(), 1u);
+    EXPECT_EQ(alias_a->At(0), "x");
+}
+
+TEST(ColumnsCase, ColumnLowCardinalityT_Wrap_ThenLoad_VisibleThroughAlias) {
+    // Serialize a source LowCardinality column.
+    ColumnLowCardinalityT<ColumnString> src;
+    src.Append("p");
+    src.Append("q");
+    src.Append("p");
+
+    char buffer[256] = {'\0'};
+    {
+        ArrayOutput output(buffer, sizeof(buffer));
+        EXPECT_NO_THROW(src.Save(&output));
+    }
+
+    // A different target column, wrapped BEFORE the load.
+    auto target = std::make_shared<ColumnLowCardinalityT<ColumnString>>();
+    target->Append("z");
+    auto alias = ColumnLowCardinalityT<ColumnString>::Wrap(target);
+    ASSERT_NE(alias, nullptr);
+    ASSERT_EQ(alias->Size(), 1u);
+
+    // Load src's data into target: LoadBody swaps the dictionary in place and REPLACES the index
+    // column inside the shared bundle.
+    {
+        ArrayInput input(buffer, sizeof(buffer));
+        EXPECT_TRUE(target->Load(&input, 3));
+    }
+
+    ASSERT_EQ(target->Size(), 3u);
+    // The pre-existing alias reflects the loaded data (shared dictionary + index bundle).
+    ASSERT_EQ(alias->Size(), 3u);
+    EXPECT_EQ(alias->At(0), "p");
+    EXPECT_EQ(alias->At(1), "q");
+    EXPECT_EQ(alias->At(2), "p");
+}
+
 TEST(ColumnsCase, ColumnLowCardinalityT_Wrap_AcceptsLvalue) {
     auto source = std::make_shared<ColumnLowCardinalityT<ColumnString>>();
     source->Append("x");
@@ -1717,6 +1780,69 @@ TEST(ColumnsCase, DeepNestedArray_Swap_VisibleThroughAlias) {
     ASSERT_EQ(inner.Size(), 2u);
     EXPECT_EQ(inner[0], std::optional<std::string_view>("x"));
     EXPECT_EQ(inner[1], std::optional<std::string_view>{});
+}
+
+// --- Deep nesting with LowCardinality: Map(UInt64, Array(LowCardinality(Nullable(String)))) ---
+
+namespace {
+// Builds a single-row Map(UInt64, Array(LowCardinality(Nullable(String)))): one map row with one
+// entry {key -> arr}, where the value is an array of LowCardinality(Nullable(String)) items.
+std::shared_ptr<ColumnMap> MakeDeepLcMapRow(uint64_t key, std::vector<std::optional<std::string>> arr) {
+    auto keys = std::make_shared<ColumnUInt64>();
+    auto vals = std::make_shared<ColumnArrayT<ColumnLowCardinalityT<ColumnNullableT<ColumnString>>>>();
+    keys->Append(key);
+    vals->Append(arr);
+    auto tuple = std::make_shared<ColumnTuple>(std::vector<ColumnRef>{keys, vals});
+    return std::make_shared<ColumnMap>(std::make_shared<ColumnArray>(tuple));
+}
+}
+
+TEST(ColumnsCase, DeepMapArrayLowCardinality_Swap_VisibleThroughAlias) {
+    using DeepLcMap = ColumnMapT<ColumnUInt64, ColumnArrayT<ColumnLowCardinalityT<ColumnNullableT<ColumnString>>>>;
+
+    auto a = MakeDeepLcMapRow(1, {std::string("a"), std::string("b"), std::string("c")});
+    auto b = MakeDeepLcMapRow(1, {std::string("x"), std::nullopt});
+
+    auto alias_a = DeepLcMap::Wrap(a);  // deep typed view created BEFORE the swap
+    ASSERT_NE(alias_a, nullptr);
+    ASSERT_EQ(alias_a->At(0).At(1).Size(), 3u);
+
+    a->Swap(*b);
+
+    // The swap recurses through Array -> LowCardinality (dictionary swapped in place, index bundle
+    // swapped) down to the Nullable(String) leaves, so the pre-existing alias reflects B's data:
+    // the value-array flips size 3 -> 2 and the null survives through LC -> Nullable.
+    auto arr = alias_a->At(0).At(1);
+    ASSERT_EQ(arr.Size(), 2u);
+    EXPECT_EQ(arr[0], std::optional<std::string_view>("x"));
+    EXPECT_EQ(arr[1], std::optional<std::string_view>{});
+
+    // b now holds a's original data.
+    auto arr_b = DeepLcMap::Wrap(b)->At(0).At(1);
+    ASSERT_EQ(arr_b.Size(), 3u);
+    EXPECT_EQ(arr_b[0], std::optional<std::string_view>("a"));
+}
+
+TEST(ColumnsCase, DeepMapArrayLowCardinality_Clear_VisibleThroughAlias) {
+    using DeepLcMap = ColumnMapT<ColumnUInt64, ColumnArrayT<ColumnLowCardinalityT<ColumnNullableT<ColumnString>>>>;
+
+    auto a = MakeDeepLcMapRow(1, {std::string("a"), std::string("b"), std::string("c")});
+    auto alias_a = DeepLcMap::Wrap(a);
+    ASSERT_NE(alias_a, nullptr);
+    ASSERT_EQ(alias_a->Size(), 1u);
+
+    a->Clear();
+
+    // Clear recurses to the shared leaves in place (incl. LowCardinality), so the alias empties too.
+    EXPECT_EQ(a->Size(), 0u);
+    EXPECT_EQ(alias_a->Size(), 0u);
+
+    // Re-appending a fresh row must not resurface the pre-clear entry.
+    a->Append(MakeDeepLcMapRow(1, {std::string("z")}));
+    ASSERT_EQ(alias_a->Size(), 1u);
+    auto arr = alias_a->At(0).At(1);
+    ASSERT_EQ(arr.Size(), 1u);
+    EXPECT_EQ(arr[0], std::optional<std::string_view>("z"));
 }
 
 TEST(ColumnsCase, ColumnTupleT_Slice_PreservesNames) {

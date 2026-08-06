@@ -49,14 +49,30 @@ private:
     // IMPLEMENTATION NOTE: ColumnLowCardinalityT takes reference to underlying dictionary column object,
     // so make sure to NOT change address of the dictionary object (with reset(), swap()) or with anything else.
     ColumnRef dictionary_column_;
-    ColumnRef index_column_;
+
+    // The index column and its cached type code, bundled behind one shared_ptr. A wrapped view
+    // (ColumnLowCardinalityT::Wrap) shares this bundle, so that LoadBody()/Swap() - which REPLACE
+    // the index column, since its numeric width can change - stay coherent across every holder.
+    // The dictionary and dedup map are only ever mutated in place (never replaced), so they don't
+    // need this extra level of indirection.
+    struct IndexState {
+        ColumnRef column;
+        Type::Code type_code;
+    };
+    std::shared_ptr<IndexState> index_;
+
     // Shared so that a wrapped (ColumnLowCardinalityT::Wrap) column shares the same dedup map as its
     // source, keeping dictionary/index/map coherent across both holders (same semantics as other columns).
     std::shared_ptr<UniqueItems> unique_items_map_;
 
+    // Dictionary item type code (for a Nullable dictionary, the code of the innermost
+    // non-nullable type; otherwise the dictionary's own type code). Computed once in Setup()
+    // and used by ColumnLowCardinalityT to build ItemView on Append.
+    Type::Code item_type_code_;
+
 protected:
-    // Shallow copy: shares dictionary_column_, index_column_ and unique_items_map_ (all shared_ptr),
-    // copies index_type_code_ and the base type. Used by ColumnLowCardinalityT::Wrap to create a
+    // Shallow copy: shares dictionary_column_, index_ (the index bundle) and unique_items_map_
+    // (all shared_ptr) and copies the base type. Used by ColumnLowCardinalityT::Wrap to create a
     // non-destructive, storage-sharing view of `col`.
     ColumnLowCardinality(const ColumnLowCardinality& col) = default;
 
@@ -117,12 +133,6 @@ private:
     void Setup(ColumnRef dictionary_column);
     void AppendNullItem();
     void AppendDefaultItem();
-
-    Type::Code index_type_code_;
-    // Dictionary item type code (for a Nullable dictionary, the code of the innermost
-    // non-nullable type; otherwise the dictionary's own type code). Computed once in Setup()
-    // and used by ColumnLowCardinalityT to build ItemView on Append.
-    Type::Code item_type_code_;
 
 public:
     static details::LowCardinalityHashKey computeHashKey(const ItemView &);
