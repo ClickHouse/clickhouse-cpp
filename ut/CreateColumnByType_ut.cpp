@@ -68,6 +68,44 @@ TEST(CreateColumnByType, LowCardinality) {
     }
 }
 
+TEST(CreateColumnByType, LowCardinalityNullable) {
+    // The factory builds LowCardinality(Nullable(String)) as a base ColumnLowCardinality whose
+    // dictionary is a base ColumnNullable (not a typed ColumnNullableT<ColumnString>). The wrapping
+    // As<> must still produce the strongly-typed view by wrapping that base dictionary into the
+    // typed one, sharing its underlying storage.
+    using TypedLC = ColumnLowCardinalityT<ColumnNullableT<ColumnString>>;
+
+    auto col = CreateColumnByType("LowCardinality(Nullable(String))");
+    ASSERT_NE(nullptr, col);
+    EXPECT_EQ("LowCardinality(Nullable(String))", col->GetType().GetName());
+    EXPECT_NE(nullptr, col->As<ColumnLowCardinality>());
+
+    auto typed = col->As<TypedLC>();
+    ASSERT_NE(nullptr, typed);
+
+    // Appends through the typed view are visible via the base handle (shared storage), and the
+    // typed accessors round-trip both real values and nulls.
+    typed->Append(std::string("abc"));
+    typed->Append(std::nullopt);
+    typed->Append(std::string("abc"));
+
+    EXPECT_EQ(3u, typed->Size());
+    EXPECT_EQ(3u, col->Size());
+    EXPECT_EQ(std::optional<std::string>("abc"), typed->At(0));
+    EXPECT_EQ(std::nullopt, typed->At(1));
+    EXPECT_EQ(std::optional<std::string>("abc"), typed->At(2));
+
+    // A second independent wrap of the same base column observes the same shared data.
+    auto typed2 = col->As<TypedLC>();
+    ASSERT_NE(nullptr, typed2);
+    EXPECT_EQ(3u, typed2->Size());
+    EXPECT_EQ(std::optional<std::string>("abc"), typed2->At(0));
+    EXPECT_EQ(std::nullopt, typed2->At(1));
+
+    // A dictionary whose nested type does not match must still be rejected.
+    EXPECT_EQ(nullptr, col->As<ColumnLowCardinalityT<ColumnNullableT<ColumnFixedString>>>());
+}
+
 TEST(CreateColumnByType, DateTime) {
     ASSERT_NE(nullptr, CreateColumnByType("DateTime"));
     ASSERT_NE(nullptr, CreateColumnByType("DateTime('Europe/Moscow')"));
