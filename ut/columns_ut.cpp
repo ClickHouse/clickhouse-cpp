@@ -1646,6 +1646,27 @@ TEST(ColumnsCase, ColumnTuple_Swap_DifferentSizeThrows) {
     EXPECT_THROW(a.Swap(b), ValidationError);
 }
 
+TEST(ColumnsCase, ColumnTuple_Swap_DifferentElementTypeDoesNotModify) {
+    auto a0 = std::make_shared<ColumnUInt64>();
+    auto a1 = std::make_shared<ColumnString>();
+    a0->Append(1);
+    a1->Append("a");
+    ColumnTuple a({a0, a1});
+
+    auto b0 = std::make_shared<ColumnUInt64>();
+    auto b1 = std::make_shared<ColumnUInt64>();
+    b0->Append(2);
+    b1->Append(3);
+    ColumnTuple b({b0, b1});
+
+    EXPECT_THROW(a.Swap(b), ValidationError);
+
+    EXPECT_EQ(a0->At(0), 1u);
+    EXPECT_EQ(a1->At(0), "a");
+    EXPECT_EQ(b0->At(0), 2u);
+    EXPECT_EQ(b1->At(0), 3u);
+}
+
 TEST(ColumnsCase, ColumnTuple_Clear_PreservesStructure_AndAlias) {
     ColumnTuple col({std::make_shared<ColumnUInt64>(), std::make_shared<ColumnString>()});
     col[0]->AsStrict<ColumnUInt64>()->Append(1);

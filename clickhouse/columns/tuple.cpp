@@ -147,11 +147,21 @@ void ColumnTuple::Clear() {
 
 void ColumnTuple::Swap(Column& other) {
     auto & col = dynamic_cast<ColumnTuple &>(other);
-    if (columns_.size() != col.columns_.size())
+    if (columns_.size() != col.columns_.size()) {
         throw ValidationError("Can't swap() Tuple columns of different sizes.");
+    }
+
+    for (size_t i = 0; i < columns_.size(); ++i) {
+        if (!columns_[i]->Type()->IsEqual(col.columns_[i]->Type())) {
+            throw ValidationError(
+                "Can't swap() Tuple elements of types "
+                + columns_[i]->GetType().GetName() + " and "
+                + col.columns_[i]->GetType().GetName() + ".");
+        }
+    }
+
     // Swap each element's CONTENTS in place (never rebind the columns_ vector), so element
     // objects keep their identity and any As<>/Wrap views of this column stay coherent.
-    // The nested Swap also type-checks each element and throws on a mismatch.
     for (size_t i = 0; i < columns_.size(); ++i) {
         columns_[i]->Swap(*col.columns_[i]);
     }
