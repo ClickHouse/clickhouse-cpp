@@ -1,8 +1,8 @@
 #pragma once
 
 #include "column.h"
-#include "utils.h"
 
+#include <tuple>
 #include <vector>
 
 namespace clickhouse {
@@ -62,7 +62,7 @@ private:
 };
 
 template <typename... Columns>
-class ColumnTupleT : public ColumnTuple {
+class ColumnTupleT : public ColumnTuple, public WrappableColumn<ColumnTupleT<Columns...>, ColumnTuple> {
 public:
     using TupleOfColumns = std::tuple<std::shared_ptr<Columns>...>;
 
@@ -98,27 +98,51 @@ public:
         AppendTuple(std::move(value));
     }
 
-    /** Create a ColumnTupleT from a ColumnTuple, without copying data and offsets, but by
-     * 'stealing' those from `col`.
+    /** Create a ColumnTupleT that SHARES the internals of `col` (its element columns)
+     *  via shared_ptr, WITHOUT stealing or copying them.
      *
-     *  Ownership of column internals is transferred to returned object, original (argument) object
-     *  MUST NOT BE USED IN ANY WAY, it is only safe to dispose it.
+     *  The original `col` remains fully valid and usable. Both the original and the
+     *  returned wrapper reference the same underlying element columns, so mutations
+     *  through one are visible through the other.
      *
-     *  Throws an exception if `col` is of wrong type, it is safe to use original col in this case.
-     *  This is a static method to make such conversion verbose.
+     *  The two-argument overloads are non-throwing: on a type mismatch they return
+     *  nullptr and, if `error` is non-null, assign a description to `*error`. The
+     *  single-argument overloads throw ValidationError on a type mismatch instead.
      */
-    static auto Wrap(ColumnTuple&& col) {
+    static std::shared_ptr<ColumnTupleT<Columns...>> Wrap(const ColumnTuple& col, ValidationError* error) {
         if (col.TupleSize() != std::tuple_size_v<TupleOfColumns>) {
-            throw ValidationError("Can't wrap from " + col.GetType().GetName());
+            if (error) {
+                *error = ValidationError("Can't wrap from " + col.GetType().GetName());
+            }
+            return nullptr;
+        }
+        auto columns = TupleFromColumn(col, error);
+        const bool all_wrapped = std::apply(
+            [](const auto&... column) { return (... && static_cast<bool>(column)); }, columns);
+        if (!all_wrapped) {
+            return nullptr;
         }
         auto names = col.Type()->As<TupleType>()->GetItemNames();
-        return std::make_shared<ColumnTupleT<Columns...>>(VectorToTuple(std::move(col)), std::move(names));
+        return std::make_shared<ColumnTupleT<Columns...>>(std::move(columns), std::move(names));
     }
 
-    static auto Wrap(Column&& col) { return Wrap(std::move(dynamic_cast<ColumnTuple&&>(col))); }
+    static std::shared_ptr<ColumnTupleT<Columns...>> Wrap(const Column& col, ValidationError* error) {
+        if (auto* c = dynamic_cast<const ColumnTuple*>(&col)) {
+            return Wrap(*c, error);
+        }
+        if (error) {
+            *error = ValidationError("Can't wrap column of type " + col.GetType().GetName() + " as Tuple");
+        }
+        return nullptr;
+    }
 
     // Helper to simplify integration with other APIs
-    static auto Wrap(ColumnRef&& col) { return Wrap(std::move(*col->AsStrict<ColumnTuple>())); }
+    static std::shared_ptr<ColumnTupleT<Columns...>> Wrap(const ColumnRef& col, ValidationError* error) {
+        return Wrap(*col, error);
+    }
+
+    // Throwing single-argument overloads (concrete type / Column& / ColumnRef&).
+    using WrappableColumn<ColumnTupleT<Columns...>, ColumnTuple>::Wrap;
 
     ColumnRef Slice(size_t begin, size_t size) const override {
         return Wrap(ColumnTuple::Slice(begin, size));
@@ -128,8 +152,9 @@ public:
 
     void Swap(Column& other) override {
         auto& col = dynamic_cast<ColumnTupleT<Columns...>&>(other);
-        typed_columns_.swap(col.typed_columns_);
-        ColumnTuple::Swap(other);
+        // Base swaps element contents in place, preserving object identity, so the cached
+        // typed_columns_ still point at the correct objects and must NOT be repointed.
+        ColumnTuple::Swap(col);
     }
 
 private:
@@ -156,6 +181,23 @@ private:
             auto result = TupleToVector<T, index - 1>(value);
             result.push_back(std::get<index - 1>(value));
             return result;
+        }
+    }
+
+    // Builds a tuple of the element columns wrapped as their typed counterparts. Any element
+    // that can't be wrapped is left as a null shared_ptr (and `*error` is set if provided).
+    template <size_t column_index = std::tuple_size_v<TupleOfColumns>>
+    inline static auto TupleFromColumn([[maybe_unused]] const ColumnTuple& col,
+                                       [[maybe_unused]] ValidationError* error) {
+        static_assert(column_index <= std::tuple_size_v<TupleOfColumns>);
+        if constexpr (column_index == 0) {
+            return std::make_tuple();
+        } else {
+            using ColumnType =
+                typename std::tuple_element<column_index - 1, TupleOfColumns>::type::element_type;
+            auto column = WrapColumn<ColumnType>(col[column_index - 1], error);
+            return std::tuple_cat(TupleFromColumn<column_index - 1>(col, error),
+                                  std::make_tuple(std::move(column)));
         }
     }
 

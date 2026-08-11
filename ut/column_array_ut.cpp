@@ -337,6 +337,86 @@ TEST(ColumnArrayT, Wrap_UInt64_2D) {
     EXPECT_TRUE(CompareRecursive(values, array));
 }
 
+TEST(ColumnArrayT, Wrap_AcceptsLvalue) {
+    // Wrap no longer requires an rvalue: lvalues and const sources are accepted.
+
+    const std::vector<std::vector<uint64_t>> values = {
+        {1u, 2u},
+        {3u},
+        {}
+    };
+
+    auto arr = CreateArray<ColumnUInt64>(values);
+
+    // Lvalue ColumnRef, no std::move required and not consumed.
+    ColumnRef ref = arr;
+    auto w1 = ColumnArrayT<ColumnUInt64>::Wrap(ref);
+    EXPECT_TRUE(CompareRecursive(values, *w1));
+    EXPECT_NE(ref, nullptr);
+
+    // Const lvalue concrete column.
+    const ColumnArray& cref = *arr;
+    auto w2 = ColumnArrayT<ColumnUInt64>::Wrap(cref);
+    EXPECT_TRUE(CompareRecursive(values, *w2));
+
+    // Non-const lvalue concrete column.
+    auto w3 = ColumnArrayT<ColumnUInt64>::Wrap(*arr);
+    EXPECT_TRUE(CompareRecursive(values, *w3));
+}
+
+TEST(ColumnArrayT, Wrap_DoesNotStealSource_UInt64) {
+    // Wrap shares storage with the source ColumnArray and leaves its contents intact.
+
+    const std::vector<std::vector<uint64_t>> values = {
+        {1u, 2u, 3u},
+        {4u, 5u, 6u, 7u, 8u, 9u},
+        {0u},
+        {},
+        {13, 14}
+    };
+
+    auto original = CreateArray<ColumnUInt64>(values);
+    // Keep an independent handle to the same underlying ColumnArray.
+    auto keep = original;
+    auto wrapped_array = ColumnArrayT<ColumnUInt64>::Wrap(std::move(original));
+
+    // Wrapper sees the same data.
+    EXPECT_TRUE(CompareRecursive(values, *wrapped_array));
+
+    // Source array contents are left intact (not stolen from).
+    ASSERT_NE(keep, nullptr);
+    EXPECT_EQ(keep->Size(), values.size());
+
+    // Storage is shared: appending a row through the source is visible via the wrapper.
+    keep->AppendAsColumn(std::make_shared<ColumnUInt64>(std::vector<uint64_t>{42, 43}));
+    EXPECT_EQ(wrapped_array->Size(), values.size() + 1);
+    EXPECT_EQ(wrapped_array->At(values.size()).At(0), 42u);
+    EXPECT_EQ(wrapped_array->At(values.size()).At(1), 43u);
+}
+
+TEST(ColumnArrayT, Wrap_DoesNotStealSource_UInt64_2D) {
+    // Wrap shares all nesting layers with the source.
+
+    const std::vector<std::vector<std::vector<uint64_t>>> values = {
+        {{1u, 2u}, {3u}},
+        {{4u}, {5u, 6u, 7u}, {8u, 9u}, {}},
+        {{0u}},
+        {{}},
+        {{13}, {14, 15}}
+    };
+
+    auto original = Create2DArray<ColumnUInt64>(values);
+    auto keep = original;
+    auto wrapped_array = ColumnArrayT<ColumnArrayT<ColumnUInt64>>::Wrap(std::move(original));
+
+    EXPECT_TRUE(CompareRecursive(values, *wrapped_array));
+
+    // Source array contents are left intact (not stolen from).
+    ASSERT_NE(keep, nullptr);
+    EXPECT_EQ(keep->Size(), values.size());
+    EXPECT_TRUE(CompareRecursive(values, *ColumnArrayT<ColumnArrayT<ColumnUInt64>>::Wrap(std::move(keep))));
+}
+
 TEST(ColumnArrayT, Bool) {
     // Check inserting\reading back data from clickhouse::ColumnArrayT<ColumnBool>
 

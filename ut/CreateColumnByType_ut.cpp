@@ -1,6 +1,7 @@
 #include <clickhouse/columns/bool.h>
 #include <clickhouse/columns/factory.h>
 #include <clickhouse/columns/date.h>
+#include <clickhouse/columns/lowcardinality.h>
 #include <clickhouse/columns/numeric.h>
 #include <clickhouse/columns/string.h>
 #include <clickhouse/columns/tuple.h>
@@ -43,6 +44,66 @@ TEST(CreateColumnByType, LowCardinalityAsWrappedColumn) {
 
     ASSERT_EQ(Type::FixedString, CreateColumnByType("LowCardinality(FixedString(10000))", create_column_settings)->GetType().GetCode());
     ASSERT_EQ(Type::FixedString, CreateColumnByType("LowCardinality(FixedString(10000))", create_column_settings)->As<ColumnFixedString>()->GetType().GetCode());
+}
+
+TEST(CreateColumnByType, LowCardinality) {
+    // In the default (non-wrapped) mode, LowCardinality(String)/LowCardinality(FixedString) map to
+    // the base ColumnLowCardinality (like Array/Nullable/Tuple/Map do), and the strongly-typed
+    // ColumnLowCardinalityT<...> view is obtained on demand via the wrapping As<>.
+    {
+        auto col = CreateColumnByType("LowCardinality(String)");
+        ASSERT_NE(nullptr, col);
+        EXPECT_EQ("LowCardinality(String)", col->GetType().GetName());
+        // Concrete type is the base ColumnLowCardinality, not ColumnLowCardinalityT<...>.
+        EXPECT_NE(nullptr, col->As<ColumnLowCardinality>());
+        // The wrapping As<> yields the strongly-typed view.
+        EXPECT_NE(nullptr, col->As<ColumnLowCardinalityT<ColumnString>>());
+    }
+    {
+        auto col = CreateColumnByType("LowCardinality(FixedString(10000))");
+        ASSERT_NE(nullptr, col);
+        EXPECT_EQ("LowCardinality(FixedString(10000))", col->GetType().GetName());
+        EXPECT_NE(nullptr, col->As<ColumnLowCardinality>());
+        EXPECT_NE(nullptr, col->As<ColumnLowCardinalityT<ColumnFixedString>>());
+    }
+}
+
+TEST(CreateColumnByType, LowCardinalityNullable) {
+    // The factory builds LowCardinality(Nullable(String)) as a base ColumnLowCardinality whose
+    // dictionary is a base ColumnNullable (not a typed ColumnNullableT<ColumnString>). The wrapping
+    // As<> must still produce the strongly-typed view by wrapping that base dictionary into the
+    // typed one, sharing its underlying storage.
+    using TypedLC = ColumnLowCardinalityT<ColumnNullableT<ColumnString>>;
+
+    auto col = CreateColumnByType("LowCardinality(Nullable(String))");
+    ASSERT_NE(nullptr, col);
+    EXPECT_EQ("LowCardinality(Nullable(String))", col->GetType().GetName());
+    EXPECT_NE(nullptr, col->As<ColumnLowCardinality>());
+
+    auto typed = col->As<TypedLC>();
+    ASSERT_NE(nullptr, typed);
+
+    // Appends through the typed view are visible via the base handle (shared storage), and the
+    // typed accessors round-trip both real values and nulls.
+    typed->Append(std::string("abc"));
+    typed->Append(std::nullopt);
+    typed->Append(std::string("abc"));
+
+    EXPECT_EQ(3u, typed->Size());
+    EXPECT_EQ(3u, col->Size());
+    EXPECT_EQ(std::optional<std::string>("abc"), typed->At(0));
+    EXPECT_EQ(std::nullopt, typed->At(1));
+    EXPECT_EQ(std::optional<std::string>("abc"), typed->At(2));
+
+    // A second independent wrap of the same base column observes the same shared data.
+    auto typed2 = col->As<TypedLC>();
+    ASSERT_NE(nullptr, typed2);
+    EXPECT_EQ(3u, typed2->Size());
+    EXPECT_EQ(std::optional<std::string>("abc"), typed2->At(0));
+    EXPECT_EQ(std::nullopt, typed2->At(1));
+
+    // A dictionary whose nested type does not match must still be rejected.
+    EXPECT_EQ(nullptr, col->As<ColumnLowCardinalityT<ColumnNullableT<ColumnFixedString>>>());
 }
 
 TEST(CreateColumnByType, DateTime) {
@@ -162,6 +223,8 @@ INSTANTIATE_TEST_SUITE_P(Parametrized, CreateColumnByTypeWithName, ::testing::Va
 
 INSTANTIATE_TEST_SUITE_P(Nested, CreateColumnByTypeWithName, ::testing::Values(
     "Nullable(FixedString(10000))",
+    "LowCardinality(String)",
+    "LowCardinality(FixedString(10000))",
     "Nullable(LowCardinality(FixedString(10000)))",
     "Array(Nullable(LowCardinality(FixedString(10000))))",
     "Array(Enum8('ONE' = 1, 'TWO' = 2))"

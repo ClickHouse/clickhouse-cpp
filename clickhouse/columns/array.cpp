@@ -138,8 +138,11 @@ size_t ColumnArray::Size() const {
 
 void ColumnArray::Swap(Column& other) {
     auto & col = dynamic_cast<ColumnArray &>(other);
-    data_.swap(col.data_);
-    offsets_.swap(col.offsets_);
+    // Swap sub-column CONTENTS in place (never rebind the shared_ptr slots), so the data and
+    // offsets objects keep their identity and any As<>/Wrap views of this column stay coherent.
+    // The nested Swap also type-checks the element columns and throws on a mismatch.
+    data_->Swap(*col.data_);
+    offsets_->Swap(*col.offsets_);
 }
 
 void ColumnArray::OffsetsIncrease(size_t n) {

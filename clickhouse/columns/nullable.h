@@ -64,7 +64,7 @@ private:
 };
 
 template <typename ColumnType>
-class ColumnNullableT : public ColumnNullable {
+class ColumnNullableT : public ColumnNullable, public WrappableColumn<ColumnNullableT<ColumnType>, ColumnNullable> {
 public:
     using NestedColumnType = ColumnType;
     using ValueType = std::optional<std::decay_t<decltype(std::declval<NestedColumnType>().At(0))>>;
@@ -108,25 +108,49 @@ public:
         }
     }
 
-    /** Create a ColumnNullableT from a ColumnNullable, without copying data and offsets, but by
-     * 'stealing' those from `col`.
+    /** Create a ColumnNullableT that SHARES the internals of `col` (nested data and
+     *  null map) via shared_ptr, WITHOUT stealing or copying them.
      *
-     *  Ownership of column internals is transferred to returned object, original (argument) object
-     *  MUST NOT BE USED IN ANY WAY, it is only safe to dispose it.
+     *  The original `col` remains fully valid and usable. Both the original and the
+     *  returned wrapper reference the same underlying columns, so mutations through
+     *  one are visible through the other.
      *
-     *  Throws an exception if `col` is of wrong type, it is safe to use original col in this case.
-     *  This is a static method to make such conversion verbose.
+     *  The two-argument overloads are non-throwing: on a type mismatch they return
+     *  nullptr and, if `error` is non-null, assign a description to `*error`. The
+     *  single-argument overloads throw ValidationError on a type mismatch instead.
      */
-    static auto Wrap(ColumnNullable&& col) {
-        return std::make_shared<ColumnNullableT<NestedColumnType>>(
-            col.Nested()->AsStrict<NestedColumnType>(),
-            col.Nulls()->AsStrict<ColumnUInt8>()) ;
+    static std::shared_ptr<ColumnNullableT<NestedColumnType>> Wrap(const ColumnNullable& col, ValidationError* error) {
+        auto nested = WrapColumn<NestedColumnType>(col.Nested(), error);
+        if (!nested) {
+            return nullptr;
+        }
+        auto nulls = col.Nulls()->As<ColumnUInt8>();
+        if (!nulls) {
+            if (error) {
+                *error = ValidationError("Can't wrap Nullable column: unexpected null-map type");
+            }
+            return nullptr;
+        }
+        return std::make_shared<ColumnNullableT<NestedColumnType>>(nested, nulls);
     }
 
-    static auto Wrap(Column&& col) { return Wrap(std::move(dynamic_cast<ColumnNullable&&>(col))); }
+    static std::shared_ptr<ColumnNullableT<NestedColumnType>> Wrap(const Column& col, ValidationError* error) {
+        if (auto* c = dynamic_cast<const ColumnNullable*>(&col)) {
+            return Wrap(*c, error);
+        }
+        if (error) {
+            *error = ValidationError("Can't wrap column of type " + col.GetType().GetName() + " as Nullable");
+        }
+        return nullptr;
+    }
 
     // Helper to simplify integration with other APIs
-    static auto Wrap(ColumnRef&& col) { return Wrap(std::move(*col->AsStrict<ColumnNullable>())); }
+    static std::shared_ptr<ColumnNullableT<NestedColumnType>> Wrap(const ColumnRef& col, ValidationError* error) {
+        return Wrap(*col, error);
+    }
+
+    // Throwing single-argument overloads (concrete type / Column& / ColumnRef&).
+    using WrappableColumn<ColumnNullableT<ColumnType>, ColumnNullable>::Wrap;
 
     ColumnRef Slice(size_t begin, size_t size) const override {
         return Wrap(ColumnNullable::Slice(begin, size));
@@ -136,8 +160,9 @@ public:
 
     void Swap(Column& other) override {
         auto& col = dynamic_cast<ColumnNullableT<NestedColumnType>&>(other);
-        typed_nested_data_.swap(col.typed_nested_data_);
-        ColumnNullable::Swap(other);
+        // Base swaps sub-column contents in place, preserving object identity, so the cached
+        // typed_nested_data_ still points at the correct object and must NOT be repointed.
+        ColumnNullable::Swap(col);
     }
 
 private:

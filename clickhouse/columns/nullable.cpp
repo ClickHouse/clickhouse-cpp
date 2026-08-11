@@ -95,8 +95,10 @@ void ColumnNullable::Swap(Column& other) {
     if (!nested_->Type()->IsEqual(col.nested_->Type()))
         throw ValidationError("Can't swap() Nullable columns of different types.");
 
-    nested_.swap(col.nested_);
-    nulls_.swap(col.nulls_);
+    // Swap sub-column CONTENTS in place (never rebind the shared_ptr slots), so the nested and
+    // nulls objects keep their identity and any As<>/Wrap views of this column stay coherent.
+    nested_->Swap(*col.nested_);
+    nulls_->Swap(*col.nulls_);
 }
 
 ItemView ColumnNullable::GetItem(size_t index) const  {

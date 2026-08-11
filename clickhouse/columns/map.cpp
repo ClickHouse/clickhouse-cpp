@@ -3,7 +3,6 @@
 #include <stdexcept>
 
 #include "../exceptions.h"
-#include "utils.h"
 
 namespace {
 
@@ -77,7 +76,9 @@ ColumnRef ColumnMap::CloneEmpty() const {
 
 void ColumnMap::Swap(Column& other) {
     auto& col = dynamic_cast<ColumnMap&>(other);
-    data_.swap(col.data_);
+    // Swap the backing array's CONTENTS in place (never rebind the shared_ptr slot), so the
+    // array/tuple/leaf objects keep their identity and any As<>/Wrap views stay coherent.
+    data_->Swap(*col.data_);
 }
 
 ColumnRef ColumnMap::GetAsColumn(size_t n) const {

@@ -1,5 +1,4 @@
 #include "numeric.h"
-#include "utils.h"
 
 #include "../base/wire_format.h"
 

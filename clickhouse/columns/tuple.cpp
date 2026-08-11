@@ -138,12 +138,33 @@ void ColumnTuple::SaveBody(OutputStream* output) {
 }
 
 void ColumnTuple::Clear() {
-    columns_.clear();
+    // Clear each element column in place (do NOT drop the element handles): this preserves the
+    // tuple structure and the element objects' identity, so any As<>/Wrap views stay coherent.
+    for (auto & column : columns_) {
+        column->Clear();
+    }
 }
 
 void ColumnTuple::Swap(Column& other) {
     auto & col = dynamic_cast<ColumnTuple &>(other);
-    columns_.swap(col.columns_);
+    if (columns_.size() != col.columns_.size()) {
+        throw ValidationError("Can't swap() Tuple columns of different sizes.");
+    }
+
+    for (size_t i = 0; i < columns_.size(); ++i) {
+        if (!columns_[i]->Type()->IsEqual(col.columns_[i]->Type())) {
+            throw ValidationError(
+                "Can't swap() Tuple elements of types "
+                + columns_[i]->GetType().GetName() + " and "
+                + col.columns_[i]->GetType().GetName() + ".");
+        }
+    }
+
+    // Swap each element's CONTENTS in place (never rebind the columns_ vector), so element
+    // objects keep their identity and any As<>/Wrap views of this column stay coherent.
+    for (size_t i = 0; i < columns_.size(); ++i) {
+        columns_[i]->Swap(*col.columns_[i]);
+    }
 }
 
 }

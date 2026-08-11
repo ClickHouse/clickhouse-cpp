@@ -69,7 +69,7 @@ private:
 };
 
 template <typename K, typename V>
-class ColumnMapT : public ColumnMap {
+class ColumnMapT : public ColumnMap, public WrappableColumn<ColumnMapT<K, V>, ColumnMap> {
 public:
     using KeyColumnType   = K;
     using ValueColumnType = V;
@@ -96,8 +96,9 @@ public:
 
     void Swap(Column& other) override {
         auto& col = dynamic_cast<ColumnMapT<K, V>&>(other);
-        col.typed_data_.swap(typed_data_);
-        ColumnMap::Swap(other);
+        // Base swaps the backing array's contents in place, preserving object identity, so the
+        // cached typed_data_ still points at the correct object and must NOT be repointed.
+        ColumnMap::Swap(col);
     }
 
     /// A single (row) value of the Map-column i.e. read-only map.
@@ -119,7 +120,9 @@ public:
 
         inline auto At(const Key& key) const {
             auto it = Find(key);
-            if (it == end()) throw ValidationError("ColumnMap value key not found");
+            if (it == end()) {
+                throw ValidationError("ColumnMap value key not found");
+            }
             return (*it).second;
         }
 
@@ -240,15 +243,42 @@ public:
         typed_data_->Append(Iterator{value.begin(), functor}, Iterator{value.end(), functor});
     }
 
-    static auto Wrap(ColumnMap&& col) {
-        auto data = ArrayColumnType::Wrap(std::move(col.data_));
-        return std::make_shared<ColumnMapT<K, V>>(std::move(data));
+    /** Create a ColumnMapT that SHARES the internals of `col` (its backing array of
+     *  key/value tuples) via shared_ptr, WITHOUT stealing or copying them.
+     *
+     *  The original `col` remains fully valid and usable. Both the original and the
+     *  returned wrapper reference the same underlying columns, so mutations through
+     *  one are visible through the other.
+     *
+     *  The two-argument overloads are non-throwing: on a type mismatch they return
+     *  nullptr and, if `error` is non-null, assign a description to `*error`. The
+     *  single-argument overloads throw ValidationError on a type mismatch instead.
+     */
+    static std::shared_ptr<ColumnMapT<K, V>> Wrap(const ColumnMap& col, ValidationError* error) {
+        auto data = ArrayColumnType::Wrap(*col.data_, error);
+        if (!data) {
+            return nullptr;
+        }
+        return std::make_shared<ColumnMapT<K, V>>(data);
     }
 
-    static auto Wrap(Column&& col) { return Wrap(std::move(dynamic_cast<ColumnMap&&>(col))); }
+    static std::shared_ptr<ColumnMapT<K, V>> Wrap(const Column& col, ValidationError* error) {
+        if (auto* c = dynamic_cast<const ColumnMap*>(&col)) {
+            return Wrap(*c, error);
+        }
+        if (error) {
+            *error = ValidationError("Can't wrap column of type " + col.GetType().GetName() + " as Map");
+        }
+        return nullptr;
+    }
 
     // Helper to simplify integration with other APIs
-    static auto Wrap(ColumnRef&& col) { return Wrap(std::move(*col->AsStrict<ColumnMap>())); }
+    static std::shared_ptr<ColumnMapT<K, V>> Wrap(const ColumnRef& col, ValidationError* error) {
+        return Wrap(*col, error);
+    }
+
+    // Throwing single-argument overloads (concrete type / Column& / ColumnRef&).
+    using WrappableColumn<ColumnMapT<K, V>, ColumnMap>::Wrap;
 
 private:
     std::shared_ptr<ArrayColumnType> typed_data_;

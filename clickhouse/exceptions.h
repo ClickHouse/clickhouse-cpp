@@ -14,6 +14,11 @@ class Error : public std::runtime_error {
 // Caused by any user-related code, like invalid column types or arguments passed to any method.
 class ValidationError : public Error {
     using Error::Error;
+
+public:
+    // Convenience default constructor, useful for creating an empty error to pass as an
+    // output parameter (e.g. to Column*T::Wrap(col, &error)).
+    ValidationError() : Error(std::string()) {}
 };
 
 // Buffers+IO errors, failure to serialize/deserialize, checksum mismatches, etc.
