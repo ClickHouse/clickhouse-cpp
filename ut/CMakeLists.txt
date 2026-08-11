@@ -7,6 +7,7 @@ SET ( clickhouse-cpp-ut-src
     block_ut.cpp
     client_ut.cpp
     columns_ut.cpp
+    column_as_ut.cpp
     column_array_ut.cpp
     itemview_ut.cpp
     socket_ut.cpp
