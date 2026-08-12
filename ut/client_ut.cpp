@@ -728,6 +728,44 @@ TEST_P(ClientCase, SimpleAggregateFunction) {
     EXPECT_EQ(EXPECTED_ROWS, total_rows);
 }
 
+TEST_P(ClientCase, SimpleAggregateFunctionLowCardinality) {
+    const auto & server_info = client_->GetServerInfo();
+    if (versionNumber(server_info) < versionNumber(19, 9)) {
+        GTEST_SKIP() << "Test is skipped since server '" << server_info << "' does not support SimpleAggregateFunction" << std::endl;
+    }
+
+    // A SimpleAggregateFunction column whose value type is a non-terminal
+    // wrapper (here LowCardinality(String)) must be readable: the column
+    // factory previously returned nullptr for such a type, so reading any
+    // block that contained it failed (#540).
+    client_->Execute("DROP TEMPORARY TABLE IF EXISTS test_clickhouse_cpp_saf_lc");
+    client_->Execute(
+            "CREATE TEMPORARY TABLE IF NOT EXISTS test_clickhouse_cpp_saf_lc "
+            "(saf SimpleAggregateFunction(anyLast, LowCardinality(String)))");
+
+    const std::vector<std::string> data{"foo", "bar", "foo", "baz"};
+    client_->Execute(
+            "INSERT INTO test_clickhouse_cpp_saf_lc (saf) VALUES ('foo'),('bar'),('foo'),('baz')");
+
+    size_t total_rows = 0;
+    client_->Select("SELECT saf FROM test_clickhouse_cpp_saf_lc", [&total_rows, &data](const Block & block) {
+        if (block.GetRowCount() == 0)
+            return;
+
+        total_rows += block.GetRowCount();
+        ASSERT_EQ(1U, block.GetColumnCount());
+
+        auto col = block[0]->As<ColumnLowCardinalityT<ColumnString>>();
+        ASSERT_NE(nullptr, col);
+        ASSERT_EQ(data.size(), col->Size());
+        for (size_t r = 0; r < col->Size(); ++r) {
+            EXPECT_EQ(data[r], (*col)[r]) << " at index: " << r;
+        }
+    });
+
+    EXPECT_EQ(data.size(), total_rows);
+}
+
 TEST_P(ClientCase, Cancellable) {
     /// Create a table.
     client_->Execute(

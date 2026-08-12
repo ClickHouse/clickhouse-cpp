@@ -264,7 +264,7 @@ static ColumnRef CreateColumnFromAst(const TypeAst& ast, CreateColumnByTypeSetti
             }
         }
         case TypeAst::SimpleAggregateFunction: {
-            return CreateTerminalColumn(GetASTChildElement(ast, -1));
+            return CreateColumnFromAst(GetASTChildElement(ast, -1), settings);
         }
 
         case TypeAst::Map: {
