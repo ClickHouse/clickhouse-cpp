@@ -24,6 +24,10 @@
 #   define _unix_
 #endif
 
+#ifdef __FreeBSD__
+#define _unix_
+#endif
+
 #if defined(_MSC_VER)
 #   undef NOMINMAX
 #   define NOMINMAX
