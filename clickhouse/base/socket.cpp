@@ -18,6 +18,10 @@
 #   include <unistd.h>
 #endif
 
+#if defined(__FreeBSD__)
+#include <netinet/in.h>
+#endif
+
 namespace clickhouse {
 
 #if defined(_win_)
@@ -355,7 +359,7 @@ void Socket::SetTcpKeepAlive(int idle, int intvl, int cnt) noexcept {
 
 #if defined(_unix_)
     setsockopt(handle_, SOL_SOCKET, SO_KEEPALIVE, &val, sizeof(val));
-#   if defined(_linux_)
+#   if defined(_linux_) || defined(__FreeBSD__)
         setsockopt(handle_, IPPROTO_TCP, TCP_KEEPIDLE, &idle, sizeof(idle));
 #   elif defined(_darwin_)
         setsockopt(handle_, IPPROTO_TCP, TCP_KEEPALIVE, &idle, sizeof(idle));
