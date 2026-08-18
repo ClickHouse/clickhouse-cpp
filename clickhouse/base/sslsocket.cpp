@@ -174,6 +174,7 @@ clickhouse::SSLParams GetSSLParams(const clickhouse::ClientOptions& opts) {
             ssl_options.use_sni,
             ssl_options.skip_verification,
             ssl_options.host_flags,
+            ssl_options.server_host_name,
             convertConfiguration(ssl_options.configuration)
     };
 }
@@ -222,15 +223,19 @@ SSLSocket::SSLSocket(const NetworkAddress& addr, const SocketTimeoutParams& time
     if (!ssl)
         throw clickhouse::OpenSSLError("Failed to create SSL instance");
 
-    std::unique_ptr<ASN1_OCTET_STRING, decltype(&ASN1_OCTET_STRING_free)> ip_addr(a2i_IPADDRESS(addr.Host().c_str()), &ASN1_OCTET_STRING_free);
+    const std::string & tls_host_name = !ssl_params.server_host_name.empty()
+        ? ssl_params.server_host_name
+        : addr.Host();
+
+    std::unique_ptr<ASN1_OCTET_STRING, decltype(&ASN1_OCTET_STRING_free)> ip_addr(a2i_IPADDRESS(tls_host_name.c_str()), &ASN1_OCTET_STRING_free);
 
     HANDLE_SSL_ERROR(ssl, SSL_set_fd(ssl, static_cast<int>(handle_)));
     if (ssl_params.use_SNI)
-        HANDLE_SSL_ERROR(ssl, SSL_set_tlsext_host_name(ssl, addr.Host().c_str()));
+        HANDLE_SSL_ERROR(ssl, SSL_set_tlsext_host_name(ssl, tls_host_name.c_str()));
 
     if (ssl_params.host_flags != -1)
         SSL_set_hostflags(ssl, ssl_params.host_flags);
-    HANDLE_SSL_ERROR(ssl, SSL_set1_host(ssl, addr.Host().c_str()));
+    HANDLE_SSL_ERROR(ssl, SSL_set1_host(ssl, tls_host_name.c_str()));
 
     // DO NOT use SSL_set_verify(ssl, SSL_VERIFY_PEER, nullptr), since
     // we check verification result later, and that provides better error message.

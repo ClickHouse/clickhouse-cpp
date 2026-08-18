@@ -197,6 +197,11 @@ struct ClientOptions {
          */
         DECLARE_FIELD(host_flags, int, SetHostVerifyFlags, DEFAULT_VALUE);
 
+        /** Server hostname to use for TLS SNI (via SSL_set_tlsext_host_name) and for
+         *  certificate hostname verification (via SSL_set1_host), instead of ClientOptions::host.
+         */
+        DECLARE_FIELD(server_host_name, std::string, SetServerHostName, "");
+
         struct CommandAndValue {
             std::string command;
             std::optional<std::string> value = std::nullopt;
