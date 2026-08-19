@@ -1,7 +1,8 @@
-<h1 align="center">
-<img src=".static/clickhouse-logo-v2.svg" align="center" style="margin-bottom: 10px;">
-ClickHouse C++ Client
-</h1>
+<div align="center">
+<p><img src=".static/clickhouse-logo-v3.svg" align="center" style="margin-bottom: 10px;"></p>
+<h1>ClickHouse C++ Client</h1>
+</div>
+
 
 <p align="center">
 C++17 client library for <a href="https://clickhouse.com/">ClickHouse</a> using the native ClickHouse protocol.
