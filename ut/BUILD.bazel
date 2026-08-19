@@ -105,6 +105,7 @@ cc_test(
         "connection_failed_client_test.cpp",
         "connection_failed_client_test.h",
         "low_cardinality_nullable_tests.cpp",
+        "low_cardinality_types_ut.cpp",
         "performance_tests.cpp",
         "readonly_client_test.cpp",
         "readonly_client_test.h",
