@@ -86,39 +86,33 @@ inline ResultColumnType & column_down_cast(ColumnType & c) {
     return dynamic_cast<ResultColumnType &>(c);
 }
 
-// std::visit-ish function to avoid including <variant> header, which is not present in older version of XCode.
-template <typename Vizitor, typename ColumnType>
-inline auto VisitIndexColumn(Vizitor && vizitor, ColumnType && col) {
-    switch (col.Type()->GetCode()) {
-        case Type::UInt8:
-            return vizitor(column_down_cast<ColumnUInt8>(col));
-        case Type::UInt16:
-            return vizitor(column_down_cast<ColumnUInt16>(col));
-        case Type::UInt32:
-            return vizitor(column_down_cast<ColumnUInt32>(col));
-        case Type::UInt64:
-            return vizitor(column_down_cast<ColumnUInt64>(col));
-        default:
-            throw ValidationError("Invalid index column type " + col.GetType().GetName());
-    }
-}
-
 // Number of bytes an ItemView holds for a fixed-size dictionary type, or 0 for
 // variable-size (String/FixedString) or unsupported types. Used to build a
 // correctly-sized zero value for the default/null dictionary item.
 inline size_t FixedSizeForDictionaryType(Type::Code code) {
     switch (code) {
-        case Type::Int8: case Type::UInt8: case Type::Enum8:
+        case Type::Int8:
+        case Type::UInt8:
             return 1;
-        case Type::Int16: case Type::UInt16: case Type::Enum16: case Type::Date:
+        case Type::Int16:
+        case Type::UInt16:
+        case Type::Date:
             return 2;
-        case Type::Int32: case Type::UInt32: case Type::Float32:
-        case Type::DateTime: case Type::Date32: case Type::IPv4:
+        case Type::Int32:
+        case Type::UInt32:
+        case Type::Float32:
+        case Type::DateTime:
+        case Type::Date32:
+        case Type::IPv4:
             return 4;
-        case Type::Int64: case Type::UInt64: case Type::Float64:
-        case Type::DateTime64:
+        case Type::Int64:
+        case Type::UInt64:
+        case Type::Float64:
             return 8;
-        case Type::Int128: case Type::UInt128: case Type::IPv6: case Type::UUID:
+        case Type::Int128:
+        case Type::UInt128:
+        case Type::IPv6:
+        case Type::UUID:
             return 16;
         default:
             return 0;
@@ -130,6 +124,9 @@ inline size_t FixedSizeForDictionaryType(Type::Code code) {
 inline ItemView ZeroItemForDictionary(Type::Code code) {
     if (const auto size = FixedSizeForDictionaryType(code)) {
         static const char zeros[16] = {};
+        if (size > sizeof(zeros)) {
+            throw AssertionError("The size of item view for ColumnLowCardinality exceeds the buffer size");
+        }
         return ItemView{code, std::string_view{zeros, size}};
     }
     // Variable-size types (String/FixedString) accept an empty value.
@@ -226,12 +223,6 @@ inline void AppendToDictionary(Column& dictionary, const ItemView & item) {
         case Type::Float64:
             column_down_cast<ColumnFloat64>(dictionary).Append(item.get<double>());
             return;
-        case Type::Enum8:
-            column_down_cast<ColumnEnum8>(dictionary).Append(item.get<int8_t>());
-            return;
-        case Type::Enum16:
-            column_down_cast<ColumnEnum16>(dictionary).Append(item.get<int16_t>());
-            return;
         case Type::Date:
             column_down_cast<ColumnDate>(dictionary).AppendRaw(item.get<uint16_t>());
             return;
@@ -240,9 +231,6 @@ inline void AppendToDictionary(Column& dictionary, const ItemView & item) {
             return;
         case Type::DateTime:
             column_down_cast<ColumnDateTime>(dictionary).AppendRaw(item.get<uint32_t>());
-            return;
-        case Type::DateTime64:
-            column_down_cast<ColumnDateTime64>(dictionary).Append(item.get<int64_t>());
             return;
         case Type::IPv4:
             // ColumnIPv4::Append applies htonl, and GetItem returns the stored
