@@ -22,6 +22,7 @@ struct SSLParams
     bool use_SNI;
     bool skip_verification;
     int host_flags;
+    std::string server_host_name;
     using ConfigurationType = std::vector<std::pair<std::string, std::optional<std::string>>>;
     ConfigurationType configuration;
 };

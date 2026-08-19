@@ -45,12 +45,11 @@ public:
     template <typename T>
     friend class ColumnLowCardinalityT;
 
-private:
-    // IMPLEMENTATION NOTE: ColumnLowCardinalityT takes reference to underlying dictionary column object,
-    // so make sure to NOT change address of the dictionary object (with reset(), swap()) or with anything else.
-    ColumnRef dictionary_column_;
-    ColumnRef index_column_;
-    UniqueItems unique_items_map_;
+protected:
+    // Shallow copy: shares dictionary_column_, index_ (the index bundle) and unique_items_map_
+    // (all shared_ptr) and copies the base type. Used by ColumnLowCardinalityT::Wrap to create a
+    // non-destructive, storage-sharing view of `col`.
+    ColumnLowCardinality(const ColumnLowCardinality& col) = default;
 
 public:
     ColumnLowCardinality(ColumnLowCardinality&& col) = default;
@@ -110,19 +109,39 @@ private:
     void AppendNullItem();
     void AppendDefaultItem();
 
-    Type::Code index_type_code_;
-
 public:
     static details::LowCardinalityHashKey computeHashKey(const ItemView &);
+
+private:
+    // IMPLEMENTATION NOTE: ColumnLowCardinalityT takes reference to underlying dictionary column object,
+    // so make sure to NOT change address of the dictionary object (with reset(), swap()) or with anything else.
+    ColumnRef dictionary_column_;
+
+    // The index column and its cached type code, bundled behind one shared_ptr. A wrapped view
+    // (ColumnLowCardinalityT::Wrap) shares this bundle, so that LoadBody()/Swap() - which REPLACE
+    // the index column, since its numeric width can change - stay coherent across every holder.
+    // The dictionary and dedup map are only ever mutated in place (never replaced), so they don't
+    // need this extra level of indirection.
+    struct IndexState {
+        ColumnRef column;
+        Type::Code type_code;
+    };
+    std::shared_ptr<IndexState> index_;
+
+    // Shared so that a wrapped (ColumnLowCardinalityT::Wrap) column shares the same dedup map as its
+    // source, keeping dictionary/index/map coherent across both holders (same semantics as other columns).
+    std::shared_ptr<UniqueItems> unique_items_map_;
+
+    // Dictionary item type code (for a Nullable dictionary, the code of the innermost
+    // non-nullable type; otherwise the dictionary's own type code). Computed once in Setup()
+    // and used by ColumnLowCardinalityT to build ItemView on Append.
+    Type::Code item_type_code_;
 };
 
 /** Type-aware wrapper that provides simple convenience interface for accessing/appending individual items.
  */
 template <typename DictionaryColumnType>
-class ColumnLowCardinalityT : public ColumnLowCardinality {
-
-    DictionaryColumnType& typed_dictionary_;
-    const Type::Code type_;
+class ColumnLowCardinalityT : public ColumnLowCardinality, public WrappableColumn<ColumnLowCardinalityT<DictionaryColumnType>, ColumnLowCardinality> {
 
 public:
     using WrappedColumnType = DictionaryColumnType;
@@ -132,7 +151,14 @@ public:
     explicit ColumnLowCardinalityT(ColumnLowCardinality&& col)
         : ColumnLowCardinality(std::move(col))
         ,  typed_dictionary_(dynamic_cast<DictionaryColumnType &>(*GetDictionary()))
-        ,  type_(GetTypeCode(typed_dictionary_))
+    {
+    }
+
+    // Shares the internals of `col` (dictionary, index and dedup map) via shared_ptr, WITHOUT
+    // stealing or copying them. Used by Wrap to create a non-destructive, storage-sharing view.
+    explicit ColumnLowCardinalityT(const ColumnLowCardinality& col)
+        : ColumnLowCardinality(col)
+        ,  typed_dictionary_(dynamic_cast<DictionaryColumnType &>(*GetDictionary()))
     {
     }
 
@@ -145,8 +171,20 @@ public:
     explicit ColumnLowCardinalityT(std::shared_ptr<DictionaryColumnType> dictionary_col)
         : ColumnLowCardinality(dictionary_col)
         , typed_dictionary_(dynamic_cast<DictionaryColumnType &>(*GetDictionary()))
-        , type_(GetTypeCode(typed_dictionary_))
     {}
+
+    // Used by Wrap() when the stored dictionary is a base column (e.g. a factory-built base
+    // ColumnNullable for LowCardinality(Nullable(String))) that had to be wrapped into the typed
+    // DictionaryColumnType. Shares col's internals (index bundle and dedup map), then swaps in the
+    // storage-sharing typed dictionary view so typed_dictionary_ binds to exactly a
+    // DictionaryColumnType. `typed_dictionary` MUST be a storage-sharing view of col's dictionary
+    // (as produced by DictionaryColumnType::Wrap), so mutations stay coherent across both holders.
+    ColumnLowCardinalityT(const ColumnLowCardinality& col, std::shared_ptr<DictionaryColumnType> typed_dictionary)
+        : ColumnLowCardinality(col)
+        , typed_dictionary_(*typed_dictionary)
+    {
+        dictionary_column_ = std::move(typed_dictionary);
+    }
 
     /// Extended interface to simplify reading/adding individual items.
 
@@ -166,12 +204,12 @@ public:
     inline void Append(const ValueType & value) {
         if constexpr (IsNullable<WrappedColumnType>) {
             if (value.has_value()) {
-                AppendUnsafe(ItemView{type_, *value});
+                AppendUnsafe(ItemView{item_type_code_, *value});
             } else {
                 AppendUnsafe(ItemView{});
             }
         } else {
-            AppendUnsafe(ItemView{type_, value});
+            AppendUnsafe(ItemView{item_type_code_, value});
         }
     }
 
@@ -182,23 +220,54 @@ public:
         }
     }
 
-    /** Create a ColumnLowCardinalityT from a ColumnLowCardinality, without copying data and offsets, but by
-     * 'stealing' those from `col`.
+    /** Create a ColumnLowCardinalityT that SHARES the internals of `col` (dictionary, index and
+     *  dedup map) via shared_ptr, WITHOUT stealing or copying them.
      *
-     *  Ownership of column internals is transferred to returned object, original (argument) object
-     *  MUST NOT BE USED IN ANY WAY, it is only safe to dispose it.
+     *  The original `col` remains fully valid and usable. Both the original and the returned
+     *  wrapper reference the same underlying storage, so mutations through one are visible through
+     *  the other and remain coherent (the dedup map is shared as well).
      *
-     *  Throws an exception if `col` is of wrong type, it is safe to use original col in this case.
-     *  This is a static method to make such conversion verbose.
+     *  The two-argument overloads are non-throwing: on a type mismatch they return nullptr and,
+     *  if `error` is non-null, assign a description to `*error`. The single-argument overloads
+     *  throw ValidationError on a type mismatch instead.
      */
-    static auto Wrap(ColumnLowCardinality&& col) {
-        return std::make_shared<ColumnLowCardinalityT<WrappedColumnType>>(std::move(col));
+    static std::shared_ptr<ColumnLowCardinalityT<WrappedColumnType>> Wrap(const ColumnLowCardinality& col, ValidationError* error) {
+        // Fast path: the stored dictionary is already exactly DictionaryColumnType, so share it
+        // directly - typed_dictionary_ can bind to it via the reference dynamic_cast unchanged.
+        if (std::dynamic_pointer_cast<DictionaryColumnType>(col.dictionary_column_)) {
+            return std::make_shared<ColumnLowCardinalityT<WrappedColumnType>>(col);
+        }
+
+        // Fallback: the stored dictionary is a base column, not DictionaryColumnType (e.g. the
+        // factory builds LowCardinality(Nullable(String)) with a base ColumnNullable dictionary).
+        // Wrap it into the typed DictionaryColumnType - a storage-sharing view over the same
+        // underlying columns - and bind typed_dictionary_ to that. Binding to the base dictionary
+        // directly would make the reference dynamic_cast throw std::bad_cast.
+        auto typed_dictionary = WrapColumn<DictionaryColumnType>(col.dictionary_column_, error);
+        if (!typed_dictionary) {
+            // error (if requested) already set by WrapColumn.
+            return nullptr;
+        }
+        return std::make_shared<ColumnLowCardinalityT<WrappedColumnType>>(col, typed_dictionary);
     }
 
-    static auto Wrap(Column&& col) { return Wrap(std::move(dynamic_cast<ColumnLowCardinality&&>(col))); }
+    static std::shared_ptr<ColumnLowCardinalityT<WrappedColumnType>> Wrap(const Column& col, ValidationError* error) {
+        if (auto* c = dynamic_cast<const ColumnLowCardinality*>(&col)) {
+            return Wrap(*c, error);
+        }
+        if (error) {
+            *error = ValidationError("Can't wrap column of type " + col.GetType().GetName() + " as LowCardinality");
+        }
+        return nullptr;
+    }
 
     // Helper to simplify integration with other APIs
-    static auto Wrap(ColumnRef&& col) { return Wrap(std::move(*col->AsStrict<ColumnLowCardinality>())); }
+    static std::shared_ptr<ColumnLowCardinalityT<WrappedColumnType>> Wrap(const ColumnRef& col, ValidationError* error) {
+        return Wrap(*col, error);
+    }
+
+    // Throwing single-argument overloads (concrete type / Column& / ColumnRef&).
+    using WrappableColumn<ColumnLowCardinalityT<DictionaryColumnType>, ColumnLowCardinality>::Wrap;
 
     ColumnRef Slice(size_t begin, size_t size) const override {
         return Wrap(ColumnLowCardinality::Slice(begin, size));
@@ -208,14 +277,8 @@ public:
 
 private:
 
-    template <typename T>
-    static auto GetTypeCode(T& column) {
-        if constexpr (IsNullable<T>) {
-            return GetTypeCode(*column.Nested()->template AsStrict<typename T::NestedColumnType>());
-        } else {
-            return column.Type()->GetCode();
-        }
-    }
+    DictionaryColumnType& typed_dictionary_;
+
 };
 
 }

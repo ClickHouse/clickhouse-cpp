@@ -26,9 +26,7 @@
 #include <stdexcept>
 #include <type_traits>
 #include "clickhouse/types/types.h"
-#include "absl/numeric/int128.h"
-
-
+#include "clickhouse/base/bignum_string.h"
 
 namespace {
 using namespace clickhouse;
@@ -402,7 +400,7 @@ std::ostream& operator<<(std::ostream& ostr, const ItemView& item_view) {
                 ostr << DateTimeValue(item_view.get<int64_t>());
             }
             else if (item_view.data.size() == sizeof(Int128)) {
-                ostr << DateTimeValue(item_view.get<Int128>());
+                ostr << DateTimeValue(Bignum::Int128Low64(item_view.get<Int128>()));
             }
             else {
                 throw std::runtime_error("Invalid data size of ItemView of type DateTime64");
@@ -463,7 +461,7 @@ std::ostream& operator<<(std::ostream& ostr, const ItemView& item_view) {
             ostr << DateTimeValue(item_view.get<int64_t>());
             break;
         case Type::Decimal128:
-            ostr << DateTimeValue(item_view.get<Int128>());
+            ostr << DateTimeValue(Bignum::Int128Low64(item_view.get<Int128>()));
             break;
         // Unsupported types. i.e. there shouldn't be `ItemView`s of those types in practice.
         // either because GetItem() is not implemented for corresponding column type

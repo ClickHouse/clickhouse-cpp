@@ -29,6 +29,7 @@ SET ( clickhouse-cpp-lib-src
 
     columns/itemview.cpp
 
+    types/bignum.cpp
     types/type_parser.cpp
     types/types.cpp
 
@@ -37,6 +38,7 @@ SET ( clickhouse-cpp-lib-src
     query.cpp
 
     # Headers
+    base/bignum_string.h
     base/buffer.h
     base/compressed.h
     base/endpoints_iterator.h
@@ -77,6 +79,7 @@ SET ( clickhouse-cpp-lib-src
     columns/utils.h
     columns/uuid.h
 
+    types/bignum.h
     types/type_parser.h
     types/types.h
 
@@ -116,11 +119,14 @@ SET_TARGET_PROPERTIES (clickhouse-cpp-lib
     VERSION ${CLICKHOUSE_CPP_VERSION}
 )
 TARGET_LINK_LIBRARIES (clickhouse-cpp-lib
-    absl::int128
     cityhash::cityhash
     lz4::lz4
     zstd::zstd
 )
+IF (CH_USE_ABSEIL_FOR_BIGNUM)
+    TARGET_LINK_LIBRARIES (clickhouse-cpp-lib absl::int128)
+ENDIF()
+
 TARGET_INCLUDE_DIRECTORIES (clickhouse-cpp-lib
     PUBLIC ${PROJECT_SOURCE_DIR}
 )
@@ -129,6 +135,13 @@ IF (CH_MAP_BOOL_TO_UINT8)
 ELSE ()
     TARGET_COMPILE_DEFINITIONS (clickhouse-cpp-lib PUBLIC CH_MAP_BOOL_TO_UINT8=0)
 ENDIF ()
+
+if (CH_USE_ABSEIL_FOR_BIGNUM) 
+    TARGET_COMPILE_DEFINITIONS (clickhouse-cpp-lib PUBLIC CH_USE_ABSEIL_FOR_BIGNUM=1)
+ELSE ()
+    TARGET_COMPILE_DEFINITIONS (clickhouse-cpp-lib PUBLIC CH_USE_ABSEIL_FOR_BIGNUM=0)
+ENDIF ()
+
 
 IF (NOT BUILD_SHARED_LIBS)
     ADD_LIBRARY (clickhouse-cpp-lib-static ALIAS clickhouse-cpp-lib)
@@ -186,11 +199,13 @@ IF (NOT BUILD_SHARED_LIBS)
             LIBRARY DESTINATION lib
         )
     ENDIF()
-    IF (NOT WITH_SYSTEM_ABSEIL)
-        INSTALL (TARGETS absl_int128
-            ARCHIVE DESTINATION lib
-            LIBRARY DESTINATION lib
-        )
+    IF (CH_USE_ABSEIL_FOR_BIGNUM) 
+        IF (NOT WITH_SYSTEM_ABSEIL)
+            INSTALL (TARGETS absl_int128
+                ARCHIVE DESTINATION lib
+                LIBRARY DESTINATION lib
+            )
+        ENDIF()
     ENDIF()
 ENDIF()
 
@@ -205,6 +220,7 @@ INSTALL(FILES query.h DESTINATION include/clickhouse/)
 INSTALL(FILES version.h DESTINATION include/clickhouse/)
 
 # base
+INSTALL(FILES base/bignum_string.h DESTINATION include/clickhouse/base/)
 INSTALL(FILES base/buffer.h DESTINATION include/clickhouse/base/)
 INSTALL(FILES base/compressed.h DESTINATION include/clickhouse/base/)
 INSTALL(FILES base/input.h DESTINATION include/clickhouse/base/)
@@ -245,6 +261,7 @@ INSTALL(FILES columns/utils.h DESTINATION include/clickhouse/columns/)
 INSTALL(FILES columns/uuid.h DESTINATION include/clickhouse/columns/)
 
 # types
+INSTALL(FILES types/bignum.h DESTINATION include/clickhouse/types/)
 INSTALL(FILES types/type_parser.h DESTINATION include/clickhouse/types/)
 INSTALL(FILES types/types.h DESTINATION include/clickhouse/types/)
 

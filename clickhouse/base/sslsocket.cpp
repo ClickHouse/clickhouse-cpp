@@ -2,6 +2,7 @@
 #include "../client.h"
 #include "../exceptions.h"
 
+#include <iostream>
 #include <stdexcept>
 
 #include <openssl/ssl.h>
@@ -50,6 +51,19 @@ void throwSSLError(SSL * ssl, int error, const char * /*location*/, const char *
 }
 
 void configureSSL(const clickhouse::SSLParams::ConfigurationType & configuration, SSL * ssl, SSL_CTX * context = nullptr) {
+#ifdef USE_BORINGSSL
+    // BoringSSL doesn't ship the SSL_CONF_* command API, so the
+    // configuration vector cannot be applied. Users who rely on
+    // SSL_CONF commands should build against
+    // OpenSSL (e.g. --@clickhouse_cpp//:tls=openssl with Bazel).
+    (void)ssl;
+    (void)context;
+    if (!configuration.empty()) {
+        throw clickhouse::OpenSSLError(
+            "SSLParams::configuration cannot be used when the library is built against BoringSSL "
+            "To apply these settings, build against OpenSSL by using the `tls=openssl` option in Bazel.");
+    }
+#else
     std::unique_ptr<SSL_CONF_CTX, decltype(&SSL_CONF_CTX_free)> conf_ctx_holder(SSL_CONF_CTX_new(), SSL_CONF_CTX_free);
     auto conf_ctx = conf_ctx_holder.get();
 
@@ -84,6 +98,7 @@ void configureSSL(const clickhouse::SSLParams::ConfigurationType & configuration
         else
             throw clickhouse::OpenSSLError("Failed to configure OpenSSL: command '" + kv.first + "' unknown error: " + std::to_string(err));
     }
+#endif
 }
 
 #define STRINGIFY_HELPER(x) #x
@@ -159,6 +174,7 @@ clickhouse::SSLParams GetSSLParams(const clickhouse::ClientOptions& opts) {
             ssl_options.use_sni,
             ssl_options.skip_verification,
             ssl_options.host_flags,
+            ssl_options.server_host_name,
             convertConfiguration(ssl_options.configuration)
     };
 }
@@ -207,15 +223,19 @@ SSLSocket::SSLSocket(const NetworkAddress& addr, const SocketTimeoutParams& time
     if (!ssl)
         throw clickhouse::OpenSSLError("Failed to create SSL instance");
 
-    std::unique_ptr<ASN1_OCTET_STRING, decltype(&ASN1_OCTET_STRING_free)> ip_addr(a2i_IPADDRESS(addr.Host().c_str()), &ASN1_OCTET_STRING_free);
+    const std::string & tls_host_name = !ssl_params.server_host_name.empty()
+        ? ssl_params.server_host_name
+        : addr.Host();
+
+    std::unique_ptr<ASN1_OCTET_STRING, decltype(&ASN1_OCTET_STRING_free)> ip_addr(a2i_IPADDRESS(tls_host_name.c_str()), &ASN1_OCTET_STRING_free);
 
     HANDLE_SSL_ERROR(ssl, SSL_set_fd(ssl, static_cast<int>(handle_)));
     if (ssl_params.use_SNI)
-        HANDLE_SSL_ERROR(ssl, SSL_set_tlsext_host_name(ssl, addr.Host().c_str()));
+        HANDLE_SSL_ERROR(ssl, SSL_set_tlsext_host_name(ssl, tls_host_name.c_str()));
 
     if (ssl_params.host_flags != -1)
         SSL_set_hostflags(ssl, ssl_params.host_flags);
-    HANDLE_SSL_ERROR(ssl, SSL_set1_host(ssl, addr.Host().c_str()));
+    HANDLE_SSL_ERROR(ssl, SSL_set1_host(ssl, tls_host_name.c_str()));
 
     // DO NOT use SSL_set_verify(ssl, SSL_VERIFY_PEER, nullptr), since
     // we check verification result later, and that provides better error message.
@@ -285,9 +305,18 @@ SSLSocketInput::SSLSocketInput(SSL *ssl)
 {}
 
 size_t SSLSocketInput::DoRead(void* buf, size_t len) {
+#ifdef USE_BORINGSSL
+    // BoringSSL doesn't have SSL_read_ex (OpenSSL 3.0+ API); fall back to
+    // SSL_read with the length clamped to INT_MAX.
+    const int max_read = static_cast<int>(
+        std::min<std::size_t>(len, std::numeric_limits<int>::max()));
+    return static_cast<size_t>(
+        HANDLE_SSL_ERROR(ssl_, SSL_read(ssl_, buf, max_read)));
+#else
     size_t actually_read;
     HANDLE_SSL_ERROR(ssl_, SSL_read_ex(ssl_, buf, len, &actually_read));
     return actually_read;
+#endif
 }
 
 SSLSocketOutput::SSLSocketOutput(SSL *ssl)

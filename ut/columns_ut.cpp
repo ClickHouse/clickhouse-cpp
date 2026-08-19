@@ -11,6 +11,7 @@
 #include <clickhouse/columns/uuid.h>
 #include <clickhouse/columns/ip4.h>
 #include <clickhouse/columns/ip6.h>
+#include <clickhouse/types/bignum.h>
 #include <clickhouse/base/input.h>
 #include <clickhouse/base/output.h>
 #include <clickhouse/base/socket.h> // for ipv4-ipv6 platform-specific stuff
@@ -19,10 +20,9 @@
 #include "utils.h"
 #include "value_generators.h"
 
+#include <memory>
 #include <string_view>
-#include <sstream>
 #include <vector>
-#include <random>
 
 namespace {
 
@@ -37,7 +37,152 @@ static const auto LOWCARDINALITY_STRING_FOOBAR_10_ITEMS_BINARY =
         "\x04\x07\x08\x04"sv;
 }
 
-// TODO: add tests for ColumnDecimal.
+class ColumnDecimalFromString : public ::testing::TestWithParam<std::pair<size_t, size_t>> {};
+
+TEST_P(ColumnDecimalFromString, DecimalFromGoodString)
+{
+    const auto [precision, scale] = GetParam();
+    size_t whole = precision - scale;
+    std::vector<std::pair<std::string, std::string>> values = {
+        {"0", "0"},
+        {"-0", "0"},
+        {"0.", "0"},
+        {"-0.", "0"},
+        {"1", "1"},
+        {"-1", "-1"},
+        {"1.0", "1" + std::string(scale, '0')},
+        {"-1.0", "-1" + std::string(scale, '0')},
+        {"1.", "1" + std::string(scale, '0')},
+        {"-1.", "-1" + std::string(scale, '0')},
+        {std::string(whole, '9') + ".", std::string(whole, '9') + std::string(scale, '0')},
+        {"-" + std::string(whole, '9') + ".", "-" + std::string(whole, '9') + std::string(scale, '0')},
+        {std::string(precision, '9'), std::string(precision, '9')},
+        {"-" + std::string(precision, '9'), "-" + std::string(precision, '9')},
+    };
+
+    for (auto & [value, expect] : values) {
+        auto col = std::make_shared<ColumnDecimal>(precision, scale);
+        EXPECT_NO_THROW(col->Append(value)) << "exception for value \"" << value << "\"";
+        ASSERT_EQ(expect, Bignum::Int128ToString(col->At(0)));
+    }
+}
+
+TEST_P(ColumnDecimalFromString, DecimalFromBadString)
+{
+    const auto [precision, scale] = GetParam();
+    size_t whole = precision - scale;
+
+    std::vector<std::string> values = {
+        "",
+        ".",
+        " ",
+        "-.",
+        "--0",
+        "1.2222x",
+        "0-",
+        ".0.",
+        "+5",
+        " 5",
+        "50 000",
+        "1e3",
+        "0x1",
+        "1,1234.5",
+
+        std::string(whole + 1, '9') + "." + std::string(scale, '0'),
+    };
+    for (auto value : values) {
+        auto col = std::make_shared<ColumnDecimal>(precision, scale);
+        EXPECT_THROW(
+            col->Append(value),
+            ValidationError
+        ) << "got \"" << Bignum::Int128ToString(col->At(0)) << "\" for value \"" << value << "\"";
+    }
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    ColumnCase,
+    ColumnDecimalFromString,
+    ::testing::Values(
+        std::make_pair<size_t, size_t>(9, 0),
+        std::make_pair<size_t, size_t>(9, 4),
+        std::make_pair<size_t, size_t>(18, 6),
+        std::make_pair<size_t, size_t>(15, 2),
+        std::make_pair<size_t, size_t>(38, 0),
+        std::make_pair<size_t, size_t>(38, 4)
+    ),
+    [](const ::testing::TestParamInfo<std::pair<size_t, size_t>>& info) {
+        return "p" + std::to_string(info.param.first)
+             + "_s" + std::to_string(info.param.second);
+    });
+
+TEST(ColumnsCase, DecimalStringValueMapping) {
+    struct TestSample {
+        size_t precision;
+        size_t scale;
+        std::string str;
+        Int128 expect;
+    };
+    
+    std::vector<TestSample> samples = {
+        {18, 0, "0.0", Int128(0)},
+        {18, 0, "0.123", Int128(0)},
+        {18, 0, "123", Int128(123)},
+        {18, 3, "0.123", Int128(123)},
+        {18, 3, "1234", Int128(1234)},
+        {18, 3, "1.234", Int128(1234)},
+        {18, 3, "0.1234", Int128(123)},
+        {18, 3, "12", Int128(12)},
+        {18, 3, "12.0", Int128(12000)},
+        {18, 3, "12.", Int128(12000)},
+    };
+
+    for (auto & [precision, scale, str, expect] : samples) {
+        auto col = std::make_shared<ColumnDecimal>(precision, scale);
+        EXPECT_NO_THROW(col->Append(str)) << "exception for value \"" << str << "\"";
+        auto value = col->At(0);
+        EXPECT_EQ(value, expect);
+    }
+
+}
+
+TEST(ColumnsCase, DecimalStringAt) {
+    struct TestSample {
+        size_t precision;
+        size_t scale;
+        std::string str;
+        std::string expect;
+    };
+
+    std::vector<TestSample> samples = {
+        {18, 0, "0", "0"},
+        {18, 0, "123", "123"},
+        {18, 0, "-123", "-123"},
+        {18, 3, "0", "0.000"},
+        {18, 3, "1", "0.001"},
+        {18, 3, "12", "0.012"},
+        {18, 3, "123", "0.123"},
+        {18, 3, "-123", "-0.123"},
+        {18, 3, "0.123", "0.123"},
+        {18, 3, "1234", "1.234"},
+        {18, 3, "-1234", "-1.234"},
+        {18, 3, "-1.234", "-1.234"},
+        {18, 3, "123.0", "123.000"},
+        {18, 3, "123.", "123.000"},
+        {18, 3, "123000", "123.000"},
+        // Large values that do not fit in 64 bits.
+        {38, 4, "12345678901234567890.1234", "12345678901234567890.1234"},
+        {38, 4, "-12345678901234567890.1234", "-12345678901234567890.1234"},
+        {38, 0, "99999999999999999999999999999999999999", "99999999999999999999999999999999999999"},
+    };
+
+    for (auto & [precision, scale, str, expect] : samples) {
+        auto col = std::make_shared<ColumnDecimal>(precision, scale);
+        EXPECT_NO_THROW(col->Append(str)) << "exception for value \"" << str << "\"";
+        auto value = col->StringAt(0);
+        EXPECT_EQ(value, expect);
+    }
+
+}
 
 TEST(ColumnsCase, NumericInit) {
     auto col = std::make_shared<ColumnUInt32>(MakeNumbers());
@@ -649,46 +794,46 @@ TEST(ColumnsCase, UUIDSlice) {
 
 TEST(ColumnsCase, Int128) {
     auto col = std::make_shared<ColumnInt128>(std::vector<Int128>{
-            absl::MakeInt128(0xffffffffffffffffll, 0xffffffffffffffffll), // -1
-            absl::MakeInt128(0, 0xffffffffffffffffll),  // 2^64
-            absl::MakeInt128(0xffffffffffffffffll, 0),
-            absl::MakeInt128(0x8000000000000000ll, 0),
+            Bignum::MakeInt128(0xffffffffffffffffll, 0xffffffffffffffffll), // -1
+            Bignum::MakeInt128(0, 0xffffffffffffffffll),  // 2^64
+            Bignum::MakeInt128(0xffffffffffffffffll, 0),
+            Bignum::MakeInt128(0x8000000000000000ll, 0),
             Int128(0)
     });
 
-    EXPECT_EQ(-1, col->At(0));
+    EXPECT_EQ(Int128(-1), col->At(0));
 
-    EXPECT_EQ(absl::MakeInt128(0, 0xffffffffffffffffll), col->At(1));
-    EXPECT_EQ(0ll,                   absl::Int128High64(col->At(1)));
-    EXPECT_EQ(0xffffffffffffffffull, absl::Int128Low64(col->At(1)));
+    EXPECT_EQ(Bignum::MakeInt128(0, 0xffffffffffffffffll), col->At(1));
+    EXPECT_EQ(0ll,                   Bignum::Int128High64(col->At(1)));
+    EXPECT_EQ(0xffffffffffffffffull, Bignum::Int128Low64(col->At(1)));
 
-    EXPECT_EQ(absl::MakeInt128(0xffffffffffffffffll, 0), col->At(2));
-    EXPECT_EQ(static_cast<int64_t>(0xffffffffffffffffll),  absl::Int128High64(col->At(2)));
-    EXPECT_EQ(0ull,                  absl::Int128Low64(col->At(2)));
+    EXPECT_EQ(Bignum::MakeInt128(0xffffffffffffffffll, 0), col->At(2));
+    EXPECT_EQ(static_cast<int64_t>(0xffffffffffffffffll),  Bignum::Int128High64(col->At(2)));
+    EXPECT_EQ(0ull,                  Bignum::Int128Low64(col->At(2)));
 
-    EXPECT_EQ(0, col->At(4));
+    EXPECT_EQ(Int128(0), col->At(4));
 }
 
 TEST(ColumnsCase, UInt128) {
     auto col = std::make_shared<ColumnUInt128>(std::vector<UInt128>{
-            absl::MakeUint128(0xffffffffffffffffll, 0xffffffffffffffffll), // 2^128 - 1
-            absl::MakeUint128(0, 0xffffffffffffffffll),  // 2^64 - 1
-            absl::MakeUint128(0xffffffffffffffffll, 0),  // 2^128 - 2^64
-            absl::MakeUint128(0x8000000000000000ll, 0),
+            Bignum::MakeUInt128(0xffffffffffffffffll, 0xffffffffffffffffll), // 2^128 - 1
+            Bignum::MakeUInt128(0, 0xffffffffffffffffll),  // 2^64 - 1
+            Bignum::MakeUInt128(0xffffffffffffffffll, 0),  // 2^128 - 2^64
+            Bignum::MakeUInt128(0x8000000000000000ll, 0),
             UInt128(0)
     });
 
-    EXPECT_EQ(absl::MakeUint128(0xffffffffffffffffll, 0xffffffffffffffffll), col->At(0));
+    EXPECT_EQ(Bignum::MakeUInt128(0xffffffffffffffffll, 0xffffffffffffffffll), col->At(0));
 
-    EXPECT_EQ(absl::MakeUint128(0, 0xffffffffffffffffll), col->At(1));
-    EXPECT_EQ(0ull,                  absl::Uint128High64(col->At(1)));
-    EXPECT_EQ(0xffffffffffffffffull, absl::Uint128Low64(col->At(1)));
+    EXPECT_EQ(Bignum::MakeUInt128(0, 0xffffffffffffffffll), col->At(1));
+    EXPECT_EQ(0ull,                  Bignum::UInt128High64(col->At(1)));
+    EXPECT_EQ(0xffffffffffffffffull, Bignum::UInt128Low64(col->At(1)));
 
-    EXPECT_EQ(absl::MakeUint128(0xffffffffffffffffll, 0), col->At(2));
-    EXPECT_EQ(static_cast<uint64_t>(0xffffffffffffffffull),  absl::Uint128High64(col->At(2)));
-    EXPECT_EQ(0ull,                  absl::Uint128Low64(col->At(2)));
+    EXPECT_EQ(Bignum::MakeUInt128(0xffffffffffffffffll, 0), col->At(2));
+    EXPECT_EQ(static_cast<uint64_t>(0xffffffffffffffffull),  Bignum::UInt128High64(col->At(2)));
+    EXPECT_EQ(0ull,                  Bignum::UInt128Low64(col->At(2)));
 
-    EXPECT_EQ(0, col->At(4));
+    EXPECT_EQ(UInt128(0), col->At(4));
 }
 
 TEST(ColumnsCase, ColumnIPv4)
@@ -885,15 +1030,15 @@ TEST(ColumnsCase, ColumnIPv6_construct_from_data)
     EXPECT_ANY_THROW(ColumnIPv6(ColumnRef(std::make_shared<ColumnString>())));
 }
 
-TEST(ColumnsCase, ColumnDecimal128_from_string) {
+TEST(ColumnsCase, ColumnDecimal128FromString) {
     auto col = std::make_shared<ColumnDecimal>(38, 0);
 
     const auto values = {
+        Bignum::StringToInt128('-' + std::string(38, '9')),
         Int128(0),
         Int128(-1),
         Int128(1),
-        std::numeric_limits<Int128>::min() + 1,
-        std::numeric_limits<Int128>::max(),
+        Bignum::StringToInt128(std::string(38, '9')),
     };
 
     for (size_t i = 0; i < values.size(); ++i) {
@@ -941,6 +1086,132 @@ TEST(ColumnsCase, ColumnLowCardinalityString_Append_and_Read) {
         ASSERT_EQ(col.At(i), FooBarGenerator(i)) << " at pos: " << i;
         ASSERT_EQ(col[i], FooBarGenerator(i)) << " at pos: " << i;
     }
+}
+
+TEST(ColumnsCase, ColumnLowCardinalityT_Wrap_DoesNotStealSource) {
+    // Populate via the typed column (the only ergonomic per-value insert path), then Wrap it
+    // through an untyped ColumnRef handle, as with a column received from a query.
+    auto source = std::make_shared<ColumnLowCardinalityT<ColumnString>>();
+    source->Append("a");
+    source->Append("b");
+    source->Append("a");
+
+    ColumnRef untyped = source;
+    auto wrapped = ColumnLowCardinalityT<ColumnString>::Wrap(untyped);
+
+    // Wrapper reads the same data.
+    ASSERT_EQ(wrapped->Size(), 3u);
+    EXPECT_EQ(wrapped->At(0), "a");
+    EXPECT_EQ(wrapped->At(1), "b");
+    EXPECT_EQ(wrapped->At(2), "a");
+
+    // Source (and the untyped handle) are left intact after Wrap (non-stealing).
+    EXPECT_NE(untyped, nullptr);
+    ASSERT_EQ(source->Size(), 3u);
+    EXPECT_EQ(source->At(0), "a");
+    EXPECT_EQ(source->At(2), "a");
+
+    // Storage (dictionary + index + dedup map) is shared and stays coherent:
+    // a new unique value appended via the source, and a repeat appended via the wrapper.
+    const auto dict_before = source->GetDictionarySize();
+    source->Append("c");     // new unique -> dictionary grows, visible via the wrapper
+    wrapped->Append("a");    // repeat -> deduped against the shared map, no dictionary growth
+
+    EXPECT_EQ(source->Size(), 5u);
+    EXPECT_EQ(wrapped->Size(), 5u);
+    EXPECT_EQ(wrapped->At(3), "c");
+    EXPECT_EQ(wrapped->At(4), "a");
+    EXPECT_EQ(source->At(4), "a");
+    // "c" added exactly one dictionary entry; "a" added none (shared dedup map).
+    EXPECT_EQ(source->GetDictionarySize(), dict_before + 1);
+    EXPECT_EQ(wrapped->GetDictionarySize(), dict_before + 1);
+}
+
+TEST(ColumnsCase, ColumnLowCardinalityT_Swap_VisibleThroughAlias) {
+    auto a = std::make_shared<ColumnLowCardinalityT<ColumnString>>();
+    a->Append("a");
+    a->Append("b");
+    a->Append("a");
+    auto b = std::make_shared<ColumnLowCardinalityT<ColumnString>>();
+    b->Append("x");
+
+    // Typed view of `a`, created BEFORE the swap; shares a's dictionary and index bundle.
+    auto alias_a = ColumnLowCardinalityT<ColumnString>::Wrap(a);
+    ASSERT_NE(alias_a, nullptr);
+    ASSERT_EQ(alias_a->Size(), 3u);
+
+    a->Swap(*b);
+
+    // a now holds b's data, b holds a's data.
+    ASSERT_EQ(a->Size(), 1u);
+    EXPECT_EQ(a->At(0), "x");
+    ASSERT_EQ(b->Size(), 3u);
+    EXPECT_EQ(b->At(0), "a");
+    EXPECT_EQ(b->At(1), "b");
+
+    // The swap is visible through the pre-existing alias: dictionary swapped in place and the
+    // shared index bundle swapped, so alias_a reflects b's data (size flips 3 -> 1).
+    ASSERT_EQ(alias_a->Size(), 1u);
+    EXPECT_EQ(alias_a->At(0), "x");
+}
+
+TEST(ColumnsCase, ColumnLowCardinalityT_Wrap_ThenLoad_VisibleThroughAlias) {
+    // Serialize a source LowCardinality column.
+    ColumnLowCardinalityT<ColumnString> src;
+    src.Append("p");
+    src.Append("q");
+    src.Append("p");
+
+    char buffer[256] = {'\0'};
+    {
+        ArrayOutput output(buffer, sizeof(buffer));
+        EXPECT_NO_THROW(src.Save(&output));
+    }
+
+    // A different target column, wrapped BEFORE the load.
+    auto target = std::make_shared<ColumnLowCardinalityT<ColumnString>>();
+    target->Append("z");
+    auto alias = ColumnLowCardinalityT<ColumnString>::Wrap(target);
+    ASSERT_NE(alias, nullptr);
+    ASSERT_EQ(alias->Size(), 1u);
+
+    // Load src's data into target: LoadBody swaps the dictionary in place and REPLACES the index
+    // column inside the shared bundle.
+    {
+        ArrayInput input(buffer, sizeof(buffer));
+        EXPECT_TRUE(target->Load(&input, 3));
+    }
+
+    ASSERT_EQ(target->Size(), 3u);
+    // The pre-existing alias reflects the loaded data (shared dictionary + index bundle).
+    ASSERT_EQ(alias->Size(), 3u);
+    EXPECT_EQ(alias->At(0), "p");
+    EXPECT_EQ(alias->At(1), "q");
+    EXPECT_EQ(alias->At(2), "p");
+}
+
+TEST(ColumnsCase, ColumnLowCardinalityT_Wrap_AcceptsLvalue) {
+    auto source = std::make_shared<ColumnLowCardinalityT<ColumnString>>();
+    source->Append("x");
+    source->Append("y");
+
+    using LC = ColumnLowCardinalityT<ColumnString>;
+
+    // Non-const lvalue (untyped base reference), no std::move required.
+    ColumnLowCardinality& base = *source;
+    auto w1 = LC::Wrap(base);
+    EXPECT_EQ(w1->At(0), "x");
+
+    // Const lvalue.
+    const ColumnLowCardinality& cref = *source;
+    auto w2 = LC::Wrap(cref);
+    EXPECT_EQ(w2->At(1), "y");
+
+    // Lvalue ColumnRef, no std::move required and not consumed.
+    ColumnRef ref = source;
+    auto w3 = LC::Wrap(ref);
+    EXPECT_EQ(w3->Size(), 2u);
+    EXPECT_NE(ref, nullptr);
 }
 
 TEST(ColumnsCase, ColumnLowCardinalityString_Clear_and_Append) {
@@ -1109,6 +1380,61 @@ TEST(ColumnsCase, ColumnTupleT) {
     EXPECT_EQ(val, col.At(0));
 }
 
+TEST(ColumnsCase, ColumnNullableT_Wrap_DoesNotStealSource) {
+    auto nested = std::make_shared<ColumnUInt64>();
+    auto nulls = std::make_shared<ColumnUInt8>();
+    ColumnNullable col(nested, nulls);
+
+    col.Append(false);
+    nested->Append(1);
+    col.Append(true);
+    nested->Append(0);
+
+    using TestNullable = ColumnNullableT<ColumnUInt64>;
+    auto wrapped = TestNullable::Wrap(std::move(col));
+
+    // Wrapper sees the same data.
+    EXPECT_EQ(wrapped->Size(), 2u);
+    EXPECT_EQ(wrapped->At(0), std::optional<uint64_t>(1));
+    EXPECT_EQ(wrapped->At(1), std::optional<uint64_t>{});
+
+    // Source column is left intact after Wrap (non-stealing).
+    EXPECT_EQ(col.Size(), 2u);
+    EXPECT_FALSE(col.IsNull(0));
+    EXPECT_TRUE(col.IsNull(1));
+
+    // Storage is shared: appending through the original is visible via the wrapper.
+    col.Append(false);
+    nested->Append(42);
+    EXPECT_EQ(wrapped->Size(), 3u);
+    EXPECT_EQ(wrapped->At(2), std::optional<uint64_t>(42));
+}
+
+TEST(ColumnsCase, ColumnNullableT_Wrap_AcceptsLvalue) {
+    auto nested = std::make_shared<ColumnUInt64>();
+    auto nulls = std::make_shared<ColumnUInt8>();
+    ColumnNullable col(nested, nulls);
+    col.Append(false);
+    nested->Append(7);
+
+    using TestNullable = ColumnNullableT<ColumnUInt64>;
+
+    // Non-const lvalue concrete column, no std::move required.
+    auto w1 = TestNullable::Wrap(col);
+    EXPECT_EQ(w1->At(0), std::optional<uint64_t>(7));
+
+    // Const lvalue concrete column.
+    const ColumnNullable& cref = col;
+    auto w2 = TestNullable::Wrap(cref);
+    EXPECT_EQ(w2->At(0), std::optional<uint64_t>(7));
+
+    // Lvalue ColumnRef, no std::move required and not consumed.
+    ColumnRef ref = std::make_shared<ColumnNullable>(nested, nulls);
+    auto w3 = TestNullable::Wrap(ref);
+    EXPECT_EQ(w3->At(0), std::optional<uint64_t>(7));
+    EXPECT_NE(ref, nullptr);
+}
+
 TEST(ColumnsCase, ColumnTupleT_Wrap) {
     ColumnTuple col ({
             std::make_shared<ColumnUInt64>(),
@@ -1130,6 +1456,84 @@ TEST(ColumnsCase, ColumnTupleT_Wrap) {
     EXPECT_EQ(val, wrapped_col->At(0));
 }
 
+TEST(ColumnsCase, ColumnTupleT_Wrap_DoesNotStealSource) {
+    ColumnTuple col ({
+            std::make_shared<ColumnUInt64>(),
+            std::make_shared<ColumnString>(),
+            std::make_shared<ColumnFixedString>(3)
+        }
+    );
+
+    const auto val = std::make_tuple(1, "a", "bcd");
+
+    col[0]->AsStrict<ColumnUInt64>()->Append(std::get<0>(val));
+    col[1]->AsStrict<ColumnString>()->Append(std::get<1>(val));
+    col[2]->AsStrict<ColumnFixedString>()->Append(std::get<2>(val));
+
+    using TestTuple = ColumnTupleT<ColumnUInt64, ColumnString, ColumnFixedString>;
+    auto wrapped = TestTuple::Wrap(std::move(col));
+
+    // Wrapper sees the same data.
+    EXPECT_EQ(wrapped->Size(), 1u);
+    EXPECT_EQ(val, wrapped->At(0));
+
+    // Source column is left intact after Wrap (non-stealing).
+    EXPECT_EQ(col.TupleSize(), 3u);
+    EXPECT_EQ(col.Size(), 1u);
+
+    // Storage is shared: appending through the original element columns is visible via the wrapper.
+    col[0]->AsStrict<ColumnUInt64>()->Append(2);
+    col[1]->AsStrict<ColumnString>()->Append("xy");
+    col[2]->AsStrict<ColumnFixedString>()->Append("zzz");
+    EXPECT_EQ(wrapped->Size(), 2u);
+    EXPECT_EQ(std::make_tuple(2, "xy", "zzz"), wrapped->At(1));
+}
+
+TEST(ColumnsCase, ColumnTupleT_Wrap_DoesNotStealSource_PreservesNames) {
+    ColumnTuple base(
+        {std::make_shared<ColumnUInt64>(), std::make_shared<ColumnString>()},
+        {"id", "name"}
+    );
+
+    using TestTuple = ColumnTupleT<ColumnUInt64, ColumnString>;
+    auto wrapped = TestTuple::Wrap(std::move(base));
+    EXPECT_EQ(wrapped->Type()->GetName(), "Tuple(id UInt64, name String)");
+
+    // Source remains usable after Wrap (non-stealing).
+    EXPECT_EQ(base.Type()->GetName(), "Tuple(id UInt64, name String)");
+    EXPECT_EQ(base.TupleSize(), 2u);
+}
+
+TEST(ColumnsCase, ColumnTupleT_Wrap_AcceptsLvalue) {
+    ColumnTuple col({
+        std::make_shared<ColumnUInt64>(),
+        std::make_shared<ColumnString>()
+    });
+    col[0]->AsStrict<ColumnUInt64>()->Append(1);
+    col[1]->AsStrict<ColumnString>()->Append("a");
+
+    using TestTuple = ColumnTupleT<ColumnUInt64, ColumnString>;
+
+    // Non-const lvalue concrete column, no std::move required.
+    auto w1 = TestTuple::Wrap(col);
+    EXPECT_EQ(w1->At(0), std::make_tuple(uint64_t(1), std::string_view("a")));
+
+    // Const lvalue concrete column.
+    const ColumnTuple& cref = col;
+    auto w2 = TestTuple::Wrap(cref);
+    EXPECT_EQ(w2->At(0), std::make_tuple(uint64_t(1), std::string_view("a")));
+
+    // Lvalue ColumnRef, no std::move required and not consumed.
+    ColumnRef ref = std::make_shared<ColumnTuple>(std::vector<ColumnRef>{col[0], col[1]});
+    auto w3 = TestTuple::Wrap(ref);
+    EXPECT_EQ(w3->At(0), std::make_tuple(uint64_t(1), std::string_view("a")));
+    EXPECT_NE(ref, nullptr);
+
+    // Source column left intact.
+    EXPECT_EQ(col.TupleSize(), 2u);
+    EXPECT_EQ(col.Size(), 1u);
+}
+
 TEST(ColumnsCase, ColumnTupleT_Empty) {
     using TestTuple = ColumnTupleT<>;
 
@@ -1137,6 +1541,405 @@ TEST(ColumnsCase, ColumnTupleT_Empty) {
     const auto val = std::make_tuple();
     col.Append(val);
     EXPECT_EQ(col.Size(), 0u);
+}
+
+TEST(ColumnsCase, ColumnTupleT_WithNames) {
+    using TestTuple = ColumnTupleT<ColumnUInt64, ColumnString>;
+
+    TestTuple col(
+        std::make_tuple(
+            std::make_shared<ColumnUInt64>(),
+            std::make_shared<ColumnString>()
+        ),
+        std::vector<std::string>{"id", "name"}
+    );
+    EXPECT_EQ(col.Type()->GetName(), "Tuple(id UInt64, name String)");
+
+    col.Append(std::make_tuple(uint64_t(42), std::string("hello")));
+    EXPECT_EQ(col.At(0), std::make_tuple(uint64_t(42), std::string_view("hello")));
+}
+
+TEST(ColumnsCase, ColumnTupleT_Wrap_PreservesNames) {
+    ColumnTuple base(
+        {std::make_shared<ColumnUInt64>(), std::make_shared<ColumnString>()},
+        {"id", "name"}
+    );
+
+    using TestTuple = ColumnTupleT<ColumnUInt64, ColumnString>;
+    auto wrapped = TestTuple::Wrap(std::move(base));
+    EXPECT_EQ(wrapped->Type()->GetName(), "Tuple(id UInt64, name String)");
+}
+
+// --- Swap/Clear must stay coherent with As<>/Wrap views (contents swapped/cleared in place) ---
+
+TEST(ColumnsCase, ColumnArrayT_Swap_VisibleThroughAlias) {
+    auto a = std::make_shared<ColumnArrayT<ColumnUInt64>>();
+    a->Append(std::vector<uint64_t>{1, 2, 3});
+    auto b = std::make_shared<ColumnArrayT<ColumnUInt64>>();
+    b->Append(std::vector<uint64_t>{7, 8});
+
+    // Alias sharing a's storage.
+    auto alias_a = ColumnArrayT<ColumnUInt64>::Wrap(a);
+    ASSERT_NE(alias_a, nullptr);
+
+    a->Swap(*b);
+
+    // a now holds b's row, b holds a's row.
+    ASSERT_EQ(a->Size(), 1u);
+    EXPECT_EQ(a->At(0).size(), 2u);
+    ASSERT_EQ(b->Size(), 1u);
+    EXPECT_EQ(b->At(0).size(), 3u);
+
+    // The swap is visible through the alias (sub-object identity preserved).
+    ASSERT_EQ(alias_a->Size(), 1u);
+    EXPECT_EQ(alias_a->At(0).size(), 2u);
+    EXPECT_EQ(alias_a->At(0)[0], 7u);
+}
+
+TEST(ColumnsCase, ColumnNullableT_Swap_VisibleThroughAlias) {
+    auto a = std::make_shared<ColumnNullableT<ColumnUInt64>>();
+    a->Append(1);
+    a->Append(std::nullopt);
+    auto b = std::make_shared<ColumnNullableT<ColumnUInt64>>();
+    b->Append(42);
+
+    auto alias_a = ColumnNullableT<ColumnUInt64>::Wrap(a);
+    ASSERT_NE(alias_a, nullptr);
+
+    a->Swap(*b);
+
+    ASSERT_EQ(a->Size(), 1u);
+    EXPECT_EQ(a->At(0), std::optional<uint64_t>(42));
+    ASSERT_EQ(b->Size(), 2u);
+
+    // Visible through the alias.
+    ASSERT_EQ(alias_a->Size(), 1u);
+    EXPECT_EQ(alias_a->At(0), std::optional<uint64_t>(42));
+}
+
+TEST(ColumnsCase, ColumnTupleT_Swap_VisibleThroughAlias) {
+    ColumnTuple a({std::make_shared<ColumnUInt64>(), std::make_shared<ColumnString>()});
+    a[0]->AsStrict<ColumnUInt64>()->Append(1);
+    a[1]->AsStrict<ColumnString>()->Append("a");
+
+    ColumnTuple b({std::make_shared<ColumnUInt64>(), std::make_shared<ColumnString>()});
+    b[0]->AsStrict<ColumnUInt64>()->Append(2);
+    b[1]->AsStrict<ColumnString>()->Append("b");
+
+    using TestTuple = ColumnTupleT<ColumnUInt64, ColumnString>;
+    auto alias_a = TestTuple::Wrap(a);
+    ASSERT_NE(alias_a, nullptr);
+
+    a.Swap(b);
+
+    EXPECT_EQ(a.Size(), 1u);
+    EXPECT_EQ(a[0]->AsStrict<ColumnUInt64>()->At(0), 2u);
+    EXPECT_EQ(b[0]->AsStrict<ColumnUInt64>()->At(0), 1u);
+
+    // Visible through the alias.
+    EXPECT_EQ(alias_a->At(0), std::make_tuple(uint64_t(2), std::string_view("b")));
+}
+
+TEST(ColumnsCase, ColumnTuple_Swap_DifferentSizeThrows) {
+    ColumnTuple a({std::make_shared<ColumnUInt64>(), std::make_shared<ColumnString>()});
+    ColumnTuple b({std::make_shared<ColumnUInt64>()});
+    EXPECT_THROW(a.Swap(b), ValidationError);
+}
+
+TEST(ColumnsCase, ColumnTuple_Swap_DifferentElementTypeDoesNotModify) {
+    auto a0 = std::make_shared<ColumnUInt64>();
+    auto a1 = std::make_shared<ColumnString>();
+    a0->Append(1);
+    a1->Append("a");
+    ColumnTuple a({a0, a1});
+
+    auto b0 = std::make_shared<ColumnUInt64>();
+    auto b1 = std::make_shared<ColumnUInt64>();
+    b0->Append(2);
+    b1->Append(3);
+    ColumnTuple b({b0, b1});
+
+    EXPECT_THROW(a.Swap(b), ValidationError);
+
+    EXPECT_EQ(a0->At(0), 1u);
+    EXPECT_EQ(a1->At(0), "a");
+    EXPECT_EQ(b0->At(0), 2u);
+    EXPECT_EQ(b1->At(0), 3u);
+}
+
+TEST(ColumnsCase, ColumnTuple_Clear_PreservesStructure_AndAlias) {
+    ColumnTuple col({std::make_shared<ColumnUInt64>(), std::make_shared<ColumnString>()});
+    col[0]->AsStrict<ColumnUInt64>()->Append(1);
+    col[1]->AsStrict<ColumnString>()->Append("a");
+
+    using TestTuple = ColumnTupleT<ColumnUInt64, ColumnString>;
+    auto alias = TestTuple::Wrap(col);
+    ASSERT_NE(alias, nullptr);
+    ASSERT_EQ(alias->Size(), 1u);
+
+    col.Clear();
+
+    // Structure is preserved (columns not dropped) and data is cleared in place.
+    EXPECT_EQ(col.Size(), 0u);
+    EXPECT_EQ(col.TupleSize(), 2u);
+    // Clear propagates to the alias.
+    EXPECT_EQ(alias->Size(), 0u);
+
+    // Re-appending through the original element columns is visible via the alias.
+    col[0]->AsStrict<ColumnUInt64>()->Append(2);
+    col[1]->AsStrict<ColumnString>()->Append("b");
+    ASSERT_EQ(alias->Size(), 1u);
+    EXPECT_EQ(alias->At(0), std::make_tuple(uint64_t(2), std::string_view("b")));
+}
+
+TEST(ColumnsCase, ColumnMapT_Swap_VisibleThroughAlias) {
+    using TestMap = ColumnMapT<ColumnString, ColumnUInt64>;
+
+    auto a = std::make_shared<TestMap>(std::make_shared<ColumnString>(), std::make_shared<ColumnUInt64>());
+    a->Append(std::map<std::string, uint64_t>{{"x", 1}});
+    auto b = std::make_shared<TestMap>(std::make_shared<ColumnString>(), std::make_shared<ColumnUInt64>());
+    b->Append(std::map<std::string, uint64_t>{{"y", 2}, {"z", 3}});
+
+    auto alias_a = TestMap::Wrap(a);
+    ASSERT_NE(alias_a, nullptr);
+
+    a->Swap(*b);
+
+    ASSERT_EQ(a->Size(), 1u);
+    EXPECT_EQ(a->At(0).size(), 2u);
+    ASSERT_EQ(b->Size(), 1u);
+    EXPECT_EQ(b->At(0).size(), 1u);
+
+    // Visible through the alias.
+    ASSERT_EQ(alias_a->Size(), 1u);
+    EXPECT_EQ(alias_a->At(0).size(), 2u);
+    EXPECT_EQ(alias_a->At(0)["y"], 2u);
+}
+
+// --- Deep-nested aliases: in-place Swap/Clear must recurse to shared leaf objects ---
+
+namespace {
+// Builds a single-row Map(UInt64, Array(Nullable(String))): one map row with one entry
+// {key -> arr}. Uses the single-offset ColumnArray ctor so the backing array has exactly one row.
+std::shared_ptr<ColumnMap> MakeDeepMapRow(uint64_t key, std::vector<std::optional<std::string>> arr) {
+    auto keys = std::make_shared<ColumnUInt64>();
+    auto vals = std::make_shared<ColumnArrayT<ColumnNullableT<ColumnString>>>();
+    keys->Append(key);
+    vals->Append(arr);
+    auto tuple = std::make_shared<ColumnTuple>(std::vector<ColumnRef>{keys, vals});
+    return std::make_shared<ColumnMap>(std::make_shared<ColumnArray>(tuple));
+}
+}
+
+TEST(ColumnsCase, DeepMap_Swap_VisibleThroughAlias) {
+    using DeepMap = ColumnMapT<ColumnUInt64, ColumnArrayT<ColumnNullableT<ColumnString>>>;
+
+    auto a = MakeDeepMapRow(1, {std::string("a"), std::string("b"), std::string("c")});
+    auto b = MakeDeepMapRow(1, {std::string("x"), std::nullopt});
+
+    auto alias_a = DeepMap::Wrap(a);  // deep typed view created BEFORE the swap
+    ASSERT_NE(alias_a, nullptr);
+    ASSERT_EQ(alias_a->At(0).At(1).Size(), 3u);
+
+    a->Swap(*b);
+
+    // The swap recurses down to the shared leaf columns, so the pre-existing alias now
+    // reflects B's data: the value-array flips size 3 -> 2 and the null survives.
+    auto arr = alias_a->At(0).At(1);
+    ASSERT_EQ(arr.Size(), 2u);
+    EXPECT_EQ(arr[0], std::optional<std::string_view>("x"));
+    EXPECT_EQ(arr[1], std::optional<std::string_view>{});
+
+    // b now holds a's original data.
+    auto arr_b = DeepMap::Wrap(b)->At(0).At(1);
+    EXPECT_EQ(arr_b.Size(), 3u);
+    EXPECT_EQ(arr_b[0], std::optional<std::string_view>("a"));
+}
+
+TEST(ColumnsCase, DeepMap_Clear_VisibleThroughAlias_NoStaleEntries) {
+    using DeepMap = ColumnMapT<ColumnUInt64, ColumnArrayT<ColumnNullableT<ColumnString>>>;
+
+    auto a = MakeDeepMapRow(1, {std::string("a"), std::string("b"), std::string("c")});
+    auto alias_a = DeepMap::Wrap(a);
+    ASSERT_NE(alias_a, nullptr);
+    ASSERT_EQ(alias_a->Size(), 1u);
+
+    a->Clear();
+
+    // Clear recurses to the shared leaves in place, so the alias goes empty too.
+    EXPECT_EQ(a->Size(), 0u);
+    EXPECT_EQ(alias_a->Size(), 0u);
+
+    // Re-appending a fresh row must not resurface the pre-clear ["a","b","c"] entry.
+    a->Append(MakeDeepMapRow(1, {std::string("z")}));
+    ASSERT_EQ(alias_a->Size(), 1u);
+    auto arr = alias_a->At(0).At(1);
+    ASSERT_EQ(arr.Size(), 1u);
+    EXPECT_EQ(arr[0], std::optional<std::string_view>("z"));
+}
+
+TEST(ColumnsCase, DeepNestedArray_Swap_VisibleThroughAlias) {
+    using DeepArray = ColumnArrayT<ColumnArrayT<ColumnNullableT<ColumnString>>>;
+
+    auto a = std::make_shared<DeepArray>();
+    a->Append(std::vector<std::vector<std::optional<std::string>>>{
+        {std::string("a")}, {std::string("b"), std::string("c")}});
+    auto b = std::make_shared<DeepArray>();
+    b->Append(std::vector<std::vector<std::optional<std::string>>>{
+        {std::string("x"), std::nullopt}});
+
+    auto alias_a = DeepArray::Wrap(a);  // created BEFORE the swap
+    ASSERT_NE(alias_a, nullptr);
+    ASSERT_EQ(alias_a->At(0).Size(), 2u);
+
+    a->Swap(*b);
+
+    // Alias reflects B's data all the way down to the nullable-string leaves.
+    auto outer = alias_a->At(0);
+    ASSERT_EQ(outer.Size(), 1u);
+    auto inner = outer.At(0);
+    ASSERT_EQ(inner.Size(), 2u);
+    EXPECT_EQ(inner[0], std::optional<std::string_view>("x"));
+    EXPECT_EQ(inner[1], std::optional<std::string_view>{});
+}
+
+// --- Deep nesting with LowCardinality: Map(UInt64, Array(LowCardinality(Nullable(String)))) ---
+
+namespace {
+// Builds a single-row Map(UInt64, Array(LowCardinality(Nullable(String)))): one map row with one
+// entry {key -> arr}, where the value is an array of LowCardinality(Nullable(String)) items.
+std::shared_ptr<ColumnMap> MakeDeepLcMapRow(uint64_t key, std::vector<std::optional<std::string>> arr) {
+    auto keys = std::make_shared<ColumnUInt64>();
+    auto vals = std::make_shared<ColumnArrayT<ColumnLowCardinalityT<ColumnNullableT<ColumnString>>>>();
+    keys->Append(key);
+    vals->Append(arr);
+    auto tuple = std::make_shared<ColumnTuple>(std::vector<ColumnRef>{keys, vals});
+    return std::make_shared<ColumnMap>(std::make_shared<ColumnArray>(tuple));
+}
+}
+
+TEST(ColumnsCase, DeepMapArrayLowCardinality_Swap_VisibleThroughAlias) {
+    using DeepLcMap = ColumnMapT<ColumnUInt64, ColumnArrayT<ColumnLowCardinalityT<ColumnNullableT<ColumnString>>>>;
+
+    auto a = MakeDeepLcMapRow(1, {std::string("a"), std::string("b"), std::string("c")});
+    auto b = MakeDeepLcMapRow(1, {std::string("x"), std::nullopt});
+
+    auto alias_a = DeepLcMap::Wrap(a);  // deep typed view created BEFORE the swap
+    ASSERT_NE(alias_a, nullptr);
+    ASSERT_EQ(alias_a->At(0).At(1).Size(), 3u);
+
+    a->Swap(*b);
+
+    // The swap recurses through Array -> LowCardinality (dictionary swapped in place, index bundle
+    // swapped) down to the Nullable(String) leaves, so the pre-existing alias reflects B's data:
+    // the value-array flips size 3 -> 2 and the null survives through LC -> Nullable.
+    auto arr = alias_a->At(0).At(1);
+    ASSERT_EQ(arr.Size(), 2u);
+    EXPECT_EQ(arr[0], std::optional<std::string_view>("x"));
+    EXPECT_EQ(arr[1], std::optional<std::string_view>{});
+
+    // b now holds a's original data.
+    auto arr_b = DeepLcMap::Wrap(b)->At(0).At(1);
+    ASSERT_EQ(arr_b.Size(), 3u);
+    EXPECT_EQ(arr_b[0], std::optional<std::string_view>("a"));
+}
+
+TEST(ColumnsCase, DeepMapArrayLowCardinality_Clear_VisibleThroughAlias) {
+    using DeepLcMap = ColumnMapT<ColumnUInt64, ColumnArrayT<ColumnLowCardinalityT<ColumnNullableT<ColumnString>>>>;
+
+    auto a = MakeDeepLcMapRow(1, {std::string("a"), std::string("b"), std::string("c")});
+    auto alias_a = DeepLcMap::Wrap(a);
+    ASSERT_NE(alias_a, nullptr);
+    ASSERT_EQ(alias_a->Size(), 1u);
+
+    a->Clear();
+
+    // Clear recurses to the shared leaves in place (incl. LowCardinality), so the alias empties too.
+    EXPECT_EQ(a->Size(), 0u);
+    EXPECT_EQ(alias_a->Size(), 0u);
+
+    // Re-appending a fresh row must not resurface the pre-clear entry.
+    a->Append(MakeDeepLcMapRow(1, {std::string("z")}));
+    ASSERT_EQ(alias_a->Size(), 1u);
+    auto arr = alias_a->At(0).At(1);
+    ASSERT_EQ(arr.Size(), 1u);
+    EXPECT_EQ(arr[0], std::optional<std::string_view>("z"));
+}
+
+// --- const As()/AsStrict() wrap like their non-const counterparts ---
+
+TEST(ColumnsCase, Const_As_WrapsWrappableColumn) {
+    using TestArray = ColumnArrayT<ColumnUInt64>;
+
+    auto arr = std::make_shared<TestArray>();
+    arr->Append(std::vector<uint64_t>{1, 2, 3});
+
+    // View the column only through a const handle.
+    std::shared_ptr<const Column> c = arr;
+    auto view = c->As<TestArray>();
+    ASSERT_NE(view, nullptr);
+    static_assert(std::is_same_v<decltype(view), std::shared_ptr<const TestArray>>,
+                  "const As() must yield shared_ptr<const T>");
+
+    // Read access reflects the same shared storage.
+    ASSERT_EQ(view->Size(), 1u);
+    auto row = view->At(0);
+    ASSERT_EQ(row.Size(), 3u);
+    EXPECT_EQ(row[0], 1u);
+    EXPECT_EQ(row[2], 3u);
+}
+
+TEST(ColumnsCase, Const_As_ExactDowncastStillWorks) {
+    auto leaf = std::make_shared<ColumnUInt64>();
+    leaf->Append(42u);
+
+    std::shared_ptr<const Column> c = leaf;
+    auto exact = c->As<ColumnUInt64>();
+    ASSERT_NE(exact, nullptr);
+    ASSERT_EQ(exact->Size(), 1u);
+    EXPECT_EQ(exact->At(0), 42u);
+
+    // Non-wrappable mismatch returns nullptr (no throw).
+    EXPECT_EQ(c->As<ColumnString>(), nullptr);
+}
+
+TEST(ColumnsCase, Const_AsStrict_WrapsAndThrows) {
+    using TestArray = ColumnArrayT<ColumnUInt64>;
+
+    auto arr = std::make_shared<TestArray>();
+    arr->Append(std::vector<uint64_t>{7, 8});
+
+    std::shared_ptr<const Column> c = arr;
+    auto view = c->AsStrict<TestArray>();
+    ASSERT_NE(view, nullptr);
+    static_assert(std::is_same_v<decltype(view), std::shared_ptr<const TestArray>>,
+                  "const AsStrict() must yield shared_ptr<const T>");
+    ASSERT_EQ(view->At(0).Size(), 2u);
+
+    // Wrappable-but-incompatible element type throws.
+    EXPECT_THROW((void)c->AsStrict<ColumnArrayT<ColumnString>>(), ValidationError);
+    // Non-wrappable mismatch throws too.
+    EXPECT_THROW((void)c->AsStrict<ColumnString>(), ValidationError);
+}
+
+TEST(ColumnsCase, ColumnTupleT_Slice_PreservesNames) {
+    using TestTuple = ColumnTupleT<ColumnUInt64, ColumnString>;
+
+    auto col = std::make_shared<TestTuple>(
+        std::make_tuple(
+            std::make_shared<ColumnUInt64>(),
+            std::make_shared<ColumnString>()
+        ),
+        std::vector<std::string>{"id", "name"}
+    );
+    col->Append(std::make_tuple(uint64_t(1), std::string("a")));
+    col->Append(std::make_tuple(uint64_t(2), std::string("b")));
+
+    auto sliced = col->Slice(0, 1);
+    EXPECT_EQ(sliced->Type()->GetName(), "Tuple(id UInt64, name String)");
+
+    auto cloned = col->CloneEmpty();
+    EXPECT_EQ(cloned->Type()->GetName(), "Tuple(id UInt64, name String)");
 }
 
 TEST(ColumnsCase, ColumnMapT) {
@@ -1258,4 +2061,180 @@ TEST(ColumnLowCardinality, NumericLoadAndSave) {
     for (size_t i = 0; i < column_A->Size(); ++i) {
         EXPECT_EQ(column_A->At(i), column_B->At(i)) << "row " << i;
     }
+}
+
+TEST(ColumnsCase, ColumnMapT_Wrap_AcceptsLvalue) {
+    auto tupls = std::make_shared<ColumnTuple>(std::vector<ColumnRef>{
+            std::make_shared<ColumnUInt64>(),
+            std::make_shared<ColumnString>()});
+
+    auto data = std::make_shared<ColumnArray>(tupls);
+
+    auto val = tupls->CloneEmpty()->As<ColumnTuple>();
+    (*val)[0]->AsStrict<ColumnUInt64>()->Append(1);
+    (*val)[1]->AsStrict<ColumnString>()->Append("123");
+    data->AppendAsColumn(val);
+
+    ColumnMap col{data};
+
+    using TestMap = ColumnMapT<ColumnUInt64, ColumnString>;
+
+    // Non-const lvalue concrete column, no std::move required.
+    auto w1 = TestMap::Wrap(col);
+    EXPECT_EQ("123", w1->At(0).At(1));
+
+    // Const lvalue concrete column.
+    const ColumnMap& cref = col;
+    auto w2 = TestMap::Wrap(cref);
+    EXPECT_EQ("123", w2->At(0).At(1));
+
+    // Lvalue ColumnRef, no std::move required and not consumed.
+    ColumnRef ref = std::make_shared<ColumnMap>(data);
+    auto w3 = TestMap::Wrap(ref);
+    EXPECT_EQ("123", w3->At(0).At(1));
+    EXPECT_NE(ref, nullptr);
+
+    // Source column left intact.
+    EXPECT_EQ(col.Size(), 1u);
+}
+
+TEST(ColumnsCase, ColumnMapT_Wrap_DoesNotStealSource) {
+    auto tupls = std::make_shared<ColumnTuple>(std::vector<ColumnRef>{
+            std::make_shared<ColumnUInt64>(),
+            std::make_shared<ColumnString>()});
+
+    auto data = std::make_shared<ColumnArray>(tupls);
+
+    auto val = tupls->CloneEmpty()->As<ColumnTuple>();
+
+    (*val)[0]->AsStrict<ColumnUInt64>()->Append(1);
+    (*val)[1]->AsStrict<ColumnString>()->Append("123");
+
+    (*val)[0]->AsStrict<ColumnUInt64>()->Append(2);
+    (*val)[1]->AsStrict<ColumnString>()->Append("abc");
+
+    data->AppendAsColumn(val);
+
+    ColumnMap col{data};
+
+    using TestMap = ColumnMapT<ColumnUInt64, ColumnString>;
+    auto wrapped_col = TestMap::Wrap(std::move(col));
+
+    // Wrapper sees the same data.
+    auto map_view = wrapped_col->At(0);
+    EXPECT_THROW(map_view.At(0), ValidationError);
+    EXPECT_EQ("123", map_view.At(1));
+    EXPECT_EQ("abc", map_view.At(2));
+
+    // Source column is left intact after Wrap (non-stealing).
+    EXPECT_EQ(col.Size(), 1u);
+
+    // Storage is shared: appending a row through the original is visible via the wrapper.
+    auto val2 = tupls->CloneEmpty()->As<ColumnTuple>();
+    (*val2)[0]->AsStrict<ColumnUInt64>()->Append(7);
+    (*val2)[1]->AsStrict<ColumnString>()->Append("xyz");
+    data->AppendAsColumn(val2);
+
+    EXPECT_EQ(wrapped_col->Size(), 2u);
+    EXPECT_EQ("xyz", wrapped_col->At(1).At(7));
+}
+
+// --- Wrap error-reporting overloads ---------------------------------------------------------
+// The two-argument Wrap(col, ValidationError*) returns nullptr (never throws) on a type
+// mismatch; the single-argument Wrap(col) throws ValidationError on the same mismatch.
+
+TEST(ColumnsCase, ColumnArrayT_Wrap_TypeMismatch) {
+    using TestArray = ColumnArrayT<ColumnUInt64>;
+
+    // Right kind (Array), wrong element type (String instead of UInt64).
+    ColumnRef bad_element = std::make_shared<ColumnArray>(std::make_shared<ColumnString>());
+    // Wrong kind entirely.
+    ColumnRef not_array = std::make_shared<ColumnUInt64>();
+
+    ValidationError error;
+    EXPECT_NO_THROW({
+        EXPECT_EQ(TestArray::Wrap(bad_element, &error), nullptr);
+    });
+    EXPECT_FALSE(std::string_view(error.what()).empty());
+
+    // Passing nullptr for the error is allowed and still non-throwing.
+    EXPECT_NO_THROW({
+        EXPECT_EQ(TestArray::Wrap(not_array, nullptr), nullptr);
+    });
+
+    // Single-argument overload throws on the same mismatches.
+    EXPECT_THROW(TestArray::Wrap(bad_element), ValidationError);
+    EXPECT_THROW(TestArray::Wrap(not_array), ValidationError);
+
+    // Sanity: a matching column wraps fine through both overloads.
+    ColumnRef good = std::make_shared<ColumnArray>(std::make_shared<ColumnUInt64>());
+    EXPECT_NE(TestArray::Wrap(good, nullptr), nullptr);
+    EXPECT_NE(TestArray::Wrap(good), nullptr);
+}
+
+TEST(ColumnsCase, ColumnNullableT_Wrap_TypeMismatch) {
+    using TestNullable = ColumnNullableT<ColumnUInt64>;
+
+    // Nullable of the wrong nested type.
+    ColumnRef bad_nested = std::make_shared<ColumnNullable>(
+        std::make_shared<ColumnString>(), std::make_shared<ColumnUInt8>());
+    ColumnRef not_nullable = std::make_shared<ColumnUInt64>();
+
+    ValidationError error;
+    EXPECT_EQ(TestNullable::Wrap(bad_nested, &error), nullptr);
+    EXPECT_FALSE(std::string_view(error.what()).empty());
+    EXPECT_EQ(TestNullable::Wrap(not_nullable, nullptr), nullptr);
+
+    EXPECT_THROW(TestNullable::Wrap(bad_nested), ValidationError);
+    EXPECT_THROW(TestNullable::Wrap(not_nullable), ValidationError);
+}
+
+TEST(ColumnsCase, ColumnTupleT_Wrap_TypeMismatch) {
+    using TestTuple = ColumnTupleT<ColumnUInt64, ColumnString>;
+
+    // Correct arity, wrong element type.
+    ColumnRef bad_element = std::make_shared<ColumnTuple>(std::vector<ColumnRef>{
+        std::make_shared<ColumnUInt64>(), std::make_shared<ColumnUInt64>()});
+    // Wrong arity.
+    ColumnRef bad_arity = std::make_shared<ColumnTuple>(std::vector<ColumnRef>{
+        std::make_shared<ColumnUInt64>()});
+    // Wrong kind.
+    ColumnRef not_tuple = std::make_shared<ColumnUInt64>();
+
+    ValidationError error;
+    EXPECT_EQ(TestTuple::Wrap(bad_element, &error), nullptr);
+    EXPECT_FALSE(std::string_view(error.what()).empty());
+    EXPECT_EQ(TestTuple::Wrap(bad_arity, nullptr), nullptr);
+    EXPECT_EQ(TestTuple::Wrap(not_tuple, nullptr), nullptr);
+
+    EXPECT_THROW(TestTuple::Wrap(bad_element), ValidationError);
+    EXPECT_THROW(TestTuple::Wrap(bad_arity), ValidationError);
+    EXPECT_THROW(TestTuple::Wrap(not_tuple), ValidationError);
+}
+
+TEST(ColumnsCase, ColumnMapT_Wrap_TypeMismatch) {
+    using TestMap = ColumnMapT<ColumnUInt64, ColumnString>;
+    ColumnRef not_map = std::make_shared<ColumnUInt64>();
+
+    ValidationError error;
+    EXPECT_EQ(TestMap::Wrap(not_map, &error), nullptr);
+    EXPECT_FALSE(std::string_view(error.what()).empty());
+    EXPECT_EQ(TestMap::Wrap(not_map, nullptr), nullptr);
+    EXPECT_THROW(TestMap::Wrap(not_map), ValidationError);
+}
+
+TEST(ColumnsCase, ColumnLowCardinalityT_Wrap_TypeMismatch) {
+    using TestLC = ColumnLowCardinalityT<ColumnString>;
+
+    // LowCardinality with the wrong (but valid) dictionary type.
+    ColumnRef bad_dict = std::make_shared<ColumnLowCardinality>(std::make_shared<ColumnFixedString>(4));
+    ColumnRef not_lc = std::make_shared<ColumnUInt64>();
+
+    ValidationError error;
+    EXPECT_EQ(TestLC::Wrap(bad_dict, &error), nullptr);
+    EXPECT_FALSE(std::string_view(error.what()).empty());
+    EXPECT_EQ(TestLC::Wrap(not_lc, nullptr), nullptr);
+
+    EXPECT_THROW(TestLC::Wrap(bad_dict), ValidationError);
+    EXPECT_THROW(TestLC::Wrap(not_lc), ValidationError);
 }

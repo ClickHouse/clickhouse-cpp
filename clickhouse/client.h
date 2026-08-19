@@ -197,6 +197,11 @@ struct ClientOptions {
          */
         DECLARE_FIELD(host_flags, int, SetHostVerifyFlags, DEFAULT_VALUE);
 
+        /** Server hostname to use for TLS SNI (via SSL_set_tlsext_host_name) and for
+         *  certificate hostname verification (via SSL_set1_host), instead of ClientOptions::host.
+         */
+        DECLARE_FIELD(server_host_name, std::string, SetServerHostName, "");
+
         struct CommandAndValue {
             std::string command;
             std::optional<std::string> value = std::nullopt;
@@ -246,6 +251,12 @@ public:
             std::unique_ptr<SocketFactory> socket_factory);
     ~Client();
 
+    // movable only
+    Client(Client&&) noexcept;
+    Client& operator=(Client&&) noexcept;
+    Client(const Client&) = delete;
+    Client& operator=(const Client&) = delete;
+
     /// Intends for execute arbitrary queries.
     void Execute(const Query& query);
 
@@ -271,6 +282,10 @@ public:
     // the data handler function \p cb.
     void SelectWithExternalDataCancelable(const std::string& query, const ExternalTables& external_tables, SelectCancelableCallback cb);
     void SelectWithExternalDataCancelable(const std::string& query, const std::string& query_id, const ExternalTables& external_tables, SelectCancelableCallback cb);
+
+    /// Same as SelectWithExternalData but takes a fully-configured Query
+    /// (settings, params, callbacks, query_id, OnData) instead of a bare string.
+    void SelectWithExternalData(const Query& query, const ExternalTables& external_tables);
 
     /// EXPERIMENTAL. Intends for execute arbitrary queries while reading the data interactively with
     /// NextBlock().
@@ -302,7 +317,9 @@ public:
     void Insert(const std::string& table_name, const std::string& query_id, const Block& block);
 
     /// Start an \p INSERT statement, insert batches of data, then finish the insert.
-    Block BeginInsert(const std::string& query);
+    /// Queries with event callbacks are not allowed.If the query has any event callbacks set, this
+    /// call throws ValidationError.
+    Block BeginInsert(const Query& query);
     Block BeginInsert(const std::string& query, const std::string& query_id);
 
     /// Insert data using a \p block returned by \p BeginInsert.
@@ -340,8 +357,6 @@ public:
     static Version GetVersion();
 
 private:
-    const ClientOptions options_;
-
     class Impl;
     std::unique_ptr<Impl> impl_;
 };

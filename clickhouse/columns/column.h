@@ -4,8 +4,10 @@
 #include "../columns/itemview.h"
 #include "../exceptions.h"
 
+#include <algorithm>
 #include <memory>
 #include <stdexcept>
+#include <vector>
 
 namespace clickhouse {
 
@@ -24,26 +26,32 @@ public:
     virtual ~Column() {}
 
     /// Downcast pointer to the specific column's subtype.
+    ///
+    /// If T is a "wrappable" typed column (one exposing a static Wrap method, e.g.
+    /// ColumnArrayT/ColumnTupleT/ColumnMapT/ColumnNullableT/ColumnLowCardinalityT) and the
+    /// column is not already exactly T, this attempts to Wrap it as T (a storage-sharing
+    /// typed view). Returns nullptr when neither an exact cast nor a wrap is possible.
+    /// (Definitions are out-of-line below, after WrapColumn is declared.)
     template <typename T>
-    inline std::shared_ptr<T> As() {
-        return std::dynamic_pointer_cast<T>(shared_from_this());
-    }
+    inline std::shared_ptr<T> As();
 
-    /// Downcast pointer to the specific column's subtype.
+    /// Const overload. Behaves like the non-const As(): for a wrappable T it first tries an
+    /// exact downcast, then falls back to Wrap, returning a storage-sharing view typed as
+    /// shared_ptr<const T> (read-only surface). Wrapping never mutates the source column; it
+    /// does require an internal const_pointer_cast because Wrap builds a mutable wrapper.
+    /// Caveat: the read-only guarantee is shallow -- the wrapper still holds non-const
+    /// references to the shared sub-columns, so a deliberate const_pointer_cast<T> could
+    /// still reach the underlying storage. Casual const use stays read-only.
     template <typename T>
-    inline std::shared_ptr<const T> As() const {
-        return std::dynamic_pointer_cast<const T>(shared_from_this());
-    }
+    inline std::shared_ptr<const T> As() const;
 
-    /// Downcast pointer to the specific column's subtype.
+    /// Like As(), but throws ValidationError instead of returning nullptr on failure.
     template <typename T>
-    inline std::shared_ptr<T> AsStrict() {
-        auto result = std::dynamic_pointer_cast<T>(shared_from_this());
-        if (!result) {
-            throw ValidationError("Can't cast from " + type_->GetName());
-        }
-        return result;
-    }
+    inline std::shared_ptr<T> AsStrict();
+
+    /// Const overload of AsStrict(); wraps like As() const and throws on failure.
+    template <typename T>
+    inline std::shared_ptr<const T> AsStrict() const;
 
     /// Get type object of the column.
     inline TypeRef Type() const { return type_; }
@@ -103,5 +111,148 @@ public:
 protected:
     TypeRef type_;
 };
+
+template <typename T>
+std::vector<T> SliceVector(const std::vector<T>& vec, size_t begin, size_t len) {
+    std::vector<T> result;
+
+    if (begin < vec.size()) {
+        len = std::min(len, vec.size() - begin);
+        result.assign(vec.begin() + begin, vec.begin() + (begin + len));
+    }
+
+    return result;
+}
+
+template <typename T>
+struct HasWrapMethod {
+private:
+    static int detect(...);
+    template <typename U>
+    static decltype(U::Wrap(std::move(std::declval<ColumnRef>()))) detect(const U&);
+
+public:
+    static constexpr bool value = !std::is_same<int, decltype(detect(std::declval<T>()))>::value;
+};
+
+// Non-throwing: returns nullptr and (if `error` is non-null) fills `*error` when `column`
+// can't be wrapped as T.
+template <typename T>
+inline std::shared_ptr<T> WrapColumn(const ColumnRef& column, ValidationError* error) {
+    if constexpr (HasWrapMethod<T>::value) {
+        return T::Wrap(column, error);
+    } else {
+        auto result = column->template As<T>();
+        if (!result && error) {
+            *error = ValidationError("Can't wrap column of type " + column->GetType().GetName());
+        }
+        return result;
+    }
+}
+
+// Throwing convenience wrapper.
+template <typename T>
+inline std::shared_ptr<T> WrapColumn(const ColumnRef& column) {
+    ValidationError error;
+    auto result = WrapColumn<T>(column, &error);
+    if (!result) {
+        throw error;
+    }
+    return result;
+}
+
+// Provides the throwing single-argument Wrap overloads for typed columns.
+// Derived must supply the non-throwing two-argument Wrap(col, ValidationError*) overloads.
+// BaseColumn is Derived's concrete base (e.g. ColumnArray) so an already-typed
+// argument takes the direct path instead of the dynamic_cast'ing Column& overload.
+template <typename Derived, typename BaseColumn>
+struct WrappableColumn {
+    static auto Wrap(const BaseColumn& col) {
+        ValidationError error;
+        auto result = Derived::Wrap(col, &error);
+        if (!result) {
+            throw error;
+        }
+        return result;
+    }
+
+    static auto Wrap(const Column& col) {
+        ValidationError error;
+        auto result = Derived::Wrap(col, &error);
+        if (!result) {
+            throw error;
+        }
+        return result;
+    }
+
+    static auto Wrap(const ColumnRef& col) {
+        ValidationError error;
+        auto result = Derived::Wrap(col, &error);
+        if (!result) {
+            throw error;
+        }
+        return result;
+    }
+};
+
+template <typename T>
+inline std::shared_ptr<T> Column::As() {
+    if constexpr (HasWrapMethod<T>::value) {
+        if (auto exact = std::dynamic_pointer_cast<T>(shared_from_this())) {
+            return exact;
+        }
+        return WrapColumn<T>(shared_from_this(), nullptr);
+    } else {
+        return std::dynamic_pointer_cast<T>(shared_from_this());
+    }
+}
+
+template <typename T>
+inline std::shared_ptr<const T> Column::As() const {
+    if constexpr (HasWrapMethod<T>::value) {
+        if (auto exact = std::dynamic_pointer_cast<const T>(shared_from_this())) {
+            return exact;
+        }
+        // Wrap needs a mutable ColumnRef to build a storage-sharing view; the result is
+        // returned as shared_ptr<const T> so the caller keeps read-only access, and
+        // wrapping never mutates the source column.
+        return WrapColumn<T>(std::const_pointer_cast<Column>(shared_from_this()), nullptr);
+    } else {
+        return std::dynamic_pointer_cast<const T>(shared_from_this());
+    }
+}
+
+template <typename T>
+inline std::shared_ptr<T> Column::AsStrict() {
+    if constexpr (HasWrapMethod<T>::value) {
+        if (auto exact = std::dynamic_pointer_cast<T>(shared_from_this())) {
+            return exact;
+        }
+        return WrapColumn<T>(shared_from_this());
+    } else {
+        auto result = std::dynamic_pointer_cast<T>(shared_from_this());
+        if (!result) {
+            throw ValidationError("Can't cast from " + type_->GetName());
+        }
+        return result;
+    }
+}
+
+template <typename T>
+inline std::shared_ptr<const T> Column::AsStrict() const {
+    if constexpr (HasWrapMethod<T>::value) {
+        if (auto exact = std::dynamic_pointer_cast<const T>(shared_from_this())) {
+            return exact;
+        }
+        // Throwing WrapColumn: raises ValidationError on a type mismatch.
+        return WrapColumn<T>(std::const_pointer_cast<Column>(shared_from_this()));
+    } else {
+        auto result = std::dynamic_pointer_cast<const T>(shared_from_this());
+        if (!result) {
+            throw ValidationError("Can't cast from " + type_->GetName());
+        }
+        return result;
+    }
+}
 
 }  // namespace clickhouse

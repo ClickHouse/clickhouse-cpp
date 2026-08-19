@@ -183,7 +183,7 @@ inline void DecimalExample(Client& client) {
         {
             for (size_t c = 0; c < block.GetRowCount(); ++c) {
                 auto col = block[0]->As<ColumnDecimal>();
-                cout << (int)col->At(c) << endl;
+                cout << col->At(c) << endl;
             }
         }
     );
@@ -192,7 +192,7 @@ inline void DecimalExample(Client& client) {
         {
             for (size_t c = 0; c < block.GetRowCount(); ++c) {
                 auto col = block[0]->As<ColumnDecimal>();
-                cout << (int)col->At(c) << endl;
+                cout << col->At(c) << endl;
             }
         }
     );

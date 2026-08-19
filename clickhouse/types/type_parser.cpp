@@ -7,6 +7,7 @@
 #include <cmath>
 #include <map>
 #include <mutex>
+#include <array>
 #include <unordered_map>
 
 #if defined _win_
@@ -75,6 +76,20 @@ static const std::unordered_map<std::string, Type::Code> kTypeCode = {
     { "Time64",      Type::Time64 },
     { "JSON",        Type::JSON },
 };
+
+static constexpr auto kUnescapeMap = [](){
+    std::array<char, 256> m{};
+    // std::fill or m.fill are not yet constant expressions in C++17
+    for (auto& x : m) x = (char)-1;
+    m['0'] = '\0';
+    m['\\'] = '\\';
+    m['b'] = '\b';
+    m['f'] = '\f';
+    m['n'] = '\n';
+    m['r'] = '\r';
+    m['t'] = '\t';
+    return m;
+}();
 
 template <typename L, typename R>
 inline int CompateStringsCaseInsensitive(const L& left, const R& right) {
@@ -247,19 +262,26 @@ TypeParser::Token TypeParser::NextToken() {
                 return Token{Token::Comma, StringView(cur_++, 1)};
             case '\'':
             {
-                const auto end_quote_length = 1;
-                const StringView end_quote{cur_, end_quote_length};
-                // Fast forward to the closing quote.
-                const auto start = cur_++;
-                for (; cur_ < end_ - end_quote_length; ++cur_) {
-                    // TODO (nemkov): handle escaping ?
-                    if (end_quote == StringView{cur_, end_quote_length}) {
-                        cur_ += end_quote_length;
-
-                        return Token{Token::QuotedString, StringView{start, cur_}};
+                scratch_.clear();
+                scratch_ += *(cur_++); // quotes must be included
+                for (; end_ - cur_  > 1; ++cur_) {
+                    if (*cur_ == '\\' && end_ - cur_ > 1 && kUnescapeMap[(uint8_t)*(cur_ + 1)] != (char)-1) {
+                        scratch_ += kUnescapeMap[(uint8_t)*(cur_ + 1)];
+                        ++cur_;
+                    }
+                    else if (*cur_ == '\\' && end_ - cur_ > 1 && *(cur_ + 1) == '\'') {
+                        scratch_ += '\'';
+                        ++cur_;
+                    }
+                    else if ('\'' == *cur_) {
+                        scratch_ += *(cur_++);
+                        return Token{Token::QuotedString, StringView(scratch_)};
+                    }
+                    else {
+                        scratch_ += *cur_;
                     }
                 }
-                return Token{Token::QuotedString, StringView(cur_++, 1)};
+                return Token{Token::QuotedString, StringView(scratch_)};
             }
             case '"':
             case '`':

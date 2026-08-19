@@ -4,6 +4,12 @@
 
 #include <stdexcept>
 
+#if defined(__FreeBSD__)
+  #include <sys/types.h>
+  #include <sys/socket.h>
+  #include <netinet/in.h>
+#endif
+
 namespace clickhouse {
 
 static_assert(sizeof(struct in6_addr) == 16, "sizeof in6_addr should be 16 bytes");

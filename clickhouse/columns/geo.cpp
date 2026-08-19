@@ -1,7 +1,5 @@
 #include "geo.h"
 
-#include "utils.h"
-
 namespace {
 using namespace ::clickhouse;
 

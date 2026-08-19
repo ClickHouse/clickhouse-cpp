@@ -1,7 +1,6 @@
 #pragma once
 
 #include "column.h"
-#include "absl/numeric/int128.h"
 
 namespace clickhouse {
 
@@ -29,7 +28,7 @@ public:
     const T& At(size_t n) const;
 
     /// Returns element at given row number.
-    inline const T& operator [] (size_t n) const { return At(n); }
+    const T& operator [] (size_t n) const;
 
     void Erase(size_t pos, size_t count = 1);
 
@@ -66,10 +65,6 @@ private:
     std::vector<T> data_;
 };
 
-using Int128 = absl::int128;
-using UInt128 = absl::uint128;
-using Int64 = int64_t;
-
 using ColumnUInt8   = ColumnVector<uint8_t>;
 using ColumnUInt16  = ColumnVector<uint16_t>;
 using ColumnUInt32  = ColumnVector<uint32_t>;
@@ -84,5 +79,23 @@ using ColumnInt128  = ColumnVector<Int128>;
 
 using ColumnFloat32 = ColumnVector<float>;
 using ColumnFloat64 = ColumnVector<double>;
+
+template <>
+CH_ABSEIL_BIGNUM_DEPRECATED void ColumnVector<Int128>::Append(const Int128& value);
+template <>
+CH_ABSEIL_BIGNUM_DEPRECATED const Int128& ColumnVector<Int128>::At(size_t n) const;
+template <>
+CH_ABSEIL_BIGNUM_DEPRECATED const Int128& ColumnVector<Int128>::operator [] (size_t n) const;
+template <>
+CH_ABSEIL_BIGNUM_DEPRECATED std::vector<Int128>& ColumnVector<Int128>::GetWritableData();
+
+template <>
+CH_ABSEIL_BIGNUM_DEPRECATED void ColumnVector<UInt128>::Append(const UInt128& value);
+template <>
+CH_ABSEIL_BIGNUM_DEPRECATED const UInt128& ColumnVector<UInt128>::At(size_t n) const;
+template <>
+CH_ABSEIL_BIGNUM_DEPRECATED const UInt128& ColumnVector<UInt128>::operator [] (size_t n) const;
+template <>
+CH_ABSEIL_BIGNUM_DEPRECATED std::vector<UInt128>& ColumnVector<UInt128>::GetWritableData();
 
 }

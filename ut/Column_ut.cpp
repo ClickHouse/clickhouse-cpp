@@ -41,6 +41,17 @@ std::ostream& operator<<(std::ostream& ostr, const Type::Code& type_code) {
 
 }
 
+TEST(ColumnNullableT, AppendRollsBackNullFlagWhenNestedAppendThrows) {
+    auto nested = std::make_shared<ColumnFixedString>(1);
+    auto column = std::make_shared<ColumnNullableT<ColumnFixedString>>(nested);
+
+    EXPECT_THROW(column->Append(std::string_view("too long")), ValidationError);
+
+    EXPECT_EQ(0u, column->Size());
+    EXPECT_EQ(0u, column->Nulls()->Size());
+    EXPECT_EQ(0u, column->Nested()->Size());
+}
+
 
 // Generic tests for a Column subclass against basic API:
 // 1. Constructor: Create, ensure that it is empty
@@ -515,4 +526,3 @@ TYPED_TEST(GenericColumnTest, ArrayT_RoundTrip) {
 
     this->TestColumnRoundtrip(column, LocalHostEndpoint, AllCompressionMethods);
 }
-

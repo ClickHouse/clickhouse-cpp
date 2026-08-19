@@ -27,6 +27,7 @@ jobs:
         compiler: [clang-11, clang-14, clang-18, gcc-9, gcc-12, gcc-14]
         ssl: [ssl_ON, ssl_OFF]
         dependencies: [dependencies_BUILT_IN]
+        bignum: [use_abseil, use_custom_bignum]
 
         include:
         - compiler: clang-11
@@ -68,6 +69,12 @@ jobs:
         - ssl: ssl_ON
           SSL_CMAKE_OPTION: -D WITH_OPENSSL=ON
 
+        - bignum: use_abseil
+          BIGNUM_CMAKE_OPTION: -D CH_USE_ABSEIL_FOR_BIGNUM=ON
+
+        - bignum: use_custom_bignum
+          BIGNUM_CMAKE_OPTION: -D CH_USE_ABSEIL_FOR_BIGNUM=OFF
+
         - dependencies: dependencies_SYSTEM
           compiler: compiler_SYSTEM
           os: ubuntu-24.04
@@ -103,6 +110,7 @@ jobs:
             -D CMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
             -D CH_MAP_BOOL_TO_UINT8=OFF \
             -D BUILD_TESTS=ON \
+            ${{matrix.BIGNUM_CMAKE_OPTION}} \
             ${{matrix.SSL_CMAKE_OPTION}} \
             ${{matrix.DEPENDENCIES_CMAKE_OPTIONS}} \
             -S ${{github.workspace}} \

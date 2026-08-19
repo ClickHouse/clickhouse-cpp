@@ -96,6 +96,70 @@ TEST(TypeParserCase, ParseEnum) {
     }
 }
 
+TEST(TypeParserCase, ParseEnum_AllEscapedBytes) {
+    // {fragment as seen by the parser, expected decoded raw byte}
+    const std::vector<std::pair<std::string, char>> cases = {
+        {"\\0", '\0'},   // NUL
+        {"\\b", '\b'},   // Backspace
+        {"\\t", '\t'},   // Tab
+        {"\\n", '\n'},   // Line feed
+        {"\\f", '\f'},   // Form feed
+        {"\\r", '\r'},   // Carriage return
+        {"\\\\", '\\'},  // Backslash
+        {"\\'", '\''},   // Single quote
+    };
+
+    // Each escaped byte, embedded in the middle of a label.
+    for (const auto& [fragment, raw] : cases) {
+        TypeAst ast;
+        ASSERT_TRUE(TypeParser("Enum8('x" + fragment + "y' = 1)").Parse(&ast))
+            << "failed to parse fragment: " << fragment;
+        ASSERT_EQ(ast.meta, TypeAst::Enum);
+        ASSERT_EQ(ast.elements.size(), 2u);
+        EXPECT_EQ(ast.elements[0].value_string, std::string("x") + raw + "y")
+            << "wrong decoding for fragment: " << fragment;
+    }
+
+    // Escaped byte as the only/first/last character of the label.
+    for (const auto& [fragment, raw] : cases) {
+        TypeAst only;
+        ASSERT_TRUE(TypeParser("Enum8('" + fragment + "' = 1)").Parse(&only));
+        EXPECT_EQ(only.elements[0].value_string, std::string(1, raw));
+
+        TypeAst first;
+        ASSERT_TRUE(TypeParser("Enum8('" + fragment + "z' = 1)").Parse(&first));
+        EXPECT_EQ(first.elements[0].value_string, std::string(1, raw) + "z");
+
+        TypeAst last;
+        ASSERT_TRUE(TypeParser("Enum8('z" + fragment + "' = 1)").Parse(&last));
+        EXPECT_EQ(last.elements[0].value_string, std::string("z") + raw);
+    }
+
+    // All escaped bytes combined in a single label.
+    {
+        std::string escaped;
+        std::string expected;
+        for (const auto& [fragment, raw] : cases) {
+            escaped += fragment;
+            expected += raw;
+        }
+        TypeAst ast;
+        ASSERT_TRUE(TypeParser("Enum8('" + escaped + "' = 1)").Parse(&ast));
+        EXPECT_EQ(ast.elements[0].value_string, expected);
+    }
+
+    // Bytes that are NOT escaped must pass through unchanged.
+    {
+        TypeAst ast;
+        ASSERT_TRUE(TypeParser(std::string("Enum8('x\x07y' = 1)")).Parse(&ast));  // BEL
+        EXPECT_EQ(ast.elements[0].value_string, std::string("x\x07y"));
+
+        TypeAst emoji;
+        ASSERT_TRUE(TypeParser("Enum8('😀' = 1)").Parse(&emoji));
+        EXPECT_EQ(emoji.elements[0].value_string, "😀");
+    }
+}
+
 TEST(TypeParserCase, ParseTuple) {
     TypeAst ast;
     TypeParser(
@@ -276,6 +340,79 @@ TEST(TypeParserCase, ParseDateTime_MINSK_TIMEZONE) {
     ASSERT_EQ(ast.elements[0].code, Type::String);
     ASSERT_EQ(ast.elements[0].value_string, "Europe/Minsk");
     ASSERT_EQ(ast.elements[0].meta, TypeAst::Terminal);
+}
+
+TEST(TypeParserCase, ParseTimezoneEscapedStrings) {
+    const std::vector<std::string> escaped_timezones = {"can\\'t", "a\\tb", "a\\\\b", "a\\nb", "a\\rb",  "😀", "a,b=(c)"};
+    const std::vector<std::string> timezones = {"can't", "a\tb", "a\\b", "a\nb", "a\rb",  "😀", "a,b=(c)"};
+
+    for (size_t i = 0; i < timezones.size(); ++i) {
+        TypeAst date_time;
+        ASSERT_TRUE(TypeParser("DateTime('" + escaped_timezones[i] + "')").Parse(&date_time));
+        ASSERT_EQ(date_time.code, Type::DateTime);
+        ASSERT_EQ(date_time.elements.size(), 1u);
+        EXPECT_EQ(date_time.elements[0].value_string, timezones[i]);
+
+        TypeAst date_time64;
+        ASSERT_TRUE(TypeParser("DateTime64(3, '" + escaped_timezones[i] + "')").Parse(&date_time64));
+        ASSERT_EQ(date_time64.code, Type::DateTime64);
+        ASSERT_EQ(date_time64.elements.size(), 2u);
+        EXPECT_EQ(date_time64.elements[1].value_string, timezones[i]);
+    }
+}
+
+TEST(TypeParserCase, ParseTimezone_AllEscapedBytes) {
+    // {fragment as seen by the parser, expected decoded raw byte}
+    const std::vector<std::pair<std::string, char>> cases = {
+        {"\\0", '\0'},   // NUL
+        {"\\b", '\b'},   // Backspace
+        {"\\t", '\t'},   // Tab
+        {"\\n", '\n'},   // Line feed
+        {"\\f", '\f'},   // Form feed
+        {"\\r", '\r'},   // Carriage return
+        {"\\\\", '\\'},  // Backslash
+        {"\\'", '\''},   // Single quote
+    };
+
+    for (const auto& [fragment, raw] : cases) {
+        const std::string expected = std::string("A") + raw + "B";
+
+        TypeAst date_time;
+        ASSERT_TRUE(TypeParser("DateTime('A" + fragment + "B')").Parse(&date_time))
+            << "failed to parse fragment: " << fragment;
+        ASSERT_EQ(date_time.code, Type::DateTime);
+        ASSERT_EQ(date_time.elements.size(), 1u);
+        EXPECT_EQ(date_time.elements[0].value_string, expected)
+            << "wrong decoding for fragment: " << fragment;
+
+        TypeAst date_time64;
+        ASSERT_TRUE(TypeParser("DateTime64(3, 'A" + fragment + "B')").Parse(&date_time64))
+            << "failed to parse fragment: " << fragment;
+        ASSERT_EQ(date_time64.code, Type::DateTime64);
+        ASSERT_EQ(date_time64.elements.size(), 2u);
+        EXPECT_EQ(date_time64.elements[1].value_string, expected)
+            << "wrong decoding for fragment: " << fragment;
+    }
+
+    // All escaped bytes combined in a single timezone string.
+    {
+        std::string escaped;
+        std::string expected;
+        for (const auto& [fragment, raw] : cases) {
+            escaped += fragment;
+            expected += raw;
+        }
+
+        TypeAst date_time;
+        ASSERT_TRUE(TypeParser("DateTime('" + escaped + "')").Parse(&date_time));
+        ASSERT_EQ(date_time.elements.size(), 1u);
+        EXPECT_EQ(date_time.elements[0].value_string, expected);
+
+        TypeAst date_time64;
+        ASSERT_TRUE(TypeParser("DateTime64(3, '" + escaped + "')").Parse(&date_time64));
+        ASSERT_EQ(date_time64.elements.size(), 2u);
+        EXPECT_EQ(date_time64.elements[1].value_string, expected);
+    }
 }
 
 TEST(TypeParserCase, EqualityIncludesValueString) {

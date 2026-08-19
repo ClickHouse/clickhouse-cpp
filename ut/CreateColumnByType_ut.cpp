@@ -4,9 +4,12 @@
 #include <clickhouse/columns/lowcardinality.h>
 #include <clickhouse/columns/numeric.h>
 #include <clickhouse/columns/string.h>
+#include <clickhouse/columns/tuple.h>
 #include <clickhouse/columns/json.h>
 
 #include <gtest/gtest.h>
+
+#include <tuple>
 
 namespace {
 using namespace clickhouse;
@@ -19,6 +22,33 @@ TEST(CreateColumnByType, CreateSimpleAggregateFunction) {
     ASSERT_EQ(Type::Int32, col->Type()->GetCode());
     ASSERT_NE(nullptr, col->As<ColumnInt32>());
 }
+
+// SimpleAggregateFunction is transparent on the wire: the created column must
+// match its value (inner) type. The inner type may itself be a wrapper such as
+// LowCardinality, Nullable, Array or Map, which previously produced a nullptr
+// because only terminal inner types were handled (issue #540).
+class CreateColumnBySimpleAggregateFunctionType
+    : public ::testing::TestWithParam<std::tuple<const char* /*type*/, const char* /*expected inner type name*/>>
+{};
+
+TEST_P(CreateColumnBySimpleAggregateFunctionType, CreateColumnByType) {
+    const auto & [type_name, expected_inner_name] = GetParam();
+    const auto col = CreateColumnByType(type_name);
+    ASSERT_NE(nullptr, col) << "CreateColumnByType returned nullptr for " << type_name;
+    EXPECT_EQ(expected_inner_name, col->GetType().GetName());
+}
+
+INSTANTIATE_TEST_SUITE_P(InnerType, CreateColumnBySimpleAggregateFunctionType, ::testing::Values(
+    // Terminal inner type — handled before the fix; must stay unchanged.
+    std::make_tuple("SimpleAggregateFunction(sum, UInt64)", "UInt64"),
+    // Non-terminal (wrapper) inner types — returned nullptr before the fix.
+    std::make_tuple("SimpleAggregateFunction(anyLast, LowCardinality(String))", "LowCardinality(String)"),
+    std::make_tuple("SimpleAggregateFunction(anyLast, Nullable(String))", "Nullable(String)"),
+    std::make_tuple("SimpleAggregateFunction(groupArrayArray, Array(UInt64))", "Array(UInt64)"),
+    std::make_tuple("SimpleAggregateFunction(sumMap, Map(String, UInt64))", "Map(String, UInt64)"),
+    std::make_tuple("SimpleAggregateFunction(anyLast, Enum8('a' = 1, 'b' = 2))", "Enum8('a' = 1, 'b' = 2)"),
+    std::make_tuple("SimpleAggregateFunction(anyLast, Tuple(UInt64, String))", "Tuple(UInt64, String)")
+));
 
 TEST(CreateColumnByType, UnmatchedBrackets) {
     // When type string has unmatched brackets, CreateColumnByType must return nullptr.
@@ -67,12 +97,130 @@ TEST(CreateColumnByType, LowCardinalityGeneralInnerTypes) {
     }
 }
 
+TEST(CreateColumnByType, LowCardinality) {
+    // In the default (non-wrapped) mode, LowCardinality(String)/LowCardinality(FixedString) map to
+    // the base ColumnLowCardinality (like Array/Nullable/Tuple/Map do), and the strongly-typed
+    // ColumnLowCardinalityT<...> view is obtained on demand via the wrapping As<>.
+    {
+        auto col = CreateColumnByType("LowCardinality(String)");
+        ASSERT_NE(nullptr, col);
+        EXPECT_EQ("LowCardinality(String)", col->GetType().GetName());
+        // Concrete type is the base ColumnLowCardinality, not ColumnLowCardinalityT<...>.
+        EXPECT_NE(nullptr, col->As<ColumnLowCardinality>());
+        // The wrapping As<> yields the strongly-typed view.
+        EXPECT_NE(nullptr, col->As<ColumnLowCardinalityT<ColumnString>>());
+    }
+    {
+        auto col = CreateColumnByType("LowCardinality(FixedString(10000))");
+        ASSERT_NE(nullptr, col);
+        EXPECT_EQ("LowCardinality(FixedString(10000))", col->GetType().GetName());
+        EXPECT_NE(nullptr, col->As<ColumnLowCardinality>());
+        EXPECT_NE(nullptr, col->As<ColumnLowCardinalityT<ColumnFixedString>>());
+    }
+}
+
+TEST(CreateColumnByType, LowCardinalityNullable) {
+    // The factory builds LowCardinality(Nullable(String)) as a base ColumnLowCardinality whose
+    // dictionary is a base ColumnNullable (not a typed ColumnNullableT<ColumnString>). The wrapping
+    // As<> must still produce the strongly-typed view by wrapping that base dictionary into the
+    // typed one, sharing its underlying storage.
+    using TypedLC = ColumnLowCardinalityT<ColumnNullableT<ColumnString>>;
+
+    auto col = CreateColumnByType("LowCardinality(Nullable(String))");
+    ASSERT_NE(nullptr, col);
+    EXPECT_EQ("LowCardinality(Nullable(String))", col->GetType().GetName());
+    EXPECT_NE(nullptr, col->As<ColumnLowCardinality>());
+
+    auto typed = col->As<TypedLC>();
+    ASSERT_NE(nullptr, typed);
+
+    // Appends through the typed view are visible via the base handle (shared storage), and the
+    // typed accessors round-trip both real values and nulls.
+    typed->Append(std::string("abc"));
+    typed->Append(std::nullopt);
+    typed->Append(std::string("abc"));
+
+    EXPECT_EQ(3u, typed->Size());
+    EXPECT_EQ(3u, col->Size());
+    EXPECT_EQ(std::optional<std::string>("abc"), typed->At(0));
+    EXPECT_EQ(std::nullopt, typed->At(1));
+    EXPECT_EQ(std::optional<std::string>("abc"), typed->At(2));
+
+    // A second independent wrap of the same base column observes the same shared data.
+    auto typed2 = col->As<TypedLC>();
+    ASSERT_NE(nullptr, typed2);
+    EXPECT_EQ(3u, typed2->Size());
+    EXPECT_EQ(std::optional<std::string>("abc"), typed2->At(0));
+    EXPECT_EQ(std::nullopt, typed2->At(1));
+
+    // A dictionary whose nested type does not match must still be rejected.
+    EXPECT_EQ(nullptr, col->As<ColumnLowCardinalityT<ColumnNullableT<ColumnFixedString>>>());
+}
+
 TEST(CreateColumnByType, DateTime) {
     ASSERT_NE(nullptr, CreateColumnByType("DateTime"));
     ASSERT_NE(nullptr, CreateColumnByType("DateTime('Europe/Moscow')"));
 
     ASSERT_EQ(CreateColumnByType("DateTime('UTC')")->As<ColumnDateTime>()->Timezone(), "UTC");
     ASSERT_EQ(CreateColumnByType("DateTime64(3, 'UTC')")->As<ColumnDateTime64>()->Timezone(), "UTC");
+    ASSERT_EQ(CreateColumnByType("DateTime('Etc/Can\\'t')")->As<ColumnDateTime>()->Timezone(), "Etc/Can't");
+    ASSERT_EQ(CreateColumnByType("DateTime64(3, 'A\\\\B')")->As<ColumnDateTime64>()->Timezone(), "A\\B");
+}
+
+TEST(CreateColumnByType, EnumEscapedNames) {
+    const std::vector<Type::EnumItem> enum_items = {{"can't", 1}, {"a\\b", 2}, {"a,b=(c)", 3}, {"", 4}};
+    auto col                                     = CreateColumnByType("Enum8('can\\'t' = 1, 'a\\\\b' = 2, 'a,b=(c)' = 3, '' = 4)");
+    ASSERT_NE(nullptr, col);
+    ASSERT_TRUE(col->Type()->IsEqual(Type::CreateEnum8(enum_items)));
+}
+
+// Round-trip: build a Type from raw values, render it via GetName() (escape),
+// re-parse the rendered name via CreateColumnByType (unescape) and verify the
+// raw values survive the render->parse cycle. Uses only escape symbols that are
+// currently implemented.
+
+TEST(CreateColumnByType, RoundTrip_Enum) {
+    const std::vector<Type::EnumItem> enum_items = {{"can't", 1}, {"a\\b", 2}, {"tab\there", 3}, {"line\nbreak", 4}};
+    auto type = Type::CreateEnum8(enum_items);
+
+    auto col = CreateColumnByType(type->GetName());
+    ASSERT_NE(nullptr, col);
+    EXPECT_TRUE(col->Type()->IsEqual(type));
+
+    const auto* enum_type = col->Type()->As<EnumType>();
+    ASSERT_NE(nullptr, enum_type);
+    EXPECT_EQ(enum_type->GetEnumName(1), "can't");
+    EXPECT_EQ(enum_type->GetEnumValue("a\\b"), 2);
+    EXPECT_EQ(enum_type->GetEnumName(3), "tab\there");
+    EXPECT_EQ(enum_type->GetEnumValue("line\nbreak"), 4);
+}
+
+TEST(CreateColumnByType, RoundTrip_DateTime) {
+    auto type = Type::CreateDateTime("Etc/Can't");
+
+    auto col = CreateColumnByType(type->GetName());
+    ASSERT_NE(nullptr, col);
+    EXPECT_EQ(col->As<ColumnDateTime>()->Timezone(), "Etc/Can't");
+}
+
+TEST(CreateColumnByType, RoundTrip_DateTime64) {
+    auto type = Type::CreateDateTime64(3, "A\\B");
+
+    auto col = CreateColumnByType(type->GetName());
+    ASSERT_NE(nullptr, col);
+    EXPECT_EQ(col->As<ColumnDateTime64>()->Timezone(), "A\\B");
+}
+
+TEST(CreateColumnByType, RoundTrip_Tuple) {
+    const std::vector<std::string> item_names = {"a`b", "c.d"};
+    auto type = Type::CreateTuple({Type::CreateSimple<uint8_t>(), Type::CreateString()}, item_names);
+
+    auto col = CreateColumnByType(type->GetName());
+    ASSERT_NE(nullptr, col);
+
+    const auto* tuple_type = col->Type()->As<TupleType>();
+    ASSERT_NE(nullptr, tuple_type);
+    EXPECT_EQ(tuple_type->GetItemNames(), item_names);
 }
 
 TEST(CreateColumnByType, AggregateFunction) {
@@ -126,6 +274,8 @@ INSTANTIATE_TEST_SUITE_P(Parametrized, CreateColumnByTypeWithName, ::testing::Va
 
 INSTANTIATE_TEST_SUITE_P(Nested, CreateColumnByTypeWithName, ::testing::Values(
     "Nullable(FixedString(10000))",
+    "LowCardinality(String)",
+    "LowCardinality(FixedString(10000))",
     "Nullable(LowCardinality(FixedString(10000)))",
     "Array(Nullable(LowCardinality(FixedString(10000))))",
     "Array(Enum8('ONE' = 1, 'TWO' = 2))"

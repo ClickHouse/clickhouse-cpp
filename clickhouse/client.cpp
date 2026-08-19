@@ -446,7 +446,7 @@ void Client::Impl::SendBlockData(const Block& block) {
     if (compression_ == CompressionState::Enable) {
         std::unique_ptr<OutputStream> compressed_output = std::make_unique<CompressedOutput>(output_.get(), options_.max_compression_chunk_size, options_.compression_method);
         BufferedOutput buffered(std::move(compressed_output), options_.max_compression_chunk_size);
-    
+
         WriteBlock(block, buffered);
     } else {
         WriteBlock(block, *output_);
@@ -531,6 +531,10 @@ Block Client::Impl::BeginInsert(Query query) {
         throw ValidationError("cannot execute query while executing another operation");
     }
 
+    if (query.HasEventCallbacks()) {
+        throw ValidationError("Query callbacks are not supported in BeginInsert");
+    }
+
     EnsureNull en(static_cast<QueryEvents*>(&query), &events_);
 
     if (options_.ping_before_query) {
@@ -546,7 +550,7 @@ Block Client::Impl::BeginInsert(Query query) {
         return true;
     });
 
-    SendQuery(query.GetText());
+    SendQuery(query);
 
     // Wait for a data packet and return
     uint64_t server_packet = 0;
@@ -898,7 +902,7 @@ bool Client::Impl::ReadBlock(InputStream& input, Block* block) {
         if (!WireFormat::ReadString(input, &type)) {
             return false;
         }
-    
+
         if (server_info_.revision >= DBMS_MIN_REVISION_WITH_CUSTOM_SERIALIZATION) {
             uint8_t custom_format_len;
             if (!WireFormat::ReadFixed(input, &custom_format_len)) {
@@ -907,7 +911,7 @@ bool Client::Impl::ReadBlock(InputStream& input, Block* block) {
             if (custom_format_len > 0) {
                 throw UnimplementedError(std::string("unsupported custom serialization"));
             }
-        }  
+        }
 
         if (ColumnRef col = CreateColumnByType(type, create_column_settings)) {
             if (num_rows && !col->Load(&input, num_rows)) {
@@ -1097,7 +1101,7 @@ void Client::Impl::SendQuery(const Query& query, bool finalize) {
         }
         WireFormat::WriteString(*output_, std::string()); // empty string after last param
     }
- 
+
     if (finalize) {
         FinalizeQuery();
     }
@@ -1273,20 +1277,22 @@ void Client::Impl::RetryGuard(std::function<void()> func) {
 }
 
 Client::Client(const ClientOptions& opts)
-    : options_(opts)
-    , impl_(new Impl(opts))
+    : impl_(new Impl(opts))
 {
 }
 
 Client::Client(const ClientOptions& opts,
                std::unique_ptr<SocketFactory> socket_factory)
-    : options_(opts)
-    , impl_(new Impl(opts, std::move(socket_factory)))
+    : impl_(new Impl(opts, std::move(socket_factory)))
 {
 }
 
 Client::~Client()
 { }
+
+
+Client::Client(Client&&) noexcept = default;
+Client& Client::operator=(Client&&) noexcept = default;
 
 void Client::Execute(const Query& query) {
     impl_->ExecuteQuery(query);
@@ -1326,6 +1332,10 @@ void Client::SelectWithExternalDataCancelable(const std::string& query, const Ex
 
 void Client::SelectWithExternalDataCancelable(const std::string& query, const std::string& query_id, const ExternalTables& external_tables, SelectCancelableCallback cb) {
     impl_->SelectWithExternalData(Query(query, query_id).OnDataCancelable(std::move(cb)), external_tables);
+}
+
+void Client::SelectWithExternalData(const Query& query, const ExternalTables& external_tables) {
+    impl_->SelectWithExternalData(query, external_tables);
 }
 
 void Client::BeginExecute(const Query& query) {
@@ -1373,8 +1383,8 @@ void Client::Insert(const std::string& table_name, const std::string& query_id, 
     impl_->Insert(table_name, query_id, block);
 }
 
-Block Client::BeginInsert(const std::string& query) {
-    return impl_->BeginInsert(Query(query));
+Block Client::BeginInsert(const Query& query) {
+    return impl_->BeginInsert(query);
 }
 
 Block Client::BeginInsert(const std::string& query, const std::string& query_id) {

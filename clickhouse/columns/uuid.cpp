@@ -1,5 +1,4 @@
 #include "uuid.h"
-#include "utils.h"
 #include "../exceptions.h"
 
 #include <stdexcept>

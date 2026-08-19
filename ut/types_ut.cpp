@@ -138,8 +138,43 @@ TEST(TypesCase, EnumTypesEmpty) {
     ASSERT_EQ("Enum16()", Type::CreateEnum16({})->GetName());
 }
 
+TEST(TypesCase, EnumTypeNameEscapesLabels) {
+    // One special byte per label; {raw label, expected escaped rendering}.
+    const std::vector<std::pair<std::string, std::string>> cases = {
+        {"a'b", "a\\'b"},                    // single quote
+        {"a\\b", "a\\\\b"},                  // backslash
+        {"a\tb", "a\\tb"},                   // tab
+        {"a\nb", "a\\nb"},                   // line feed
+        {"a\rb", "a\\rb"},                   // carriage return
+        {"a\bb", "a\\bb"},                   // backspace
+        {"a\fb", "a\\fb"},                   // form feed
+        {std::string("a\0b", 3), "a\\0b"},   // NUL
+    };
+    for (const auto& [label, escaped] : cases) {
+        EXPECT_EQ(Type::CreateEnum8({{label, 1}})->GetName(), "Enum8('" + escaped + "' = 1)");
+    }
+}
+
 TEST(TypesCase, DecimalTypes) {
     // TODO: implement this test.
+}
+
+TEST(TypesCase, DateTimeTypeNameEscapesTimezone) {
+    // One special byte per timezone; {raw timezone, expected escaped rendering}.
+    const std::vector<std::pair<std::string, std::string>> cases = {
+        {"a'b", "a\\'b"},                    // single quote
+        {"a\\b", "a\\\\b"},                  // backslash
+        {"a\tb", "a\\tb"},                   // tab
+        {"a\nb", "a\\nb"},                   // line feed
+        {"a\rb", "a\\rb"},                   // carriage return
+        {"a\bb", "a\\bb"},                   // backspace
+        {"a\fb", "a\\fb"},                   // form feed
+        {std::string("a\0b", 3), "a\\0b"},   // NUL
+    };
+    for (const auto& [tz, escaped] : cases) {
+        EXPECT_EQ(Type::CreateDateTime(tz)->GetName(),      "DateTime('"      + escaped + "')");
+        EXPECT_EQ(Type::CreateDateTime64(3, tz)->GetName(), "DateTime64(3, '" + escaped + "')");
+    }
 }
 
 TEST(TypesCase, IsEqual) {

@@ -274,8 +274,8 @@ namespace clickhouse {
 ColumnLowCardinality::ColumnLowCardinality(ColumnRef dictionary_column)
     : Column(Type::CreateLowCardinality(dictionary_column->Type())),
       dictionary_column_(dictionary_column->CloneEmpty()), // safe way to get an column of the same type.
-      index_column_(std::make_shared<ColumnUInt32>()),
-      index_type_code_(Type::UInt32)
+      index_(std::make_shared<IndexState>(IndexState{std::make_shared<ColumnUInt32>(), Type::UInt32})),
+      unique_items_map_(std::make_shared<UniqueItems>())
 {
     Setup(dictionary_column);
 }
@@ -283,8 +283,8 @@ ColumnLowCardinality::ColumnLowCardinality(ColumnRef dictionary_column)
 ColumnLowCardinality::ColumnLowCardinality(std::shared_ptr<ColumnNullable> dictionary_column)
     : Column(Type::CreateLowCardinality(dictionary_column->Type())),
       dictionary_column_(dictionary_column->CloneEmpty()), // safe way to get an column of the same type.
-      index_column_(std::make_shared<ColumnUInt32>()),
-      index_type_code_(Type::UInt32)
+      index_(std::make_shared<IndexState>(IndexState{std::make_shared<ColumnUInt32>(), Type::UInt32})),
+      unique_items_map_(std::make_shared<UniqueItems>())
 {
     AppendNullItem();
     Setup(dictionary_column);
@@ -298,14 +298,23 @@ void ColumnLowCardinality::Reserve(size_t new_cap) {
     // NOTE(vnemkov): Formula below (`ceil(sqrt(x))`) is a gut-feeling-good-enough estimation,
     // feel free to replace/adjust if you have better one suported by actual data.
     dictionary_column_->Reserve(static_cast<size_t>(ceil(sqrt(static_cast<double>(new_cap)))));    
-    index_column_->Reserve(new_cap + 2); // + 1 for null item (at pos 0), + 1 for default item (at pos 1)
+    index_->column->Reserve(new_cap + 2); // + 1 for null item (at pos 0), + 1 for default item (at pos 1)
 }
 
 void ColumnLowCardinality::Setup(ColumnRef dictionary_column) {
+    // Cache the dictionary item type code: for a Nullable dictionary it is the code of the
+    // innermost non-nullable type, otherwise the dictionary's own type code. The dictionary
+    // type is invariant after construction, so this stays valid.
+    if (auto nullable = dictionary_column_->As<ColumnNullable>()) {
+        item_type_code_ = nullable->Nested()->Type()->GetCode();
+    } else {
+        item_type_code_ = dictionary_column_->Type()->GetCode();
+    }
+
     AppendDefaultItem();
 
     if (dictionary_column->Size() != 0) {
-        // Add values, updating index_column_ and unique_items_map_.
+        // Add values, updating the index column and unique_items_map_.
 
         // TODO: it would be possible to eliminate copying
         // by adding InsertUnsafe(pos, ItemView) method to a Column
@@ -318,15 +327,15 @@ void ColumnLowCardinality::Setup(ColumnRef dictionary_column) {
 }
 
 std::uint64_t ColumnLowCardinality::getDictionaryIndex(std::uint64_t item_index) const {
-    switch (index_type_code_) {
+    switch (index_->type_code) {
         case Type::UInt8:
-            return static_cast<const ColumnUInt8&>(*index_column_)[item_index];
+            return static_cast<const ColumnUInt8&>(*index_->column)[item_index];
         case Type::UInt16:
-            return static_cast<const ColumnUInt16&>(*index_column_)[item_index];
+            return static_cast<const ColumnUInt16&>(*index_->column)[item_index];
         case Type::UInt32:
-            return static_cast<const ColumnUInt32&>(*index_column_)[item_index];
+            return static_cast<const ColumnUInt32&>(*index_->column)[item_index];
         case Type::UInt64:
-            return static_cast<const ColumnUInt64&>(*index_column_)[item_index];
+            return static_cast<const ColumnUInt64&>(*index_->column)[item_index];
         default:
             throw ValidationError("Invalid index column type");
     }
@@ -334,18 +343,18 @@ std::uint64_t ColumnLowCardinality::getDictionaryIndex(std::uint64_t item_index)
 
 void ColumnLowCardinality::appendIndex(std::uint64_t item_index) {
     // TODO (nemkov): handle case when index should go from UInt8 to UInt16, etc.
-    switch (index_type_code_) {
+    switch (index_->type_code) {
         case Type::UInt8:
-            static_cast<ColumnUInt8&>(*index_column_).Append(static_cast<uint8_t>(item_index));
+            static_cast<ColumnUInt8&>(*index_->column).Append(static_cast<uint8_t>(item_index));
             break;
         case Type::UInt16:
-            static_cast<ColumnUInt16&>(*index_column_).Append(static_cast<uint16_t>(item_index));
+            static_cast<ColumnUInt16&>(*index_->column).Append(static_cast<uint16_t>(item_index));
             break;
         case Type::UInt32:
-            static_cast<ColumnUInt32&>(*index_column_).Append(static_cast<uint32_t>(item_index));
+            static_cast<ColumnUInt32&>(*index_->column).Append(static_cast<uint32_t>(item_index));
             break;
         case Type::UInt64:
-            static_cast<ColumnUInt64&>(*index_column_).Append(static_cast<uint64_t>(item_index));
+            static_cast<ColumnUInt64&>(*index_->column).Append(static_cast<uint64_t>(item_index));
             break;
         default:
             throw ValidationError("Invalid index column type");
@@ -353,24 +362,24 @@ void ColumnLowCardinality::appendIndex(std::uint64_t item_index) {
 }
 
 void ColumnLowCardinality::removeLastIndex() {
-    switch (index_type_code_) {
+    switch (index_->type_code) {
         case Type::UInt8: {
-            auto& col = static_cast<ColumnUInt8&>(*index_column_);
+            auto& col = static_cast<ColumnUInt8&>(*index_->column);
             col.Erase(col.Size() - 1);
             break;
         }
         case Type::UInt16: {
-            auto& col = static_cast<ColumnUInt16&>(*index_column_);
+            auto& col = static_cast<ColumnUInt16&>(*index_->column);
             col.Erase(col.Size() - 1);
             break;
         }
         case Type::UInt32: {
-            auto& col = static_cast<ColumnUInt32&>(*index_column_);
+            auto& col = static_cast<ColumnUInt32&>(*index_->column);
             col.Erase(col.Size() - 1);
             break;
         }
         case Type::UInt64: {
-            auto& col = static_cast<ColumnUInt64&>(*index_column_);
+            auto& col = static_cast<ColumnUInt64&>(*index_->column);
             col.Erase(col.Size() - 1);
             break;
         }
@@ -387,7 +396,7 @@ details::LowCardinalityHashKey ColumnLowCardinality::computeHashKey(const ItemVi
     }
 
     const auto hash1 = hasher(item.data);
-    const auto hash2 = CityHash64(item.data.data(), item.data.size());
+    const auto hash2 = cityhash::CityHash64(item.data.data(), item.data.size());
 
     return details::LowCardinalityHashKey{hash1, hash2};
 }
@@ -496,9 +505,11 @@ bool ColumnLowCardinality::LoadBody(InputStream* input, size_t rows) {
         auto [new_dictionary, new_index, new_unique_items_map] = ::Load(dictionary_column_->CloneEmpty(), *input, rows);
 
         dictionary_column_->Swap(*new_dictionary);
-        index_column_.swap(new_index);
-        unique_items_map_.swap(new_unique_items_map);
-        index_type_code_ = index_column_->Type()->GetCode();
+        // Reassign the index column inside the SHARED bundle (not a local member slot) so the
+        // new index and its type code are visible through every wrapped view.
+        index_->column = std::move(new_index);
+        index_->type_code = index_->column->Type()->GetCode();
+        unique_items_map_->swap(new_unique_items_map);
 
         return true;
     } catch (...) {
@@ -512,8 +523,9 @@ void ColumnLowCardinality::SavePrefix(OutputStream* output) {
 }
 
 void ColumnLowCardinality::SaveBody(OutputStream* output) {
+    uint64_t iflag = static_cast<uint64_t>(IndexFlag::HasAdditionalKeysBit);
     const uint64_t index_serialization_type =
-        static_cast<uint64_t>(indexTypeFromIndexColumn(*index_column_)) | IndexFlag::HasAdditionalKeysBit;
+        static_cast<uint64_t>(indexTypeFromIndexColumn(*index_->column)) | iflag;
     WireFormat::WriteFixed(*output, index_serialization_type);
 
     const uint64_t number_of_keys = dictionary_column_->Size();
@@ -525,16 +537,16 @@ void ColumnLowCardinality::SaveBody(OutputStream* output) {
         dictionary_column_->SaveBody(output);
     }
 
-    const uint64_t number_of_rows = index_column_->Size();
+    const uint64_t number_of_rows = index_->column->Size();
     WireFormat::WriteFixed(*output, number_of_rows);
 
-    index_column_->SaveBody(output);
+    index_->column->SaveBody(output);
 }
 
 void ColumnLowCardinality::Clear() {
-    index_column_->Clear();
+    index_->column->Clear();
     dictionary_column_->Clear();
-    unique_items_map_.clear();
+    unique_items_map_->clear();
 
     if (auto columnNullable = dictionary_column_->As<ColumnNullable>()) {
         AppendNullItem();
@@ -543,7 +555,7 @@ void ColumnLowCardinality::Clear() {
 }
 
 size_t ColumnLowCardinality::Size() const {
-    return index_column_->Size();
+    return index_->column->Size();
 }
 
 ColumnRef ColumnLowCardinality::Slice(size_t begin, size_t len) const {
@@ -572,9 +584,16 @@ void ColumnLowCardinality::Swap(Column& other) {
     // (needed for ColumnLowCardinalityT)
     dictionary_column_->Swap(*col.dictionary_column_);
 
-    index_column_.swap(col.index_column_);
-    unique_items_map_.swap(col.unique_items_map_);
-    std::swap(index_type_code_, col.index_type_code_);
+    // Swap the index bundle CONTENTS (column + type code) in place. Both sides' wrapped views
+    // share their respective IndexState object, so the swap is visible through every holder.
+    // (The index column can't be swapped content-wise like the dictionary: the two columns may
+    // have different numeric widths, hence the shared-bundle indirection.)
+    std::swap(*index_, *col.index_);
+    unique_items_map_->swap(*col.unique_items_map_);
+
+    // NOTE: item_type_code_ is intentionally NOT swapped. It is derived solely from the dictionary
+    // type, and the guard above requires both columns to have the same dictionary type, so it is
+    // identical on both sides - swapping would be a no-op.
 }
 
 ItemView ColumnLowCardinality::GetItem(size_t index) const {
@@ -594,9 +613,9 @@ ItemView ColumnLowCardinality::GetItem(size_t index) const {
 // No checks regarding value type or validity of value is made.
 void ColumnLowCardinality::AppendUnsafe(const ItemView & value) {
     const auto key = computeHashKey(value);
-    const auto initial_index_size = index_column_->Size();
+    const auto initial_index_size = index_->column->Size();
     // If the value is unique, then we are going to append it to a dictionary, hence new index is Size().
-    auto [iterator, is_new_item] = unique_items_map_.try_emplace(key, dictionary_column_->Size());
+    auto [iterator, is_new_item] = unique_items_map_->try_emplace(key, dictionary_column_->Size());
     try {
         // Order is important, adding to dictionary last, since it is much (MUCH!!!!) harder
         // to remove item from dictionary column than from index column
@@ -610,10 +629,10 @@ void ColumnLowCardinality::AppendUnsafe(const ItemView & value) {
         }
     }
     catch (...) {
-        if (index_column_->Size() != initial_index_size)
+        if (index_->column->Size() != initial_index_size)
             removeLastIndex();
         if (is_new_item)
-            unique_items_map_.erase(iterator);
+            unique_items_map_->erase(iterator);
 
         throw;
     }
@@ -623,13 +642,13 @@ void ColumnLowCardinality::AppendNullItem()
 {
     const auto null_item = GetNullItemForDictionary(dictionary_column_);
     AppendToDictionary(*dictionary_column_, null_item);
-    unique_items_map_.emplace(computeHashKey(null_item), 0);
+    unique_items_map_->emplace(computeHashKey(null_item), 0);
 }
 
 void ColumnLowCardinality::AppendDefaultItem()
 {
     const auto defaultItem = GetDefaultItemForDictionary(dictionary_column_);
-    unique_items_map_.emplace(computeHashKey(defaultItem), dictionary_column_->Size());
+    unique_items_map_->emplace(computeHashKey(defaultItem), dictionary_column_->Size());
     AppendToDictionary(*dictionary_column_, defaultItem);
 }
 

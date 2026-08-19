@@ -9,7 +9,6 @@
 #include "clickhouse/columns/uuid.h"
 #include "ut/value_generators.h"
 #include "utils.h"
-#include "absl/numeric/int128.h"
 
 #include <limits>
 #include <optional>
@@ -243,13 +242,13 @@ TEST(ItemView, OutputToOstream_VALID) {
     EXPECTED_SERIALIZATION("Int16 : -1234", ColumnInt16(), -1234);
     EXPECTED_SERIALIZATION("Int32 : -12345", ColumnInt32(), -12345);
     EXPECTED_SERIALIZATION("Int64 : -123456", ColumnInt64(), -123456);
-    EXPECTED_SERIALIZATION("Int128 : -123456789", ColumnInt128(), absl::MakeInt128(-1, -123456789ll));
+    EXPECTED_SERIALIZATION("Int128 : -123456789", ColumnInt128(), Bignum::MakeInt128(-1, -123456789ll));
 
     EXPECTED_SERIALIZATION("UInt8 : 123", ColumnUInt8(), 123);
     EXPECTED_SERIALIZATION("UInt16 : 1234", ColumnUInt16(), 1234);
     EXPECTED_SERIALIZATION("UInt32 : 12345", ColumnUInt32(), 12345);
     EXPECTED_SERIALIZATION("UInt64 : 1234567", ColumnUInt64(), 1234567);
-    EXPECTED_SERIALIZATION("UInt128 : 123456789", ColumnUInt128(), absl::MakeUint128(0, 123456789ll));
+    EXPECTED_SERIALIZATION("UInt128 : 123456789", ColumnUInt128(), Bignum::MakeUInt128(0, 123456789ll));
 
     EXPECTED_SERIALIZATION("Float32 : 1", ColumnFloat32(), 1);
     EXPECTED_SERIALIZATION("Float64 : 4", ColumnFloat64(), 4);

@@ -2,7 +2,6 @@
 
 #include "column.h"
 #include "numeric.h"
-#include "utils.h"
 
 #include <memory>
 
@@ -107,7 +106,7 @@ private:
 };
 
 template <typename ColumnType>
-class ColumnArrayT : public ColumnArray {
+class ColumnArrayT : public ColumnArray, public WrappableColumn<ColumnArrayT<ColumnType>, ColumnArray> {
 public:
     class ArrayValueView;
     using ValueType = ArrayValueView;
@@ -128,27 +127,42 @@ public:
         : ColumnArrayT(std::make_shared<NestedColumnType>(std::forward<Args>(args)...))
     {}
 
-    /** Create a ColumnArrayT from a ColumnArray, without copying data and offsets, but by 'stealing' those from `col`.
+    /** Create a ColumnArrayT that SHARES the internals of `col` (nested data and
+     *  offsets) via shared_ptr, WITHOUT stealing or copying them.
      *
-     *  Ownership of column internals is transferred to returned object, original (argument) object
-     *  MUST NOT BE USED IN ANY WAY, it is only safe to dispose it.
+     *  The original `col` remains fully valid and usable. Both the original and the
+     *  returned wrapper reference the same underlying columns, so mutations through
+     *  one are visible through the other.
      *
-     *  Throws an exception if `col` is of wrong type, it is safe to use original col in this case.
-     *  This is a static method to make such conversion verbose.
+     *  The two-argument overloads are non-throwing: on a type mismatch they return
+     *  nullptr and, if `error` is non-null, assign a description to `*error`. The
+     *  single-argument overloads throw ValidationError on a type mismatch instead.
      */
-    static auto Wrap(ColumnArray&& col) {
-        auto nested_data = WrapColumn<NestedColumnType>(col.GetData());
+    static std::shared_ptr<ColumnArrayT<NestedColumnType>> Wrap(const ColumnArray& col, ValidationError* error) {
+        auto nested_data = WrapColumn<NestedColumnType>(col.data_, error);
+        if (!nested_data) {
+            return nullptr;
+        }
         return std::make_shared<ColumnArrayT<NestedColumnType>>(nested_data, col.offsets_);
     }
 
-    static auto Wrap(Column&& col) {
-        return Wrap(std::move(dynamic_cast<ColumnArray&&>(col)));
+    static std::shared_ptr<ColumnArrayT<NestedColumnType>> Wrap(const Column& col, ValidationError* error) {
+        if (auto* c = dynamic_cast<const ColumnArray*>(&col)) {
+            return Wrap(*c, error);
+        }
+        if (error) {
+            *error = ValidationError("Can't wrap column of type " + col.GetType().GetName() + " as Array");
+        }
+        return nullptr;
     }
 
     // Helper to simplify integration with other APIs
-    static auto Wrap(ColumnRef&& col) {
-        return Wrap(std::move(*col->AsStrict<ColumnArray>()));
+    static std::shared_ptr<ColumnArrayT<NestedColumnType>> Wrap(const ColumnRef& col, ValidationError* error) {
+        return Wrap(*col, error);
     }
+
+    // Throwing single-argument overloads (concrete type / Column& / ColumnRef&).
+    using WrappableColumn<ColumnArrayT<ColumnType>, ColumnArray>::Wrap;
 
     /// A single (row) value of the Array-column, i.e. readonly array of items.
     class ArrayValueView {
@@ -312,8 +326,9 @@ public:
 
     void Swap(Column& other) override {
         auto & col = dynamic_cast<ColumnArrayT<NestedColumnType> &>(other);
-        typed_nested_data_.swap(col.typed_nested_data_);
-        ColumnArray::Swap(other);
+        // Base swaps sub-column contents in place, preserving object identity, so the cached
+        // typed_nested_data_ still points at the correct object and must NOT be repointed.
+        ColumnArray::Swap(col);
     }
 
 private:

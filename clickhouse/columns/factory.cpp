@@ -233,13 +233,25 @@ static ColumnRef CreateColumnFromAst(const TypeAst& ast, CreateColumnByTypeSetti
                 }
             }
             else {
+                // Create the base ColumnLowCardinality (like Array/Nullable/Tuple/Map create their
+                // base types). Callers can obtain the strongly-typed ColumnLowCardinalityT<...> view
+                // on demand via Column::As<ColumnLowCardinalityT<...>>(), which wraps it.
                 switch (nested.code) {
-                    // TODO (nemkov): update this to maximize code reuse.
                     case Type::String:
-                        return std::make_shared<ColumnLowCardinalityT<ColumnString>>();
                     case Type::FixedString:
-                        return std::make_shared<ColumnLowCardinalityT<ColumnFixedString>>(GetASTChildElement(nested, 0).value);
+                        return std::make_shared<ColumnLowCardinality>(CreateColumnFromAst(nested, settings));
                     case Type::Nullable:
+                        // Nullable needs its own case (it can't reuse the generic CreateColumnFromAst
+                        // path above) for two reasons:
+                        //   1. Constructor overload: ColumnLowCardinality has a dedicated
+                        //      ColumnLowCardinality(shared_ptr<ColumnNullable>) ctor that seeds the
+                        //      special NULL item at dictionary index 0 (via AppendNullItem()). We must
+                        //      pass a statically-typed shared_ptr<ColumnNullable> so that overload is
+                        //      selected; passing a ColumnRef would statically bind to the generic
+                        //      ColumnLowCardinality(ColumnRef) ctor, which only appends the default
+                        //      item and would omit the null item, producing an incorrect nullable
+                        //      dictionary.
+                        //   2. It lets us construct the ColumnNullable with an explicit UInt8 null-map.
                         return std::make_shared<ColumnLowCardinality>(
                             std::make_shared<ColumnNullable>(
                                 CreateColumnFromAst(GetASTChildElement(nested, 0), settings),
@@ -260,7 +272,7 @@ static ColumnRef CreateColumnFromAst(const TypeAst& ast, CreateColumnByTypeSetti
             }
         }
         case TypeAst::SimpleAggregateFunction: {
-            return CreateTerminalColumn(GetASTChildElement(ast, -1));
+            return CreateColumnFromAst(GetASTChildElement(ast, -1), settings);
         }
 
         case TypeAst::Map: {
