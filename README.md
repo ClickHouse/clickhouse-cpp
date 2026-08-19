@@ -1,5 +1,5 @@
 <h1 align="center">
-<img src=".static/clickhouse-logo.svg" width="50px" align="center" style="margin-bottom: 10px;">
+<img src=".static/clickhouse-logo-v2.svg" align="center" style="margin-bottom: 10px;">
 ClickHouse C++ Client
 </h1>
 
