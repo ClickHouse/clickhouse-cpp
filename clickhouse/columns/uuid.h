@@ -12,6 +12,8 @@ namespace clickhouse {
  */
 class ColumnUUID : public Column {
 public:
+    using ValueType = UUID;
+
     ColumnUUID();
 
     explicit ColumnUUID(ColumnRef data);

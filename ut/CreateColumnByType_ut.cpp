@@ -75,6 +75,28 @@ TEST(CreateColumnByType, LowCardinalityAsWrappedColumn) {
     ASSERT_EQ(Type::FixedString, CreateColumnByType("LowCardinality(FixedString(10000))", create_column_settings)->As<ColumnFixedString>()->GetType().GetCode());
 }
 
+TEST(CreateColumnByType, LowCardinalityGeneralInnerTypes) {
+    // LowCardinality used to be supported only over String/FixedString. The
+    // factory now builds a generic ColumnLowCardinality for any fixed-size inner
+    // type.
+    for (const auto* type_name : {
+             "LowCardinality(Int8)",
+             "LowCardinality(Int64)",
+             "LowCardinality(UInt64)",
+             "LowCardinality(Float64)",
+             "LowCardinality(Date)",
+             "LowCardinality(DateTime)",
+             "LowCardinality(Nullable(Int64))",
+             "LowCardinality(Nullable(Float64))",
+         }) {
+        auto col = CreateColumnByType(type_name);
+        ASSERT_NE(nullptr, col) << type_name;
+        ASSERT_EQ(Type::LowCardinality, col->GetType().GetCode()) << type_name;
+        ASSERT_NE(nullptr, col->As<ColumnLowCardinality>()) << type_name;
+        EXPECT_EQ(std::string{type_name}, col->GetType().GetName()) << type_name;
+    }
+}
+
 TEST(CreateColumnByType, LowCardinality) {
     // In the default (non-wrapped) mode, LowCardinality(String)/LowCardinality(FixedString) map to
     // the base ColumnLowCardinality (like Array/Nullable/Tuple/Map do), and the strongly-typed

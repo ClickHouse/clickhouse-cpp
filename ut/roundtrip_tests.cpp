@@ -233,6 +233,34 @@ TEST_P(RoundtripCase, LowCardinalityTNullableString) {
     EXPECT_TRUE(CompareRecursive(*col, *result_typed));
 }
 
+TEST_P(RoundtripCase, LowCardinalityTUInt64) {
+    using TestColumn = ColumnLowCardinalityT<ColumnUInt64>;
+    auto col = std::make_shared<TestColumn>();
+
+    col->Append(7);
+    col->Append(42);
+    col->Append(7);
+    col->Append(7);
+
+    auto result_typed = RoundtripColumnValues(*client_, col)->As<TestColumn>();
+    EXPECT_TRUE(CompareRecursive(*col, *result_typed));
+}
+
+TEST_P(RoundtripCase, LowCardinalityTNullableUInt64) {
+    using TestColumn = ColumnLowCardinalityT<ColumnNullableT<ColumnUInt64>>;
+    auto col = std::make_shared<TestColumn>();
+
+    col->Append(7);
+    col->Append(42);
+    col->Append(std::nullopt);
+    col->Append(7);
+    col->Append(std::nullopt);
+    col->Append(7);
+
+    auto result_typed = RoundtripColumnValues(*client_, col)->As<TestColumn>();
+    EXPECT_TRUE(CompareRecursive(*col, *result_typed));
+}
+
 TEST_P(RoundtripCase, ArrayTNullableString) {
     using TestColumn = ColumnArrayT<ColumnNullableT<ColumnString>>;
     auto col = std::make_shared<TestColumn>();

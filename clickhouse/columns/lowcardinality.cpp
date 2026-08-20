@@ -2,6 +2,13 @@
 
 #include "string.h"
 #include "nullable.h"
+#include "numeric.h"
+#include "enum.h"
+#include "date.h"
+#include "ip4.h"
+#include "ip6.h"
+#include "uuid.h"
+#include "../base/socket.h" // for htonl/ntohl and in_addr/in6_addr
 #include "../base/wire_format.h"
 
 #include <city.h>
@@ -10,6 +17,7 @@
 #include <string_view>
 #include <type_traits>
 #include <cmath>
+#include <cstring>
 
 #include <cassert>
 
@@ -78,21 +86,51 @@ inline ResultColumnType & column_down_cast(ColumnType & c) {
     return dynamic_cast<ResultColumnType &>(c);
 }
 
-// std::visit-ish function to avoid including <variant> header, which is not present in older version of XCode.
-template <typename Vizitor, typename ColumnType>
-inline auto VisitIndexColumn(Vizitor && vizitor, ColumnType && col) {
-    switch (col.Type()->GetCode()) {
+// Number of bytes an ItemView holds for a fixed-size dictionary type, or 0 for
+// variable-size (String/FixedString) or unsupported types. Used to build a
+// correctly-sized zero value for the default/null dictionary item.
+inline size_t FixedSizeForDictionaryType(Type::Code code) {
+    switch (code) {
+        case Type::Int8:
         case Type::UInt8:
-            return vizitor(column_down_cast<ColumnUInt8>(col));
+            return 1;
+        case Type::Int16:
         case Type::UInt16:
-            return vizitor(column_down_cast<ColumnUInt16>(col));
+        case Type::Date:
+            return 2;
+        case Type::Int32:
         case Type::UInt32:
-            return vizitor(column_down_cast<ColumnUInt32>(col));
+        case Type::Float32:
+        case Type::DateTime:
+        case Type::Date32:
+        case Type::IPv4:
+            return 4;
+        case Type::Int64:
         case Type::UInt64:
-            return vizitor(column_down_cast<ColumnUInt64>(col));
+        case Type::Float64:
+            return 8;
+        case Type::Int128:
+        case Type::UInt128:
+        case Type::IPv6:
+        case Type::UUID:
+            return 16;
         default:
-            throw ValidationError("Invalid index column type " + col.GetType().GetName());
+            return 0;
     }
+}
+
+// A zero-filled, correctly-sized ItemView for a fixed-size dictionary type. The
+// backing buffer is static so the non-owning view stays valid.
+inline ItemView ZeroItemForDictionary(Type::Code code) {
+    if (const auto size = FixedSizeForDictionaryType(code)) {
+        static const char zeros[16] = {};
+        if (size > sizeof(zeros)) {
+            throw AssertionError("The size of item view for ColumnLowCardinality exceeds the buffer size");
+        }
+        return ItemView{code, std::string_view{zeros, size}};
+    }
+    // Variable-size types (String/FixedString) accept an empty value.
+    return ItemView{code, std::string_view{}};
 }
 
 // A special NULL-item, which is expected at pos(0) in dictionary,
@@ -101,7 +139,7 @@ inline auto GetNullItemForDictionary(const ColumnRef dictionary) {
     if (auto n = dictionary->As<ColumnNullable>()) {
         return ItemView {};
     } else {
-        return ItemView{dictionary->Type()->GetCode(), std::string_view{}};
+        return ZeroItemForDictionary(dictionary->Type()->GetCode());
     }
 }
 
@@ -111,7 +149,7 @@ inline ItemView GetDefaultItemForDictionary(const ColumnRef dictionary) {
     if (auto n = dictionary->As<ColumnNullable>()) {
         return GetDefaultItemForDictionary(n->Nested());
     } else {
-        return ItemView{dictionary->Type()->GetCode(), std::string_view{}};
+        return ZeroItemForDictionary(dictionary->Type()->GetCode());
     }
 }
 
@@ -147,6 +185,72 @@ inline void AppendToDictionary(Column& dictionary, const ItemView & item) {
         case Type::Nullable:
             AppendNullableToDictionary(column_down_cast<ColumnNullable>(dictionary), item);
             return;
+        // Fixed-size dictionary types. The ItemView holds the raw stored bytes
+        // (see the matching ColumnXxx::GetItem), so we re-append the raw value.
+        case Type::Int8:
+            column_down_cast<ColumnInt8>(dictionary).Append(item.get<int8_t>());
+            return;
+        case Type::Int16:
+            column_down_cast<ColumnInt16>(dictionary).Append(item.get<int16_t>());
+            return;
+        case Type::Int32:
+            column_down_cast<ColumnInt32>(dictionary).Append(item.get<int32_t>());
+            return;
+        case Type::Int64:
+            column_down_cast<ColumnInt64>(dictionary).Append(item.get<int64_t>());
+            return;
+        case Type::UInt8:
+            column_down_cast<ColumnUInt8>(dictionary).Append(item.get<uint8_t>());
+            return;
+        case Type::UInt16:
+            column_down_cast<ColumnUInt16>(dictionary).Append(item.get<uint16_t>());
+            return;
+        case Type::UInt32:
+            column_down_cast<ColumnUInt32>(dictionary).Append(item.get<uint32_t>());
+            return;
+        case Type::UInt64:
+            column_down_cast<ColumnUInt64>(dictionary).Append(item.get<uint64_t>());
+            return;
+        case Type::Int128:
+            column_down_cast<ColumnInt128>(dictionary).Append(item.get<Int128>());
+            return;
+        case Type::UInt128:
+            column_down_cast<ColumnUInt128>(dictionary).Append(item.get<UInt128>());
+            return;
+        case Type::Float32:
+            column_down_cast<ColumnFloat32>(dictionary).Append(item.get<float>());
+            return;
+        case Type::Float64:
+            column_down_cast<ColumnFloat64>(dictionary).Append(item.get<double>());
+            return;
+        case Type::Date:
+            column_down_cast<ColumnDate>(dictionary).AppendRaw(item.get<uint16_t>());
+            return;
+        case Type::Date32:
+            column_down_cast<ColumnDate32>(dictionary).AppendRaw(item.get<int32_t>());
+            return;
+        case Type::DateTime:
+            column_down_cast<ColumnDateTime>(dictionary).AppendRaw(item.get<uint32_t>());
+            return;
+        case Type::IPv4:
+            // ColumnIPv4::Append applies htonl, and GetItem returns the stored
+            // (already byte-swapped) value, so undo the swap to re-store as-is.
+            column_down_cast<ColumnIPv4>(dictionary).Append(ntohl(item.get<uint32_t>()));
+            return;
+        case Type::IPv6: {
+            in6_addr addr;
+            std::memcpy(&addr, item.data.data(), sizeof(addr));
+            column_down_cast<ColumnIPv6>(dictionary).Append(addr);
+            return;
+        }
+        case Type::UUID: {
+            UUID value;
+            std::memcpy(&value.first, item.data.data(), sizeof(value.first));
+            std::memcpy(&value.second, item.data.data() + sizeof(value.first),
+                        sizeof(value.second));
+            column_down_cast<ColumnUUID>(dictionary).Append(value);
+            return;
+        }
         default:
             throw ValidationError("Unexpected dictionary column type: " + dictionary.GetType().GetName());
     }

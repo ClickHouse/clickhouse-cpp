@@ -10,6 +10,7 @@ SET ( clickhouse-cpp-ut-src
     column_as_ut.cpp
     column_array_ut.cpp
     itemview_ut.cpp
+    low_cardinality_types_ut.cpp
     socket_ut.cpp
     stream_ut.cpp
     type_parser_ut.cpp
