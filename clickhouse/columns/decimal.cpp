@@ -236,6 +236,19 @@ ColumnRef ColumnDecimal::CloneEmpty() const {
 
 void ColumnDecimal::Swap(Column& other) {
     auto & col = dynamic_cast<ColumnDecimal &>(other);
+
+    if (col.GetPrecision() != GetPrecision()) {
+        throw ValidationError("Can't swap Decimal columns when precisions are not the same: "
+            + std::to_string(GetPrecision()) + "(this) != "
+            + std::to_string(col.GetPrecision()) + "(that)");
+    }
+
+    if (col.GetScale() != GetScale()) {
+        throw ValidationError("Can't swap Decimal columns when scales are not the same: "
+            + std::to_string(GetScale()) + "(this) != "
+            + std::to_string(col.GetScale()) + "(that)");
+    }
+
     data_.swap(col.data_);
 }
 
