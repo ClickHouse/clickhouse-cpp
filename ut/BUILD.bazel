@@ -101,6 +101,7 @@ cc_test(
         "bignum_samples.cpp",
         "bignum_round_trip.cpp",
         "Column_ut.cpp",
+        "client_socket_state_test.cpp",
         "client_ut.cpp",
         "connection_failed_client_test.cpp",
         "connection_failed_client_test.h",

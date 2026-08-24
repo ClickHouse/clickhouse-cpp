@@ -237,6 +237,8 @@ private:
     DecodedPacket ReceivePacket(uint64_t* server_packet = nullptr);
     bool ProcessPacket(uint64_t* server_packet = nullptr);
     void ResetState();
+    void EnsureConnection();
+    void InvalidateConnection() noexcept;
 
     void SendQuery(const Query& query, bool finalize = true);
     void FinalizeQuery();
@@ -365,6 +367,8 @@ void Client::Impl::BeginExecuteQuery(const Query& query, bool finalize) {
         throw ValidationError("cannot execute query while executing another operation");
     }
 
+    EnsureConnection();
+
     if (options_.ping_before_query) {
         RetryGuard([this]() { Ping(); });
     }
@@ -377,6 +381,7 @@ void Client::Impl::BeginExecuteQuery(const Query& query, bool finalize) {
         SendQuery(query_, finalize);
     }
     catch (...) {
+        InvalidateConnection();
         ResetState();
         throw;
     }
@@ -399,8 +404,11 @@ std::optional<Block> Client::Impl::NextBlock() {
                 return {std::move(block)};
             }
             case VariantIndex<ServerError, decltype(packet)>():
-            case VariantIndex<std::monostate, decltype(packet)>():
             case VariantIndex<EndOfStream, decltype(packet)>():
+                ResetState();
+                return std::nullopt;
+            case VariantIndex<std::monostate, decltype(packet)>():
+                InvalidateConnection();
                 ResetState();
                 return std::nullopt;
             default:
@@ -408,7 +416,12 @@ std::optional<Block> Client::Impl::NextBlock() {
             }
         }
     }
+    catch (const ServerException&) {
+        ResetState();
+        throw;
+    }
     catch (...) {
+        InvalidateConnection();
         ResetState();
         throw;
     }
@@ -433,6 +446,7 @@ void Client::Impl::SelectWithExternalData(Query query, const ExternalTables& ext
         FinalizeQuery();
     }
     catch (...) {
+        InvalidateConnection();
         ResetState();
         throw;
     }
@@ -493,11 +507,11 @@ void Client::Impl::Insert(const std::string& table_name, const std::string& quer
         throw ValidationError("cannot execute query while executing another operation");
     }
 
+    EnsureConnection();
+
     if (options_.ping_before_query) {
         RetryGuard([this]() { Ping(); });
     }
-
-    state_ = State::Inserting;
 
     std::stringstream fields_section;
     const auto num_columns = block.GetColumnCount();
@@ -511,19 +525,30 @@ void Client::Impl::Insert(const std::string& table_name, const std::string& quer
     }
 
     Query query("INSERT INTO " + table_name + " ( " + fields_section.str() + " ) VALUES", query_id);
-    SendQuery(query);
+    state_ = State::Inserting;
 
-    // Wait for a data packet and return
-    uint64_t server_packet = 0;
-    while (ProcessPacket(&server_packet)) {
-        if (server_packet == ServerCodes::Data) {
-            SendData(block);
-            EndInsert();
-            return;
+    try {
+        SendQuery(query);
+
+        // Wait for a data packet and return
+        uint64_t server_packet = 0;
+        while (ProcessPacket(&server_packet)) {
+            if (server_packet == ServerCodes::Data) {
+                SendData(block);
+                EndInsert();
+                return;
+            }
         }
-    }
 
-    throw ProtocolError("fail to receive data packet");
+        throw ProtocolError("fail to receive data packet");
+    } catch (const ServerException&) {
+        ResetState();
+        throw;
+    } catch (...) {
+        InvalidateConnection();
+        ResetState();
+        throw;
+    }
 }
 
 Block Client::Impl::BeginInsert(Query query) {
@@ -535,13 +560,13 @@ Block Client::Impl::BeginInsert(Query query) {
         throw ValidationError("Query callbacks are not supported in BeginInsert");
     }
 
+    EnsureConnection();
+
     EnsureNull en(static_cast<QueryEvents*>(&query), &events_);
 
     if (options_.ping_before_query) {
         RetryGuard([this]() { Ping(); });
     }
-
-    state_ = State::Inserting;
 
     // Create a callback to extract the block with the proper query columns.
     Block block;
@@ -550,17 +575,28 @@ Block Client::Impl::BeginInsert(Query query) {
         return true;
     });
 
-    SendQuery(query);
+    state_ = State::Inserting;
 
-    // Wait for a data packet and return
-    uint64_t server_packet = 0;
-    while (ProcessPacket(&server_packet)) {
-        if (server_packet == ServerCodes::Data) {
-            return block;
+    try {
+        SendQuery(query);
+
+        // Wait for a data packet and return
+        uint64_t server_packet = 0;
+        while (ProcessPacket(&server_packet)) {
+            if (server_packet == ServerCodes::Data) {
+                return block;
+            }
         }
-    }
 
-    throw ProtocolError("fail to receive data packet");
+        throw ProtocolError("fail to receive data packet");
+    } catch (const ServerException&) {
+        ResetState();
+        throw;
+    } catch (...) {
+        InvalidateConnection();
+        ResetState();
+        throw;
+    }
 }
 
 void Client::Impl::SendInsertBlock(const Block& block) {
@@ -568,7 +604,13 @@ void Client::Impl::SendInsertBlock(const Block& block) {
         throw ValidationError("illegal to send insert data without first calling BeginInsert");
     }
 
-    SendData(block);
+    try {
+        SendData(block);
+    } catch (...) {
+        InvalidateConnection();
+        ResetState();
+        throw;
+    }
 }
 
 void Client::Impl::EndInsert() {
@@ -576,21 +618,30 @@ void Client::Impl::EndInsert() {
         return;
     }
 
-    // Send empty block as marker of end of data.
-    SendData(Block());
+    try {
+        // Send empty block as marker of end of data.
+        SendData(Block());
 
-    // Wait for EOS.
-    uint64_t eos_packet{0};
-    while (ProcessPacket(&eos_packet)) {
-        ;
-    }
+        // Wait for EOS.
+        uint64_t eos_packet{0};
+        while (ProcessPacket(&eos_packet)) {
+            ;
+        }
 
-    if (eos_packet != ServerCodes::EndOfStream && eos_packet != ServerCodes::Exception
-        && eos_packet != ServerCodes::Log && options_.rethrow_exceptions) {
-        throw ProtocolError(std::string{"unexpected packet from server while receiving end of query, expected (expected Exception, EndOfStream or Log, got: "}
-                            + (eos_packet ? std::to_string(eos_packet) : "nothing") + ")");
+        if (eos_packet != ServerCodes::EndOfStream && eos_packet != ServerCodes::Exception
+            && eos_packet != ServerCodes::Log && options_.rethrow_exceptions) {
+            throw ProtocolError(std::string{"unexpected packet from server while receiving end of query, expected (expected Exception, EndOfStream or Log, got: "}
+                                + (eos_packet ? std::to_string(eos_packet) : "nothing") + ")");
+        }
+        state_ = State::Idle;
+    } catch (const ServerException&) {
+        ResetState();
+        throw;
+    } catch (...) {
+        InvalidateConnection();
+        ResetState();
+        throw;
     }
-    state_ = State::Idle;
 }
 
 void Client::Impl::Ping() {
@@ -598,23 +649,37 @@ void Client::Impl::Ping() {
         throw ValidationError("cannot execute query while executing another operation");
     }
 
-    WireFormat::WriteUInt64(*output_, ClientCodes::Ping);
-    output_->Flush();
+    EnsureConnection();
 
-    uint64_t server_packet;
-    const bool ret = ProcessPacket(&server_packet);
+    try {
+        WireFormat::WriteUInt64(*output_, ClientCodes::Ping);
+        output_->Flush();
 
-    if (!ret || server_packet != ServerCodes::Pong) {
-        throw ProtocolError("fail to ping server");
+        uint64_t server_packet;
+        const bool ret = ProcessPacket(&server_packet);
+
+        if (!ret || server_packet != ServerCodes::Pong) {
+            throw ProtocolError("fail to ping server");
+        }
+    } catch (const ServerException&) {
+        throw;
+    } catch (...) {
+        InvalidateConnection();
+        throw;
     }
 }
 
 void Client::Impl::ResetConnection() {
     InitializeStreams(socket_factory_->connect(options_, current_endpoint_.value()));
-    state_ = State::Idle;
+    ResetState();
 
-    if (!Handshake()) {
-        throw ProtocolError("fail to connect to " + options_.host);
+    try {
+        if (!Handshake()) {
+            throw ProtocolError("fail to connect to " + options_.host);
+        }
+    } catch (...) {
+        InvalidateConnection();
+        throw;
     }
 }
 
@@ -839,8 +904,10 @@ bool Client::Impl::ProcessPacket(uint64_t* server_packet) {
     auto packet = ReceivePacket(server_packet);
     switch (packet.index()) {
     case VariantIndex<ServerError, decltype(packet)>():
-    case VariantIndex<std::monostate, decltype(packet)>():
     case VariantIndex<EndOfStream, decltype(packet)>():
+        return false;
+    case VariantIndex<std::monostate, decltype(packet)>():
+        InvalidateConnection();
         return false;
     default:
         return true;
@@ -849,9 +916,23 @@ bool Client::Impl::ProcessPacket(uint64_t* server_packet) {
 
 void Client::Impl::ResetState()
 {
-    state_ = State::Idle;
-    query_ = {};
     events_ = nullptr;
+    query_ = {};
+    state_ = State::Idle;
+}
+
+void Client::Impl::EnsureConnection()
+{
+    if (!socket_) {
+        ResetConnection();
+    }
+}
+
+void Client::Impl::InvalidateConnection() noexcept
+{
+    input_.reset();
+    output_.reset();
+    socket_.reset();
 }
 
 bool Client::Impl::ReadBlock(InputStream& input, Block* block) {
@@ -967,6 +1048,10 @@ bool Client::Impl::ReceiveException(bool rethrow, ServerError * error) {
         && WireFormat::ReadString(*input_, &e->stack_trace)
         && WireFormat::ReadFixed(*input_, &has_nested);
 
+    if (!exception_received) {
+        return false;
+    }
+
     if (events_) {
         events_->OnServerException(*e);
     }
@@ -975,10 +1060,10 @@ bool Client::Impl::ReceiveException(bool rethrow, ServerError * error) {
         throw ServerError(e);
     }
 
-    if (exception_received && error != nullptr) {
+    if (error != nullptr) {
         *error = ServerError(e);
     }
-    return exception_received;
+    return true;
 }
 
 void Client::Impl::SendCancel() {
@@ -990,7 +1075,15 @@ void Client::Impl::Cancel() {
     if (state_ != State::Selecting) {
         throw ValidationError("cannot cancel while not executing a query");
     }
-    SendCancel();
+
+    try {
+        SendCancel();
+    } catch (...) {
+        InvalidateConnection();
+        ResetState();
+        throw;
+    }
+
     while (NextBlock().has_value()) {
         ;
     }

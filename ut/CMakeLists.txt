@@ -5,6 +5,7 @@ SET ( clickhouse-cpp-ut-src
     bignum_ut.cpp
     bignum_round_trip.cpp
     block_ut.cpp
+    client_socket_state_test.cpp
     client_ut.cpp
     columns_ut.cpp
     column_as_ut.cpp
