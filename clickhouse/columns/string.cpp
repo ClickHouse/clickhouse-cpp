@@ -112,7 +112,11 @@ ColumnRef ColumnFixedString::CloneEmpty() const {
 
 void ColumnFixedString::Swap(Column& other) {
     auto & col = dynamic_cast<ColumnFixedString &>(other);
-    std::swap(string_size_, col.string_size_);
+    if (string_size_ != col.string_size_) {
+        throw ValidationError("Can't swap FixedString columns when sizes are not the same: "
+            + std::to_string(string_size_) + "(this) != "
+            + std::to_string(col.string_size_) + "(that)");
+    }
     data_.swap(col.data_);
 }
 

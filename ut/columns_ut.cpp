@@ -259,6 +259,32 @@ TEST(ColumnsCase, FixedString_Type_Size_Eq10) {
     ASSERT_EQ(col->FixedSize(), col->Type()->As<FixedStringType>()->GetSize());
 }
 
+TEST(ColumnsCase, FixedStringSwap) {
+    auto column1 = std::make_shared<ColumnFixedString>(2);
+    auto column2 = std::make_shared<ColumnFixedString>(2);
+    column1->Append("aa");
+    column2->Append("bb");
+
+    column1->Swap(*column2);
+
+    EXPECT_EQ(column1->At(0), "bb");
+    EXPECT_EQ(column2->At(0), "aa");
+}
+
+TEST(ColumnsCase, FixedStringSwapDifferentSize) {
+    auto column1 = std::make_shared<ColumnFixedString>(2);
+    auto column2 = std::make_shared<ColumnFixedString>(4);
+    column1->Append("aa");
+    column2->Append("bbbb");
+
+    EXPECT_THROW(column1->Swap(*column2), ValidationError);
+
+    EXPECT_EQ(column1->FixedSize(), 2u);
+    EXPECT_EQ(column2->FixedSize(), 4u);
+    EXPECT_EQ(column1->At(0), "aa");
+    EXPECT_EQ(column2->At(0), "bbbb");
+}
+
 TEST(ColumnsCase, StringInit) {
     auto values = MakeStrings();
     auto col = std::make_shared<ColumnString>(values);
