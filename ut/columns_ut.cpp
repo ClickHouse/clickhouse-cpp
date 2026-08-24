@@ -184,6 +184,60 @@ TEST(ColumnsCase, DecimalStringAt) {
 
 }
 
+TEST(ColumnsCase, DecimalSwap) {
+    auto column1 = std::make_shared<ColumnDecimal>(18, 2);
+    auto column2 = std::make_shared<ColumnDecimal>(18, 2);
+    column1->Append("1.23");
+    column2->Append("4.56");
+
+    column1->Swap(*column2);
+
+    EXPECT_EQ(column1->StringAt(0), "4.56");
+    EXPECT_EQ(column2->StringAt(0), "1.23");
+}
+
+TEST(ColumnsCase, DecimalSwapDifferentScale) {
+    auto column1 = std::make_shared<ColumnDecimal>(18, 2);
+    auto column2 = std::make_shared<ColumnDecimal>(18, 3);
+    column1->Append("1.23");
+    column2->Append("4.567");
+
+    EXPECT_THROW(column1->Swap(*column2), ValidationError);
+
+    EXPECT_EQ(column1->GetType().GetName(), "Decimal(18,2)");
+    EXPECT_EQ(column2->GetType().GetName(), "Decimal(18,3)");
+    EXPECT_EQ(column1->StringAt(0), "1.23");
+    EXPECT_EQ(column2->StringAt(0), "4.567");
+}
+
+TEST(ColumnsCase, DecimalSwapDifferentPrecision) {
+    auto column1 = std::make_shared<ColumnDecimal>(9, 2);
+    auto column2 = std::make_shared<ColumnDecimal>(18, 2);
+    column1->Append("1.23");
+    column2->Append("4.56");
+
+    EXPECT_THROW(column1->Swap(*column2), ValidationError);
+
+    EXPECT_EQ(column1->GetType().GetName(), "Decimal(9,2)");
+    EXPECT_EQ(column2->GetType().GetName(), "Decimal(18,2)");
+    EXPECT_EQ(column1->StringAt(0), "1.23");
+    EXPECT_EQ(column2->StringAt(0), "4.56");
+}
+
+TEST(ColumnsCase, DecimalSwapDifferentPrecisionSameStorageType) {
+    auto column1 = std::make_shared<ColumnDecimal>(17, 2);
+    auto column2 = std::make_shared<ColumnDecimal>(18, 2);
+    column1->Append("1.23");
+    column2->Append("4.56");
+
+    EXPECT_THROW(column1->Swap(*column2), ValidationError);
+
+    EXPECT_EQ(column1->GetType().GetName(), "Decimal(17,2)");
+    EXPECT_EQ(column2->GetType().GetName(), "Decimal(18,2)");
+    EXPECT_EQ(column1->StringAt(0), "1.23");
+    EXPECT_EQ(column2->StringAt(0), "4.56");
+}
+
 TEST(ColumnsCase, NumericInit) {
     auto col = std::make_shared<ColumnUInt32>(MakeNumbers());
 
