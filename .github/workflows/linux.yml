@@ -144,3 +144,79 @@ jobs:
       - name: Test
         working-directory: ${{github.workspace}}/build/ut
         run: ./clickhouse-cpp-ut
+
+  # Runs the same test suite against the supported ClickHouse server versions.
+  # The compiler axis is pinned to one canonical configuration here, so that
+  # the server-version axis does not multiply the build matrix above.
+  server-versions:
+    name: clickhouse-server ${{matrix.clickhouse-version}}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        clickhouse-version:
+          - '25.8'  # LTS
+          - '26.3'  # LTS
+          - '26.5'  # Stable
+          - '26.6'  # Stable
+          - '26.7'  # Stable
+          - 'head'  # nightly build of ClickHouse master
+
+    runs-on: ubuntu-24.04
+
+    env:
+      CLICKHOUSE_VERSION: '${{matrix.clickhouse-version}}-alpine'
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 100
+          fetch-tags: true
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake \
+            clang-18 libc++-18-dev
+
+      - name: Configure project
+        run: |
+          cmake \
+            -D CMAKE_C_COMPILER=clang-18 \
+            -D CMAKE_CXX_COMPILER=clang++-18 \
+            -D CMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
+            -D CH_MAP_BOOL_TO_UINT8=OFF \
+            -D BUILD_TESTS=ON \
+            -D WITH_OPENSSL=ON \
+            -S ${{github.workspace}} \
+            -B ${{github.workspace}}/build
+
+      - name: Build project
+        run: |
+          cmake \
+            --build ${{github.workspace}}/build \
+            --config ${{env.BUILD_TYPE}} \
+            --target all
+
+      - name: Start ClickHouse in Docker
+        uses: hoverkraft-tech/compose-action@v2.0.1
+        with:
+          compose-file: ci/docker-compose.yml
+          down-flags: --volumes
+
+      - name: Check if ClickHouse is available
+        run: |
+          for i in {1..60}; do
+            if curl -fsS http://localhost:8123/ > /dev/null; then
+              echo "ClickHouse is ready"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "ClickHouse failed to start"
+          exit 1
+
+      - name: Test
+        working-directory: ${{github.workspace}}/build/ut
+        run: ./clickhouse-cpp-ut
