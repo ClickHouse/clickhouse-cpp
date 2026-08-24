@@ -88,6 +88,19 @@ TEST(ColumnArray, AppendPreservesDateTimeTimezoneCompatibility) {
     EXPECT_EQ(values->RawAt(0), 1u);
 }
 
+TEST(ColumnArray, AppendAsColumnRejectsDifferentDateTimeTimezone) {
+    auto data = std::make_shared<ColumnDateTime>("UTC");
+    auto array = std::make_shared<ColumnArray>(data);
+    auto source = std::make_shared<ColumnDateTime>("Europe/Berlin");
+    source->AppendRaw(1);
+
+    EXPECT_THROW(array->AppendAsColumn(source), ValidationError);
+    EXPECT_EQ(array->Size(), 0u);
+    EXPECT_EQ(data->Size(), 0u);
+    EXPECT_EQ(array->GetOffsets()->Size(), 0u);
+    EXPECT_EQ(source->Size(), 1u);
+}
+
 TEST(ColumnArray, AppendAsColumnAcceptsNestedArrayWithCompatibleElementType) {
     auto nested_destination = std::make_shared<ColumnArray>(std::make_shared<ColumnBool>());
     auto destination = std::make_shared<ColumnArray>(nested_destination);
