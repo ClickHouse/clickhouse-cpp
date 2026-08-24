@@ -598,6 +598,23 @@ TEST(ColumnsCase, DateTime_construct_from_rvalue_data) {
     EXPECT_TRUE(CompareRecursive(*col1, expected));
 }
 
+TEST(ColumnsCase, DateTimeTimezonePreservedBySliceAndCloneEmpty) {
+    auto column = std::make_shared<ColumnDateTime>("UTC");
+    column->AppendRaw(1);
+
+    auto slice = column->Slice(0, 1)->As<ColumnDateTime>();
+    ASSERT_NE(slice, nullptr);
+    EXPECT_EQ(slice->GetType().GetName(), column->GetType().GetName());
+    EXPECT_EQ(slice->Timezone(), "UTC");
+    EXPECT_EQ(slice->RawAt(0), 1u);
+
+    auto empty = column->CloneEmpty()->As<ColumnDateTime>();
+    ASSERT_NE(empty, nullptr);
+    EXPECT_EQ(empty->GetType().GetName(), column->GetType().GetName());
+    EXPECT_EQ(empty->Timezone(), "UTC");
+    EXPECT_EQ(empty->Size(), 0u);
+}
+
 TEST(ColumnsCase, DateTime64_0) {
     auto column = std::make_shared<ColumnDateTime64>(0ul);
 

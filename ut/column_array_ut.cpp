@@ -70,6 +70,46 @@ TEST(ColumnArray, Append) {
     ASSERT_EQ(col->As<ColumnUInt64>()->At(1), 3u);
 }
 
+TEST(ColumnArray, AppendPreservesDateTimeTimezoneCompatibility) {
+    auto source_data = std::make_shared<ColumnDateTime>("UTC");
+    source_data->AppendRaw(1);
+    auto source = std::make_shared<ColumnArray>(source_data);
+
+    auto destination = std::make_shared<ColumnArray>(std::make_shared<ColumnDateTime>("UTC"));
+
+    EXPECT_NO_THROW(destination->Append(source));
+    ASSERT_EQ(destination->Size(), 1u);
+    EXPECT_EQ(destination->GetSize(0), 1u);
+    EXPECT_EQ(destination->GetType().GetName(), source->GetType().GetName());
+
+    auto values = destination->GetAsColumn(0)->As<ColumnDateTime>();
+    ASSERT_NE(values, nullptr);
+    EXPECT_EQ(values->Timezone(), "UTC");
+    EXPECT_EQ(values->RawAt(0), 1u);
+}
+
+TEST(ColumnArray, AppendAsColumnAcceptsNestedArrayWithCompatibleElementType) {
+    auto nested_destination = std::make_shared<ColumnArray>(std::make_shared<ColumnBool>());
+    auto destination = std::make_shared<ColumnArray>(nested_destination);
+
+    auto nested_source = std::make_shared<ColumnArray>(std::make_shared<ColumnUInt8>());
+    auto values = std::make_shared<ColumnUInt8>();
+    values->Append(1);
+    values->Append(0);
+    nested_source->AppendAsColumn(values);
+
+    EXPECT_NO_THROW(destination->AppendAsColumn(nested_source));
+    ASSERT_EQ(destination->Size(), 1u);
+    EXPECT_EQ(destination->GetSize(0), 1u);
+    auto row = destination->GetAsColumn(0)->As<ColumnArray>();
+    ASSERT_NE(row, nullptr);
+    ASSERT_EQ(row->GetSize(0), 2u);
+    auto bool_values = row->GetAsColumn(0)->As<ColumnBool>();
+    ASSERT_NE(bool_values, nullptr);
+    EXPECT_TRUE(bool_values->At(0));
+    EXPECT_FALSE(bool_values->At(1));
+}
+
 TEST(ColumnArray, AppendAsColumnRejectsWrongTypeWithoutChangingState) {
     auto data = std::make_shared<ColumnString>();
     auto array = std::make_shared<ColumnArray>(data);
