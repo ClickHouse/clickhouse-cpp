@@ -751,6 +751,20 @@ TEST(ColumnsCase, EnumTest) {
     ASSERT_TRUE(CreateColumnByType("Enum8('Hi' = 1, 'Hello' = 2)")->Type()->IsEqual(Type::CreateEnum8(enum_items)));
 }
 
+TEST(ColumnsCase, EnumCheckValue) {
+    auto column = std::make_shared<ColumnEnum8>(Type::CreateEnum8({{"Hi", 1}, {"Hello", 2}}));
+
+    EXPECT_NO_THROW(column->Append(1, true));
+    EXPECT_THROW(column->Append(3, true), ValidationError);
+    EXPECT_EQ(column->Size(), 1u);
+
+    EXPECT_NO_THROW(column->SetAt(0, 2, true));
+    EXPECT_EQ(column->At(0), 2);
+
+    EXPECT_THROW(column->SetAt(0, 3, true), ValidationError);
+    EXPECT_EQ(column->At(0), 2);
+}
+
 TEST(ColumnsCase, NullableSlice) {
     auto data = std::make_shared<ColumnUInt32>(MakeNumbers());
     auto nulls = std::make_shared<ColumnUInt8>(MakeBools());

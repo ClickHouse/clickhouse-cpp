@@ -28,8 +28,8 @@ ColumnEnum<T>::ColumnEnum(TypeRef type, std::vector<T>&& data)
 
 template <typename T>
 void ColumnEnum<T>::Append(const T& value, bool checkValue) {
-    if  (checkValue) {
-        // TODO: type_->HasEnumValue(value), "Enum type doesn't have value " + std::to_string(value);
+    if (checkValue && !type_->As<EnumType>()->HasEnumValue(value)) {
+        throw ValidationError("Enum type doesn't have value " + std::to_string(value));
     }
     data_.push_back(value);
 }
@@ -56,8 +56,8 @@ std::string_view ColumnEnum<T>::NameAt(size_t n) const {
 
 template <typename T>
 void ColumnEnum<T>::SetAt(size_t n, const T& value, bool checkValue) {
-    if (checkValue) {
-        // TODO: type_->HasEnumValue(value), "Enum type doesn't have value " + std::to_string(value);
+    if (checkValue && !type_->As<EnumType>()->HasEnumValue(value)) {
+        throw ValidationError("Enum type doesn't have value " + std::to_string(value));
     }
     data_.at(n) = value;
 }
