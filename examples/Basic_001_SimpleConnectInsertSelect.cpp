@@ -1,14 +1,3 @@
-/***************************************************************************************************
- *
- * Basic clickhouse-cpp usage: connect to a ClickHouse server, create a table, insert a block of
- * data, then select and print the inserted rows.
- *
- * Before running, configure the host, username, and password below. TLS requires building
- * clickhouse-cpp with WITH_OPENSSL=ON. For a plaintext connection, remove SetSSLOptions() and use
- * the server's plaintext native-protocol port.
- *
-***************************************************************************************************/
-
 #include <cstdlib>
 #include <iostream>
 #include <memory>
@@ -20,10 +9,6 @@ int main()
 {
 
     try {
-
-/***************************************************************************************************
- *                                   Setting up the connection
-***************************************************************************************************/
 
         // Setup the client configuration options
         auto client_options = ch::ClientOptions{}
@@ -37,9 +22,6 @@ int main()
         auto client = ch::Client{client_options};
 
 
-/***************************************************************************************************
- *                                Create a table and insert data
-***************************************************************************************************/
         // Create a test table
         client.Execute(R"(
             CREATE OR REPLACE TABLE greetings (
@@ -75,10 +57,6 @@ int main()
         // Insert the data into the table using ClickHouse Native protocol
         client.Insert("greetings", block);
 
-
-/***************************************************************************************************
- *                                Select and print data
-***************************************************************************************************/
 
         client.BeginSelect("SELECT id, message, language FROM greetings");
         while (auto block = client.NextBlock()) {
