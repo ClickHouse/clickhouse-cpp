@@ -6,6 +6,53 @@
 namespace clickhouse {
 
 namespace {
+bool CanAppendType(const TypeRef& destination_type, const TypeRef& source_type);
+
+bool CanAppendTupleType(const TypeRef& destination_type, const TypeRef& source_type) {
+    if (destination_type->GetCode() != Type::Tuple || source_type->GetCode() != Type::Tuple) {
+        return destination_type->IsEqual(source_type);
+    }
+
+    const auto destination_item_types = destination_type->As<TupleType>()->GetTupleType();
+    const auto source_item_types      = source_type->As<TupleType>()->GetTupleType();
+    if (destination_item_types.size() != source_item_types.size()) {
+        return false;
+    }
+
+    for (size_t i = 0; i < destination_item_types.size(); ++i) {
+        if (!CanAppendTupleType(destination_item_types[i], source_item_types[i])) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool CanAppendType(const TypeRef& destination_type, const TypeRef& source_type) {
+    if (destination_type->IsEqual(source_type)) {
+        return true;
+    }
+
+    switch (destination_type->GetCode()) {
+        case Type::Array:
+            if (source_type->GetCode() != Type::Array) {
+                return false;
+            }
+            return CanAppendType(
+                destination_type->As<ArrayType>()->GetItemType(),
+                source_type->As<ArrayType>()->GetItemType());
+        case Type::Tuple:
+            return CanAppendTupleType(destination_type, source_type);
+        case Type::LowCardinality:
+            return source_type->GetCode() != Type::LowCardinality
+                && destination_type->As<LowCardinalityType>()->GetNestedType()->IsEqual(source_type);
+        case Type::Bool:
+            return source_type->GetCode() == Type::UInt8;
+        default:
+            return false;
+    }
+}
+
 std::shared_ptr<ColumnUInt64> make_single_offset(size_t value) {
     auto res = std::make_shared<ColumnUInt64>();
     if (value != 0) {
@@ -47,7 +94,12 @@ ColumnArray::ColumnArray(ColumnArray&& other)
 }
 
 void ColumnArray::AppendAsColumn(ColumnRef array) {
-    // appending data may throw (i.e. due to ype check failure), so do it first to avoid partly modified state.
+    if (!CanAppendType(data_->Type(), array->Type())) {
+        throw ValidationError(
+            "can't append column of type " + array->Type()->GetName() + " "
+            "to column type " + data_->Type()->GetName());
+    }
+
     data_->Append(array);
     AddOffset(array->Size());
 }

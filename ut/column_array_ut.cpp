@@ -1,4 +1,5 @@
 #include <clickhouse/columns/array.h>
+#include <clickhouse/columns/bool.h>
 #include <clickhouse/columns/tuple.h>
 #include <clickhouse/columns/date.h>
 #include <clickhouse/columns/enum.h>
@@ -67,6 +68,100 @@ TEST(ColumnArray, Append) {
     ASSERT_EQ(arr1->Size(), 2u);
     ASSERT_EQ(col->As<ColumnUInt64>()->At(0), 1u);
     ASSERT_EQ(col->As<ColumnUInt64>()->At(1), 3u);
+}
+
+TEST(ColumnArray, AppendAsColumnRejectsWrongTypeWithoutChangingState) {
+    auto data = std::make_shared<ColumnString>();
+    auto array = std::make_shared<ColumnArray>(data);
+
+    auto valid = std::make_shared<ColumnString>();
+    valid->Append("keep");
+    array->AppendAsColumn(valid);
+
+    auto wrong = std::make_shared<ColumnUInt64>();
+    wrong->Append(1);
+    wrong->Append(2);
+
+    EXPECT_THROW(array->AppendAsColumn(wrong), ValidationError);
+    EXPECT_EQ(array->Size(), 1u);
+    EXPECT_EQ(data->Size(), 1u);
+    EXPECT_EQ((*array->GetOffsets())[0], 1u);
+    EXPECT_EQ(data->At(0), "keep");
+    EXPECT_EQ(wrong->Size(), 2u);
+}
+
+TEST(ColumnArray, AppendAsColumnAcceptsEmptyColumn) {
+    auto array = std::make_shared<ColumnArray>(std::make_shared<ColumnString>());
+    auto empty = std::make_shared<ColumnString>();
+
+    EXPECT_NO_THROW(array->AppendAsColumn(empty));
+    ASSERT_EQ(array->Size(), 1u);
+    EXPECT_EQ(array->GetData()->Size(), 0u);
+    EXPECT_EQ(array->GetOffsets()->Size(), 1u);
+    EXPECT_EQ((*array->GetOffsets())[0], 0u);
+    EXPECT_EQ(array->GetSize(0), 0u);
+}
+
+TEST(ColumnArray, AppendAsColumnRejectsDifferentFixedStringSize) {
+    auto data = std::make_shared<ColumnFixedString>(2);
+    auto array = std::make_shared<ColumnArray>(data);
+    auto wrong = std::make_shared<ColumnFixedString>(4);
+    wrong->Append("abcd");
+
+    EXPECT_THROW(array->AppendAsColumn(wrong), ValidationError);
+    EXPECT_EQ(array->Size(), 0u);
+    EXPECT_EQ(data->Size(), 0u);
+    EXPECT_EQ(array->GetOffsets()->Size(), 0u);
+    EXPECT_EQ(wrong->Size(), 1u);
+}
+
+TEST(ColumnArray, AppendAsColumnAcceptsTupleWithDifferentFieldNames) {
+    auto data = std::make_shared<ColumnTuple>(
+        std::vector<ColumnRef>{std::make_shared<ColumnUInt64>(), std::make_shared<ColumnString>()},
+        std::vector<std::string>{"destination_id", "destination_name"});
+    auto array = std::make_shared<ColumnArray>(data);
+
+    auto source = std::make_shared<ColumnTuple>(
+        std::vector<ColumnRef>{std::make_shared<ColumnUInt64>(), std::make_shared<ColumnString>()},
+        std::vector<std::string>{"source_id", "source_name"});
+    (*source)[0]->As<ColumnUInt64>()->Append(7);
+    (*source)[1]->As<ColumnString>()->Append("value");
+
+    EXPECT_NO_THROW(array->AppendAsColumn(source));
+    ASSERT_EQ(array->Size(), 1u);
+    EXPECT_EQ(array->GetSize(0), 1u);
+    auto row = array->GetAsColumn(0)->As<ColumnTuple>();
+    ASSERT_NE(row, nullptr);
+    EXPECT_EQ((*row)[0]->As<ColumnUInt64>()->At(0), 7u);
+    EXPECT_EQ((*row)[1]->As<ColumnString>()->At(0), "value");
+}
+
+TEST(ColumnArray, AppendAsColumnAcceptsLowCardinalityDictionaryColumn) {
+    auto data = std::make_shared<ColumnLowCardinality>(std::make_shared<ColumnString>());
+    auto array = std::make_shared<ColumnArray>(data);
+    auto source = std::make_shared<ColumnString>();
+    source->Append("value");
+
+    EXPECT_NO_THROW(array->AppendAsColumn(source));
+    ASSERT_EQ(array->Size(), 1u);
+    EXPECT_EQ(array->GetSize(0), 1u);
+    EXPECT_EQ(array->GetData()->Size(), 1u);
+    EXPECT_EQ(array->GetAsColumn(0)->As<ColumnLowCardinality>()->GetItem(0).get<std::string_view>(), "value");
+}
+
+TEST(ColumnArray, AppendAsColumnAcceptsUInt8ForBool) {
+    auto array = std::make_shared<ColumnArray>(std::make_shared<ColumnBool>());
+    auto source = std::make_shared<ColumnUInt8>();
+    source->Append(1);
+    source->Append(0);
+
+    EXPECT_NO_THROW(array->AppendAsColumn(source));
+    ASSERT_EQ(array->Size(), 1u);
+    EXPECT_EQ(array->GetSize(0), 2u);
+    auto values = array->GetAsColumn(0)->As<ColumnBool>();
+    ASSERT_NE(values, nullptr);
+    EXPECT_TRUE(values->At(0));
+    EXPECT_FALSE(values->At(1));
 }
 
 TEST(ColumnArray, ArrayOfDecimal) {
