@@ -3,8 +3,21 @@
 
 namespace clickhouse {
 
+namespace {
+
+const std::vector<Endpoint> & ValidateEndpoints(const std::vector<Endpoint>& endpoints)
+{
+    if (endpoints.empty()) {
+        throw ValidationError("The list of endpoints is empty");
+    }
+    return endpoints;
+}
+
+} // anonymous namespace
+
 RoundRobinEndpointsIterator::RoundRobinEndpointsIterator(const std::vector<Endpoint>& _endpoints)
-   :  endpoints (_endpoints)
+   :  endpoints (ValidateEndpoints(_endpoints))
+   // set `current_index` to the value such that `Next` returns an element at index 0
    , current_index (endpoints.size() - 1ull)
 {
 }

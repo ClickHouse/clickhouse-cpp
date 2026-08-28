@@ -110,6 +110,7 @@ cc_test(
         "readonly_client_test.cpp",
         "readonly_client_test.h",
         "roundtrip_tests.cpp",
+        "test_socket_factory_adapters.h",
         # Test entry point and shared support code.
         "main.cpp",
         "roundtrip_column.cpp",
