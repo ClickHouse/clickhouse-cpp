@@ -264,11 +264,6 @@ private:
 
     void InitializeStreams(std::unique_ptr<SocketBase>&& socket);
 
-    inline size_t GetConnectionAttempts() const
-    {
-        return options_.endpoints.size() * options_.send_retries;
-    }
-
 private:
     /// In case of network errors tries to reconnect to server and
     /// call fuc several times.
@@ -1256,7 +1251,8 @@ void Client::Impl::RetryGuard(std::function<void()> func) {
     }
     // Connections with current_endpoint_ are broken.
     // Trying to establish  with the another one from the list.
-    size_t connection_attempts_count = GetConnectionAttempts();
+    size_t connection_attempts_count = options_.endpoints.size() * options_.send_retries;
+
     for (size_t i = 0; i < connection_attempts_count;)
     {
         try
