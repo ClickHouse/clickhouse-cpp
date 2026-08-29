@@ -338,11 +338,12 @@ public:
 
     const ServerInfo& GetServerInfo() const;
 
-    /// Get current connected endpoint.
-    /// In case when client is not connected to any endpoint, nullopt will returned.
+    /// Get current endpoint, i.e. the last successfully connected endpoint.
+    /// It remains optional for backward compatibility, but now always contains a value.
     const std::optional<Endpoint>& GetCurrentEndpoint() const;
 
-    // Try to connect to different endpoints one by one only one time. If it doesn't work, throw an exception.
+    /// Try to reconnect to different endpoints one by one only one time. If it doesn't work, throw
+    /// an exception. The function starts with the last successfully connected endpoint.
     void ResetConnectionEndpoint();
 
     struct Version
