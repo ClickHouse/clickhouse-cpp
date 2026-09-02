@@ -129,3 +129,56 @@ TEST(Socketcase, connecttimeout) {
 //    auto input = socket.makeInputStream();
 //    input->Read(buffer, sizeof(buffer));
 //}
+
+#if !defined(_win_)
+#   include <sys/socket.h>
+#   include <unistd.h>
+
+// Regression test for issue #487.
+//
+// On a clean peer close, `recv()` returns 0, which is EOF, not an error.
+// POSIX does NOT require `errno` to be set when `recv()` returns 0, so reading
+// `errno` at that point yields a stale value from a previous syscall. Prior
+// to the fix, `SocketInput::DoRead` surfaced that stale `errno` to the caller
+// (e.g. "Operation now in progress" if the last failing call was the
+// non-blocking `connect()`), making the exception message non-deterministic
+// and misleading.
+//
+// The fix reports `ECONNRESET` with a fixed message instead. This test
+// drives a clean close via `socketpair(2)`, seeds `errno` to a known value
+// that is NOT `ECONNRESET`, and asserts the resulting exception's
+// `error_code` is exactly `ECONNRESET`.
+TEST(Socketcase, recvReturnsZeroReportsConnResetNotStaleErrno) {
+    int sv[2];
+    ASSERT_EQ(0, ::socketpair(AF_UNIX, SOCK_STREAM, 0, sv));
+
+    // Seed `errno` to a known stale value that must NOT leak into the
+    // exception. On Linux, closing an invalid fd sets `errno = EBADF` (9),
+    // which is clearly distinct from `ECONNRESET` (104).
+    if (::close(-1) != -1) {
+        // Sanity guard: `close(-1)` must fail; if it doesn't, the test
+        // cannot guarantee `errno` is set as expected.
+        ::close(sv[0]);
+        ::close(sv[1]);
+        FAIL() << "close(-1) unexpectedly succeeded; cannot seed errno";
+    }
+    ASSERT_EQ(EBADF, errno);
+
+    SocketInput input(sv[0]);
+    // Close the peer side: the next `recv()` on sv[0] returns 0 (EOF).
+    ::close(sv[1]);
+
+    char buf[16];
+    try {
+        input.Read(buf, sizeof(buf));
+        ::close(sv[0]);
+        FAIL() << "expected std::system_error on clean peer close";
+    } catch (const std::system_error& e) {
+        ::close(sv[0]);
+        EXPECT_EQ(ECONNRESET, e.code().value())
+            << "stale errno leaked into the exception: " << e.code().value();
+        EXPECT_NE(EBADF, e.code().value())
+            << "regression: stale errno was surfaced instead of ECONNRESET";
+    }
+}
+#endif  // !defined(_win_)

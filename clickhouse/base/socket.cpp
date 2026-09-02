@@ -436,7 +436,11 @@ size_t SocketInput::DoRead(void* buf, size_t len) {
     }
 
     if (ret == 0) {
-        throw std::system_error(getSocketErrorCode(), getErrorCategory(), "closed");
+#if defined(_win_)
+        throw std::system_error(WSAECONNRESET, getErrorCategory(), "connection closed by peer");
+#else
+        throw std::system_error(ECONNRESET, getErrorCategory(), "connection closed by peer");
+#endif
     }
 
     throw std::system_error(getSocketErrorCode(), getErrorCategory(), "can't receive string data");
