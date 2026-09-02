@@ -9,6 +9,7 @@
 #include "columns/factory.h"
 
 #include <cassert>
+#include <memory>
 #include <optional>
 #include <sstream>
 #include <system_error>
@@ -157,7 +158,6 @@ struct ProfileEvents {
 struct EndOfStream {
 };
 using DecodedPacket = std::variant<
-    std::monostate,
     Block,
     ServerException,
     Profile,
@@ -386,7 +386,7 @@ std::optional<Block> Client::Impl::NextBlock() {
                 return {std::move(block)};
             }
             case VariantIndex<ServerError, decltype(packet)>():
-            case VariantIndex<std::monostate, decltype(packet)>():
+                // See note in ReceivePacket() for the ServerCodes::Exception case
             case VariantIndex<EndOfStream, decltype(packet)>():
                 ResetState();
                 return std::nullopt;
@@ -674,7 +674,7 @@ DecodedPacket Client::Impl::ReceivePacket(uint64_t* server_packet) {
     uint64_t packet_type = 0;
 
     if (!WireFormat::ReadVarint64(*input_, &packet_type)) {
-        return {};
+        throw ProtocolError{"can't read packet type from input stream"};
     }
     if (server_packet) {
         *server_packet = packet_type;
@@ -684,15 +684,19 @@ DecodedPacket Client::Impl::ReceivePacket(uint64_t* server_packet) {
     case ServerCodes::Data: {
         Block ret{};
         if (!ReceiveData(ret)) {
-            throw ProtocolError("can't read data packet from input stream");
+            throw ProtocolError{"can't read data packet from input stream"};
         }
         return ret;
     }
 
     case ServerCodes::Exception: {
+        // ReceiveException throws ServerExceptions when it succeeds reading the exception
+        // information from the server. So the execution does not usually reach this state.
+        // However, the user can suppress exceptions with
+        // `ClientOptions::SetRethrowException(false)` (the default is true).
         ServerError ret{std::make_shared<Exception>()};
         if (!ReceiveException(false, &ret)) {
-            throw ProtocolError("can't read exception packet from input stream");
+            throw ProtocolError{"server reported an error, but the exception packet could not be decoded (error details lost)"};
         }
         return ret;
     }
@@ -700,23 +704,13 @@ DecodedPacket Client::Impl::ReceivePacket(uint64_t* server_packet) {
     case ServerCodes::ProfileInfo: {
         Profile ret{};
 
-        if (!WireFormat::ReadUInt64(*input_, &ret.rows)) {
-            return {};
-        }
-        if (!WireFormat::ReadUInt64(*input_, &ret.blocks)) {
-            return {};
-        }
-        if (!WireFormat::ReadUInt64(*input_, &ret.bytes)) {
-            return {};
-        }
-        if (!WireFormat::ReadFixed(*input_, &ret.applied_limit)) {
-            return {};
-        }
-        if (!WireFormat::ReadUInt64(*input_, &ret.rows_before_limit)) {
-            return {};
-        }
-        if (!WireFormat::ReadFixed(*input_, &ret.calculated_rows_before_limit)) {
-            return {};
+        if (!WireFormat::ReadUInt64(*input_, &ret.rows) ||
+            !WireFormat::ReadUInt64(*input_, &ret.blocks) ||
+            !WireFormat::ReadUInt64(*input_, &ret.bytes) ||
+            !WireFormat::ReadFixed(*input_, &ret.applied_limit) ||
+            !WireFormat::ReadUInt64(*input_, &ret.rows_before_limit) ||
+            !WireFormat::ReadFixed(*input_, &ret.calculated_rows_before_limit)) {
+            throw ProtocolError{"can't read profile info packet from input stream"};
         }
 
         if (events_) {
@@ -729,24 +723,21 @@ DecodedPacket Client::Impl::ReceivePacket(uint64_t* server_packet) {
     case ServerCodes::Progress: {
         Progress ret{};
 
-        if (!WireFormat::ReadUInt64(*input_, &ret.rows)) {
-            return {};
+        if (!WireFormat::ReadUInt64(*input_, &ret.rows) ||
+            !WireFormat::ReadUInt64(*input_, &ret.bytes)) {
+            throw ProtocolError{"can't read progress packet from input stream"};
         }
-        if (!WireFormat::ReadUInt64(*input_, &ret.bytes)) {
-            return {};
-        }
+
         if constexpr(DMBS_PROTOCOL_REVISION >= DBMS_MIN_REVISION_WITH_TOTAL_ROWS_IN_PROGRESS) {
             if (!WireFormat::ReadUInt64(*input_, &ret.total_rows)) {
-                return {};
+                throw ProtocolError{"can't read progress packet from input stream"};
             }
         }
         if (server_info_.revision >= DBMS_MIN_REVISION_WITH_CLIENT_WRITE_INFO)
         {
-            if (!WireFormat::ReadUInt64(*input_, &ret.written_rows)) {
-                return {};
-            }
-            if (!WireFormat::ReadUInt64(*input_, &ret.written_bytes)) {
-                return {};
+            if (!WireFormat::ReadUInt64(*input_, &ret.written_rows) ||
+                !WireFormat::ReadUInt64(*input_, &ret.written_bytes)) {
+                throw ProtocolError{"can't read progress packet from input stream"};
             }
         }
 
@@ -774,14 +765,11 @@ DecodedPacket Client::Impl::ReceivePacket(uint64_t* server_packet) {
 
     case ServerCodes::Log: {
         // log tag
-        if (!WireFormat::SkipString(*input_)) {
-            return {};
-        }
         Log ret;
-
-        // Use uncompressed stream since log blocks usually contain only one row
-        if (!ReadBlock(*input_, &ret.block)) {
-            return {};
+        if (!WireFormat::SkipString(*input_) ||
+            // Use uncompressed stream since log blocks usually contain only one row
+            !ReadBlock(*input_, &ret.block)) {
+            throw ProtocolError{"can't read log packet from input stream"};
         }
 
         if (events_) {
@@ -792,25 +780,19 @@ DecodedPacket Client::Impl::ReceivePacket(uint64_t* server_packet) {
 
     case ServerCodes::TableColumns: {
         // external table name
-        if (!WireFormat::SkipString(*input_)) {
-            return {};
-        }
-
-        //  columns metadata
-        if (!WireFormat::SkipString(*input_)) {
-            return {};
+        if (!WireFormat::SkipString(*input_) ||
+            // columns metadata
+            !WireFormat::SkipString(*input_)) {
+            throw ProtocolError{"can't read table columns packet from input stream"};
         }
         return TableColumns{};
     }
 
     case ServerCodes::ProfileEvents: {
-        if (!WireFormat::SkipString(*input_)) {
-            return {};
-        }
-
         ProfileEvents ret;
-        if (!ReadBlock(*input_, &ret.block)) {
-            return {};
+        if (!WireFormat::SkipString(*input_) ||
+            !ReadBlock(*input_, &ret.block)) {
+            throw ProtocolError{"can't read profile events packet from input stream"};
         }
 
         if (events_) {
@@ -829,7 +811,7 @@ bool Client::Impl::ProcessPacket(uint64_t* server_packet) {
     auto packet = ReceivePacket(server_packet);
     switch (packet.index()) {
     case VariantIndex<ServerError, decltype(packet)>():
-    case VariantIndex<std::monostate, decltype(packet)>():
+        // See note in ReceivePacket() for the ServerCodes::Exception case
     case VariantIndex<EndOfStream, decltype(packet)>():
         return false;
     default:
@@ -949,25 +931,29 @@ bool Client::Impl::ReceiveData(Block & block) {
 bool Client::Impl::ReceiveException(bool rethrow, ServerError * error) {
     std::shared_ptr<Exception> e(new Exception);
     bool has_nested = false; // obsolete: https://github.com/ClickHouse/ClickHouse/blob/ef11941cf5a/src/IO/ReadHelpers.cpp#L2017
+    bool exception_received = false;
 
-    bool exception_received =
-        WireFormat::ReadFixed(*input_, &e->code)
+    if (WireFormat::ReadFixed(*input_, &e->code)
         && WireFormat::ReadString(*input_, &e->name)
         && WireFormat::ReadString(*input_, &e->display_text)
         && WireFormat::ReadString(*input_, &e->stack_trace)
-        && WireFormat::ReadFixed(*input_, &has_nested);
+        && WireFormat::ReadFixed(*input_, &has_nested)) {
 
-    if (events_) {
-        events_->OnServerException(*e);
+        if (events_) {
+            events_->OnServerException(*e);
+        }
+
+        if (rethrow || options_.rethrow_exceptions) {
+            throw ServerError(e);
+        }
+
+        exception_received = true;
+
+        if (error != nullptr) {
+            *error = ServerError(e);
+        }
     }
 
-    if (rethrow || options_.rethrow_exceptions) {
-        throw ServerError(e);
-    }
-
-    if (exception_received && error != nullptr) {
-        *error = ServerError(e);
-    }
     return exception_received;
 }
 
@@ -1213,7 +1199,9 @@ bool Client::Impl::ReceiveHello() {
 
         return true;
     } else if (packet_type == ServerCodes::Exception) {
-        ReceiveException(true);
+        if (!ReceiveException(true)) {
+            throw ProtocolError{"server rejected the connection, but its exception packet could not be decoded"};
+        }
         return false;
     }
 
