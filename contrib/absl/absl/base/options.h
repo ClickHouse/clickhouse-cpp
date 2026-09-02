@@ -70,7 +70,11 @@
 // Include a standard library header to allow configuration based on the
 // standard library in use.
 #ifdef __cplusplus
+#if __cplusplus >= 202002L
+#include <version>
+#else
 #include <ciso646>
+#endif
 #endif
 
 // -----------------------------------------------------------------------------
