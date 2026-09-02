@@ -254,7 +254,7 @@ void ColumnDateTime::Clear() {
 
 ColumnRef ColumnDateTime::Slice(size_t begin, size_t len) const {
     auto col = data_->Slice(begin, len)->As<ColumnUInt32>();
-    auto result = std::make_shared<ColumnDateTime>();
+    auto result = std::make_shared<ColumnDateTime>(Timezone());
 
     result->data_->Append(col);
 
@@ -262,7 +262,7 @@ ColumnRef ColumnDateTime::Slice(size_t begin, size_t len) const {
 }
 
 ColumnRef ColumnDateTime::CloneEmpty() const {
-    return std::make_shared<ColumnDateTime>();
+    return std::make_shared<ColumnDateTime>(Timezone());
 }
 
 void ColumnDateTime::Swap(Column& other) {
