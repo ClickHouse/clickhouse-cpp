@@ -247,7 +247,17 @@ private:
     bool ReceiveData(Block & block);
 
     /// Reads exception packet form input stream.
-    bool ReceiveException(bool rethrow = false, ServerError * error = nullptr);
+    bool ReceiveException(ServerError & error);
+
+    bool ReceiveProfileInfo(Profile & profile);
+
+    bool ReceiveProgress(Progress & progress);
+
+    bool ReceiveLog(Block & block);
+
+    bool ReceiveTableColumns();
+
+    bool ReceiveProfileEvents(Block & block);
 
     void WriteBlock(const Block& block, OutputStream& output);
 
@@ -386,7 +396,9 @@ std::optional<Block> Client::Impl::NextBlock() {
                 return {std::move(block)};
             }
             case VariantIndex<ServerError, decltype(packet)>():
-                // See note in ReceivePacket() for the ServerCodes::Exception case
+                // Normally `ReceivePacket()` throws on server exceptions, but it can be
+                // suppressed by `ClientOptions::SetRethrowException`. In that case the
+                // error marks the end of the response.
             case VariantIndex<EndOfStream, decltype(packet)>():
                 ResetState();
                 return std::nullopt;
@@ -690,61 +702,31 @@ DecodedPacket Client::Impl::ReceivePacket(uint64_t* server_packet) {
     }
 
     case ServerCodes::Exception: {
-        // ReceiveException throws ServerExceptions when it succeeds reading the exception
-        // information from the server. So the execution does not usually reach this state.
-        // However, the user can suppress exceptions with
-        // `ClientOptions::SetRethrowException(false)` (the default is true).
         ServerError ret{std::make_shared<Exception>()};
-        if (!ReceiveException(false, &ret)) {
+        if (!ReceiveException(ret)) {
             throw ProtocolError{"server reported an error, but the exception packet could not be decoded (error details lost)"};
         }
+
+        if (options_.rethrow_exceptions) {
+            throw ret;
+        }
+
         return ret;
     }
 
     case ServerCodes::ProfileInfo: {
         Profile ret{};
-
-        if (!WireFormat::ReadUInt64(*input_, &ret.rows) ||
-            !WireFormat::ReadUInt64(*input_, &ret.blocks) ||
-            !WireFormat::ReadUInt64(*input_, &ret.bytes) ||
-            !WireFormat::ReadFixed(*input_, &ret.applied_limit) ||
-            !WireFormat::ReadUInt64(*input_, &ret.rows_before_limit) ||
-            !WireFormat::ReadFixed(*input_, &ret.calculated_rows_before_limit)) {
+        if (!ReceiveProfileInfo(ret)) {
             throw ProtocolError{"can't read profile info packet from input stream"};
         }
-
-        if (events_) {
-            events_->OnProfile(ret);
-        }
-
         return ret;
     }
 
     case ServerCodes::Progress: {
         Progress ret{};
-
-        if (!WireFormat::ReadUInt64(*input_, &ret.rows) ||
-            !WireFormat::ReadUInt64(*input_, &ret.bytes)) {
+        if (!ReceiveProgress(ret)) {
             throw ProtocolError{"can't read progress packet from input stream"};
         }
-
-        if constexpr(DMBS_PROTOCOL_REVISION >= DBMS_MIN_REVISION_WITH_TOTAL_ROWS_IN_PROGRESS) {
-            if (!WireFormat::ReadUInt64(*input_, &ret.total_rows)) {
-                throw ProtocolError{"can't read progress packet from input stream"};
-            }
-        }
-        if (server_info_.revision >= DBMS_MIN_REVISION_WITH_CLIENT_WRITE_INFO)
-        {
-            if (!WireFormat::ReadUInt64(*input_, &ret.written_rows) ||
-                !WireFormat::ReadUInt64(*input_, &ret.written_bytes)) {
-                throw ProtocolError{"can't read progress packet from input stream"};
-            }
-        }
-
-        if (events_) {
-            events_->OnProgress(ret);
-        }
-
         return ret;
     }
 
@@ -764,25 +746,15 @@ DecodedPacket Client::Impl::ReceivePacket(uint64_t* server_packet) {
     }
 
     case ServerCodes::Log: {
-        // log tag
         Log ret;
-        if (!WireFormat::SkipString(*input_) ||
-            // Use uncompressed stream since log blocks usually contain only one row
-            !ReadBlock(*input_, &ret.block)) {
+        if (!ReceiveLog(ret.block)) {
             throw ProtocolError{"can't read log packet from input stream"};
-        }
-
-        if (events_) {
-            events_->OnServerLog(ret.block);
         }
         return ret;
     }
 
     case ServerCodes::TableColumns: {
-        // external table name
-        if (!WireFormat::SkipString(*input_) ||
-            // columns metadata
-            !WireFormat::SkipString(*input_)) {
+        if (!ReceiveTableColumns()) {
             throw ProtocolError{"can't read table columns packet from input stream"};
         }
         return TableColumns{};
@@ -790,20 +762,14 @@ DecodedPacket Client::Impl::ReceivePacket(uint64_t* server_packet) {
 
     case ServerCodes::ProfileEvents: {
         ProfileEvents ret;
-        if (!WireFormat::SkipString(*input_) ||
-            !ReadBlock(*input_, &ret.block)) {
+        if (!ReceiveProfileEvents(ret.block)) {
             throw ProtocolError{"can't read profile events packet from input stream"};
-        }
-
-        if (events_) {
-            events_->OnProfileEvents(ret.block);
         }
         return ret;
     }
 
     default:
         throw UnimplementedError("unimplemented " + std::to_string((int)packet_type));
-        break;
     }
 }
 
@@ -811,7 +777,9 @@ bool Client::Impl::ProcessPacket(uint64_t* server_packet) {
     auto packet = ReceivePacket(server_packet);
     switch (packet.index()) {
     case VariantIndex<ServerError, decltype(packet)>():
-        // See note in ReceivePacket() for the ServerCodes::Exception case
+        // Normally `ReceivePacket()` throws on server exceptions, but it can be
+        // suppressed by `ClientOptions::SetRethrowException`. In that case the
+        // error marks the end of the response.
     case VariantIndex<EndOfStream, decltype(packet)>():
         return false;
     default:
@@ -928,33 +896,97 @@ bool Client::Impl::ReceiveData(Block & block) {
     return true;
 }
 
-bool Client::Impl::ReceiveException(bool rethrow, ServerError * error) {
+bool Client::Impl::ReceiveException(ServerError & error) {
     std::shared_ptr<Exception> e(new Exception);
     bool has_nested = false; // obsolete: https://github.com/ClickHouse/ClickHouse/blob/ef11941cf5a/src/IO/ReadHelpers.cpp#L2017
-    bool exception_received = false;
 
-    if (WireFormat::ReadFixed(*input_, &e->code)
-        && WireFormat::ReadString(*input_, &e->name)
-        && WireFormat::ReadString(*input_, &e->display_text)
-        && WireFormat::ReadString(*input_, &e->stack_trace)
-        && WireFormat::ReadFixed(*input_, &has_nested)) {
+    if (!WireFormat::ReadFixed(*input_, &e->code) ||
+        !WireFormat::ReadString(*input_, &e->name) ||
+        !WireFormat::ReadString(*input_, &e->display_text) ||
+        !WireFormat::ReadString(*input_, &e->stack_trace) ||
+        !WireFormat::ReadFixed(*input_, &has_nested)) {
+        return false;
+    }
 
-        if (events_) {
-            events_->OnServerException(*e);
+    if (events_) {
+        events_->OnServerException(*e);
+    }
+
+    error = ServerError(e);
+
+    return true;
+}
+
+bool Client::Impl::ReceiveProfileInfo(Profile & profile) {
+    if (!WireFormat::ReadUInt64(*input_, &profile.rows) ||
+        !WireFormat::ReadUInt64(*input_, &profile.blocks) ||
+        !WireFormat::ReadUInt64(*input_, &profile.bytes) ||
+        !WireFormat::ReadFixed(*input_, &profile.applied_limit) ||
+        !WireFormat::ReadUInt64(*input_, &profile.rows_before_limit) ||
+        !WireFormat::ReadFixed(*input_, &profile.calculated_rows_before_limit)) {
+        return false;
+    }
+
+    if (events_) {
+        events_->OnProfile(profile);
+    }
+
+    return true;
+}
+
+bool Client::Impl::ReceiveProgress(Progress & progress) {
+    if (!WireFormat::ReadUInt64(*input_, &progress.rows) ||
+        !WireFormat::ReadUInt64(*input_, &progress.bytes)) {
+        return false;
+    }
+
+    if constexpr(DMBS_PROTOCOL_REVISION >= DBMS_MIN_REVISION_WITH_TOTAL_ROWS_IN_PROGRESS) {
+        if (!WireFormat::ReadUInt64(*input_, &progress.total_rows)) {
+            return false;
         }
-
-        if (rethrow || options_.rethrow_exceptions) {
-            throw ServerError(e);
-        }
-
-        exception_received = true;
-
-        if (error != nullptr) {
-            *error = ServerError(e);
+    }
+    if (server_info_.revision >= DBMS_MIN_REVISION_WITH_CLIENT_WRITE_INFO)
+    {
+        if (!WireFormat::ReadUInt64(*input_, &progress.written_rows) ||
+            !WireFormat::ReadUInt64(*input_, &progress.written_bytes)) {
+            return false;
         }
     }
 
-    return exception_received;
+    if (events_) {
+        events_->OnProgress(progress);
+    }
+
+    return true;
+}
+
+bool Client::Impl::ReceiveLog(Block & block) {
+    if (!WireFormat::SkipString(*input_) || // log tag
+        !ReadBlock(*input_, &block)) { // Use uncompressed stream since log blocks usually contain only one row
+        return false;
+    }
+    if (events_) {
+        events_->OnServerLog(block);
+    }
+    return true;
+}
+
+bool Client::Impl::ReceiveTableColumns() {
+    if (!WireFormat::SkipString(*input_) || // external table name
+        !WireFormat::SkipString(*input_)) { // columns metadata
+        return false;
+    }
+    return true;
+}
+
+bool Client::Impl::ReceiveProfileEvents(Block & block) {
+    if (!WireFormat::SkipString(*input_) || !ReadBlock(*input_, &block)) {
+        return false;
+    }
+    if (events_) {
+        events_->OnProfileEvents(block);
+    }
+    return true;
 }
 
 void Client::Impl::SendCancel() {
@@ -1199,10 +1231,11 @@ bool Client::Impl::ReceiveHello() {
 
         return true;
     } else if (packet_type == ServerCodes::Exception) {
-        if (!ReceiveException(true)) {
+        ServerError ret{std::make_shared<Exception>()};
+        if (!ReceiveException(ret)) {
             throw ProtocolError{"server rejected the connection, but its exception packet could not be decoded"};
         }
-        return false;
+        throw ret;
     }
 
     return false;
