@@ -131,6 +131,7 @@ TEST(Socketcase, connecttimeout) {
 //}
 
 #if !defined(_win_)
+#   include <cerrno>
 #   include <sys/socket.h>
 #   include <unistd.h>
 
