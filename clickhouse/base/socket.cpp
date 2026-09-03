@@ -1,6 +1,7 @@
 #include "socket.h"
 #include "singleton.h"
 #include "../client.h"
+#include "../exceptions.h"
 
 #include <assert.h>
 #include <stdexcept>
@@ -436,11 +437,12 @@ size_t SocketInput::DoRead(void* buf, size_t len) {
     }
 
     if (ret == 0) {
-#if defined(_win_)
-        throw std::system_error(WSAECONNRESET, getErrorCategory(), "connection closed by peer");
-#else
-        throw std::system_error(ECONNRESET, getErrorCategory(), "connection closed by peer");
-#endif
+        // Clean peer close (EOF) before the requested number of bytes
+        // arrived: the underlying `recv()` succeeded, so this is not a
+        // syscall error. The decoder expected more protocol data and the
+        // connection ended instead, so surface this as a truncated-data
+        // / protocol decoding failure rather than a system_error.
+        throw ProtocolError("connection closed by peer while reading");
     }
 
     throw std::system_error(getSocketErrorCode(), getErrorCategory(), "can't receive string data");

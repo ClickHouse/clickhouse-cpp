@@ -137,33 +137,21 @@ TEST(Socketcase, connecttimeout) {
 
 // Regression test for issue #487.
 //
-// On a clean peer close, `recv()` returns 0, which is EOF, not an error.
-// POSIX does NOT require `errno` to be set when `recv()` returns 0, so reading
-// `errno` at that point yields a stale value from a previous syscall. Prior
-// to the fix, `SocketInput::DoRead` surfaced that stale `errno` to the caller
-// (e.g. "Operation now in progress" if the last failing call was the
-// non-blocking `connect()`), making the exception message non-deterministic
-// and misleading.
+// On a clean peer close, `recv()` returns 0, which is EOF, not a syscall
+// error. POSIX does NOT require `errno` to be set when `recv()` returns 0,
+// so reading `errno` at that point would yield a stale value from a previous
+// syscall. The proper representation is a protocol-level / truncated-data
+// failure, not a `std::system_error`: the underlying `recv()` succeeded;
+// the decoder expected more protocol bytes and the connection ended instead.
 //
-// The fix reports `ECONNRESET` with a fixed message instead. This test
-// drives a clean close via `socketpair(2)`, seeds `errno` to a known value
-// that is NOT `ECONNRESET`, and asserts the resulting exception's
-// `error_code` is exactly `ECONNRESET`.
-TEST(Socketcase, recvReturnsZeroReportsConnResetNotStaleErrno) {
+// The fix throws `clickhouse::ProtocolError` on `recv() == 0`. The other
+// `recv() < 0` path still uses `std::system_error` because that is an
+// actual syscall failure. This test drives a clean close via `socketpair(2)`
+// and asserts the resulting exception is exactly `ProtocolError` with a
+// message indicating a peer-closed connection.
+TEST(Socketcase, recvReturnsZeroReportsProtocolErrorNotStaleErrno) {
     int sv[2];
     ASSERT_EQ(0, ::socketpair(AF_UNIX, SOCK_STREAM, 0, sv));
-
-    // Seed `errno` to a known stale value that must NOT leak into the
-    // exception. On Linux, closing an invalid fd sets `errno = EBADF` (9),
-    // which is clearly distinct from `ECONNRESET` (104).
-    if (::close(-1) != -1) {
-        // Sanity guard: `close(-1)` must fail; if it doesn't, the test
-        // cannot guarantee `errno` is set as expected.
-        ::close(sv[0]);
-        ::close(sv[1]);
-        FAIL() << "close(-1) unexpectedly succeeded; cannot seed errno";
-    }
-    ASSERT_EQ(EBADF, errno);
 
     SocketInput input(sv[0]);
     // Close the peer side: the next `recv()` on sv[0] returns 0 (EOF).
@@ -173,13 +161,17 @@ TEST(Socketcase, recvReturnsZeroReportsConnResetNotStaleErrno) {
     try {
         input.Read(buf, sizeof(buf));
         ::close(sv[0]);
-        FAIL() << "expected std::system_error on clean peer close";
+        FAIL() << "expected ProtocolError on clean peer close";
+    } catch (const ProtocolError& e) {
+        ::close(sv[0]);
+        const std::string what = e.what();
+        EXPECT_NE(what.find("closed"), std::string::npos)
+            << "expected message to mention 'closed', got: " << what;
     } catch (const std::system_error& e) {
         ::close(sv[0]);
-        EXPECT_EQ(ECONNRESET, e.code().value())
-            << "stale errno leaked into the exception: " << e.code().value();
-        EXPECT_NE(EBADF, e.code().value())
-            << "regression: stale errno was surfaced instead of ECONNRESET";
+        FAIL() << "recv()==0 must be reported as ProtocolError, not "
+                  "std::system_error (got errno-style code "
+               << e.code().value() << "); stale errno regression";
     }
 }
 #endif  // !defined(_win_)
