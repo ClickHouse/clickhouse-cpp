@@ -30,18 +30,25 @@ Here is an example with recommended settings;
 ```sh
 $ mkdir build .
 $ cd build
-$ cmake .. -DCH_USE_ABSEIL_FOR_BIGNUM=NO -DCH_MAP_BOOL_TO_UINT8=NO -DCH_NON_OPTIONAL_CURRENT_ENDPOINT=YES
+$ cmake .. -DCH_USE_3X_API=YES
 $ make
 ```
 
-The command above disables two legacy CMake defaults, `CH_USE_ABSEIL_FOR_BIGNUM`  and
-`CH_MAP_BOOL_TO_UINT8`. New projects should set both options to `OFF`. Existing projects can keep
-the defaults temporarily, but should migrate to this configuration as this behavior will be removed
-in the future versions of the library.
+`CH_USE_3X_API` selects the new 3.x API. As the project evolves we bring new changes to the
+API; sometimes these require breaking changes. When that happens we keep the old API
+unchanged by default and hide the changes behind specific flags. To enable all of these changes
+at once, we recommend enabling `CH_USE_3X_API`, which will be the default API in version 3.0.
 
-It also enables `CH_NON_OPTIONAL_CURRENT_ENDPOINT`, which makes `Client::GetCurrentEndpoint()`
-return `Endpoint` by value instead of the legacy `std::optional<Endpoint>`. The option defaults to
-`OFF` for backward compatibility; the optional form will be removed in future versions.
+Enabling this option is equivalent to setting the following individual options:
+
+| Option                             | 2.x default | 3.x value | Effect when set to the 3.x value                                                        |
+|------------------------------------|-------------|-----------|-----------------------------------------------------------------------------------------|
+| `CH_MAP_BOOL_TO_UINT8`             | `ON`        | `OFF`     | ClickHouse `Bool` maps to `clickhouse::ColumnBool` instead of `ColumnUInt8`             |
+| `CH_USE_ABSEIL_FOR_BIGNUM`         | `ON`        | `OFF`     | 128-bit integers use the self-contained implementation instead of Abseil                |
+| `CH_NON_OPTIONAL_CURRENT_ENDPOINT` | `OFF`       | `ON`      | `Client::GetCurrentEndpoint()` returns `Endpoint` by value instead of `std::optional`   |
+
+The individual options can still be set one at a time for a gradual migration; however, when
+`CH_USE_3X_API=ON` is given, setting any of them to a conflicting value is a configuration error.
 
 Please refer to the workflows for the reference on dependencies/build options
 - https://github.com/ClickHouse/clickhouse-cpp/blob/master/.github/workflows/linux.yml
@@ -101,9 +108,7 @@ Then include it from your `CMakeLists.txt`:
 cmake_minimum_required(VERSION 3.13)
 project(application-example LANGUAGES CXX)
 
-set(CH_USE_ABSEIL_FOR_BIGNUM OFF)
-set(CH_MAP_BOOL_TO_UINT8 OFF)
-set(CH_NON_OPTIONAL_CURRENT_ENDPOINT ON)
+set(CH_USE_3X_API ON)
 
 add_subdirectory(contrib/clickhouse-cpp)
 
@@ -121,9 +126,7 @@ project(application-example LANGUAGES CXX)
 
 include(FetchContent)
 
-set(CH_USE_ABSEIL_FOR_BIGNUM OFF)
-set(CH_MAP_BOOL_TO_UINT8 OFF)
-set(CH_NON_OPTIONAL_CURRENT_ENDPOINT ON)
+set(CH_USE_3X_API ON)
 
 FetchContent_Declare(
     clickhouse_cpp
