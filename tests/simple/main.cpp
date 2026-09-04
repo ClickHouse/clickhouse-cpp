@@ -588,7 +588,11 @@ int main() {
             Client client(ClientOptions(localHostEndpoint)
                     .SetPingBeforeQuery(true));
             RunTests(client);
+#if CH_NON_OPTIONAL_CURRENT_ENDPOINT
+            std::cout << "current endpoint : " <<  client.GetCurrentEndpoint().host << "\n";
+#else
             std::cout << "current endpoint : " <<  client.GetCurrentEndpoint().value().host << "\n";
+#endif
         }
 
         {

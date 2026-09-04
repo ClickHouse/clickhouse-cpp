@@ -15,7 +15,6 @@ IF ("${CMAKE_CURRENT_SOURCE_DIR}" STREQUAL "${CMAKE_SOURCE_DIR}")
 ENDIF ()
 OPTION (WITH_OPENSSL "Use OpenSSL for TLS connections" OFF)
 
-OPTION (CH_USE_ABSEIL_FOR_BIGNUM "Use Google Abseil for wide (128-bit) integers" ON)
 OPTION (WITH_SYSTEM_ABSEIL "Use system Google Abseil, otherwise vendored part part of Google Abseil will be used" OFF)
 
 OPTION (WITH_SYSTEM_LZ4 "Use system LZ4" OFF)
@@ -23,7 +22,33 @@ OPTION (WITH_SYSTEM_ZSTD "Use system ZSTD" OFF)
 OPTION (DEBUG_DEPENDENCIES "Print debug info about dependencies duting build" ON)
 OPTION (CHECK_VERSION "Check that version number corresponds to git tag, usefull in CI/CD to validate that new version published on GitHub has same version in sources" OFF)
 OPTION (DISABLE_CLANG_LIBC_WORKAROUND "Disable linking compiler-rt & gcc_s if using clang & libstdc++" OFF)
-OPTION (CH_MAP_BOOL_TO_UINT8 "Map ClickHouse Bool type to UInt8 instead of exposing a distinct Bool API." ON)
+
+# API compatibility options. The defaults preserve the legacy 2.x behaviour. CH_USE_3X_API switches
+# all of them to the 3.x values at once; individual options may not be set to conflicting values.
+OPTION (CH_USE_3X_API "Use the 3.x API: implies CH_MAP_BOOL_TO_UINT8=OFF, CH_USE_ABSEIL_FOR_BIGNUM=OFF, CH_NON_OPTIONAL_CURRENT_ENDPOINT=ON" OFF)
+IF (CH_USE_3X_API)
+    SET (CH_3X_MAP_BOOL_TO_UINT8 OFF)
+    SET (CH_3X_USE_ABSEIL_FOR_BIGNUM OFF)
+    SET (CH_3X_NON_OPTIONAL_CURRENT_ENDPOINT ON)
+ELSE ()
+    SET (CH_3X_MAP_BOOL_TO_UINT8 ON)
+    SET (CH_3X_USE_ABSEIL_FOR_BIGNUM ON)
+    SET (CH_3X_NON_OPTIONAL_CURRENT_ENDPOINT OFF)
+ENDIF ()
+OPTION (CH_MAP_BOOL_TO_UINT8 "Map ClickHouse Bool type to UInt8 instead of exposing a distinct Bool API." ${CH_3X_MAP_BOOL_TO_UINT8})
+OPTION (CH_USE_ABSEIL_FOR_BIGNUM "Use Google Abseil for wide (128-bit) integers" ${CH_3X_USE_ABSEIL_FOR_BIGNUM})
+OPTION (CH_NON_OPTIONAL_CURRENT_ENDPOINT "Make Client::GetCurrentEndpoint() return Endpoint by value instead of std::optional<Endpoint>." ${CH_3X_NON_OPTIONAL_CURRENT_ENDPOINT})
+
+IF (CH_USE_3X_API)
+    FOREACH (opt MAP_BOOL_TO_UINT8 USE_ABSEIL_FOR_BIGNUM NON_OPTIONAL_CURRENT_ENDPOINT)
+        IF ((CH_${opt} AND NOT CH_3X_${opt}) OR (NOT CH_${opt} AND CH_3X_${opt}))
+            MESSAGE (FATAL_ERROR
+                "CH_USE_3X_API=ON requires CH_${opt}=${CH_3X_${opt}}, but it is set to '${CH_${opt}}'. "
+                "Either drop the explicit CH_${opt} setting, or set it to ${CH_3X_${opt}}. "
+                "If the value comes from a previous configure run, delete CMakeCache.txt or pass -DCH_${opt}=${CH_3X_${opt}}.")
+        ENDIF ()
+    ENDFOREACH ()
+ENDIF ()
 
 PROJECT (CLICKHOUSE-CLIENT
     VERSION "${CLICKHOUSE_CPP_VERSION}"
