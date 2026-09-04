@@ -30,7 +30,7 @@ Here is an example with recommended settings;
 ```sh
 $ mkdir build .
 $ cd build
-$ cmake .. -DCH_USE_ABSEIL_FOR_BIGNUM=NO -DCH_MAP_BOOL_TO_UINT8=NO
+$ cmake .. -DCH_USE_ABSEIL_FOR_BIGNUM=NO -DCH_MAP_BOOL_TO_UINT8=NO -DCH_NON_OPTIONAL_CURRENT_ENDPOINT=YES
 $ make
 ```
 
@@ -38,6 +38,10 @@ The command above disables two legacy CMake defaults, `CH_USE_ABSEIL_FOR_BIGNUM`
 `CH_MAP_BOOL_TO_UINT8`. New projects should set both options to `OFF`. Existing projects can keep
 the defaults temporarily, but should migrate to this configuration as this behavior will be removed
 in the future versions of the library.
+
+It also enables `CH_NON_OPTIONAL_CURRENT_ENDPOINT`, which makes `Client::GetCurrentEndpoint()`
+return `Endpoint` by value instead of the legacy `std::optional<Endpoint>`. The option defaults to
+`OFF` for backward compatibility; the optional form will be removed in future versions.
 
 Please refer to the workflows for the reference on dependencies/build options
 - https://github.com/ClickHouse/clickhouse-cpp/blob/master/.github/workflows/linux.yml
@@ -99,6 +103,7 @@ project(application-example LANGUAGES CXX)
 
 set(CH_USE_ABSEIL_FOR_BIGNUM OFF)
 set(CH_MAP_BOOL_TO_UINT8 OFF)
+set(CH_NON_OPTIONAL_CURRENT_ENDPOINT ON)
 
 add_subdirectory(contrib/clickhouse-cpp)
 
@@ -118,6 +123,7 @@ include(FetchContent)
 
 set(CH_USE_ABSEIL_FOR_BIGNUM OFF)
 set(CH_MAP_BOOL_TO_UINT8 OFF)
+set(CH_NON_OPTIONAL_CURRENT_ENDPOINT ON)
 
 FetchContent_Declare(
     clickhouse_cpp

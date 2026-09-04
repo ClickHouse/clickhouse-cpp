@@ -114,6 +114,10 @@ cc_library(
         # Users are free to include Abseil in their own projects and convert values produced by this
         # library to the corresponding Abseil types.
         "CH_USE_ABSEIL_FOR_BIGNUM=0",
+        # `Client::GetCurrentEndpoint()` returns `Endpoint` by value rather than the legacy
+        # `std::optional<Endpoint>`. The Bazel build does not promise backward compatibility with
+        # the 2.x API, so it always uses the new form (CMake's `CH_NON_OPTIONAL_CURRENT_ENDPOINT=ON`).
+        "CH_NON_OPTIONAL_CURRENT_ENDPOINT=1",
     ] + select({
         # `WITH_OPENSSL` enables the TLS code paths in client.cpp /
         # sslsocket.cpp (same macro as the CMake option). `USE_BORINGSSL`

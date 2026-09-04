@@ -41,6 +41,16 @@ ClientBoolValue MakeClientBoolValue(bool value) {
 #endif
 }
 
+// Client::GetCurrentEndpoint() returns either Endpoint or std::optional<Endpoint>
+// depending on CH_NON_OPTIONAL_CURRENT_ENDPOINT; normalize to Endpoint for tests.
+Endpoint CurrentEndpoint(const Client & client) {
+#if CH_NON_OPTIONAL_CURRENT_ENDPOINT
+    return client.GetCurrentEndpoint();
+#else
+    return client.GetCurrentEndpoint().value();
+#endif
+}
+
 template <typename T>
 std::shared_ptr<T> createTableWithOneColumn(Client & client, const std::string & table_name, const std::string & column_name)
 {
@@ -1784,7 +1794,7 @@ TEST_P(ConnectionSuccessTestCase, SuccessConnectionEstablished) {
 
     try {
         client = std::make_unique<Client>(client_options);
-        auto endpoint = client->GetCurrentEndpoint().value();
+        auto endpoint = CurrentEndpoint(*client);
         ASSERT_EQ("localhost", endpoint.host);
         ASSERT_EQ(9000u, endpoint.port);
         SUCCEED();
@@ -1866,27 +1876,27 @@ TEST(ResetConnectionEndpointTest, ReconnectsCurrentBeforeFailover) {
 
     // The initial connection selects the first endpoint.
     Client client(options, std::move(socket_factory));
-    ASSERT_EQ(primary, client.GetCurrentEndpoint().value());
+    ASSERT_EQ(primary, CurrentEndpoint(client));
 
     // A healthy current endpoint is retried without advancing.
     adapter->SetFailEndpoint(std::nullopt);
     adapter->ClearConnectRequests();
     client.ResetConnectionEndpoint();
-    EXPECT_EQ(primary, client.GetCurrentEndpoint().value());
+    EXPECT_EQ(primary, CurrentEndpoint(client));
     EXPECT_EQ(std::vector<Endpoint>{primary}, adapter->ConnectRequests());
 
     // Failure of the current endpoint advances to the next endpoint.
     adapter->SetFailEndpoint(primary);
     adapter->ClearConnectRequests();
     client.ResetConnectionEndpoint();
-    EXPECT_EQ(secondary, client.GetCurrentEndpoint().value());
+    EXPECT_EQ(secondary, CurrentEndpoint(client));
     EXPECT_EQ((std::vector<Endpoint>{primary, secondary}), adapter->ConnectRequests());
 
     // Failure of the last endpoint wraps around to the first endpoint.
     adapter->SetFailEndpoint(secondary);
     adapter->ClearConnectRequests();
     client.ResetConnectionEndpoint();
-    EXPECT_EQ(primary, client.GetCurrentEndpoint().value());
+    EXPECT_EQ(primary, CurrentEndpoint(client));
     EXPECT_EQ((std::vector<Endpoint>{secondary, primary}), adapter->ConnectRequests());
 }
 
@@ -1896,12 +1906,12 @@ TEST_P(ResetConnectionTestCase, ResetConnectionTest) {
 
     try {
         client = std::make_unique<Client>(client_options);
-        auto endpoint = client->GetCurrentEndpoint().value();
+        auto endpoint = CurrentEndpoint(*client);
         ASSERT_EQ("localhost", endpoint.host);
         ASSERT_EQ(9000u, endpoint.port);
 
         client->ResetConnection();
-        endpoint = client->GetCurrentEndpoint().value();
+        endpoint = CurrentEndpoint(*client);
         ASSERT_EQ("localhost", endpoint.host);
         ASSERT_EQ(9000u, endpoint.port);
 

@@ -1412,9 +1412,15 @@ void Client::ResetConnectionEndpoint() {
     impl_->ResetConnectionEndpoint();
 }
 
+#if CH_NON_OPTIONAL_CURRENT_ENDPOINT
+Endpoint Client::GetCurrentEndpoint() const {
+    return impl_->GetCurrentEndpoint().value();
+}
+#else
 const std::optional<Endpoint>& Client::GetCurrentEndpoint() const {
     return impl_->GetCurrentEndpoint();
 }
+#endif
 
 const ServerInfo& Client::GetServerInfo() const {
     return impl_->GetServerInfo();
