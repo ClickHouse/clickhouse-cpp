@@ -426,7 +426,7 @@ std::ostream& operator<<(std::ostream& ostr, const ItemView& item_view) {
         }
         case Type::IPv4: {
             in_addr addr;
-            addr.s_addr = ntohl(item_view.get<uint32_t>());
+            addr.s_addr = htonl(item_view.get<uint32_t>());
             ostr << addr;
             break;
         }

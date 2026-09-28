@@ -186,11 +186,11 @@ std::string FooBarGenerator(size_t i) {
 
 std::vector<in_addr> MakeIPv4s() {
     return {
-        MakeIPv4(0x12345678), // 255.255.255.255
+        MakeIPv4(0xFFFFFFFF), // 255.255.255.255
+        MakeIPv4(0x12345678), // 120.86.52.18
         MakeIPv4(0x0100007f), // 127.0.0.1
-        MakeIPv4(3585395774),
+        MakeIPv4(0xD5B4CC3E), // 62.204.180.213
         MakeIPv4(0),
-        MakeIPv4(0x12345678),
     };
 }
 

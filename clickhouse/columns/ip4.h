@@ -19,15 +19,18 @@ public:
      */
     explicit ColumnIPv4(ColumnRef data);
 
+    /// Create column from numeric values in the same representation as `in_addr::s_addr`
+    /// (network byte order), i.e. `htonl(0xC0A80107)` for `192.168.1.7`.
     explicit ColumnIPv4(std::vector<uint32_t>&& data);
 
     /// Appends one element to the column.
     void Append(const std::string& ip);
 
-    /// @params ip numeric value with host byte order.
+    /// Append numeric value in the same representation as `in_addr::s_addr`
+    /// (network byte order), i.e. `htonl(0xC0A80107)` for `192.168.1.7`.
     void Append(uint32_t ip);
 
-    ///
+    /// Append struct in_addr
     void Append(in_addr ip);
 
     /// Returns element at given row number.
