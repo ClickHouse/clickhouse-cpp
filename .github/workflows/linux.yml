@@ -156,9 +156,9 @@ jobs:
       matrix:
         clickhouse-version:
           - '26.3'  # LTS
-          - '26.6'  # Stable
           - '26.7'  # Stable
-          - '26.8'  # LTS, latest stable
+          - '26.8'  # LTS
+          - '26.9'  # Stable, latest stable
           - 'head'  # nightly build of ClickHouse master
 
     runs-on: ubuntu-24.04
