@@ -954,7 +954,7 @@ TEST(ColumnsCase, ColumnIPv4)
 
     col.Append("255.255.255.255");
     col.Append("127.0.0.1");
-    col.Append(3585395774);
+    col.Append(0xD5B4CC3E);
     col.Append(0);
     const in_addr ip = MakeIPv4(0x12345678);
     col.Append(ip);
@@ -962,7 +962,7 @@ TEST(ColumnsCase, ColumnIPv4)
     ASSERT_EQ(5u, col.Size());
     EXPECT_EQ(MakeIPv4(0xffffffff), col.At(0));
     EXPECT_EQ(MakeIPv4(0x0100007f), col.At(1));
-    EXPECT_EQ(MakeIPv4(3585395774), col.At(2));
+    EXPECT_EQ(MakeIPv4(0xD5B4CC3E), col.At(2));
     EXPECT_EQ(MakeIPv4(0),          col.At(3));
     EXPECT_EQ(ip,                  col.At(4));
 

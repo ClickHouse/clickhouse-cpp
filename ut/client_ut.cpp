@@ -259,6 +259,92 @@ TEST_P(ClientCase, Time64) {
     EXPECT_EQ(total_rows, 1UL);
 }
 
+TEST_P(ClientCase, IPv4RoundTrip) {
+    // Check that an inserted IP address matches representation created by ClickHouse's toString()
+    client_->Execute("DROP TEMPORARY TABLE IF EXISTS test_clickhouse_cpp_ipv4");
+    client_->Execute("CREATE TEMPORARY TABLE test_clickhouse_cpp_ipv4 (id String, ip IPv4) ENGINE = Memory");
+
+    std::string address_string = "192.168.1.7";
+    auto id = std::make_shared<ColumnString>();
+    auto ip = std::make_shared<ColumnIPv4>();
+    id->Append("Append(const std::string&)");
+    ip->Append(address_string);
+
+    struct sockaddr_in sa{};
+    ASSERT_EQ(inet_pton(AF_INET, address_string.c_str(), &sa.sin_addr), 1);
+    id->Append("Append(in_addr)");
+    ip->Append(sa.sin_addr);
+
+    // Append(uint32_t) expects the raw value as found in in_addr::s_addr (network byte order).
+    uint32_t network_order = htonl(0xC0A80107);
+    id->Append("Append(uint32_t)");
+    ip->Append(network_order);
+
+    Block b;
+    b.AppendColumn("id", id);
+    b.AppendColumn("ip", ip);
+    client_->Insert("test_clickhouse_cpp_ipv4", b);
+
+    size_t total_rows = 0;
+    client_->Select("SELECT id, toString(ip) FROM test_clickhouse_cpp_ipv4 ORDER BY id", [&](const Block& block) {
+        total_rows += block.GetRowCount();
+        for (size_t i = 0; i < block.GetRowCount(); ++i) {
+            const auto id = block[0]->AsStrict<ColumnString>()->At(i);
+            const auto out_string = block[1]->AsStrict<ColumnString>()->At(i);
+            EXPECT_EQ(out_string, address_string) << id;
+        }
+    });
+    EXPECT_EQ(total_rows, ip->Size());
+}
+
+TEST_P(ClientCase, IPv6RoundTrip) {
+    // Check that an inserted IP address matches representation created by ClickHouse's toString().
+    // The address has 16 distinct, monotonically increasing bytes (01 02 ... 10), so any
+    // byte-order or offset mistake on the way to the server produces a different string.
+    client_->Execute("DROP TEMPORARY TABLE IF EXISTS test_clickhouse_cpp_ipv6");
+    client_->Execute("CREATE TEMPORARY TABLE test_clickhouse_cpp_ipv6 (id String, ip IPv6) ENGINE = Memory");
+
+    std::string address_string = "102:304:506:708:90a:b0c:d0e:f10";
+    auto id = std::make_shared<ColumnString>();
+    auto ip = std::make_shared<ColumnIPv6>();
+    id->Append("Append(const std::string_view&)");
+    ip->Append(address_string);
+
+    struct sockaddr_in6 sa{};
+    ASSERT_EQ(inet_pton(AF_INET6, address_string.c_str(), &sa.sin6_addr), 1);
+    id->Append("Append(const in6_addr&)");
+    ip->Append(sa.sin6_addr);
+
+    id->Append("Append(const in6_addr*)");
+    ip->Append(&sa.sin6_addr);
+
+    // Bytes spelled out explicitly, bypassing inet_pton: s6_addr[0] is the most
+    // significant byte on the wire (network order).
+    const uint8_t raw_bytes[16] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+                                   0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10};
+    in6_addr explicit_bytes;
+    static_assert(sizeof(explicit_bytes) == sizeof(raw_bytes));
+    memcpy(&explicit_bytes, raw_bytes, sizeof(raw_bytes));
+    id->Append("Append(const in6_addr&) from explicit bytes");
+    ip->Append(explicit_bytes);
+
+    Block b;
+    b.AppendColumn("id", id);
+    b.AppendColumn("ip", ip);
+    client_->Insert("test_clickhouse_cpp_ipv6", b);
+
+    size_t total_rows = 0;
+    client_->Select("SELECT id, toString(ip) FROM test_clickhouse_cpp_ipv6 ORDER BY id", [&](const Block& block) {
+        total_rows += block.GetRowCount();
+        for (size_t i = 0; i < block.GetRowCount(); ++i) {
+            const auto id = block[0]->AsStrict<ColumnString>()->At(i);
+            const auto out_string = block[1]->AsStrict<ColumnString>()->At(i);
+            EXPECT_EQ(out_string, address_string) << id;
+        }
+    });
+    EXPECT_EQ(total_rows, ip->Size());
+}
+
 TEST_P(ClientCase, Date) {
     Block b;
 
