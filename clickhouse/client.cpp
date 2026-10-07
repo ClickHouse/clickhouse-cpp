@@ -676,7 +676,13 @@ bool Client::Impl::Handshake() {
     }
 
     if (server_info_.revision >= DBMS_MIN_PROTOCOL_VERSION_WITH_ADDENDUM) {
+        // The server reads the addendum as part of the handshake and, since
+        // handshake_timeout_milliseconds (default 30s), drops the connection
+        // if it does not arrive in time. Without this flush the addendum only
+        // left the buffer with the first query, so a connection that was idle
+        // for 30s after connecting was closed with SOCKET_TIMEOUT.
         WireFormat::WriteString(*output_, std::string());
+        output_->Flush();
     }
 
     return true;
