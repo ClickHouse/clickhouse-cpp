@@ -406,6 +406,35 @@ TEST_P(ClientCase, LowCardinality) {
     ASSERT_EQ(total_rows, data.size());
 }
 
+TEST_P(ClientCase, InsertQuotesBareTableName) {
+    const std::string hyphenated_table = "test_clickhouse_cpp_my-table";
+
+    client_->Execute("DROP TABLE IF EXISTS `" + hyphenated_table + "`");
+    client_->Execute("CREATE TABLE `" + hyphenated_table + "` (id Int64) ENGINE = Memory");
+
+    Block block;
+    auto col = std::make_shared<ColumnInt64>();
+    col->Append(42);
+    block.AppendColumn("id", col);
+    block.RefreshRowCount();
+
+    client_->Insert(hyphenated_table, block);
+
+    int64_t value = 0;
+    client_->Select(
+        "SELECT id FROM `" + hyphenated_table + "`",
+        [&value](const Block& result) {
+            if (result.GetRowCount() == 0) {
+                return;
+            }
+
+            value = result[0]->As<ColumnInt64>()->At(0);
+        });
+
+    EXPECT_EQ(value, 42);
+    client_->Execute("DROP TABLE IF EXISTS `" + hyphenated_table + "`");
+}
+
 TEST_P(ClientCase, LowCardinality_InsertAfterClear) {
     // User can successfully insert values after invoking Clear() on LC column.
     Block block;
