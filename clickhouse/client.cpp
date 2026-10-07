@@ -484,6 +484,29 @@ std::string NameToQueryString(const std::string &input)
     return output;
 }
 
+std::string TableNameToQueryString(const std::string& input)
+{
+    if (input.size() >= 2 && input.front() == '`' && input.back() == '`') {
+        return input;
+    }
+
+    std::string output;
+    size_t start = 0;
+    bool first = true;
+    for (size_t i = 0; i <= input.size(); ++i) {
+        if (i == input.size() || input[i] == '.') {
+            if (!first) {
+                output.push_back('.');
+            }
+            output += NameToQueryString(input.substr(start, i - start));
+            first = false;
+            start = i + 1;
+        }
+    }
+
+    return output;
+}
+
 void Client::Impl::Insert(const std::string& table_name, const std::string& query_id, const Block& block) {
     if (state_ == State::Inserting) {
         throw ValidationError("cannot execute query while inserting, use SendInsertData instead");
@@ -509,7 +532,9 @@ void Client::Impl::Insert(const std::string& table_name, const std::string& quer
         }
     }
 
-    Query query("INSERT INTO " + table_name + " ( " + fields_section.str() + " ) VALUES", query_id);
+    Query query(
+        "INSERT INTO " + TableNameToQueryString(table_name) + " ( " + fields_section.str() + " ) VALUES",
+        query_id);
     SendQuery(query);
 
     // Wait for a data packet and return

@@ -313,6 +313,9 @@ public:
     bool IsSelecting() const;
 
     /// Intends for insert block of data into a table \p table_name.
+    /// \p table_name is a bare table identifier, or a qualified \c database.table name.
+    /// Each identifier part is quoted automatically. Pass an already backtick-quoted
+    /// identifier to use it verbatim (for example a table name that contains a dot).
     void Insert(const std::string& table_name, const Block& block);
     void Insert(const std::string& table_name, const std::string& query_id, const Block& block);
 
