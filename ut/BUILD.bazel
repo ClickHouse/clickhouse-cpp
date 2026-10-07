@@ -42,6 +42,7 @@ cc_test(
         "bignum_string_ut.cpp",
         "bignum_ut.cpp",
         "block_ut.cpp",
+        "client_protocol_ut.cpp",
         "column_array_ut.cpp",
         "columns_ut.cpp",
         "itemview_ut.cpp",
