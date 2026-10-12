@@ -103,7 +103,8 @@ struct ClientOptions {
     /// Amount of time to wait before next retry.
     DECLARE_FIELD(retry_timeout, std::chrono::seconds, SetRetryTimeout, std::chrono::seconds(5));
 
-    /// Compression method.
+    /// Compression method for outgoing and incoming blocks.
+    /// An explicit network_compression_method query setting overrides the incoming codec.
     DECLARE_FIELD(compression_method, CompressionMethod, SetCompressionMethod, CompressionMethod::None);
 
     /// TCP Keep alive options

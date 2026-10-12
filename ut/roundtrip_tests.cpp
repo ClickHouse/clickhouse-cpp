@@ -39,6 +39,55 @@ protected:
     std::unique_ptr<Client> client_;
 };
 
+TEST_P(RoundtripCase, ResponseCompressionMethod) {
+    for (const std::string server_method : {"LZ4", "ZSTD"}) {
+        client_->Execute("SET network_compression_method = '" + server_method + "'");
+
+        const auto method = GetParam().compression_method;
+        const auto expected = method == CompressionMethod::None ? server_method
+            : method == CompressionMethod::LZ4 ? "LZ4" : "ZSTD";
+        EXPECT_EQ(expected, GetSettingValue("network_compression_method"));
+    }
+}
+
+TEST_P(RoundtripCase, ResponseCompressionMethodQuerySetting) {
+    for (const std::string method : {"LZ4", "ZSTD"}) {
+        Query query("SELECT value FROM system.settings WHERE name = 'network_compression_method'");
+        query.SetSetting("network_compression_method", {method});
+
+        std::string result;
+        query.OnData([&result](const Block& block) {
+            if (block.GetRowCount() != 0) {
+                result = block[0]->AsStrict<ColumnString>()->At(0);
+            }
+        });
+        client_->Execute(query);
+        EXPECT_EQ(method, result);
+    }
+}
+
+TEST_P(RoundtripCase, ResponseCompressionReadonly) {
+    const auto method = GetParam().compression_method;
+    const std::string server_method = method == CompressionMethod::ZSTD ? "LZ4" : "ZSTD";
+    client_->Execute("SET network_compression_method = '" + server_method + "'");
+    client_->Execute("SET readonly = 1");
+
+    Query query("SELECT 1");
+    query.SetSetting("network_compression_method", {server_method});
+    EXPECT_NO_THROW(client_->Execute(query));
+
+    if (method == CompressionMethod::None) {
+        EXPECT_NO_THROW(client_->Execute("SELECT 1"));
+    } else {
+        try {
+            client_->Execute("SELECT 1");
+            FAIL() << "expected readonly to prevent changing the response codec";
+        } catch (const ServerException& e) {
+            EXPECT_EQ(164, e.GetCode()); // READONLY
+        }
+    }
+}
+
 TEST_P(RoundtripCase, ArrayTUint64) {
     auto array = std::make_shared<ColumnArrayT<ColumnUInt64>>();
     array->Append({0, 1, 2});

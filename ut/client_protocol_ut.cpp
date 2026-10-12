@@ -2,6 +2,7 @@
 #include <clickhouse/base/input.h>
 #include <clickhouse/base/output.h>
 #include <clickhouse/base/socket.h>
+#include <clickhouse/base/wire_format.h>
 #include <clickhouse/exceptions.h>
 
 #include <gtest/gtest.h>
@@ -16,11 +17,13 @@ namespace {
 using namespace clickhouse;
 
 /// A socket that serves a pre-recorded byte script as the server response
-/// and discards (but keeps) everything written by the client.
+/// and records everything written by the client. An optional capture buffer
+/// must outlive the socket.
 class ScriptedSocket : public SocketBase {
 public:
-    explicit ScriptedSocket(std::vector<uint8_t> script)
+    explicit ScriptedSocket(std::vector<uint8_t> script, std::vector<uint8_t>* captured = nullptr)
         : script_(std::move(script))
+        , captured_(captured)
     {}
 
     std::unique_ptr<InputStream> makeInputStream() const override {
@@ -28,26 +31,29 @@ public:
     }
 
     std::unique_ptr<OutputStream> makeOutputStream() const override {
-        return std::make_unique<BufferOutput>(&written_);
+        return std::make_unique<BufferOutput>(captured_ ? captured_ : &written_);
     }
 
 private:
     const std::vector<uint8_t> script_;
+    std::vector<uint8_t>* captured_;
     mutable std::vector<uint8_t> written_;
 };
 
 class ScriptedSocketFactory : public SocketFactory {
 public:
-    explicit ScriptedSocketFactory(std::vector<uint8_t> script)
+    explicit ScriptedSocketFactory(std::vector<uint8_t> script, std::vector<uint8_t>* captured = nullptr)
         : script_(std::move(script))
+        , captured_(captured)
     {}
 
     std::unique_ptr<SocketBase> connect(const ClientOptions&, const Endpoint&) override {
-        return std::make_unique<ScriptedSocket>(script_);
+        return std::make_unique<ScriptedSocket>(script_, captured_);
     }
 
 private:
     std::vector<uint8_t> script_;
+    std::vector<uint8_t>* captured_;
 };
 
 ClientOptions ScriptedClientOptions() {
@@ -237,4 +243,38 @@ TEST(ClientProtocol, WellFormedSelectResponseSucceeds) {
         EXPECT_EQ(block.GetRowCount(), 0u);
     }));
     EXPECT_EQ(blocks, 1u);
+}
+
+TEST(ClientProtocol, CompressionWithOldServerRevision) {
+    std::vector<uint8_t> script = kServerHello;
+    script.push_back(0x05); // ServerCodes::EndOfStream
+
+    for (const auto method : {CompressionMethod::LZ4, CompressionMethod::ZSTD}) {
+        std::vector<uint8_t> written;
+        Client client(ScriptedClientOptions().SetCompressionMethod(method),
+                      std::make_unique<ScriptedSocketFactory>(script, &written));
+        const auto query_offset = written.size(); // Skip the client handshake.
+        // Older servers cannot receive string-serialized query settings.
+        ASSERT_NO_THROW(client.Execute("SELECT 1"));
+
+        ArrayInput input(written.data() + query_offset, written.size() - query_offset);
+        uint64_t value = 0;
+        std::string text;
+        ASSERT_TRUE(WireFormat::ReadUInt64(input, &value));
+        ASSERT_EQ(1u, value); // ClientCodes::Query
+        ASSERT_TRUE(WireFormat::ReadString(input, &text));
+        ASSERT_TRUE(text.empty()); // Query ID
+        ASSERT_TRUE(WireFormat::ReadString(input, &text));
+        ASSERT_TRUE(text.empty()); // Settings terminator: no automatic setting
+        ASSERT_TRUE(WireFormat::ReadUInt64(input, &value));
+        ASSERT_EQ(2u, value); // Stages::Complete
+        ASSERT_TRUE(WireFormat::ReadUInt64(input, &value));
+        EXPECT_EQ(1u, value); // Compression remains enabled.
+        ASSERT_TRUE(WireFormat::ReadString(input, &text));
+        EXPECT_EQ("SELECT 1", text);
+
+        Query query("SELECT 1");
+        query.SetSetting("network_compression_method", {"LZ4"});
+        EXPECT_THROW(client.Execute(query), UnimplementedError);
+    }
 }
