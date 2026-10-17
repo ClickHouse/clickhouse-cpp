@@ -152,6 +152,10 @@ static TypeAst::Meta GetTypeMeta(const StringView& name) {
         return TypeAst::Map;
     }
 
+    if (name == "Nested") {
+        return TypeAst::Nested;
+    }
+
     return TypeAst::Terminal;
 }
 

@@ -22,7 +22,8 @@ struct TypeAst {
         Enum,
         LowCardinality,
         SimpleAggregateFunction,
-        Map
+        Map,
+        Nested
     };
 
     /// Type's category.
