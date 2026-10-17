@@ -1823,6 +1823,117 @@ const auto LocalHostEndpoint = ClientOptions()
         .SetPassword(       getEnvOrDefault("CLICKHOUSE_PASSWORD", ""))
         .SetDefaultDatabase(getEnvOrDefault("CLICKHOUSE_DB",       "default"));
 
+namespace {
+
+using KeyValuePairs = std::vector<std::pair<std::string, uint8_t>>;
+
+KeyValuePairs KeyValuePairsOf(const ColumnRef& column) {
+    auto tuples = column->AsStrict<ColumnTuple>();
+    auto keys = (*tuples)[0]->AsStrict<ColumnString>();
+    auto values = (*tuples)[1]->AsStrict<ColumnUInt8>();
+    KeyValuePairs pairs;
+    for (size_t i = 0; i < tuples->Size(); ++i) {
+        pairs.emplace_back(std::string(keys->At(i)), values->At(i));
+    }
+    return pairs;
+}
+
+std::vector<KeyValuePairs> ArraysOfKeyValuePairsOf(const ColumnRef& column) {
+    auto arrays = column->AsStrict<ColumnArray>();
+    std::vector<KeyValuePairs> arrays_of_pairs;
+    for (size_t i = 0; i < arrays->Size(); ++i) {
+        arrays_of_pairs.push_back(KeyValuePairsOf(arrays->GetAsColumn(i)));
+    }
+    return arrays_of_pairs;
+}
+
+}
+
+TEST_P(ClientCase, ArrayOfNested_SelectServerTypedColumn) {
+    client_->Execute("DROP TEMPORARY TABLE IF EXISTS test_clickhouse_cpp_array_of_nested");
+    client_->Execute("CREATE TEMPORARY TABLE test_clickhouse_cpp_array_of_nested "
+                     "(id UInt8, arrays_of_pairs Array(Nested(key String, value UInt8)))");
+    client_->Execute("INSERT INTO test_clickhouse_cpp_array_of_nested VALUES "
+                     "(1, [[('a', 1), ('b', 2)], []]), (2, []), (3, [[('c', 3)]])");
+
+    std::vector<std::vector<KeyValuePairs>> rows;
+    std::string type_name;
+    client_->Select("SELECT id, arrays_of_pairs FROM test_clickhouse_cpp_array_of_nested ORDER BY id", [&](const Block& block) {
+        if (block.GetRowCount() == 0) {
+            return;
+        }
+        type_name = block[1]->GetType().GetName();
+        auto arrays_of_pairs = block[1]->AsStrict<ColumnArray>();
+        for (size_t row = 0; row < block.GetRowCount(); ++row) {
+            rows.push_back(ArraysOfKeyValuePairsOf(arrays_of_pairs->GetAsColumn(row)));
+        }
+    });
+
+    EXPECT_EQ("Array(Array(Tuple(key String, value UInt8)))", type_name);
+    const std::vector<std::vector<KeyValuePairs>> expected = {
+        {{{"a", 1}, {"b", 2}}, {}},
+        {},
+        {{{"c", 3}}},
+    };
+    EXPECT_EQ(expected, rows);
+}
+
+TEST_P(ClientCase, ArrayOfNested_ReinsertSelectedRows) {
+    client_->Execute("DROP TEMPORARY TABLE IF EXISTS test_clickhouse_cpp_array_of_nested_source");
+    client_->Execute("DROP TEMPORARY TABLE IF EXISTS test_clickhouse_cpp_array_of_nested_copy");
+    client_->Execute("CREATE TEMPORARY TABLE test_clickhouse_cpp_array_of_nested_source "
+                     "(id UInt8, arrays_of_pairs Array(Nested(key String, value UInt8)))");
+    client_->Execute("CREATE TEMPORARY TABLE test_clickhouse_cpp_array_of_nested_copy "
+                     "(id UInt8, arrays_of_pairs Array(Nested(key String, value UInt8)))");
+    client_->Execute("INSERT INTO test_clickhouse_cpp_array_of_nested_source VALUES (1, [[('a', 1), ('b', 2)], []]), (2, [])");
+
+    std::vector<Block> selected_blocks;
+    client_->Select("SELECT id, arrays_of_pairs FROM test_clickhouse_cpp_array_of_nested_source ORDER BY id", [&](const Block& block) {
+        if (block.GetRowCount() > 0) {
+            selected_blocks.push_back(block);
+        }
+    });
+    for (const auto& block : selected_blocks) {
+        client_->Insert("test_clickhouse_cpp_array_of_nested_copy", block);
+    }
+
+    std::vector<std::string> rendered_rows;
+    client_->Select("SELECT toString(arrays_of_pairs) FROM test_clickhouse_cpp_array_of_nested_copy ORDER BY id",
+                    [&](const Block& block) {
+        for (size_t row = 0; row < block.GetRowCount(); ++row) {
+            rendered_rows.emplace_back(block[0]->AsStrict<ColumnString>()->At(row));
+        }
+    });
+
+    const std::vector<std::string> expected = {"[[('a',1),('b',2)],[]]", "[]"};
+    EXPECT_EQ(expected, rendered_rows);
+}
+
+TEST_P(ClientCase, Nested_UnflattenedColumn) {
+    client_->Execute("SET flatten_nested = 0");
+    client_->Execute("DROP TEMPORARY TABLE IF EXISTS test_clickhouse_cpp_nested_unflattened");
+    client_->Execute("CREATE TEMPORARY TABLE test_clickhouse_cpp_nested_unflattened "
+                     "(id UInt8, pairs Nested(key String, value UInt8))");
+    client_->Execute("INSERT INTO test_clickhouse_cpp_nested_unflattened VALUES (1, [('a', 1), ('b', 2)]), (2, [])");
+
+    std::vector<KeyValuePairs> rows;
+    std::string type_name;
+    client_->Select("SELECT id, pairs FROM test_clickhouse_cpp_nested_unflattened ORDER BY id", [&](const Block& block) {
+        if (block.GetRowCount() == 0) {
+            return;
+        }
+        type_name = block[1]->GetType().GetName();
+        auto pairs = block[1]->AsStrict<ColumnArray>();
+        for (size_t row = 0; row < block.GetRowCount(); ++row) {
+            rows.push_back(KeyValuePairsOf(pairs->GetAsColumn(row)));
+        }
+    });
+
+    EXPECT_EQ("Array(Tuple(key String, value UInt8))", type_name);
+    const std::vector<KeyValuePairs> expected = {{{"a", 1}, {"b", 2}}, {}};
+    EXPECT_EQ(expected, rows);
+}
+
 INSTANTIATE_TEST_SUITE_P(
     Client, ClientCase,
     ::testing::Values(
