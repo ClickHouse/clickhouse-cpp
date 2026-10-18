@@ -244,7 +244,7 @@ SSLSocket::SSLSocket(const NetworkAddress& addr, const SocketTimeoutParams& time
         configureSSL(ssl_params.configuration, ssl);
 
     SSL_set_connect_state(ssl);
-    HANDLE_SSL_ERROR(ssl, SSL_connect(ssl));
+    Handshake(ssl, timeout_params.connect_timeout);
     HANDLE_SSL_ERROR(ssl, SSL_set_mode(ssl, SSL_MODE_AUTO_RETRY));
 
     if (const auto verify_result = SSL_get_verify_result(ssl); !ssl_params.skip_verification && verify_result != X509_V_OK) {
@@ -266,6 +266,37 @@ SSLSocket::SSLSocket(const NetworkAddress& addr, const SocketTimeoutParams& time
 //                ASN1_STRING_length(ip_addr.get()),
 //                0));
 //    }
+}
+
+void SSLSocket::Handshake(SSL* ssl, std::chrono::milliseconds timeout) {
+    // A blocking SSL_connect() is bounded only by SO_RCVTIMEO, which is the query receive timeout
+    // (infinite by default), so run the handshake non-blocking against the connect timeout instead.
+    using Clock      = std::chrono::steady_clock;
+    const auto start = Clock::now();
+
+    SetNonBlocking(true);
+    ERR_clear_error();
+    for (;;) {
+        const int ret = SSL_connect(ssl);
+        if (ret > 0) break;
+
+        const int error = SSL_get_error(ssl, ret);
+        short events    = 0;
+        if (error == SSL_ERROR_WANT_READ)
+            events = POLLIN;
+        else if (error == SSL_ERROR_WANT_WRITE)
+            events = POLLOUT;
+        else
+            throwSSLError(ssl, error, LOCATION, "SSL_connect(ssl)");
+
+        auto remaining = timeout;
+        if (timeout.count() >= 0) {
+            const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - start);
+            remaining          = elapsed < timeout ? timeout - elapsed : std::chrono::milliseconds(0);
+        }
+        WaitFor(events, remaining, "TLS handshake timed out");
+    }
+    SetNonBlocking(false);
 }
 
 void SSLSocket::validateParams(const SSLParams & ssl_params) {
