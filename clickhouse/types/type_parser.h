@@ -71,6 +71,11 @@ class TypeParser {
     };
 
 public:
+    // Current servers reject column types nested deeper than 499 levels. The
+    // column factory and TypeAst destruction recurse once per level, so the
+    // limit also bounds their stack use.
+    static constexpr size_t kMaxNestingDepth = 512;
+
     explicit TypeParser(const StringView& name);
     ~TypeParser();
 
