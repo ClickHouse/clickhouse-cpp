@@ -46,6 +46,16 @@ const auto& GetASTChildElement(const TypeAst & ast, int position) {
     return ast.elements[static_cast<size_t>(position)];
 }
 
+size_t GetFixedStringSize(const TypeAst& ast) {
+    // Same bounds as the server's DataTypeFixedString (MAX_FIXEDSTRING_SIZE).
+    constexpr int64_t kMaxFixedStringSize = 0xFFFFFF;
+    const auto size                       = GetASTChildElement(ast, 0).value;
+    if (size <= 0 || size > kMaxFixedStringSize)
+        throw ValidationError("FixedString size must be between 1 and " + std::to_string(kMaxFixedStringSize) + ", got " +
+                              std::to_string(size));
+    return static_cast<size_t>(size);
+}
+
 static ColumnRef CreateTerminalColumn(const TypeAst& ast) {
     switch (ast.code) {
     case Type::Void:
@@ -91,15 +101,8 @@ static ColumnRef CreateTerminalColumn(const TypeAst& ast) {
 
     case Type::String:
         return std::make_shared<ColumnString>();
-    case Type::FixedString: {
-        // Same bounds as the server's DataTypeFixedString (MAX_FIXEDSTRING_SIZE).
-        constexpr int64_t kMaxFixedStringSize = 0xFFFFFF;
-        const auto size                       = GetASTChildElement(ast, 0).value;
-        if (size <= 0 || size > kMaxFixedStringSize)
-            throw ValidationError("FixedString size must be between 1 and " + std::to_string(kMaxFixedStringSize) + ", got " +
-                                  std::to_string(size));
-        return std::make_shared<ColumnFixedString>(static_cast<size_t>(size));
-    }
+    case Type::FixedString:
+        return std::make_shared<ColumnFixedString>(GetFixedStringSize(ast));
 
     case Type::DateTime:
         if (ast.elements.empty()) {
@@ -232,7 +235,7 @@ static ColumnRef CreateColumnFromAst(const TypeAst& ast, CreateColumnByTypeSetti
                     case Type::String:
                         return std::make_shared<LowCardinalitySerializationAdaptor<ColumnString>>();
                     case Type::FixedString:
-                        return std::make_shared<LowCardinalitySerializationAdaptor<ColumnFixedString>>(GetASTChildElement(nested, 0).value);
+                        return std::make_shared<LowCardinalitySerializationAdaptor<ColumnFixedString>>(GetFixedStringSize(nested));
                     case Type::Nullable:
                         throw UnimplementedError("LowCardinality(" + nested.name + ") is not supported with LowCardinalityAsWrappedColumn on");
                     default:

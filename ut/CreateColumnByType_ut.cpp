@@ -83,6 +83,25 @@ TEST(CreateColumnByType, FixedStringSizeLimit) {
     EXPECT_THROW(CreateColumnByType("FixedString(16777216)"), ValidationError);
 }
 
+TEST(CreateColumnByType, LowCardinalityFixedStringSizeLimit) {
+    CreateColumnByTypeSettings wrapped;
+    wrapped.low_cardinality_as_wrapped_column = true;
+
+    const std::pair<CreateColumnByTypeSettings, std::string> cases[] = {
+        {CreateColumnByTypeSettings{}, "LowCardinality(FixedString(16777215))"},
+        {wrapped, "FixedString(16777215)"},
+    };
+    for (const auto& [settings, expected_type] : cases) {
+        SCOPED_TRACE(expected_type);
+        const auto col = CreateColumnByType("LowCardinality(FixedString(16777215))", settings);
+        ASSERT_NE(nullptr, col);
+        EXPECT_EQ(expected_type, col->GetType().GetName());
+
+        EXPECT_THROW(CreateColumnByType("LowCardinality(FixedString(16777216))", settings), ValidationError);
+    }
+    EXPECT_THROW(CreateColumnByType("LowCardinality(Nullable(FixedString(16777216)))"), ValidationError);
+}
+
 TEST(CreateColumnByType, MalformedFixedStringSize) {
     // Repeated on purpose: a failed parse must not leave a cached AST behind.
     for (int i = 0; i < 2; ++i) {
