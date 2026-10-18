@@ -91,8 +91,15 @@ static ColumnRef CreateTerminalColumn(const TypeAst& ast) {
 
     case Type::String:
         return std::make_shared<ColumnString>();
-    case Type::FixedString:
-        return std::make_shared<ColumnFixedString>(GetASTChildElement(ast, 0).value);
+    case Type::FixedString: {
+        // Same bounds as the server's DataTypeFixedString (MAX_FIXEDSTRING_SIZE).
+        constexpr int64_t kMaxFixedStringSize = 0xFFFFFF;
+        const auto size                       = GetASTChildElement(ast, 0).value;
+        if (size <= 0 || size > kMaxFixedStringSize)
+            throw ValidationError("FixedString size must be between 1 and " + std::to_string(kMaxFixedStringSize) + ", got " +
+                                  std::to_string(size));
+        return std::make_shared<ColumnFixedString>(static_cast<size_t>(size));
+    }
 
     case Type::DateTime:
         if (ast.elements.empty()) {
