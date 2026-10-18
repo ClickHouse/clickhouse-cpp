@@ -78,7 +78,12 @@ void ColumnFixedString::Append(ColumnRef column) {
 }
 
 bool ColumnFixedString::LoadBody(InputStream * input, size_t rows) {
-    data_.resize(string_size_ * rows);
+    const size_t bytes = string_size_ * rows;
+    if (string_size_ != 0 && bytes / string_size_ != rows) {
+        throw ProtocolError("FixedString(" + std::to_string(string_size_) + ") column with " + std::to_string(rows) +
+                            " rows exceeds the addressable size");
+    }
+    data_.resize(bytes);
     if (!WireFormat::ReadBytes(*input, &data_[0], data_.size())) {
         return false;
     }
