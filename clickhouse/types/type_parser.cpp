@@ -209,16 +209,19 @@ bool TypeParser::Parse(TypeAst* type) {
                 type_->value_string = std::string(token.value);
                 break;
             case Token::LPar:
+                if (open_elements_.size() > kMaxNestingDepth) return false;
                 type_->elements.emplace_back(TypeAst());
                 open_elements_.push(type_);
                 type_ = &type_->elements.back();
                 break;
             case Token::RPar:
+                if (open_elements_.size() < 2) return false;
                 type_ = open_elements_.top();
                 open_elements_.pop();
                 break;
             case Token::Assign:
             case Token::Comma:
+                if (open_elements_.size() < 2) return false;
                 type_ = open_elements_.top();
                 open_elements_.pop();
                 type_->elements.emplace_back(TypeAst());
