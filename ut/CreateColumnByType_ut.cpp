@@ -64,6 +64,34 @@ TEST(CreateColumnByType, UnmatchedBrackets) {
     ASSERT_EQ(nullptr, CreateColumnByType("Array(LowCardinality(Nullable(FixedString(10000)))"));
 }
 
+TEST(CreateColumnByType, FixedStringSize) {
+    const auto col = CreateColumnByType("FixedString(16)");
+    ASSERT_NE(nullptr, col);
+    EXPECT_EQ(16u, col->As<ColumnFixedString>()->FixedSize());
+
+    EXPECT_THROW(CreateColumnByType("FixedString(0)"), ValidationError);
+    EXPECT_THROW(CreateColumnByType("FixedString(-1)"), ValidationError);
+    EXPECT_THROW(CreateColumnByType("Nullable(FixedString(0))"), ValidationError);
+    EXPECT_THROW(CreateColumnByType("LowCardinality(FixedString(0))"), ValidationError);
+}
+
+TEST(CreateColumnByType, FixedStringSizeLimit) {
+    const auto col = CreateColumnByType("FixedString(16777215)");
+    ASSERT_NE(nullptr, col);
+    EXPECT_EQ(16777215u, col->As<ColumnFixedString>()->FixedSize());
+
+    EXPECT_THROW(CreateColumnByType("FixedString(16777216)"), ValidationError);
+}
+
+TEST(CreateColumnByType, MalformedFixedStringSize) {
+    // Repeated on purpose: a failed parse must not leave a cached AST behind.
+    for (int i = 0; i < 2; ++i) {
+        SCOPED_TRACE(i);
+        EXPECT_EQ(nullptr, CreateColumnByType("FixedString(-)"));
+        EXPECT_EQ(nullptr, CreateColumnByType("FixedString(99999999999999999999)"));
+    }
+}
+
 TEST(CreateColumnByType, LowCardinalityAsWrappedColumn) {
     CreateColumnByTypeSettings create_column_settings;
     create_column_settings.low_cardinality_as_wrapped_column = true;
@@ -263,14 +291,10 @@ INSTANTIATE_TEST_SUITE_P(Basic, CreateColumnByTypeWithName, ::testing::Values(
 INSTANTIATE_TEST_SUITE_P(BasicBool, CreateColumnByTypeWithName, ::testing::Values("Bool"));
 #endif
 
-INSTANTIATE_TEST_SUITE_P(Parametrized, CreateColumnByTypeWithName, ::testing::Values(
-    "FixedString(0)", "FixedString(10000)",
-    "DateTime('UTC')", "DateTime64(3, 'UTC')",
-    "Decimal(9,3)", "Decimal(18,3)",
-    "Enum8('ONE' = 1, 'TWO' = 2)",
-    "Enum16('ONE' = 1, 'TWO' = 2, 'THREE' = 3, 'FOUR' = 4)"
-));
-
+INSTANTIATE_TEST_SUITE_P(Parametrized, CreateColumnByTypeWithName,
+                         ::testing::Values("FixedString(1)", "FixedString(10000)", "DateTime('UTC')", "DateTime64(3, 'UTC')",
+                                           "Decimal(9,3)", "Decimal(18,3)", "Enum8('ONE' = 1, 'TWO' = 2)",
+                                           "Enum16('ONE' = 1, 'TWO' = 2, 'THREE' = 3, 'FOUR' = 4)"));
 
 INSTANTIATE_TEST_SUITE_P(Nested, CreateColumnByTypeWithName, ::testing::Values(
     "Nullable(FixedString(10000))",
