@@ -358,25 +358,32 @@ TypeParser::Token TypeParser::NextToken() {
     return Token{Token::EOS, StringView()};
 }
 
-
-const TypeAst* ParseTypeName(const std::string& type_name) {
-    // Cache for type_name.
-    // Usually we won't have too many type names in the cache, so do not try to
-    // limit cache size.
-    static std::map<std::string, TypeAst> ast_cache;
+std::shared_ptr<const TypeAst> ParseTypeName(const std::string& type_name) {
+    static std::map<std::string, std::shared_ptr<const TypeAst>> ast_cache;
+    static size_t ast_cache_bytes = 0;
     static std::mutex lock;
 
+    // Declared before the guard so a cleared cache is destroyed after the mutex is released.
+    std::map<std::string, std::shared_ptr<const TypeAst>> evicted;
     std::lock_guard<std::mutex> guard(lock);
     auto it = ast_cache.find(type_name);
     if (it != ast_cache.end()) {
-        return &it->second;
+        return it->second;
     }
 
-    TypeAst ast;
-    if (!TypeParser(type_name).Parse(&ast)) {
+    auto ast = std::make_shared<TypeAst>();
+    if (!TypeParser(type_name).Parse(ast.get())) {
         return nullptr;
     }
-    return &ast_cache.emplace(type_name, std::move(ast)).first->second;
-}
 
+    if (type_name.size() <= kTypeAstCacheMaxBytes) {
+        if (ast_cache.size() >= kTypeAstCacheMaxEntries || ast_cache_bytes + type_name.size() > kTypeAstCacheMaxBytes) {
+            evicted.swap(ast_cache);
+            ast_cache_bytes = 0;
+        }
+        ast_cache.emplace(type_name, ast);
+        ast_cache_bytes += type_name.size();
+    }
+    return ast;
+}
 }

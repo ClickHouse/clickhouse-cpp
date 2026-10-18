@@ -94,7 +94,12 @@ private:
     std::string scratch_;
 };
 
+/// ParseTypeName() keeps parsed ASTs in a process-wide cache. When adding an
+/// entry would exceed either limit, the cache is cleared first. A type name
+/// longer than kTypeAstCacheMaxBytes is parsed on every call and never cached.
+inline constexpr size_t kTypeAstCacheMaxEntries = 4096;
+inline constexpr size_t kTypeAstCacheMaxBytes   = 256 * 1024;
 
-const TypeAst* ParseTypeName(const std::string& type_name);
-
+/// Returns nullptr if type_name is not a valid type.
+std::shared_ptr<const TypeAst> ParseTypeName(const std::string& type_name);
 }
