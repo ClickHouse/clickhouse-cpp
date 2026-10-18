@@ -8,6 +8,18 @@ namespace {
 
 constexpr size_t DEFAULT_BLOCK_SIZE = 4096;
 
+// Upper bound on what LoadBody allocates ahead of the data, since row counts and
+// string lengths come from the peer.
+constexpr size_t MAX_PREALLOCATED_BYTES = 1 << 20;
+
+// Grows `items` eightfold rather than twofold so that loading many rows copies little.
+void AppendItem(std::vector<std::string_view>& items, size_t rows, std::string_view item) {
+    if (items.size() == items.capacity()) {
+        items.reserve(clickhouse::WireFormat::NextReadCapacity(items.size(), rows, size_t(1)));
+    }
+    items.emplace_back(item);
+}
+
 template <typename Container>
 size_t ComputeTotalSize(const Container & strings, size_t begin = 0, size_t len = -1) {
     size_t result = 0;
@@ -78,12 +90,7 @@ void ColumnFixedString::Append(ColumnRef column) {
 }
 
 bool ColumnFixedString::LoadBody(InputStream * input, size_t rows) {
-    data_.resize(string_size_ * rows);
-    if (!WireFormat::ReadBytes(*input, &data_[0], data_.size())) {
-        return false;
-    }
-
-    return true;
+    return WireFormat::ReadPODArray(*input, &data_, string_size_ * rows);
 }
 
 void ColumnFixedString::SaveBody(OutputStream* output) {
@@ -134,6 +141,16 @@ struct ColumnString::Block
         data_(new CharT[capacity])
     {}
 
+    // Moves the data, so it must not be called once a string_view points into the block.
+    void Grow(size_t new_capacity) {
+        std::unique_ptr<CharT[]> new_data(new CharT[new_capacity]);
+        if (size > 0) {
+            memcpy(new_data.get(), data_.get(), size);
+        }
+        data_    = std::move(new_data);
+        capacity = new_capacity;
+    }
+
     inline auto GetAvailable() const {
         return capacity - size;
     }
@@ -163,7 +180,7 @@ struct ColumnString::Block
     }
 
     size_t size;
-    const size_t capacity;
+    size_t capacity;
     std::unique_ptr<CharT[]> data_;
 };
 
@@ -274,7 +291,7 @@ bool ColumnString::LoadBody(InputStream* input, size_t rows) {
     decltype(items_) new_items;
     decltype(blocks_) new_blocks;
 
-    new_items.reserve(rows);
+    new_items.reserve(std::min(rows, MAX_PREALLOCATED_BYTES / sizeof(std::string_view)));
 
     // Suboptimzal if the first row string is >DEFAULT_BLOCK_SIZE, but that must be a very rare case.
     Block * block = &new_blocks.emplace_back(DEFAULT_BLOCK_SIZE);
@@ -284,13 +301,31 @@ bool ColumnString::LoadBody(InputStream* input, size_t rows) {
         if (!WireFormat::ReadUInt64(*input, &len))
             return false;
 
+        if (len > MAX_PREALLOCATED_BYTES) {
+            if (len > SIZE_MAX) return false;
+
+            // A block of its own, grown as the bytes arrive.
+            block = &new_blocks.emplace_back(MAX_PREALLOCATED_BYTES);
+            while (block->size < len) {
+                if (block->GetAvailable() == 0)
+                    block->Grow(WireFormat::NextReadCapacity(block->capacity, static_cast<size_t>(len), size_t(0)));
+
+                const size_t chunk = std::min<size_t>(static_cast<size_t>(len) - block->size, block->GetAvailable());
+                if (!WireFormat::ReadBytes(*input, block->GetCurrentWritePos(), chunk)) return false;
+                block->size += chunk;
+            }
+
+            AppendItem(new_items, rows, std::string_view(block->data_.get(), block->size));
+            continue;
+        }
+
         if (len > block->GetAvailable())
             block = &new_blocks.emplace_back(std::max<size_t>(DEFAULT_BLOCK_SIZE, len));
 
         if (!WireFormat::ReadBytes(*input, block->GetCurrentWritePos(), len))
             return false;
 
-        new_items.emplace_back(block->ConsumeTailAsStringViewUnsafe(len));
+        AppendItem(new_items, rows, block->ConsumeTailAsStringViewUnsafe(len));
     }
 
     items_.swap(new_items);

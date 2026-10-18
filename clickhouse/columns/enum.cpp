@@ -81,8 +81,7 @@ void ColumnEnum<T>::Append(ColumnRef column) {
 
 template <typename T>
 bool ColumnEnum<T>::LoadBody(InputStream* input, size_t rows) {
-    data_.resize(rows);
-    return WireFormat::ReadBytes(*input, data_.data(), data_.size() * sizeof(T));
+    return WireFormat::ReadPODArray(*input, &data_, rows);
 }
 
 template <typename T>

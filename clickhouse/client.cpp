@@ -835,6 +835,10 @@ bool Client::Impl::ReadBlock(InputStream& input, Block* block) {
     if (!WireFormat::ReadUInt64(input, &num_rows)) {
         return false;
     }
+    if (static_cast<size_t>(num_columns) != num_columns || static_cast<size_t>(num_rows) != num_rows) {
+        throw ProtocolError("block declares " + std::to_string(num_columns) + " columns and " + std::to_string(num_rows) +
+                            " rows, more than size_t can hold");
+    }
 
     CreateColumnByTypeSettings create_column_settings;
     create_column_settings.low_cardinality_as_wrapped_column = options_.backward_compatibility_lowcardinality_as_wrapped_column;

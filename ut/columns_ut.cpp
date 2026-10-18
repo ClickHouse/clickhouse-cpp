@@ -2349,3 +2349,173 @@ TEST(ColumnsCase, ColumnLowCardinalityT_Wrap_TypeMismatch) {
     EXPECT_THROW(TestLC::Wrap(bad_dict), ValidationError);
     EXPECT_THROW(TestLC::Wrap(not_lc), ValidationError);
 }
+
+namespace {
+
+// Truncated bodies below declare this much data but carry only a few bytes of it.
+constexpr size_t DECLARED_BODY_SIZE = 128 * 1024 * 1024;
+// Generous for growth-as-data-arrives, far below DECLARED_BODY_SIZE.
+constexpr size_t MAX_ALLOCATION_FOR_TRUNCATED_BODY = 8 * 1024 * 1024;
+// Above the size LoadBody allocates ahead of the data, so loading has to grow.
+constexpr size_t LARGE_BODY_SIZE = 3 * 1024 * 1024 + 17;
+// Above eight times that size, so loading grows more than once.
+constexpr size_t HUGE_BODY_SIZE = 9 * 1024 * 1024 + 17;
+
+Buffer SaveColumn(Column& column) {
+    Buffer buffer;
+    BufferOutput output(&buffer);
+    column.Save(&output);
+    output.Flush();
+    return buffer;
+}
+
+}  // namespace
+
+TEST(ColumnsCase, NumericLoad_TruncatedBodyDoesNotAllocateDeclaredRows) {
+    const uint64_t payload[] = {1, 2};
+    ArrayInput input(payload, sizeof(payload));
+    ColumnUInt64 column;
+
+    SKIP_UNLESS_LIBRARY_ALLOCATIONS_OBSERVED();
+    LargestAllocationScope allocations;
+    EXPECT_FALSE(column.Load(&input, DECLARED_BODY_SIZE / sizeof(uint64_t)));
+    EXPECT_LT(allocations.Get(), MAX_ALLOCATION_FOR_TRUNCATED_BODY);
+}
+
+TEST(ColumnsCase, ArrayLoad_TruncatedBodyDoesNotAllocateDeclaredNestedRows) {
+    const uint64_t payload[] = {DECLARED_BODY_SIZE / sizeof(uint64_t), 1, 2};
+    ArrayInput input(payload, sizeof(payload));
+    auto column = CreateColumnByType("Array(UInt64)");
+
+    SKIP_UNLESS_LIBRARY_ALLOCATIONS_OBSERVED();
+    LargestAllocationScope allocations;
+    EXPECT_FALSE(column->Load(&input, 1));
+    EXPECT_LT(allocations.Get(), MAX_ALLOCATION_FOR_TRUNCATED_BODY);
+}
+
+TEST(ColumnsCase, FixedStringLoad_TruncatedBodyDoesNotAllocateDeclaredSize) {
+    const char payload[] = "0123456789abcdef";
+    ArrayInput input(payload, sizeof(payload) - 1);
+    ColumnFixedString column(DECLARED_BODY_SIZE);
+
+    SKIP_UNLESS_LIBRARY_ALLOCATIONS_OBSERVED();
+    LargestAllocationScope allocations;
+    EXPECT_FALSE(column.Load(&input, 1));
+    EXPECT_LT(allocations.Get(), MAX_ALLOCATION_FOR_TRUNCATED_BODY);
+}
+
+TEST(ColumnsCase, StringLoad_TruncatedBodyDoesNotAllocateDeclaredLength) {
+    // Varint of DECLARED_BODY_SIZE, then three of its bytes.
+    const uint8_t payload[] = {0x80, 0x80, 0x80, 0x40, 'a', 'b', 'c'};
+    ArrayInput input(payload, sizeof(payload));
+    ColumnString column;
+
+    SKIP_UNLESS_LIBRARY_ALLOCATIONS_OBSERVED();
+    LargestAllocationScope allocations;
+    EXPECT_FALSE(column.Load(&input, 1));
+    EXPECT_LT(allocations.Get(), MAX_ALLOCATION_FOR_TRUNCATED_BODY);
+}
+
+TEST(ColumnsCase, StringLoad_TruncatedBodyDoesNotAllocateDeclaredRows) {
+    const uint8_t payload[] = {3, 'a', 'b', 'c'};
+    ArrayInput input(payload, sizeof(payload));
+    ColumnString column;
+
+    SKIP_UNLESS_LIBRARY_ALLOCATIONS_OBSERVED();
+    LargestAllocationScope allocations;
+    EXPECT_FALSE(column.Load(&input, DECLARED_BODY_SIZE / sizeof(std::string_view)));
+    EXPECT_LT(allocations.Get(), MAX_ALLOCATION_FOR_TRUNCATED_BODY);
+}
+
+TEST(ColumnsCase, NumericLoad_LargeBodyRoundTrip) {
+    ColumnUInt64 source;
+    for (uint64_t i = 0; i < LARGE_BODY_SIZE / sizeof(uint64_t); ++i) {
+        source.Append(i * 2654435761u);
+    }
+    const Buffer buffer = SaveColumn(source);
+
+    ArrayInput input(buffer.data(), buffer.size());
+    ColumnUInt64 loaded;
+    ASSERT_TRUE(loaded.Load(&input, source.Size()));
+    EXPECT_TRUE(input.Exhausted());
+    EXPECT_EQ(loaded.GetWritableData(), source.GetWritableData());
+}
+
+TEST(ColumnsCase, FixedStringLoad_LargeBodyRoundTrip) {
+    const size_t width = 1000;
+    ColumnFixedString source(width);
+    for (size_t i = 0; i < LARGE_BODY_SIZE / width; ++i) {
+        source.Append(std::string(width, static_cast<char>('a' + i % 26)));
+    }
+    const Buffer buffer = SaveColumn(source);
+
+    ArrayInput input(buffer.data(), buffer.size());
+    ColumnFixedString loaded(width);
+    ASSERT_TRUE(loaded.Load(&input, source.Size()));
+    EXPECT_TRUE(input.Exhausted());
+    ASSERT_EQ(loaded.Size(), source.Size());
+    for (size_t i = 0; i < source.Size(); ++i) {
+        ASSERT_EQ(loaded.At(i), source.At(i)) << "at row " << i;
+    }
+}
+
+TEST(ColumnsCase, StringLoad_LargeItemRoundTrip) {
+    std::string large(LARGE_BODY_SIZE, '\0');
+    for (size_t i = 0; i < large.size(); ++i) {
+        large[i] = static_cast<char>(i * 31);
+    }
+    const std::vector<std::string> items = {"first", large, "", "after", std::string(5000, 'x'), large.substr(7)};
+
+    ColumnString source(items);
+    const Buffer buffer = SaveColumn(source);
+
+    ArrayInput input(buffer.data(), buffer.size());
+    ColumnString loaded;
+    ASSERT_TRUE(loaded.Load(&input, items.size()));
+    EXPECT_TRUE(input.Exhausted());
+    ASSERT_EQ(loaded.Size(), items.size());
+    for (size_t i = 0; i < items.size(); ++i) {
+        EXPECT_EQ(loaded.At(i), items[i]) << "at row " << i;
+    }
+}
+
+TEST(ColumnsCase, StringLoad_HugeItemRoundTrip) {
+    std::string huge(HUGE_BODY_SIZE, '\0');
+    for (size_t i = 0; i < huge.size(); ++i) {
+        huge[i] = static_cast<char>(i * 131);
+    }
+    const std::vector<std::string> items = {huge, "after"};
+
+    ColumnString source(items);
+    const Buffer buffer = SaveColumn(source);
+
+    ArrayInput input(buffer.data(), buffer.size());
+    ColumnString loaded;
+    ASSERT_TRUE(loaded.Load(&input, items.size()));
+    EXPECT_TRUE(input.Exhausted());
+    ASSERT_EQ(loaded.Size(), items.size());
+    EXPECT_EQ(loaded.At(0), huge);
+    EXPECT_EQ(loaded.At(1), "after");
+}
+
+TEST(ColumnsCase, NumericLoad_HugeBodyRoundTrip) {
+    ColumnUInt64 source;
+    for (uint64_t i = 0; i < HUGE_BODY_SIZE / sizeof(uint64_t); ++i) {
+        source.Append(i * 0x9E3779B97F4A7C15ULL);
+    }
+    const Buffer buffer = SaveColumn(source);
+
+    ArrayInput input(buffer.data(), buffer.size());
+    ColumnUInt64 loaded;
+    ASSERT_TRUE(loaded.Load(&input, source.Size()));
+    EXPECT_TRUE(input.Exhausted());
+    EXPECT_EQ(loaded.GetWritableData(), source.GetWritableData());
+}
+
+TEST(ColumnsCase, ColumnLowCardinalityString_Load_TruncatedIndex) {
+    const auto& data = LOWCARDINALITY_STRING_FOOBAR_10_ITEMS_BINARY;
+    ArrayInput input(data.data(), data.size() - 1);
+    ColumnLowCardinalityT<ColumnString> column;
+
+    EXPECT_FALSE(column.Load(&input, 10));
+}

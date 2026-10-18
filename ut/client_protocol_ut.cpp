@@ -238,3 +238,29 @@ TEST(ClientProtocol, WellFormedSelectResponseSucceeds) {
     }));
     EXPECT_EQ(blocks, 1u);
 }
+
+TEST(ClientProtocol, RowCountBeyondSizeTThrowsProtocolError) {
+    if (sizeof(size_t) >= sizeof(uint64_t)) {
+        GTEST_SKIP() << "every uint64_t row count fits in size_t here";
+    }
+
+    std::vector<uint8_t> script         = kServerHello;
+    const std::vector<uint8_t> response = {
+        0x01,                                // packet type: ServerCodes::Data (varint)
+        0x01,                                // num_columns = 1 (varint)
+        0x80, 0x80, 0x80, 0x80, 0x80, 0x40,  // num_rows = 2^41 (varint), 0 once truncated to 32 bits
+        0x01, 0x63,                          // column name: "c"
+        0x05, 0x55, 0x49, 0x6E, 0x74, 0x38,  // column type: "UInt8"
+        0x05,                                // packet type: ServerCodes::EndOfStream (varint)
+    };
+    script.insert(script.end(), response.begin(), response.end());
+
+    Client client(ScriptedClientOptions(), std::make_unique<ScriptedSocketFactory>(script));
+
+    try {
+        client.Select("SELECT 1", [](const Block&) {});
+        FAIL() << "expected ProtocolError";
+    } catch (const ProtocolError& e) {
+        EXPECT_TRUE(std::string(e.what()).find("more than size_t can hold") != std::string::npos) << "unexpected message: " << e.what();
+    }
+}
