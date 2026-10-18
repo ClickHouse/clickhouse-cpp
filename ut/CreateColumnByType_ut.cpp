@@ -429,3 +429,18 @@ TEST(CreateColumnByTypeDeathTest, DeepNestedDoesNotCopyAst) {
     EXPECT_EXIT(create_within_peak_budget(), ::testing::ExitedWithCode(EXIT_SUCCESS), "");
 #endif
 }
+
+TEST(CreateColumnByType, UnknownTypeInsideContainer) {
+    ASSERT_EQ(nullptr, CreateColumnByType("Array(Int256)"));
+    ASSERT_EQ(nullptr, CreateColumnByType("Array(Nested(key String, value Dynamic))"));
+}
+
+TEST(CreateColumnByType, Nothing) {
+    ASSERT_NE(nullptr, CreateColumnByType("Array(Nothing)"));
+    ASSERT_NE(nullptr, CreateColumnByType("Nullable(Nothing)"));
+}
+
+TEST(CreateColumnByType, ParameterisedJSON) {
+    ASSERT_NE(nullptr, CreateColumnByType("JSON(max_dynamic_paths=1)"));
+    ASSERT_NE(nullptr, CreateColumnByType("JSON(a Int256, SKIP b)"));
+}

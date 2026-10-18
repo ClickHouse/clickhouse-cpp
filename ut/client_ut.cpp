@@ -1934,6 +1934,36 @@ TEST_P(ClientCase, Nested_UnflattenedColumn) {
     EXPECT_EQ(expected, rows);
 }
 
+TEST_P(ClientCase, EmptyArrayAndNullDecode) {
+    size_t rows = 0;
+    client_->Select("SELECT [] AS empty, NULL AS null_value, [NULL] AS nulls", [&](const Block& block) {
+        rows += block.GetRowCount();
+    });
+    EXPECT_EQ(1u, rows);
+}
+
+TEST_P(ClientCase, ParameterisedJSONDecodes) {
+    const auto & server_info = client_->GetServerInfo();
+    if (versionNumber(server_info) < versionNumber(25, 3)) {
+        GTEST_SKIP() << "Test is skipped since server '" << server_info << "' does not support the JSON type" << std::endl;
+    }
+
+    std::vector<std::string> documents;
+    client_->Select("SELECT CAST('{\"a\":1}', 'JSON(max_dynamic_paths=1)') AS document "
+                    "SETTINGS output_format_native_write_json_as_string = 1", [&](const Block& block) {
+        for (size_t row = 0; row < block.GetRowCount(); ++row) {
+            documents.emplace_back(block[0]->AsStrict<ColumnJSON>()->At(row));
+        }
+    });
+
+    const std::vector<std::string> expected = {"{\"a\":1}"};
+    EXPECT_EQ(expected, documents);
+}
+
+TEST_P(ClientCase, UnknownTypeInsideArrayIsReported) {
+    EXPECT_THROW(client_->Select("SELECT [CAST(1, 'Int256')] AS wide", [](const Block&) {}), UnimplementedError);
+}
+
 INSTANTIATE_TEST_SUITE_P(
     Client, ClientCase,
     ::testing::Values(
