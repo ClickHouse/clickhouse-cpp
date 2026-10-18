@@ -339,6 +339,100 @@ TEST(ColumnsCase, FixedStringSwapDifferentSize) {
     EXPECT_EQ(column2->At(0), "bbbb");
 }
 
+// Width for which width * 4 wraps around size_t to 4.
+static const size_t WRAPPING_FIXED_STRING_WIDTH = std::numeric_limits<size_t>::max() / 4 + 2;
+
+TEST(ColumnsCase, FixedString_Load) {
+    const auto data = "abcdefgh"sv;
+    ArrayInput input(data.data(), data.size());
+    ColumnFixedString col(4);
+
+    ASSERT_TRUE(col.Load(&input, 2));
+    ASSERT_EQ(col.Size(), 2u);
+    EXPECT_EQ(col.At(0), "abcd");
+    EXPECT_EQ(col.At(1), "efgh");
+}
+
+TEST(ColumnsCase, FixedString_Load_SizeOverflow) {
+    const auto data = "ABCD"sv;
+    ArrayInput input(data.data(), data.size());
+    ColumnFixedString col(WRAPPING_FIXED_STRING_WIDTH);
+
+    EXPECT_THROW(col.Load(&input, 4), ProtocolError);
+}
+
+TEST(ColumnsCase, Tuple_Load) {
+    const auto data =
+        "\x01\x02"
+        "abcdefgh"sv;
+    ArrayInput input(data.data(), data.size());
+    ColumnTuple col({std::make_shared<ColumnUInt8>(), std::make_shared<ColumnFixedString>(4)});
+
+    ASSERT_TRUE(col.Load(&input, 2));
+    ASSERT_EQ(col.Size(), 2u);
+    EXPECT_EQ(col[0]->As<ColumnUInt8>()->At(1), 2u);
+    EXPECT_EQ(col[1]->As<ColumnFixedString>()->At(0), "abcd");
+    EXPECT_EQ(col[1]->As<ColumnFixedString>()->At(1), "efgh");
+}
+
+TEST(ColumnsCase, Tuple_Load_FixedStringSizeOverflow) {
+    const auto data =
+        "\x01\x02\x03\x04"
+        "ABCD"sv;
+    ArrayInput input(data.data(), data.size());
+    ColumnTuple col({std::make_shared<ColumnUInt8>(), std::make_shared<ColumnFixedString>(WRAPPING_FIXED_STRING_WIDTH)});
+
+    EXPECT_THROW(col.Load(&input, 4), ProtocolError);
+}
+
+TEST(ColumnsCase, Tuple_Load_ElementSizeMismatch) {
+    // Nothing::LoadBody adds to the rows it already holds while UInt8 replaces them, so a second Load leaves the elements uneven.
+    const auto data =
+        "\x01\x00"
+        "\x01\x02\x00\x00"sv;
+    ArrayInput input(data.data(), data.size());
+    auto col = CreateColumnByType("Tuple(UInt8, Nothing)");
+
+    ASSERT_TRUE(col->Load(&input, 1));
+    EXPECT_THROW(col->Load(&input, 2), ProtocolError);
+}
+
+TEST(ColumnsCase, Nullable_Load) {
+    const auto data =
+        "\x00\x01"
+        "abcd\x00\x00\x00\x00"sv;
+    ArrayInput input(data.data(), data.size());
+    ColumnNullable col(std::make_shared<ColumnFixedString>(4), std::make_shared<ColumnUInt8>());
+
+    ASSERT_TRUE(col.Load(&input, 2));
+    ASSERT_EQ(col.Size(), 2u);
+    EXPECT_FALSE(col.IsNull(0));
+    EXPECT_TRUE(col.IsNull(1));
+    EXPECT_EQ(col.Nested()->As<ColumnFixedString>()->At(0), "abcd");
+}
+
+TEST(ColumnsCase, Nullable_Load_FixedStringSizeOverflow) {
+    const auto data =
+        "\x00\x00\x00\x00"
+        "ABCD"sv;
+    ArrayInput input(data.data(), data.size());
+    ColumnNullable col(std::make_shared<ColumnFixedString>(WRAPPING_FIXED_STRING_WIDTH), std::make_shared<ColumnUInt8>());
+
+    EXPECT_THROW(col.Load(&input, 4), ProtocolError);
+}
+
+TEST(ColumnsCase, Nullable_Load_NestedSizeMismatch) {
+    // Nothing::LoadBody adds to the rows it already holds while the null map replaces them, so a second Load leaves them uneven.
+    const auto data =
+        "\x00\x00"
+        "\x00\x00\x00\x00"sv;
+    ArrayInput input(data.data(), data.size());
+    auto col = CreateColumnByType("Nullable(Nothing)");
+
+    ASSERT_TRUE(col->Load(&input, 1));
+    EXPECT_THROW(col->Load(&input, 2), ProtocolError);
+}
+
 TEST(ColumnsCase, StringInit) {
     auto values = MakeStrings();
     auto col = std::make_shared<ColumnString>(values);
