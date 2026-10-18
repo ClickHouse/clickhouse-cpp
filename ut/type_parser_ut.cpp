@@ -541,6 +541,84 @@ TEST(ParseTypeName, EmptyName) {
     EXPECT_EQ(nullptr, ParseTypeName(std::string(5, '\0')));
 }
 
+TEST(TypeParser, InvalidNumber) {
+    TypeAst ast;
+    EXPECT_FALSE(TypeParser("FixedString(-)").Parse(&ast));
+
+    TypeAst overflow;
+    EXPECT_FALSE(TypeParser("FixedString(99999999999999999999)").Parse(&overflow));
+
+    TypeAst negative;
+    ASSERT_TRUE(TypeParser("Enum8('a' = -128)").Parse(&negative));
+    ASSERT_EQ(negative.elements.size(), 2u);
+    EXPECT_EQ(negative.elements[1].value, -128);
+}
+
+TEST(ParseTypeName, MalformedNumberReturnsNull) {
+    EXPECT_EQ(nullptr, ParseTypeName("FixedString(-)"));
+    EXPECT_EQ(nullptr, ParseTypeName("FixedString(-)"));
+
+    const auto ast = ParseTypeName("FixedString(16)");
+    ASSERT_NE(nullptr, ast);
+    EXPECT_EQ(ast, ParseTypeName("FixedString(16)"));
+    ASSERT_EQ(ast->elements.size(), 1u);
+    EXPECT_EQ(ast->elements[0].value, 16);
+}
+
+namespace {
+
+size_t CountAlive(const std::vector<std::weak_ptr<const TypeAst>>& asts) {
+    size_t alive = 0;
+    for (const auto& ast : asts) alive += !ast.expired();
+    return alive;
+}
+
+}  // namespace
+
+TEST(ParseTypeName, CacheReusesAst) {
+    const auto ast = ParseTypeName("Array(Nullable(String))");
+    ASSERT_NE(nullptr, ast);
+    EXPECT_EQ(ast, ParseTypeName("Array(Nullable(String))"));
+}
+
+TEST(ParseTypeName, CacheEntryCountIsBounded) {
+    std::vector<std::weak_ptr<const TypeAst>> asts;
+    for (size_t i = 0; i < 3 * kTypeAstCacheMaxEntries; ++i) {
+        asts.push_back(ParseTypeName("FixedString(" + std::to_string(i + 1) + ")"));
+        ASSERT_FALSE(asts.back().expired());
+    }
+    EXPECT_LE(CountAlive(asts), kTypeAstCacheMaxEntries);
+    EXPECT_GT(CountAlive(asts), 0u);
+}
+
+TEST(ParseTypeName, CacheByteBudgetIsBounded) {
+    const std::string label(1024, 'x');
+    const std::string first_name = "Enum8('" + label + "' = 0)";
+    const auto first             = ParseTypeName(first_name);
+    ASSERT_NE(nullptr, first);
+
+    std::vector<std::weak_ptr<const TypeAst>> asts;
+    for (size_t i = 1; i <= 3 * kTypeAstCacheMaxBytes / label.size(); ++i) {
+        asts.push_back(ParseTypeName("Enum8('" + label + std::to_string(i) + "' = 0)"));
+        ASSERT_FALSE(asts.back().expired());
+    }
+    EXPECT_LE(CountAlive(asts), kTypeAstCacheMaxBytes / label.size());
+
+    // An AST handed out before the cache was cleared stays valid.
+    EXPECT_EQ(first->elements[0].value_string, label);
+    EXPECT_NE(first, ParseTypeName(first_name));
+}
+
+TEST(ParseTypeName, OversizedNameIsNotCached) {
+    const std::string name            = "Enum8('" + std::string(kTypeAstCacheMaxBytes, 'x') + "' = 0)";
+    std::weak_ptr<const TypeAst> weak = ParseTypeName(name);
+    EXPECT_TRUE(weak.expired());
+
+    const auto ast = ParseTypeName(name);
+    ASSERT_NE(nullptr, ast);
+    EXPECT_EQ(ast->elements[0].value_string.size(), kTypeAstCacheMaxBytes);
+}
+
 TEST(TypeParser, AggregateFunction) {
     {
         TypeAst ast;

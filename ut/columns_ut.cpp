@@ -303,8 +303,12 @@ TEST(ColumnsCase, FixedString_Append_LargeString) {
     EXPECT_ANY_THROW(col->Append("this is a long string"));
 }
 
-TEST(ColumnsCase, FixedString_Type_Size_Eq0) {
-    const auto col = std::make_shared<ColumnFixedString>(0);
+TEST(ColumnsCase, FixedString_Size_Eq0_Throws) {
+    EXPECT_THROW(ColumnFixedString(0), ValidationError);
+}
+
+TEST(ColumnsCase, FixedString_Type_Size_Eq1) {
+    const auto col = std::make_shared<ColumnFixedString>(1);
     ASSERT_EQ(col->FixedSize(), col->Type()->As<FixedStringType>()->GetSize());
 }
 
