@@ -355,6 +355,34 @@ void Socket::Close() {
     handle_ = INVALID_SOCKET;
 }
 
+void Socket::SetNonBlocking(bool value) {
+    SetNonBlock(handle_, value);
+}
+
+void Socket::WaitFor(short events, std::chrono::milliseconds timeout, const char* timeout_message) {
+    pollfd fd;
+    fd.fd      = handle_;
+    fd.events  = events;
+    fd.revents = 0;
+
+    const ssize_t rval = Poll(&fd, 1, timeout.count() < 0 ? -1 : static_cast<int>(timeout.count()));
+    if (rval == -1) {
+        const int err = getSocketErrorCode();
+#if !defined(_win_)
+        // Callers loop until their own deadline, so an interrupted wait is just an early wakeup.
+        if (err == EINTR) return;
+#endif
+        throw std::system_error(err, getErrorCategory(), "fail to poll socket");
+    }
+    if (rval == 0) {
+#if defined(_win_)
+        throw std::system_error(WSAETIMEDOUT, getErrorCategory(), timeout_message);
+#else
+        throw std::system_error(ETIMEDOUT, getErrorCategory(), timeout_message);
+#endif
+    }
+}
+
 void Socket::SetTcpKeepAlive(int idle, int intvl, int cnt) noexcept {
     int val = 1;
 

@@ -128,6 +128,12 @@ protected:
     Socket& operator = (const Socket&) = delete;
     void Close();
 
+    void SetNonBlocking(bool value);
+
+    /// Waits until one of `events` is ready on the socket; a negative timeout waits forever.
+    /// Throws std::system_error with a timed-out code when the timeout expires first.
+    void WaitFor(short events, std::chrono::milliseconds timeout, const char* timeout_message);
+
     SOCKET handle_;
 };
 
