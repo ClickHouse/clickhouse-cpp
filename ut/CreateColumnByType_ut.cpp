@@ -64,6 +64,35 @@ TEST(CreateColumnByType, UnmatchedBrackets) {
     ASSERT_EQ(nullptr, CreateColumnByType("Array(LowCardinality(Nullable(FixedString(10000)))"));
 }
 
+TEST(CreateColumnByType, UnsupportedNestedType) {
+    // A wrapper over a type the factory cannot create must not be built around a null nested column.
+    for (const char* type_name : {
+             "Nullable(5)",
+             "Nullable(DateTime64)",
+             "Array(Nullable(5))",
+             "Array(Null)",
+             "Array(DateTime64)",
+             "Array(5)",
+             "Array(Time64)",
+         }) {
+        EXPECT_EQ(nullptr, CreateColumnByType(type_name)) << type_name;
+    }
+
+    EXPECT_THROW(CreateColumnByType("LowCardinality(Nullable(5))"), UnimplementedError);
+    EXPECT_THROW(CreateColumnByType("LowCardinality(Nullable(DateTime64))"), UnimplementedError);
+
+    for (const char* type_name : {
+             "Nullable(UInt8)",
+             "Array(String)",
+             "LowCardinality(Nullable(String))",
+             "Array(Nullable(DateTime64(3)))",
+         }) {
+        const auto col = CreateColumnByType(type_name);
+        ASSERT_NE(nullptr, col) << type_name;
+        EXPECT_EQ(type_name, col->GetType().GetName());
+    }
+}
+
 TEST(CreateColumnByType, LowCardinalityAsWrappedColumn) {
     CreateColumnByTypeSettings create_column_settings;
     create_column_settings.low_cardinality_as_wrapped_column = true;

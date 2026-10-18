@@ -150,16 +150,17 @@ static ColumnRef CreateTerminalColumn(const TypeAst& ast) {
 static ColumnRef CreateColumnFromAst(const TypeAst& ast, CreateColumnByTypeSettings settings) {
     switch (ast.meta) {
         case TypeAst::Array: {
-            return std::make_shared<ColumnArray>(
-                CreateColumnFromAst(GetASTChildElement(ast, 0), settings)
-            );
+            if (auto nested = CreateColumnFromAst(GetASTChildElement(ast, 0), settings)) {
+                return std::make_shared<ColumnArray>(nested);
+            }
+            return nullptr;
         }
 
         case TypeAst::Nullable: {
-            return std::make_shared<ColumnNullable>(
-                CreateColumnFromAst(GetASTChildElement(ast, 0), settings),
-                std::make_shared<ColumnUInt8>()
-            );
+            if (auto nested = CreateColumnFromAst(GetASTChildElement(ast, 0), settings)) {
+                return std::make_shared<ColumnNullable>(nested, std::make_shared<ColumnUInt8>());
+            }
+            return nullptr;
         }
 
         case TypeAst::Terminal: {
@@ -252,12 +253,11 @@ static ColumnRef CreateColumnFromAst(const TypeAst& ast, CreateColumnByTypeSetti
                         //      item and would omit the null item, producing an incorrect nullable
                         //      dictionary.
                         //   2. It lets us construct the ColumnNullable with an explicit UInt8 null-map.
-                        return std::make_shared<ColumnLowCardinality>(
-                            std::make_shared<ColumnNullable>(
-                                CreateColumnFromAst(GetASTChildElement(nested, 0), settings),
-                                std::make_shared<ColumnUInt8>()
-                            )
-                        );
+                        if (auto inner = CreateColumnFromAst(GetASTChildElement(nested, 0), settings)) {
+                            return std::make_shared<ColumnLowCardinality>(
+                                std::make_shared<ColumnNullable>(inner, std::make_shared<ColumnUInt8>()));
+                        }
+                        throw UnimplementedError("LowCardinality(Nullable(" + GetASTChildElement(nested, 0).name + ")) is not supported");
                     default: {
                         // Generic LowCardinality(T): build the inner column and
                         // wrap it. Works for any fixed-size dictionary type that
