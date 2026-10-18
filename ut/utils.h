@@ -209,3 +209,20 @@ inline uint64_t versionNumber(
 uint64_t versionNumber(const clickhouse::ServerInfo & server_info);
 
 std::string ToString(const clickhouse::UUID& v);
+
+/// Records the largest single operator new request made by the current thread
+/// while the object is alive.
+class LargestAllocationScope {
+public:
+    LargestAllocationScope();
+    ~LargestAllocationScope();
+
+    size_t Get() const;
+
+    /// Whether allocations made inside the library reach the replaced operator new;
+    /// they do not when the library brings its own allocator (e.g. a DLL build).
+    static bool ObservesLibraryAllocations();
+};
+
+#define SKIP_UNLESS_LIBRARY_ALLOCATIONS_OBSERVED() \
+    if (!LargestAllocationScope::ObservesLibraryAllocations()) GTEST_SKIP() << "the library's allocations bypass the test's operator new"

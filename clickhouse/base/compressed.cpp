@@ -23,6 +23,12 @@ enum class CompressionMethodByte : uint8_t {
 // Documentation says that compression is faster when output buffer is larger than LZ4_compressBound/ZSTD_compressBound estimation.
 constexpr size_t EXTRA_COMPRESS_BUFFER_SIZE = 4096;
 constexpr size_t DBMS_MAX_COMPRESSED_SIZE = 0x40000000ULL;   // 1GB
+// The same limits as ClickHouse applies to the sizes in a block header (src/Compression/CompressionInfo.h).
+constexpr size_t DBMS_MAX_DECOMPRESSED_SIZE = 0x40000000ULL;  // 1GB
+// The compressed payload is read in steps starting at this size, so that a declared
+// size is not allocated before the bytes behind it arrive. It covers the server's
+// default 1 MiB blocks even when they do not compress.
+constexpr size_t COMPRESSED_READ_STEP = 4 << 20;
 }
 
 namespace clickhouse {
@@ -86,7 +92,12 @@ bool CompressedInput::Decompress() {
         throw CompressionError("compressed block size " + std::to_string(compressed) + " is smaller than header, data is likely corrupted");
     }
 
-    Buffer tmp(compressed);
+    if (original > DBMS_MAX_DECOMPRESSED_SIZE) {
+        throw CompressionError("decompressed block size " + std::to_string(original) +
+                               " exceeds maximum allowed, data is likely corrupted");
+    }
+
+    Buffer tmp;
 
     // Data header
     {
@@ -97,20 +108,35 @@ bool CompressedInput::Decompress() {
         out.Flush();
     }
 
-    if (!WireFormat::ReadBytes(*input_, tmp.data() + HEADER_SIZE, compressed - HEADER_SIZE)) {
-        return false;
-    } else {
-        if (hash != cityhash::CityHash128((const char*)tmp.data(), compressed)) {
-            throw CompressionError("data was corrupted");
+    while (tmp.size() < compressed) {
+        const size_t loaded = tmp.size();
+        if (tmp.capacity() <= loaded) {
+            // Eightfold, without overflowing a 32-bit size_t near the 1 GiB limit.
+            const size_t target = loaded > compressed / 8 ? compressed : std::max(COMPRESSED_READ_STEP, loaded * 8);
+            tmp.reserve(std::min<size_t>(compressed, target));
+        }
+        const size_t step = std::min({compressed - loaded, tmp.capacity() - loaded, std::max(loaded, COMPRESSED_READ_STEP)});
+        tmp.resize(loaded + step);
+        if (!WireFormat::ReadBytes(*input_, tmp.data() + loaded, step)) {
+            return false;
         }
     }
 
-    data_ = Buffer(original);
+    if (hash != cityhash::CityHash128((const char*)tmp.data(), compressed)) {
+        throw CompressionError("data was corrupted");
+    }
 
-    // Buffer(0).data() is null, and the decompressors do pointer arithmetic on
-    // the destination even when its capacity is zero.
+    // Left uninitialized: zero-filling would commit the whole declared size even when
+    // the payload decompresses to far less, which the length checks below reject.
+    if (original > data_capacity_) {
+        data_.reset(new uint8_t[original]);
+        data_capacity_ = original;
+    }
+
+    // data_ is null until a non-empty block arrives, and the decompressors do
+    // pointer arithmetic on the destination even when its capacity is zero.
     char empty_output  = 0;
-    char* const output = original > 0 ? reinterpret_cast<char*>(data_.data()) : &empty_output;
+    char* const output = original > 0 ? reinterpret_cast<char*>(data_.get()) : &empty_output;
 
     switch (method) {
     case static_cast<uint8_t>(CompressionMethodByte::LZ4): {
@@ -123,7 +149,7 @@ bool CompressedInput::Decompress() {
             throw CompressionError("LZ4-encoded block decompressed to " + std::to_string(res) + " bytes, expected " +
                                    std::to_string(original));
         }
-        mem_.Reset(data_.data(), original);
+        mem_.Reset(data_.get(), original);
         return true;
     }
 
@@ -137,7 +163,7 @@ bool CompressedInput::Decompress() {
             throw CompressionError("ZSTD-encoded block decompressed to " + std::to_string(res) + " bytes, expected " +
                                    std::to_string(original));
         }
-        mem_.Reset(data_.data(), original);
+        mem_.Reset(data_.get(), original);
         return true;
     }
 
