@@ -31,10 +31,20 @@ std::string getCertificateInfo(X509* cert)
 
 void throwSSLError(SSL * ssl, int error, const char * /*location*/, const char * /*statement*/, const std::string prefix = "OpenSSL error: ") {
     const auto detail_error = ERR_get_error();
-    auto reason = ERR_reason_error_string(detail_error);
-    reason = reason ? reason : "Unknown SSL error";
+    std::string reason_str;
+    if (const auto reason = ERR_reason_error_string(detail_error)) {
+        reason_str = reason;
+    } else if (detail_error != 0) {
+        // OpenSSL 3 has no static reason string for system errors (errno from fopen and the like).
+        char buf[256];
+        ERR_error_string_n(detail_error, buf, sizeof(buf));
+        reason_str = buf;
+    } else {
+        reason_str = "Unknown SSL error";
+    }
+    // Leftover entries would be reported as the reason of a later, unrelated failure.
+    ERR_clear_error();
 
-    std::string reason_str = reason;
     if (ssl) {
         // Print certificate only if handshake isn't completed 
         if (auto ssl_session = SSL_get_session(ssl); ssl_session && SSL_get_state(ssl) != TLS_ST_OK)
@@ -129,16 +139,20 @@ SSL_CTX * prepareSSLContext(const clickhouse::SSLParams & context_params) {
 
     if (context_params.use_default_ca_locations)
         HANDLE_SSL_CTX_ERROR(SSL_CTX_set_default_verify_paths(ctx.get()));
+    const auto load_verify_locations = [&ctx](const char* file, const char* dir, const std::string& what) {
+        // Otherwise an entry queued by unrelated earlier work would be reported as the reason.
+        ERR_clear_error();
+        if (!SSL_CTX_load_verify_locations(ctx.get(), file, dir))
+            throwSSLError(nullptr, static_cast<int>(ERR_peek_error()), LOCATION, "SSL_CTX_load_verify_locations",
+                          "Failed to load " + what + ": ");
+    };
     if (!context_params.path_to_ca_directory.empty())
-        HANDLE_SSL_CTX_ERROR(
-            SSL_CTX_load_verify_locations(
-                ctx.get(),
-                nullptr,
-                context_params.path_to_ca_directory.c_str())
-        );
+        load_verify_locations(nullptr, context_params.path_to_ca_directory.c_str(),
+                              "CA directory '" + context_params.path_to_ca_directory + "'");
 
-    for (const auto & f : context_params.path_to_ca_files)
-        HANDLE_SSL_CTX_ERROR(SSL_CTX_load_verify_locations(ctx.get(), f.c_str(), nullptr));
+    for (const auto& f : context_params.path_to_ca_files) {
+        load_verify_locations(f.c_str(), nullptr, "CA file '" + f + "'");
+    }
 
     if (context_params.context_options != -1)
         SSL_CTX_set_options(ctx.get(), context_params.context_options);
@@ -255,17 +269,18 @@ SSLSocket::SSLSocket(const NetworkAddress& addr, const SocketTimeoutParams& time
                 + "\nServer certificate: " + getCertificateInfo(SSL_get_peer_certificate(ssl)));
     }
 
-    // Host name verification is done by OpenSSL itself, however if we are connecting to an ip-address,
-    // no verification is made, so we have to do it manually.
-    // Just in case if this is ever required, leave it here commented out.
-//    if (ip_addr) {
-//        // if hostname is actually an IP address
-//        HANDLE_SSL_ERROR(ssl, X509_check_ip(
-//                SSL_get_peer_certificate(ssl),
-//                ASN1_STRING_get0_data(ip_addr.get()),
-//                ASN1_STRING_length(ip_addr.get()),
-//                0));
-//    }
+    // SSL_set1_host() above makes OpenSSL verify the peer name. Since OpenSSL 3.0 it also
+    // recognizes IP literals and checks them against the certificate's IP SANs; older
+    // releases match an IP literal only as a DNS name. The manual IP check below is kept
+    // for reference in case a build ever needs it.
+    //    if (ip_addr) {
+    //        // if hostname is actually an IP address
+    //        HANDLE_SSL_ERROR(ssl, X509_check_ip(
+    //                SSL_get_peer_certificate(ssl),
+    //                ASN1_STRING_get0_data(ip_addr.get()),
+    //                ASN1_STRING_length(ip_addr.get()),
+    //                0));
+    //    }
 }
 
 void SSLSocket::validateParams(const SSLParams & ssl_params) {
