@@ -452,7 +452,7 @@ auto Load(ColumnRef new_dictionary_column, InputStream& input, size_t rows) {
     if (number_of_rows != rows)
         throw AssertionError("LowCardinality column must be read in full.");
 
-    new_index_column->LoadBody(&input, number_of_rows);
+    if (!new_index_column->LoadBody(&input, number_of_rows)) throw ProtocolError("Failed to read index column.");
 
     if (auto nullable = new_dictionary_column->As<ColumnNullable>()) {
         nullable->Append(true);
