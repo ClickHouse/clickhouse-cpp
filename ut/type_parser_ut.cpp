@@ -541,6 +541,30 @@ TEST(ParseTypeName, EmptyName) {
     EXPECT_EQ(nullptr, ParseTypeName(std::string(5, '\0')));
 }
 
+TEST(TypeParser, InvalidNumber) {
+    TypeAst ast;
+    EXPECT_FALSE(TypeParser("FixedString(-)").Parse(&ast));
+
+    TypeAst overflow;
+    EXPECT_FALSE(TypeParser("FixedString(99999999999999999999)").Parse(&overflow));
+
+    TypeAst negative;
+    ASSERT_TRUE(TypeParser("Enum8('a' = -128)").Parse(&negative));
+    ASSERT_EQ(negative.elements.size(), 2u);
+    EXPECT_EQ(negative.elements[1].value, -128);
+}
+
+TEST(ParseTypeName, MalformedNumberReturnsNull) {
+    EXPECT_EQ(nullptr, ParseTypeName("FixedString(-)"));
+    EXPECT_EQ(nullptr, ParseTypeName("FixedString(-)"));
+
+    const TypeAst* ast = ParseTypeName("FixedString(16)");
+    ASSERT_NE(nullptr, ast);
+    EXPECT_EQ(ast, ParseTypeName("FixedString(16)"));
+    ASSERT_EQ(ast->elements.size(), 1u);
+    EXPECT_EQ(ast->elements[0].value, 16);
+}
+
 TEST(TypeParser, AggregateFunction) {
     {
         TypeAst ast;

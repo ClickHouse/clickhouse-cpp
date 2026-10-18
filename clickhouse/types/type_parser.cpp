@@ -16,6 +16,7 @@
 #include <strings.h>
 #endif
 
+#include <charconv>
 
 namespace clickhouse {
 
@@ -200,10 +201,13 @@ bool TypeParser::Parse(TypeAst* type) {
                 type_->name = token.value.to_string();
                 type_->code = GetTypeCode(type_->name);
                 break;
-            case Token::Number:
+            case Token::Number: {
                 type_->meta = TypeAst::Number;
-                type_->value = std::stol(token.value.to_string());
+                const char* last     = token.value.data() + token.value.size();
+                const auto [ptr, ec] = std::from_chars(token.value.data(), last, type_->value);
+                if (ec != std::errc() || ptr != last) return false;
                 break;
+            }
             case Token::String:
                 type_->meta = TypeAst::String;
                 type_->value_string = std::string(token.value);
@@ -368,12 +372,11 @@ const TypeAst* ParseTypeName(const std::string& type_name) {
         return &it->second;
     }
 
-    auto& ast = ast_cache[type_name];
-    if (TypeParser(type_name).Parse(&ast)) {
-        return &ast;
+    TypeAst ast;
+    if (!TypeParser(type_name).Parse(&ast)) {
+        return nullptr;
     }
-    ast_cache.erase(type_name);
-    return nullptr;
+    return &ast_cache.emplace(type_name, std::move(ast)).first->second;
 }
 
 }
