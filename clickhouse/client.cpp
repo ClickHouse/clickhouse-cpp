@@ -1204,6 +1204,8 @@ bool Client::Impl::ReceiveHello() {
     }
 
     if (packet_type == ServerCodes::Hello) {
+        server_info_ = ServerInfo{};
+
         if (!WireFormat::ReadString(*input_, &server_info_.name)) {
             return false;
         }

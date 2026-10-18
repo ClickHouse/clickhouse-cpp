@@ -37,10 +37,10 @@ struct ServerInfo {
     std::string name;
     std::string timezone;
     std::string display_name;
-    uint64_t    version_major;
-    uint64_t    version_minor;
-    uint64_t    version_patch;
-    uint64_t    revision;
+    uint64_t version_major = 0;
+    uint64_t version_minor = 0;
+    uint64_t version_patch = 0;
+    uint64_t revision      = 0;
 };
 
 /// Methods of block compression.
