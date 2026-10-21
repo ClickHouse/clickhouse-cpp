@@ -161,7 +161,12 @@ INSTANTIATE_TEST_SUITE_P(
         ClientOptions(ClickHouseExplorerConfig)
             .SetSSLOptions(ClientOptions::SSLOptions()
                     .SetUseDefaultCALocations(false)
-                    .SetMaxProtocolVersion(SSL3_VERSION)),
+                    // Impossible range (min > max) so that the handshake fails with
+                    // "no protocols available" on every OpenSSL version. SSL3_VERSION
+                    // was used before, but OpenSSL 4.0 removed SSLv3 entirely and
+                    // SSL_CTX_set_max_proto_version(SSL3_VERSION) now fails outright.
+                    .SetMinProtocolVersion(TLS1_3_VERSION)
+                    .SetMaxProtocolVersion(TLS1_2_VERSION)),
         ExpectingException{"no protocols available"}
     }
 ));
