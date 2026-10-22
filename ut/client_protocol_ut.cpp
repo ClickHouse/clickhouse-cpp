@@ -50,6 +50,21 @@ private:
     std::vector<uint8_t> script_;
 };
 
+/// Serves the next script on each connect, repeating the last one.
+class SequencedSocketFactory : public SocketFactory {
+public:
+    explicit SequencedSocketFactory(std::vector<std::vector<uint8_t>> scripts) : scripts_(std::move(scripts)) {}
+
+    std::unique_ptr<SocketBase> connect(const ClientOptions&, const Endpoint&) override {
+        const size_t index = next_ < scripts_.size() - 1 ? next_++ : next_;
+        return std::make_unique<ScriptedSocket>(scripts_[index]);
+    }
+
+private:
+    const std::vector<std::vector<uint8_t>> scripts_;
+    size_t next_ = 0;
+};
+
 ClientOptions ScriptedClientOptions() {
     return ClientOptions()
         .SetHost("scripted.test")
@@ -66,6 +81,19 @@ const std::vector<uint8_t> kServerHello = {
     0x01,             // version_major = 1 (varint)
     0x01,             // version_minor = 1 (varint)
     0xD0, 0x86, 0x03, // revision = 50000 (varint)
+};
+
+/// A ServerHello at revision 54401 (DBMS_MIN_REVISION_WITH_VERSION_PATCH),
+/// the first revision that carries every ServerInfo field.
+const std::vector<uint8_t> kServerHelloWithPatch = {
+    0x00,                    // packet type: ServerCodes::Hello (varint)
+    0x02, 0x43, 0x48,        // server name: "CH" (string, len 2)
+    0x02,                    // version_major = 2 (varint)
+    0x03,                    // version_minor = 3 (varint)
+    0x81, 0xA9, 0x03,        // revision = 54401 (varint)
+    0x03, 0x55, 0x54, 0x43,  // timezone: "UTC" (string, len 3)
+    0x01, 0x64,              // display_name: "d" (string, len 1)
+    0x07,                    // version_patch = 7 (varint)
 };
 
 /// An exception packet with a valid code but a corrupt `name` string.
@@ -237,4 +265,35 @@ TEST(ClientProtocol, WellFormedSelectResponseSucceeds) {
         EXPECT_EQ(block.GetRowCount(), 0u);
     }));
     EXPECT_EQ(blocks, 1u);
+}
+
+TEST(ClientProtocol, OldRevisionServerHelloLeavesMissingFieldsZero) {
+    Client client(ScriptedClientOptions(), std::make_unique<ScriptedSocketFactory>(kServerHello));
+
+    const ServerInfo& info = client.GetServerInfo();
+    EXPECT_EQ(info.name, "CH");
+    EXPECT_EQ(info.version_major, 1u);
+    EXPECT_EQ(info.version_minor, 1u);
+    EXPECT_EQ(info.revision, 50000u);
+    EXPECT_EQ(info.timezone, "");
+    EXPECT_EQ(info.display_name, "");
+    EXPECT_EQ(info.version_patch, 0u);
+}
+
+TEST(ClientProtocol, ReconnectToOldRevisionServerClearsPreviousServerInfo) {
+    Client client(ScriptedClientOptions(),
+                  std::make_unique<SequencedSocketFactory>(std::vector<std::vector<uint8_t>>{kServerHelloWithPatch, kServerHello}));
+
+    EXPECT_EQ(client.GetServerInfo().timezone, "UTC");
+    EXPECT_EQ(client.GetServerInfo().display_name, "d");
+    EXPECT_EQ(client.GetServerInfo().version_patch, 7u);
+
+    client.ResetConnection();
+
+    const ServerInfo& info = client.GetServerInfo();
+    EXPECT_EQ(info.name, "CH");
+    EXPECT_EQ(info.revision, 50000u);
+    EXPECT_EQ(info.timezone, "");
+    EXPECT_EQ(info.display_name, "");
+    EXPECT_EQ(info.version_patch, 0u);
 }
