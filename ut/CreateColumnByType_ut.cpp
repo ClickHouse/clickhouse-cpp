@@ -1,14 +1,15 @@
 #include <clickhouse/columns/bool.h>
-#include <clickhouse/columns/factory.h>
 #include <clickhouse/columns/date.h>
+#include <clickhouse/columns/factory.h>
+#include <clickhouse/columns/json.h>
 #include <clickhouse/columns/lowcardinality.h>
 #include <clickhouse/columns/numeric.h>
 #include <clickhouse/columns/string.h>
 #include <clickhouse/columns/tuple.h>
-#include <clickhouse/columns/json.h>
-
 #include <gtest/gtest.h>
 
+#include <fstream>
+#include <string>
 #include <tuple>
 
 namespace {
@@ -95,6 +96,61 @@ TEST(CreateColumnByType, LowCardinalityGeneralInnerTypes) {
         ASSERT_NE(nullptr, col->As<ColumnLowCardinality>()) << type_name;
         EXPECT_EQ(std::string{type_name}, col->GetType().GetName()) << type_name;
     }
+}
+
+#if defined(__linux__)
+namespace {
+long PeakRssKiB() {
+    std::ifstream status("/proc/self/status");
+    std::string line;
+    while (std::getline(status, line)) {
+        if (line.rfind("VmHWM:", 0) == 0) {
+            return std::stol(line.substr(6));
+        }
+    }
+    return -1;
+}
+
+bool ResetPeakRss() {
+    std::ofstream clear_refs("/proc/self/clear_refs");
+    clear_refs << "5";
+    clear_refs.close();
+    return !clear_refs.fail();
+}
+}  // namespace
+#endif
+
+TEST(CreateColumnByType, NestedLowCardinalityDoesNotCopyAst) {
+#if !defined(__linux__)
+    GTEST_SKIP() << "peak RSS is read from /proc/self/status";
+#else
+    // Each LowCardinality level used to copy its whole subtree, so peak memory
+    // grew with depth * width (about 220 MiB here) instead of width.
+    const size_t depth = 200;
+    const size_t width = 8000;
+    std::string type_name;
+    for (size_t i = 0; i < depth; ++i) {
+        type_name += "LowCardinality(Nullable(";
+    }
+    type_name += "Tuple(UInt8";
+    for (size_t i = 1; i < width; ++i) {
+        type_name += ", UInt8";
+    }
+    type_name += ")";
+    type_name.append(2 * depth, ')');
+
+    if (!ResetPeakRss() || PeakRssKiB() < 0) {
+        GTEST_SKIP() << "cannot reset or read peak RSS";
+    }
+    const long before = PeakRssKiB();
+    // Whether this type is supported is not the subject; only the memory used
+    // while building or rejecting it is.
+    try {
+        CreateColumnByType(type_name);
+    } catch (const std::exception&) {
+    }
+    EXPECT_LT(PeakRssKiB() - before, 16 * 1024);
+#endif
 }
 
 TEST(CreateColumnByType, LowCardinality) {

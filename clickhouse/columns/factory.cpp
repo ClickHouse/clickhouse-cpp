@@ -218,7 +218,7 @@ static ColumnRef CreateColumnFromAst(const TypeAst& ast, CreateColumnByTypeSetti
             break;
         }
         case TypeAst::LowCardinality: {
-            const auto nested = GetASTChildElement(ast, 0);
+            const auto& nested = GetASTChildElement(ast, 0);
             if (settings.low_cardinality_as_wrapped_column) {
                 switch (nested.code) {
                     // TODO (nemkov): update this to maximize code reuse.
