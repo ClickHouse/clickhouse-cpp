@@ -31,6 +31,7 @@ bool TypeAst::operator==(const TypeAst & other) const {
 
 static const std::unordered_map<std::string, Type::Code> kTypeCode = {
     { "Void",        Type::Void },
+    { "Nothing",     Type::Void },
     { "Int8",        Type::Int8 },
     { "Int16",       Type::Int16 },
     { "Int32",       Type::Int32 },
@@ -146,17 +147,41 @@ static TypeAst::Meta GetTypeMeta(const StringView& name) {
         return TypeAst::Map;
     }
 
+    if (name == "Nested") {
+        return TypeAst::Nested;
+    }
+
     return TypeAst::Terminal;
 }
 
-bool ValidateAST(const TypeAst& ast) {
-    // Void terminal that is not actually "void" produced when unknown type is encountered.
-    if (ast.meta == TypeAst::Terminal
-            && ast.code == Type::Void
-            && CompateStringsCaseInsensitive(ast.name, std::string_view("void")) != 0)
-        //throw UnimplementedError("Unsupported type: " + ast.name);
-        return false;
+static bool IsKnownVoidName(const std::string& name) {
+    return CompateStringsCaseInsensitive(name, std::string_view("void")) == 0
+        || CompateStringsCaseInsensitive(name, std::string_view("nothing")) == 0;
+}
 
+static bool ElementsAreTypes(TypeAst::Meta meta) {
+    return meta == TypeAst::Array || meta == TypeAst::Nullable || meta == TypeAst::Tuple
+        || meta == TypeAst::Map || meta == TypeAst::LowCardinality || meta == TypeAst::Nested;
+}
+
+bool ValidateAST(const TypeAst& ast) {
+    if (ast.name.empty()) {
+        return true;
+    }
+    if (ast.meta == TypeAst::Terminal && ast.code == Type::Void && !IsKnownVoidName(ast.name)) {
+        return false;
+    }
+    if (ast.meta == TypeAst::SimpleAggregateFunction) {
+        return !ast.elements.empty() && ValidateAST(ast.elements.back());
+    }
+    if (!ElementsAreTypes(ast.meta)) {
+        return true;
+    }
+    for (const auto& element : ast.elements) {
+        if (!ValidateAST(element)) {
+            return false;
+        }
+    }
     return true;
 }
 

@@ -8,13 +8,33 @@
 #include <clickhouse/columns/tuple.h>
 #include <gtest/gtest.h>
 
+#include <cstdlib>
 #include <fstream>
+#include <iostream>
 #include <string>
 #include <tuple>
+
+#if !defined(_WIN32)
+#include <sys/resource.h>
+#endif
 
 namespace {
 using namespace clickhouse;
 }
+
+#if !defined(_WIN32)
+namespace {
+long MaxResidentKiB() {
+    struct rusage usage {};
+    getrusage(RUSAGE_SELF, &usage);
+#if defined(__APPLE__)
+    return usage.ru_maxrss / 1024;
+#else
+    return usage.ru_maxrss;
+#endif
+}
+}
+#endif
 
 TEST(CreateColumnByType, CreateSimpleAggregateFunction) {
     auto col = CreateColumnByType("SimpleAggregateFunction(funt, Int32)");
@@ -365,3 +385,62 @@ INSTANTIATE_TEST_SUITE_P(Nested, CreateColumnByTypeWithName, ::testing::Values(
     "Array(Nullable(LowCardinality(FixedString(10000))))",
     "Array(Enum8('ONE' = 1, 'TWO' = 2))"
 ));
+
+class CreateColumnByNestedType : public ::testing::TestWithParam<std::tuple<const char*, const char*>> {};
+
+TEST_P(CreateColumnByNestedType, CreateColumnByType) {
+    const auto & [type_name, expected_name] = GetParam();
+    const auto col = CreateColumnByType(type_name);
+    ASSERT_NE(nullptr, col) << "CreateColumnByType returned nullptr for " << type_name;
+    EXPECT_EQ(expected_name, col->GetType().GetName());
+}
+
+INSTANTIATE_TEST_SUITE_P(Nested, CreateColumnByNestedType, ::testing::Values(
+    std::make_tuple("Nested(key String, value UInt8)", "Array(Tuple(key String, value UInt8))"),
+    std::make_tuple("Array(Nested(key String, value UInt8))", "Array(Array(Tuple(key String, value UInt8)))"),
+    std::make_tuple("Map(String, Nested(key String, value UInt8))", "Map(String, Array(Tuple(key String, value UInt8)))"),
+    std::make_tuple("Nested(a Nested(b String))", "Array(Tuple(a Array(Tuple(b String))))")
+));
+
+TEST(CreateColumnByTypeDeathTest, DeepNestedDoesNotCopyAst) {
+#if defined(_WIN32)
+    GTEST_SKIP() << "peak RSS is read with getrusage";
+#else
+    const size_t depth = 200;
+    const size_t width = 8000;
+    std::string type_name;
+    for (size_t i = 0; i < depth; ++i) {
+        type_name += "Nested(n ";
+    }
+    type_name += "Nested(f0 UInt8";
+    for (size_t i = 1; i < width; ++i) {
+        type_name += ", f" + std::to_string(i) + " UInt8";
+    }
+    type_name += ")";
+    type_name.append(depth, ')');
+
+    const auto create_within_peak_budget = [&type_name] {
+        const long before = MaxResidentKiB();
+        const bool created = CreateColumnByType(type_name) != nullptr;
+        const long growth = MaxResidentKiB() - before;
+        std::cerr << "peak RSS grew by " << growth << " KiB";
+        std::exit(created && growth < 16 * 1024 ? EXIT_SUCCESS : EXIT_FAILURE);
+    };
+    EXPECT_EXIT(create_within_peak_budget(), ::testing::ExitedWithCode(EXIT_SUCCESS), "");
+#endif
+}
+
+TEST(CreateColumnByType, UnknownTypeInsideContainer) {
+    ASSERT_EQ(nullptr, CreateColumnByType("Array(Int256)"));
+    ASSERT_EQ(nullptr, CreateColumnByType("Array(Nested(key String, value Dynamic))"));
+}
+
+TEST(CreateColumnByType, Nothing) {
+    ASSERT_NE(nullptr, CreateColumnByType("Array(Nothing)"));
+    ASSERT_NE(nullptr, CreateColumnByType("Nullable(Nothing)"));
+}
+
+TEST(CreateColumnByType, ParameterisedJSON) {
+    ASSERT_NE(nullptr, CreateColumnByType("JSON(max_dynamic_paths=1)"));
+    ASSERT_NE(nullptr, CreateColumnByType("JSON(a Int256, SKIP b)"));
+}

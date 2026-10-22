@@ -552,3 +552,53 @@ TEST(TypeParser, AggregateFunction) {
         EXPECT_FALSE(TypeParser("AggregateFunction(argMax, LowCardinality(Nullable(FixedString(4))), DateTime(3, 'UTC'))").Parse(&ast));
     }
 }
+
+TEST(TypeParserCase, ParseNested) {
+    TypeAst ast;
+    ASSERT_TRUE(TypeParser("Nested(key String, value UInt8)").Parse(&ast));
+    ASSERT_EQ(ast.meta, TypeAst::Nested);
+    ASSERT_EQ(ast.name, "Nested");
+    ASSERT_EQ(ast.elements.size(), 2u);
+
+    ASSERT_EQ(ast.elements[0].element_name, "key");
+    ASSERT_EQ(ast.elements[0].name, "String");
+    ASSERT_EQ(ast.elements[0].code, Type::String);
+
+    ASSERT_EQ(ast.elements[1].element_name, "value");
+    ASSERT_EQ(ast.elements[1].name, "UInt8");
+    ASSERT_EQ(ast.elements[1].code, Type::UInt8);
+}
+
+TEST(TypeParserCase, ParseNested_FieldNamedNested) {
+    TypeAst ast;
+    ASSERT_TRUE(TypeParser("Nested(Nested String)").Parse(&ast));
+    ASSERT_EQ(ast.meta, TypeAst::Nested);
+    ASSERT_EQ(ast.elements.size(), 1u);
+    ASSERT_EQ(ast.elements[0].meta, TypeAst::Terminal);
+    ASSERT_EQ(ast.elements[0].element_name, "Nested");
+    ASSERT_EQ(ast.elements[0].name, "String");
+}
+
+class TypeNameValidation : public ::testing::TestWithParam<std::tuple<const char*, bool>> {};
+
+TEST_P(TypeNameValidation, Parse) {
+    const auto & [type_name, accepted] = GetParam();
+    TypeAst ast;
+    EXPECT_EQ(accepted, TypeParser(std::string(type_name)).Parse(&ast)) << type_name;
+}
+
+INSTANTIATE_TEST_SUITE_P(UnknownNames, TypeNameValidation, ::testing::Values(
+    std::make_tuple("Array(Int256)", false),
+    std::make_tuple("Nullable(Variant(UInt8, String))", false),
+    std::make_tuple("Tuple(a Dynamic)", false),
+    std::make_tuple("Map(String, IntervalDay)", false),
+    std::make_tuple("LowCardinality(BFloat16)", false),
+    std::make_tuple("Nested(key String, value Dynamic)", false),
+    std::make_tuple("Array(Nothing)", true),
+    std::make_tuple("Nullable(Nothing)", true),
+    std::make_tuple("SimpleAggregateFunction(anyLast, LowCardinality(String))", true),
+    std::make_tuple("JSON(max_dynamic_paths=1)", true),
+    std::make_tuple("JSON(a Int256, SKIP b)", true),
+    std::make_tuple("Enum8('a' = 1)", true),
+    std::make_tuple("DateTime64(3, 'UTC')", true)
+));
