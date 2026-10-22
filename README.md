@@ -185,6 +185,7 @@ still might break.
 * String
 * LowCardinality(String) or LowCardinality(FixedString(N))
 * Tuple
+* Nested, read and written as Array(Tuple(...))
 * UInt8, UInt16, UInt32, UInt64, Int8, Int16, Int32, Int64
 * UInt128, Int128
 * UUID
