@@ -904,7 +904,7 @@ bool Client::Impl::ReceiveData(Block & block) {
 
 bool Client::Impl::ReceiveException(ServerError & error) {
     std::shared_ptr<Exception> e(new Exception);
-    bool has_nested = false; // obsolete: https://github.com/ClickHouse/ClickHouse/blob/ef11941cf5a/src/IO/ReadHelpers.cpp#L2017
+    uint8_t has_nested = 0;  // obsolete: https://github.com/ClickHouse/ClickHouse/blob/ef11941cf5a/src/IO/ReadHelpers.cpp#L2017
 
     if (!WireFormat::ReadFixed(*input_, &e->code) ||
         !WireFormat::ReadString(*input_, &e->name) ||
@@ -924,14 +924,17 @@ bool Client::Impl::ReceiveException(ServerError & error) {
 }
 
 bool Client::Impl::ReceiveProfileInfo(Profile & profile) {
-    if (!WireFormat::ReadUInt64(*input_, &profile.rows) ||
-        !WireFormat::ReadUInt64(*input_, &profile.blocks) ||
-        !WireFormat::ReadUInt64(*input_, &profile.bytes) ||
-        !WireFormat::ReadFixed(*input_, &profile.applied_limit) ||
-        !WireFormat::ReadUInt64(*input_, &profile.rows_before_limit) ||
-        !WireFormat::ReadFixed(*input_, &profile.calculated_rows_before_limit)) {
+    uint8_t applied_limit                = 0;
+    uint8_t calculated_rows_before_limit = 0;
+
+    if (!WireFormat::ReadUInt64(*input_, &profile.rows) || !WireFormat::ReadUInt64(*input_, &profile.blocks) ||
+        !WireFormat::ReadUInt64(*input_, &profile.bytes) || !WireFormat::ReadFixed(*input_, &applied_limit) ||
+        !WireFormat::ReadUInt64(*input_, &profile.rows_before_limit) || !WireFormat::ReadFixed(*input_, &calculated_rows_before_limit)) {
         return false;
     }
+
+    profile.applied_limit                = applied_limit != 0;
+    profile.calculated_rows_before_limit = calculated_rows_before_limit != 0;
 
     if (events_) {
         events_->OnProfile(profile);
