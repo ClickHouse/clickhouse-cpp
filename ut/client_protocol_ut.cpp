@@ -297,3 +297,44 @@ TEST(ClientProtocol, ReconnectToOldRevisionServerClearsPreviousServerInfo) {
     EXPECT_EQ(info.display_name, "");
     EXPECT_EQ(info.version_patch, 0u);
 }
+
+TEST(ClientProtocol, ProfileInfoFlagsAcceptAnyNonZeroByte) {
+    std::vector<uint8_t> script         = kServerHello;
+    const std::vector<uint8_t> response = {
+        0x06,  // packet type: ServerCodes::ProfileInfo (varint)
+        0x01,  // rows = 1 (varint)
+        0x00,  // blocks = 0 (varint)
+        0x02,  // bytes = 2 (varint)
+        0x05,  // applied_limit: non-canonical true (fixed, 1 byte)
+        0x03,  // rows_before_limit = 3 (varint)
+        0x00,  // calculated_rows_before_limit = false (fixed, 1 byte)
+        0x06,  // packet type: ServerCodes::ProfileInfo (varint)
+        0x01, 0x00, 0x02,
+        0x00,  // applied_limit = false
+        0x03,
+        0xFF,  // calculated_rows_before_limit: non-canonical true
+        0x05,  // packet type: ServerCodes::EndOfStream (varint)
+    };
+    script.insert(script.end(), response.begin(), response.end());
+
+    Client client(ScriptedClientOptions(), std::make_unique<ScriptedSocketFactory>(script));
+
+    std::vector<std::pair<uint8_t, uint8_t>> flags;
+    Query query("SELECT 1");
+    query.OnProfile([&flags](const Profile& profile) {
+        EXPECT_EQ(profile.rows, 1u);
+        EXPECT_EQ(profile.bytes, 2u);
+        EXPECT_EQ(profile.rows_before_limit, 3u);
+        // Inspect the object representation: a bool holding anything other
+        // than 0 or 1 is undefined behaviour to load.
+        flags.emplace_back(*reinterpret_cast<const uint8_t*>(&profile.applied_limit),
+                           *reinterpret_cast<const uint8_t*>(&profile.calculated_rows_before_limit));
+    });
+    client.Select(query);
+
+    ASSERT_EQ(flags.size(), 2u);
+    EXPECT_EQ(flags[0].first, 1u);
+    EXPECT_EQ(flags[0].second, 0u);
+    EXPECT_EQ(flags[1].first, 0u);
+    EXPECT_EQ(flags[1].second, 1u);
+}
