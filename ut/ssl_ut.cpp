@@ -1,12 +1,16 @@
 /** Collection of integration tests that validate TLS-connectivity to a CH server
  */
-#include "readonly_client_test.h"
-#include "connection_failed_client_test.h"
-#include "utils.h"
-
-#include <openssl/tls1.h>
+#include <clickhouse/base/sslsocket.h>
 #include <openssl/ssl2.h>
 #include <openssl/ssl3.h>
+#include <openssl/tls1.h>
+
+#include <cerrno>
+#include <cstring>
+
+#include "connection_failed_client_test.h"
+#include "readonly_client_test.h"
+#include "utils.h"
 
 namespace {
     using namespace clickhouse;
@@ -123,6 +127,20 @@ TEST(OpenSSLConfiguration, InValidValues) {
     }
 }
 
+TEST(SSLContext, MissingCAFileErrorNamesFileAndReason) {
+    const std::string path = "/nonexistent/clickhouse-cpp-ut/ca.pem";
+    SSLParams params{};
+    params.path_to_ca_files = {path};
+
+    try {
+        SSLContext context(params);
+        FAIL() << "Expected OpenSSLError for a missing CA file";
+    } catch (const OpenSSLError& e) {
+        const std::string what = e.what();
+        EXPECT_NE(what.find(path), std::string::npos) << what;
+        EXPECT_NE(what.find(std::strerror(ENOENT)), std::string::npos) << what;
+    }
+}
 
 //INSTANTIATE_TEST_SUITE_P(
 //    Remote_GH_API_TLS_WithStringConfig, ReadonlyClientTest,
