@@ -115,7 +115,9 @@ struct ClientOptions {
     // TCP options
     DECLARE_FIELD(tcp_nodelay, bool, TcpNoDelay, true);
 
-    /// Connection socket connect timeout. If the timeout is negative then the connect operation will never timeout.
+    /// Connection socket connect timeout. It bounds the TCP connect and, for TLS connections, the TLS handshake separately,
+    /// so establishing a TLS connection can take up to twice this timeout.
+    /// If the timeout is negative then the connect operation will never timeout.
     DECLARE_FIELD(connection_connect_timeout, std::chrono::milliseconds, SetConnectionConnectTimeout, std::chrono::seconds(5));
 
     /// Connection socket timeout. If the timeout is set to zero then the operation will never timeout.

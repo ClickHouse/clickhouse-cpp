@@ -63,6 +63,8 @@ public:
 
     static void validateParams(const SSLParams & ssl_params);
 private:
+    void Handshake(SSL* ssl, std::chrono::milliseconds timeout);
+
     std::unique_ptr<SSL, void (*)(SSL *s)> ssl_;
 };
 

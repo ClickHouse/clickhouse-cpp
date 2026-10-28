@@ -1,12 +1,15 @@
 /** Collection of integration tests that validate TLS-connectivity to a CH server
  */
-#include "readonly_client_test.h"
-#include "connection_failed_client_test.h"
-#include "utils.h"
-
-#include <openssl/tls1.h>
 #include <openssl/ssl2.h>
 #include <openssl/ssl3.h>
+#include <openssl/tls1.h>
+
+#include <cerrno>
+
+#include "connection_failed_client_test.h"
+#include "readonly_client_test.h"
+#include "tcp_server.h"
+#include "utils.h"
 
 namespace {
     using namespace clickhouse;
@@ -123,6 +126,39 @@ TEST(OpenSSLConfiguration, InValidValues) {
     }
 }
 
+TEST(OpenSSLConnection, HandshakeIsBoundedByConnectTimeout) {
+    // The kernel completes the TCP handshake from the listen backlog, but nobody ever
+    // answers the ClientHello. Each endpoint must give up after the connect timeout and
+    // rotation must move on to the next one; the receive timeout is only a hang guard.
+    const int first_port  = 19980;
+    const int second_port = 19981;
+    LocalTcpServer first(first_port);
+    LocalTcpServer second(second_port);
+    first.start();
+    second.start();
+
+    const auto connect_timeout = std::chrono::milliseconds(500);
+    const auto start           = std::chrono::steady_clock::now();
+    try {
+        Client client(ClientOptions()
+                          .SetEndpoints({{"127.0.0.1", first_port}, {"127.0.0.1", second_port}})
+                          .SetSendRetries(1)
+                          .SetConnectionConnectTimeout(connect_timeout)
+                          .SetConnectionRecvTimeout(std::chrono::seconds(10))
+                          .SetSSLOptions(ClientOptions::SSLOptions().SetSkipVerification(true)));
+        FAIL() << "TLS handshake completed against a peer that never answered";
+    } catch (const std::system_error& e) {
+#if defined(_win_)
+        EXPECT_EQ(WSAETIMEDOUT, e.code().value()) << e.what();
+#else
+        EXPECT_EQ(ETIMEDOUT, e.code().value()) << e.what();
+#endif
+    }
+    const auto elapsed = std::chrono::steady_clock::now() - start;
+
+    EXPECT_GE(elapsed, 2 * connect_timeout);
+    EXPECT_LT(elapsed, 2 * connect_timeout + std::chrono::seconds(2));
+}
 
 //INSTANTIATE_TEST_SUITE_P(
 //    Remote_GH_API_TLS_WithStringConfig, ReadonlyClientTest,
