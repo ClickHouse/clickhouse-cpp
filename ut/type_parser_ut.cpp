@@ -577,10 +577,14 @@ std::string NestedArrayType(size_t depth, bool closed = true) {
 }
 }  // namespace
 
+// The depth limit is an internal detail of type_parser.cpp, so these tests pin
+// it by value rather than by referring to the constant. Asserting against the
+// constant would hold for any limit, including one too low to parse the types
+// real servers send; changing the limit must fail here deliberately.
 TEST(TypeParser, NestingDepthLimit) {
     {
         TypeAst ast;
-        ASSERT_TRUE(TypeParser(NestedArrayType(TypeParser::kMaxNestingDepth)).Parse(&ast));
+        ASSERT_TRUE(TypeParser(NestedArrayType(512)).Parse(&ast));
 
         size_t depth        = 0;
         const TypeAst* node = &ast;
@@ -589,11 +593,11 @@ TEST(TypeParser, NestingDepthLimit) {
             node = &node->elements.front();
             ++depth;
         }
-        EXPECT_EQ(TypeParser::kMaxNestingDepth, depth);
+        EXPECT_EQ(512u, depth);
         EXPECT_EQ(Type::UInt8, node->code);
     }
 
-    for (size_t depth : {TypeParser::kMaxNestingDepth + 1, size_t{100000}}) {
+    for (size_t depth : {size_t{513}, size_t{100000}}) {
         TypeAst closed_ast;
         EXPECT_FALSE(TypeParser(NestedArrayType(depth)).Parse(&closed_ast)) << depth;
         EXPECT_EQ(nullptr, ParseTypeName(NestedArrayType(depth))) << depth;
@@ -610,8 +614,8 @@ TEST(TypeParser, NestingDepthLimitBoundsColumnFactory) {
     EXPECT_EQ(NestedArrayType(32), col->Type()->GetName());
 
     EXPECT_NE(nullptr, CreateColumnByType(NestedArrayType(499)));
-    EXPECT_NE(nullptr, CreateColumnByType(NestedArrayType(TypeParser::kMaxNestingDepth)));
-    EXPECT_EQ(nullptr, CreateColumnByType(NestedArrayType(TypeParser::kMaxNestingDepth + 1)));
+    EXPECT_NE(nullptr, CreateColumnByType(NestedArrayType(512)));
+    EXPECT_EQ(nullptr, CreateColumnByType(NestedArrayType(513)));
     EXPECT_EQ(nullptr, CreateColumnByType(NestedArrayType(100000)));
     EXPECT_EQ(nullptr, CreateColumnByType(NestedArrayType(100000, false)));
 }

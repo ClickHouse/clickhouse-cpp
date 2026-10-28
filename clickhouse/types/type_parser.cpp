@@ -29,6 +29,12 @@ bool TypeAst::operator==(const TypeAst & other) const {
         && std::equal(elements.begin(), elements.end(), other.elements.begin(), other.elements.end());
 }
 
+// Current servers reject column types nested deeper than 499 levels. The column
+// factory and TypeAst destruction recurse once per level, so the limit also
+// bounds their stack use. Kept internal: this is a hardening detail, not part of
+// the installed API.
+static constexpr size_t kMaxNestingDepth = 512;
+
 static const std::unordered_map<std::string, Type::Code> kTypeCode = {
     { "Void",        Type::Void },
     { "Int8",        Type::Int8 },
