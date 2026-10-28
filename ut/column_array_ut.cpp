@@ -281,6 +281,101 @@ TEST(ColumnArray, Slice) {
     EXPECT_ANY_THROW(untyped_array->Slice(0, values.size() + 1));
 }
 
+TEST(ColumnArray, Load) {
+    using namespace std::literals;
+    // Offsets 2, 2, 3 followed by three UInt8 values: [1, 2], [], [3].
+    const auto data =
+        "\x02\x00\x00\x00\x00\x00\x00\x00"
+        "\x02\x00\x00\x00\x00\x00\x00\x00"
+        "\x03\x00\x00\x00\x00\x00\x00\x00"
+        "\x01\x02\x03"sv;
+    ArrayInput input(data.data(), data.size());
+    auto array = CreateColumnByType("Array(UInt8)")->AsStrict<ColumnArray>();
+
+    ASSERT_TRUE(array->Load(&input, 3));
+    ASSERT_EQ(3u, array->Size());
+    EXPECT_TRUE(CompareRecursive(std::vector<uint8_t>{1, 2}, *array->GetAsColumnTyped<ColumnUInt8>(0)));
+    EXPECT_EQ(0u, array->GetAsColumn(1)->Size());
+    EXPECT_TRUE(CompareRecursive(std::vector<uint8_t>{3}, *array->GetAsColumnTyped<ColumnUInt8>(2)));
+}
+
+TEST(ColumnArray, Load_EmptyArrays) {
+    using namespace std::literals;
+    const auto data =
+        "\x00\x00\x00\x00\x00\x00\x00\x00"
+        "\x00\x00\x00\x00\x00\x00\x00\x00"sv;
+    ArrayInput input(data.data(), data.size());
+    auto array = CreateColumnByType("Array(Nothing)")->AsStrict<ColumnArray>();
+
+    ASSERT_TRUE(array->Load(&input, 2));
+    ASSERT_EQ(2u, array->Size());
+    EXPECT_EQ(0u, array->GetAsColumn(0)->Size());
+    EXPECT_EQ(0u, array->GetAsColumn(1)->Size());
+}
+
+TEST(ColumnArray, Load_ReplacesPreviousRows) {
+    using namespace std::literals;
+    // One row [1], then two empty rows, then no rows.
+    const auto data =
+        "\x01\x00\x00\x00\x00\x00\x00\x00"
+        "\x01"
+        "\x00\x00\x00\x00\x00\x00\x00\x00"
+        "\x00\x00\x00\x00\x00\x00\x00\x00"sv;
+    ArrayInput input(data.data(), data.size());
+    auto array = CreateColumnByType("Array(UInt8)")->AsStrict<ColumnArray>();
+
+    ASSERT_TRUE(array->Load(&input, 1));
+    ASSERT_EQ(1u, array->GetData()->Size());
+
+    ASSERT_TRUE(array->Load(&input, 2));
+    EXPECT_EQ(2u, array->Size());
+    EXPECT_EQ(0u, array->GetData()->Size());
+
+    ASSERT_TRUE(array->Load(&input, 0));
+    EXPECT_EQ(0u, array->Size());
+    EXPECT_EQ(0u, array->GetData()->Size());
+}
+
+TEST(ColumnArray, Load_DecreasingOffsets) {
+    using namespace std::literals;
+    // Offsets 2, 1: the second row would span from offset 2 back to offset 1.
+    const auto data =
+        "\x02\x00\x00\x00\x00\x00\x00\x00"
+        "\x01\x00\x00\x00\x00\x00\x00\x00"
+        "\x00"sv;
+    ArrayInput input(data.data(), data.size());
+    auto array = CreateColumnByType("Array(Nothing)");
+
+    EXPECT_THROW(array->Load(&input, 2), ProtocolError);
+}
+
+TEST(ColumnArray, Load_FixedStringNestedSizeMismatch) {
+    using namespace std::literals;
+    // Offset 4 followed by 4 bytes; width * 4 wraps around size_t to 4, so the nested column holds 0 rows, not 4.
+    const auto data =
+        "\x04\x00\x00\x00\x00\x00\x00\x00"
+        "ABCD"sv;
+    ArrayInput input(data.data(), data.size());
+    ColumnArray array(std::make_shared<ColumnFixedString>(static_cast<size_t>(-1) / 4 + 2));
+
+    EXPECT_THROW(array.Load(&input, 1), ProtocolError);
+}
+
+TEST(ColumnArray, Load_NestedSizeMismatch) {
+    using namespace std::literals;
+    // Nothing::LoadBody adds to the rows it already holds, so a second Load leaves more nested rows than the offsets cover.
+    const auto data =
+        "\x01\x00\x00\x00\x00\x00\x00\x00"
+        "\x00"
+        "\x02\x00\x00\x00\x00\x00\x00\x00"
+        "\x00\x00"sv;
+    ArrayInput input(data.data(), data.size());
+    auto array = CreateColumnByType("Array(Nothing)");
+
+    ASSERT_TRUE(array->Load(&input, 1));
+    EXPECT_THROW(array->Load(&input, 1), ProtocolError);
+}
+
 TEST(ColumnArray, Slice_2D) {
     // Verify that ColumnArray::Slice on 2D Array produces a 2D Array of proper type, size and contents.
     // Also check that slices can be of any size.
