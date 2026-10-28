@@ -1360,6 +1360,82 @@ TEST(ColumnsCase, ColumnLowCardinalityString_Load) {
     }
 }
 
+namespace {
+// Native LowCardinality body: key version, index type (0..3 for UInt8..UInt64) with
+// HasAdditionalKeys, dictionary keys, row count and the indexes at that width.
+std::string MakeLowCardinalityBody(uint64_t index_type, uint64_t keys, const std::string& dictionary,
+                                   const std::vector<uint64_t>& indexes) {
+    std::string out;
+    auto put = [&out](uint64_t v, size_t width) { out.append(reinterpret_cast<const char*>(&v), width); };
+    put(1, 8);
+    put(index_type | (1u << 9), 8);
+    put(keys, 8);
+    out += dictionary;
+    put(indexes.size(), 8);
+    for (auto index : indexes) {
+        put(index, size_t{1} << index_type);
+    }
+    return out;
+}
+}  // namespace
+
+TEST(ColumnsCase, ColumnLowCardinalityFixedString_LoadRejectsIndexOutOfRange) {
+    // 1001 * index wraps modulo 2^64 to byte 1500 of the 2002-byte dictionary.
+    const uint64_t wrapping_index = 12107403452974201212ull;
+    const std::string dictionary  = std::string(1001, 'A') + std::string(1001, 'B');
+
+    for (const auto& [index_type, index] : std::vector<std::pair<uint64_t, uint64_t>>{{3, 2}, {3, wrapping_index}, {0, 2}}) {
+        ColumnLowCardinalityT<ColumnFixedString> col(1001);
+        const auto body = MakeLowCardinalityBody(index_type, 2, dictionary, {1, index});
+        ArrayInput input(body.data(), body.size());
+        EXPECT_FALSE(col.Load(&input, 2)) << "index type " << index_type << " index " << index;
+    }
+
+    for (uint64_t index_type : {0, 3}) {
+        ColumnLowCardinalityT<ColumnFixedString> col(1001);
+        const auto body = MakeLowCardinalityBody(index_type, 2, dictionary, {1, 0});
+        ArrayInput input(body.data(), body.size());
+        ASSERT_TRUE(col.Load(&input, 2)) << "index type " << index_type;
+        EXPECT_EQ(col.At(0), std::string(1001, 'B'));
+        EXPECT_EQ(col.At(1), std::string(1001, 'A'));
+    }
+}
+
+TEST(ColumnsCase, ColumnLowCardinalityString_LoadRejectsIndexOutOfRange) {
+    const std::string dictionary = std::string{0, 3} + "foo";
+    auto make_nullable           = [] {
+        return ColumnLowCardinality(std::make_shared<ColumnNullable>(std::make_shared<ColumnString>(), std::make_shared<ColumnUInt8>()));
+    };
+    {
+        ColumnLowCardinalityT<ColumnString> col;
+        const auto body = MakeLowCardinalityBody(3, 2, dictionary, {1, 2});
+        ArrayInput input(body.data(), body.size());
+        EXPECT_FALSE(col.Load(&input, 2));
+    }
+    {
+        auto col        = make_nullable();
+        const auto body = MakeLowCardinalityBody(3, 2, dictionary, {0, 2});
+        ArrayInput input(body.data(), body.size());
+        EXPECT_FALSE(col.Load(&input, 2));
+    }
+    {
+        ColumnLowCardinalityT<ColumnString> col;
+        const auto body = MakeLowCardinalityBody(3, 2, dictionary, {1, 0});
+        ArrayInput input(body.data(), body.size());
+        ASSERT_TRUE(col.Load(&input, 2));
+        EXPECT_EQ(col.At(0), "foo");
+        EXPECT_EQ(col.At(1), "");
+    }
+
+    // Index 0 of a Nullable dictionary is the null item.
+    auto col        = make_nullable();
+    const auto body = MakeLowCardinalityBody(0, 2, dictionary, {0, 1});
+    ArrayInput input(body.data(), body.size());
+    ASSERT_TRUE(col.Load(&input, 2));
+    EXPECT_EQ(col.GetItem(0).type, Type::Void);
+    EXPECT_EQ(col.GetItem(1).AsBinaryData(), "foo");
+}
+
 // This is temporary disabled since we are not 100% compatitable with ClickHouse
 // on how we serailize LC columns, but we check interoperability in other tests (see client_ut.cpp)
 TEST(ColumnsCase, DISABLED_ColumnLowCardinalityString_Save) {
