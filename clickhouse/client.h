@@ -316,6 +316,12 @@ public:
     void Insert(const std::string& table_name, const Block& block);
     void Insert(const std::string& table_name, const std::string& query_id, const Block& block);
 
+    /// Same as above, but also sends \p settings with the query, e.g. insert_deduplication_token.
+    /// Throws UnimplementedError if \p settings is not empty and the server is older than 20.1.2.4.
+    void Insert(const std::string& table_name, const Block& block, const QuerySettings& settings);
+    void Insert(const std::string& table_name, const std::string& query_id, const Block& block,
+                const QuerySettings& settings);
+
     /// Start an \p INSERT statement, insert batches of data, then finish the insert.
     /// Queries with event callbacks are not allowed.If the query has any event callbacks set, this
     /// call throws ValidationError.

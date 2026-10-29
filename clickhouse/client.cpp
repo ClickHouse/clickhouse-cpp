@@ -202,7 +202,8 @@ public:
 
     bool IsSelecting() const { return state_ == State::Selecting; }
 
-    void Insert(const std::string& table_name, const std::string& query_id, const Block& block);
+    void Insert(const std::string& table_name, const std::string& query_id, const Block& block,
+                const QuerySettings& settings);
 
     Block BeginInsert(Query query);
 
@@ -484,7 +485,8 @@ std::string NameToQueryString(const std::string &input)
     return output;
 }
 
-void Client::Impl::Insert(const std::string& table_name, const std::string& query_id, const Block& block) {
+void Client::Impl::Insert(const std::string& table_name, const std::string& query_id, const Block& block,
+                          const QuerySettings& settings) {
     if (state_ == State::Inserting) {
         throw ValidationError("cannot execute query while inserting, use SendInsertData instead");
     }
@@ -510,6 +512,7 @@ void Client::Impl::Insert(const std::string& table_name, const std::string& quer
     }
 
     Query query("INSERT INTO " + table_name + " ( " + fields_section.str() + " ) VALUES", query_id);
+    query.SetQuerySettings(settings);
     SendQuery(query);
 
     // Wait for a data packet and return
@@ -1405,11 +1408,20 @@ bool Client::IsSelecting() const
 }
 
 void Client::Insert(const std::string& table_name, const Block& block) {
-    impl_->Insert(table_name, Query::default_query_id, block);
+    impl_->Insert(table_name, Query::default_query_id, block, QuerySettings{});
 }
 
 void Client::Insert(const std::string& table_name, const std::string& query_id, const Block& block) {
-    impl_->Insert(table_name, query_id, block);
+    impl_->Insert(table_name, query_id, block, QuerySettings{});
+}
+
+void Client::Insert(const std::string& table_name, const Block& block, const QuerySettings& settings) {
+    impl_->Insert(table_name, Query::default_query_id, block, settings);
+}
+
+void Client::Insert(const std::string& table_name, const std::string& query_id, const Block& block,
+                    const QuerySettings& settings) {
+    impl_->Insert(table_name, query_id, block, settings);
 }
 
 Block Client::BeginInsert(const Query& query) {
