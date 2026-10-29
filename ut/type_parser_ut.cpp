@@ -1,3 +1,4 @@
+#include <clickhouse/columns/factory.h>
 #include <clickhouse/types/type_parser.h>
 #include <gtest/gtest.h>
 
@@ -550,5 +551,81 @@ TEST(TypeParser, AggregateFunction) {
     {
         TypeAst ast;
         EXPECT_FALSE(TypeParser("AggregateFunction(argMax, LowCardinality(Nullable(FixedString(4))), DateTime(3, 'UTC'))").Parse(&ast));
+    }
+}
+
+TEST(TypeParser, UnbalancedClosingParenthesis) {
+    for (const std::string type_name : {")", "),", ")))", "UInt8)", "UInt8))", "UInt8),", "UInt8)(", "Array(UInt8))", "Array(UInt8)),",
+                                        "Tuple(UInt8, String))", "UInt8,", "UInt8, String", ","}) {
+        TypeAst ast;
+        EXPECT_FALSE(TypeParser(type_name).Parse(&ast)) << type_name;
+        EXPECT_EQ(nullptr, ParseTypeName(type_name)) << type_name;
+    }
+}
+
+namespace {
+std::string NestedArrayType(size_t depth, bool closed = true) {
+    std::string result;
+    for (size_t i = 0; i < depth; ++i) {
+        result += "Array(";
+    }
+    result += "UInt8";
+    if (closed) {
+        result.append(depth, ')');
+    }
+    return result;
+}
+}  // namespace
+
+// The depth limit is an internal detail of type_parser.cpp, so these tests pin
+// it by value rather than by referring to the constant. Asserting against the
+// constant would hold for any limit, including one too low to parse the types
+// real servers send; changing the limit must fail here deliberately.
+TEST(TypeParser, NestingDepthLimit) {
+    {
+        TypeAst ast;
+        ASSERT_TRUE(TypeParser(NestedArrayType(512)).Parse(&ast));
+
+        size_t depth        = 0;
+        const TypeAst* node = &ast;
+        while (node->meta == TypeAst::Array) {
+            ASSERT_EQ(1u, node->elements.size());
+            node = &node->elements.front();
+            ++depth;
+        }
+        EXPECT_EQ(512u, depth);
+        EXPECT_EQ(Type::UInt8, node->code);
+    }
+
+    for (size_t depth : {size_t{513}, size_t{100000}}) {
+        TypeAst closed_ast;
+        EXPECT_FALSE(TypeParser(NestedArrayType(depth)).Parse(&closed_ast)) << depth;
+        EXPECT_EQ(nullptr, ParseTypeName(NestedArrayType(depth))) << depth;
+
+        TypeAst open_ast;
+        EXPECT_FALSE(TypeParser(NestedArrayType(depth, false)).Parse(&open_ast)) << depth;
+        EXPECT_EQ(nullptr, ParseTypeName(NestedArrayType(depth, false))) << depth;
+    }
+}
+
+TEST(TypeParser, NestingDepthLimitBoundsColumnFactory) {
+    auto col = CreateColumnByType(NestedArrayType(32));
+    ASSERT_NE(nullptr, col);
+    EXPECT_EQ(NestedArrayType(32), col->Type()->GetName());
+
+    EXPECT_NE(nullptr, CreateColumnByType(NestedArrayType(499)));
+    EXPECT_NE(nullptr, CreateColumnByType(NestedArrayType(512)));
+    EXPECT_EQ(nullptr, CreateColumnByType(NestedArrayType(513)));
+    EXPECT_EQ(nullptr, CreateColumnByType(NestedArrayType(100000)));
+    EXPECT_EQ(nullptr, CreateColumnByType(NestedArrayType(100000, false)));
+}
+
+TEST(TypeParser, BalancedNestedControls) {
+    for (const std::string type_name : {"Map(String, Array(Nullable(UInt8)))", "Tuple(a UInt8, b String)",
+                                        "Array(Array(Array(Array(Array(Array(Array(Array(UInt8))))))))"}) {
+        TypeAst ast;
+        EXPECT_TRUE(TypeParser(type_name).Parse(&ast)) << type_name;
+        EXPECT_NE(nullptr, ParseTypeName(type_name)) << type_name;
+        EXPECT_NE(nullptr, CreateColumnByType(type_name)) << type_name;
     }
 }

@@ -29,6 +29,12 @@ bool TypeAst::operator==(const TypeAst & other) const {
         && std::equal(elements.begin(), elements.end(), other.elements.begin(), other.elements.end());
 }
 
+// Current servers reject column types nested deeper than 499 levels. The column
+// factory and TypeAst destruction recurse once per level, so the limit also
+// bounds their stack use. Kept internal: this is a hardening detail, not part of
+// the installed API.
+static constexpr size_t kMaxNestingDepth = 512;
+
 static const std::unordered_map<std::string, Type::Code> kTypeCode = {
     { "Void",        Type::Void },
     { "Int8",        Type::Int8 },
@@ -209,16 +215,19 @@ bool TypeParser::Parse(TypeAst* type) {
                 type_->value_string = std::string(token.value);
                 break;
             case Token::LPar:
+                if (open_elements_.size() > kMaxNestingDepth) return false;
                 type_->elements.emplace_back(TypeAst());
                 open_elements_.push(type_);
                 type_ = &type_->elements.back();
                 break;
             case Token::RPar:
+                if (open_elements_.size() < 2) return false;
                 type_ = open_elements_.top();
                 open_elements_.pop();
                 break;
             case Token::Assign:
             case Token::Comma:
+                if (open_elements_.size() < 2) return false;
                 type_ = open_elements_.top();
                 open_elements_.pop();
                 type_->elements.emplace_back(TypeAst());
