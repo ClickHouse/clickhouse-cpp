@@ -12,6 +12,8 @@ C++17 client library for <a href="https://clickhouse.com/">ClickHouse</a> using 
 inserting and selecting columnar `Block` data, and working with ClickHouse data types from C++. It
 builds on Linux, macOS, and Windows with CMake or Bazel. It supports TLS and compression.
 
+The client works with both ClickHouse Cloud and self-hosted ClickHouse. You can [start a free Cloud trial](https://console.clickhouse.cloud/signUp?utm_medium=referral&utm_source=github&utm_campaign=readme&utm_content=clickhouse-cpp) or [install ClickHouse](https://clickhouse.com/docs/get-started/setup/install) locally.
+
 <br/>
 
 <p align="center">
