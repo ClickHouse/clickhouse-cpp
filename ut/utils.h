@@ -9,11 +9,16 @@
 #include "utils_meta.h"
 #include "utils_comparison.h"
 
+#include <charconv>
+#include <cstdlib>
 #include <iterator>
 #include <optional>
 #include <ostream>
 #include <ratio>
+#include <stdexcept>
+#include <string>
 #include <string_view>
+#include <system_error>
 #include <type_traits>
 #include <vector>
 #include <cmath>
@@ -34,30 +39,29 @@ namespace clickhouse {
 
 template <typename ResultType = std::string>
 auto getEnvOrDefault(const std::string& env, const char * default_val) {
+    constexpr bool is_string  = std::is_same_v<ResultType, std::string>;
+    constexpr bool is_integer = std::is_integral_v<ResultType> && !std::is_same_v<ResultType, bool>;
+    static_assert(is_string || is_integer, "getEnvOrDefault supports only std::string and integer types");
+
     const char* v = std::getenv(env.c_str());
     if (!v && !default_val)
         throw std::runtime_error("Environment var '" + env + "' is not set.");
 
     const std::string value = v ? v : default_val;
 
-    if constexpr (std::is_same_v<ResultType, std::string>) {
+    if constexpr (is_string) {
         return value;
-    } else if constexpr (std::is_integral_v<ResultType>) {
-        // since std::from_chars is not available on GCC-7  on linux
-        if constexpr (std::is_signed_v<ResultType>) {
-            if constexpr (sizeof(ResultType) <= sizeof(int))
-                return std::stoi(value);
-            else if constexpr (sizeof(ResultType) <= sizeof(long))
-                return std::stol(value);
-            else if constexpr (sizeof(ResultType) <= sizeof(long long))
-                return std::stoll(value);
-        } else if constexpr (std::is_unsigned_v<ResultType>) {
-            if constexpr (sizeof(ResultType) <= sizeof(unsigned long))
-                // For cases when ResultType is unsigned int.
-                return static_cast<ResultType>(std::stoul(value));
-            else if constexpr (sizeof(ResultType) <= sizeof(unsigned long long))
-                return std::stoull(value);
-        }
+    } else if constexpr (is_integer) {
+        // Strict: the whole value must be a decimal integer that fits into ResultType.
+        ResultType result{};
+        const char* first = value.data();
+        const char* last  = first + value.size();
+        const auto [ptr, ec] = std::from_chars(first, last, result);
+        if (ec == std::errc::result_out_of_range)
+            throw std::runtime_error("Environment var '" + env + "' value '" + value + "' is out of range.");
+        if (ec != std::errc() || ptr != last)
+            throw std::runtime_error("Environment var '" + env + "' value '" + value + "' is not a valid decimal integer.");
+        return result;
     }
 }
 
