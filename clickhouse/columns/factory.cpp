@@ -177,7 +177,8 @@ static ColumnRef CreateColumnFromAst(const TypeAst& ast, CreateColumnByTypeSetti
             return CreateTerminalColumn(ast);
         }
 
-        case TypeAst::Tuple: {
+        case TypeAst::Tuple:
+        case TypeAst::Nested: {
             std::vector<ColumnRef> columns;
             std::vector<std::string> names;
 
@@ -196,10 +197,12 @@ static ColumnRef CreateColumnFromAst(const TypeAst& ast, CreateColumnByTypeSetti
                 }
             }
 
-            if (any_named) {
-                return std::make_shared<ColumnTuple>(columns, std::move(names));
+            auto tuple = any_named ? std::make_shared<ColumnTuple>(columns, std::move(names))
+                                   : std::make_shared<ColumnTuple>(columns);
+            if (ast.meta == TypeAst::Nested) {
+                return std::make_shared<ColumnArray>(tuple);
             }
-            return std::make_shared<ColumnTuple>(columns);
+            return tuple;
         }
 
         case TypeAst::Enum: {
