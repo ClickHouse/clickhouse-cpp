@@ -184,9 +184,9 @@ TEST(TypesCase, IsEqual) {
 #endif
         "UInt8",
         "Int8",
-//        "UInt128",
+        //        "UInt128",
         "String",
-        "FixedString(0)",
+        "FixedString(1)",
         "FixedString(10000)",
         "DateTime('UTC')",
         "DateTime64(3, 'UTC')",
@@ -208,7 +208,8 @@ TEST(TypesCase, IsEqual) {
         "Array(Array(Nullable(Tuple(String, Int8, Date, DateTime))))",
         "Array(Array(Array(Nullable(Tuple(String, Int8, Date, DateTime)))))",
         "Array(Array(Array(Array(Nullable(Tuple(String, Int8, Date, DateTime('UTC')))))))"
-        "Array(Array(Array(Array(Nullable(Tuple(String, Int8, Date, DateTime('UTC'), Tuple(LowCardinality(String), Enum8('READ'=1, 'WRITE'=0))))))))",
+        "Array(Array(Array(Array(Nullable(Tuple(String, Int8, Date, DateTime('UTC'), Tuple(LowCardinality(String), Enum8('READ'=1, "
+        "'WRITE'=0))))))))",
         "Map(String, Int8)",
         "Map(String, Tuple(String, Int8, Date, DateTime))",
         "Map(UUID, Array(Tuple(String, Int8, Date, DateTime)))",

@@ -29,6 +29,7 @@ ColumnFixedString::ColumnFixedString(size_t n)
     : Column(Type::CreateString(n))
     , string_size_(n)
 {
+    if (n == 0) throw ValidationError("FixedString size must be positive");
 }
 
 void ColumnFixedString::Reserve(size_t new_cap) {
