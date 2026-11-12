@@ -7,8 +7,10 @@
 #include <cmath>
 #include <map>
 #include <mutex>
+#include <optional>
 #include <array>
 #include <unordered_map>
+#include <utility>
 
 #if defined _win_
 #include <string.h>
@@ -16,6 +18,7 @@
 #include <strings.h>
 #endif
 
+#include <charconv>
 
 namespace clickhouse {
 
@@ -206,10 +209,13 @@ bool TypeParser::Parse(TypeAst* type) {
                 type_->name = token.value.to_string();
                 type_->code = GetTypeCode(type_->name);
                 break;
-            case Token::Number:
+            case Token::Number: {
                 type_->meta = TypeAst::Number;
-                type_->value = std::stol(token.value.to_string());
+                const char* last     = token.value.data() + token.value.size();
+                const auto [ptr, ec] = std::from_chars(token.value.data(), last, type_->value);
+                if (ec != std::errc() || ptr != last) return false;
                 break;
+            }
             case Token::String:
                 type_->meta = TypeAst::String;
                 type_->value_string = std::string(token.value);
@@ -363,26 +369,42 @@ TypeParser::Token TypeParser::NextToken() {
     return Token{Token::EOS, StringView()};
 }
 
+/// Limits of the ParseTypeName() cache. When adding an entry would exceed
+/// either limit, the cache is cleared first. kTypeAstCacheMaxBytes counts the
+/// length of the type names, not memory: the ASTs are typically tens of times
+/// larger. A longer name is never cached.
+static constexpr size_t kTypeAstCacheMaxEntries = 4096;
+static constexpr size_t kTypeAstCacheMaxBytes   = 256 * 1024;
 
-const TypeAst* ParseTypeName(const std::string& type_name) {
-    // Cache for type_name.
-    // Usually we won't have too many type names in the cache, so do not try to
-    // limit cache size.
-    static std::map<std::string, TypeAst> ast_cache;
+std::shared_ptr<const TypeAst> ParseTypeName(const std::string& type_name) {
+    using Cache = std::map<std::string, std::shared_ptr<const TypeAst>>;
+    static Cache ast_cache;
+    static size_t ast_cache_bytes = 0;
     static std::mutex lock;
 
+    // Declared before the guard so a cleared cache is destroyed after the mutex is released.
+    // Optional because some std::map implementations (MSVC) allocate in the default constructor.
+    std::optional<Cache> evicted;
     std::lock_guard<std::mutex> guard(lock);
     auto it = ast_cache.find(type_name);
     if (it != ast_cache.end()) {
-        return &it->second;
+        return it->second;
     }
 
-    auto& ast = ast_cache[type_name];
-    if (TypeParser(type_name).Parse(&ast)) {
-        return &ast;
+    auto ast = std::make_shared<TypeAst>();
+    if (!TypeParser(type_name).Parse(ast.get())) {
+        return nullptr;
     }
-    ast_cache.erase(type_name);
-    return nullptr;
+
+    if (type_name.size() <= kTypeAstCacheMaxBytes) {
+        if (ast_cache.size() >= kTypeAstCacheMaxEntries || ast_cache_bytes + type_name.size() > kTypeAstCacheMaxBytes) {
+            evicted = std::move(ast_cache);
+            ast_cache.clear();
+            ast_cache_bytes = 0;
+        }
+        ast_cache.emplace(type_name, ast);
+        ast_cache_bytes += type_name.size();
+    }
+    return ast;
 }
-
 }

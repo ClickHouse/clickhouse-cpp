@@ -94,7 +94,6 @@ private:
     std::string scratch_;
 };
 
-
-const TypeAst* ParseTypeName(const std::string& type_name);
-
+/// Returns nullptr if type_name is not a valid type.
+std::shared_ptr<const TypeAst> ParseTypeName(const std::string& type_name);
 }
