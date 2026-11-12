@@ -21,7 +21,8 @@ protected:
 private:
     InputStream* const input_;
 
-    Buffer data_;
+    std::unique_ptr<uint8_t[]> data_;
+    size_t data_capacity_ = 0;
     ArrayInput mem_;
 };
 
