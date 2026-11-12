@@ -120,6 +120,10 @@ bool ColumnTuple::LoadBody(InputStream* input, size_t rows) {
         if (!(*ci)->LoadBody(input, rows)) {
             return false;
         }
+        if ((*ci)->Size() != rows) {
+            throw ProtocolError("Tuple element " + std::to_string(ci - columns_.begin()) + " loaded " + std::to_string((*ci)->Size()) +
+                                " rows, expected " + std::to_string(rows));
+        }
     }
 
     return true;
