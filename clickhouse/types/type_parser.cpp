@@ -7,8 +7,10 @@
 #include <cmath>
 #include <map>
 #include <mutex>
+#include <optional>
 #include <array>
 #include <unordered_map>
+#include <utility>
 
 #if defined _win_
 #include <string.h>
@@ -367,13 +369,22 @@ TypeParser::Token TypeParser::NextToken() {
     return Token{Token::EOS, StringView()};
 }
 
+/// Limits of the ParseTypeName() cache. When adding an entry would exceed
+/// either limit, the cache is cleared first. kTypeAstCacheMaxBytes counts the
+/// length of the type names, not memory: the ASTs are typically tens of times
+/// larger. A longer name is never cached.
+static constexpr size_t kTypeAstCacheMaxEntries = 4096;
+static constexpr size_t kTypeAstCacheMaxBytes   = 256 * 1024;
+
 std::shared_ptr<const TypeAst> ParseTypeName(const std::string& type_name) {
-    static std::map<std::string, std::shared_ptr<const TypeAst>> ast_cache;
+    using Cache = std::map<std::string, std::shared_ptr<const TypeAst>>;
+    static Cache ast_cache;
     static size_t ast_cache_bytes = 0;
     static std::mutex lock;
 
     // Declared before the guard so a cleared cache is destroyed after the mutex is released.
-    std::map<std::string, std::shared_ptr<const TypeAst>> evicted;
+    // Optional because some std::map implementations (MSVC) allocate in the default constructor.
+    std::optional<Cache> evicted;
     std::lock_guard<std::mutex> guard(lock);
     auto it = ast_cache.find(type_name);
     if (it != ast_cache.end()) {
@@ -387,7 +398,8 @@ std::shared_ptr<const TypeAst> ParseTypeName(const std::string& type_name) {
 
     if (type_name.size() <= kTypeAstCacheMaxBytes) {
         if (ast_cache.size() >= kTypeAstCacheMaxEntries || ast_cache_bytes + type_name.size() > kTypeAstCacheMaxBytes) {
-            evicted.swap(ast_cache);
+            evicted = std::move(ast_cache);
+            ast_cache.clear();
             ast_cache_bytes = 0;
         }
         ast_cache.emplace(type_name, ast);

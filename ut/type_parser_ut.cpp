@@ -568,6 +568,10 @@ TEST(ParseTypeName, MalformedNumberReturnsNull) {
 
 namespace {
 
+// Must match the limits in type_parser.cpp.
+constexpr size_t kTypeAstCacheMaxEntries = 4096;
+constexpr size_t kTypeAstCacheMaxBytes   = 256 * 1024;
+
 size_t CountAlive(const std::vector<std::weak_ptr<const TypeAst>>& asts) {
     size_t alive = 0;
     for (const auto& ast : asts) alive += !ast.expired();
