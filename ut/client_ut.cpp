@@ -1523,6 +1523,66 @@ TEST_P(ClientCase, QuerySettings) {
     EXPECT_THROW(client_->Execute(query), ServerException);
 }
 
+// Checks that settings given to Insert() and BeginInsert(const Query&) reach the server, using
+// insert_deduplication_token: identical blocks are kept if their tokens differ.
+TEST_P(ClientCase, InsertWithQuerySettings) {
+    const std::string table = "test_clickhouse_cpp_insert_query_settings";
+    client_->Execute("DROP TABLE IF EXISTS " + table);
+    client_->Execute("CREATE TABLE " + table + " (id UInt64) "
+                     "ENGINE = MergeTree ORDER BY id SETTINGS non_replicated_deduplication_window = 100");
+
+    auto id = std::make_shared<ColumnUInt64>(std::vector<uint64_t>{1, 2, 3});
+    Block block;
+    block.AppendColumn("id", id);
+
+    auto count_rows = [&]() {
+        uint64_t count = 0;
+        client_->Select("SELECT count() FROM " + table, [&](const Block& b) {
+            if (b.GetRowCount() > 0) {
+                count = b[0]->As<ColumnUInt64>()->At(0);
+            }
+        });
+        return count;
+    };
+
+    auto with_token = [](const std::string& token) {
+        return QuerySettings{{"insert_deduplication_token", QuerySettingsField{token}}};
+    };
+
+    // Without a token, identical blocks are deduplicated by their data hash.
+    client_->Insert(table, block);
+    client_->Insert(table, block);
+    EXPECT_EQ(3u, count_rows());
+
+    // Identical blocks with a new token are kept; a repeated token is deduplicated.
+    client_->Insert(table, block, with_token("token-1"));
+    EXPECT_EQ(6u, count_rows());
+    client_->Insert(table, "", block, with_token("token-1"));
+    EXPECT_EQ(6u, count_rows());
+    client_->Insert(table, block, with_token("token-2"));
+    EXPECT_EQ(9u, count_rows());
+
+    // Same for settings on a Query passed to BeginInsert.
+    for (const auto& token : {"token-3", "token-3"}) {
+        Query query("INSERT INTO " + table + " (id) VALUES");
+        query.SetQuerySettings(with_token(token));
+        auto insert_block = client_->BeginInsert(query);
+        insert_block[0]->Append(id);
+        insert_block.RefreshRowCount();
+        client_->SendInsertBlock(insert_block);
+        client_->EndInsert();
+    }
+    EXPECT_EQ(12u, count_rows());
+
+    EXPECT_THROW(
+        client_->Insert(table, block, {{"wrong_setting_name", {"0", QuerySettingsField::IMPORTANT}}}),
+        ServerException);
+
+    // The client must be reset after an exception before it can be used again.
+    client_->ResetConnection();
+    client_->Execute("DROP TABLE " + table);
+}
+
 TEST_P(ClientCase, ServerLogs) {
 
     Block block;
