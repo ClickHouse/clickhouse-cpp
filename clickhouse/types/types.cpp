@@ -356,8 +356,12 @@ std::string DecimalType::GetName() const {
 
 EnumType::EnumType(Type::Code type, const std::vector<EnumItem>& items) : Type(type) {
     for (const auto& item : items) {
-        auto result = name_to_value_.insert(item);
-        value_to_name_[item.second] = result.first->first;
+        if (name_to_value_.count(item.first) || value_to_name_.count(item.second)) {
+            throw ValidationError("Duplicate enum name or value");
+        }
+
+        const auto result = name_to_value_.insert(item);
+        value_to_name_.insert({item.second, result.first->first});
     }
 }
 
