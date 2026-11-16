@@ -242,7 +242,16 @@ struct ExternalTable {
 using ExternalTables = std::vector<ExternalTable>;
 
 /**
+ * If an operation fails while a request or a response is partly transferred
+ * (for example, a callback throws, or the client cannot decode a packet), the
+ * client closes the connection. The native protocol does not give the size of
+ * a packet, so the client cannot find where the next packet starts. The next
+ * operation opens a new connection. The new connection does not keep the
+ * session state of the old one: temporary tables, the database set with USE,
+ * and settings set with SET.
  *
+ * A server exception is the last packet of a response. Thus, after a query or
+ * an insert fails with a server exception, the connection stays open.
  */
 class Client {
 public:

@@ -145,8 +145,6 @@ struct VariantIndex<T, std::variant<Ts...>>
 
 struct Pong {
 };
-struct Hello {
-};
 struct Log {
     Block block;
 };
@@ -163,7 +161,6 @@ using DecodedPacket = std::variant<
     Profile,
     Progress,
     Pong,
-    Hello,
     Log,
     TableColumns,
     ProfileEvents,
@@ -228,6 +225,14 @@ private:
     DecodedPacket ReceivePacket(uint64_t* server_packet = nullptr);
     bool ProcessPacket(uint64_t* server_packet = nullptr);
     void ResetState();
+
+    /// Opens a new connection if the previous one was closed.
+    void EnsureConnected();
+    /// Closes the connection. The next operation opens a new one.
+    void CloseConnection() noexcept;
+    /// Resets the state after an operation failed. Closes the connection
+    /// if a request or a response was partly transferred.
+    void HandleOperationFailure() noexcept;
 
     void SendQuery(const Query& query, bool finalize = true);
     void FinalizeQuery();
@@ -317,6 +322,8 @@ private:
 
     ServerInfo server_info_;
 
+    /// Idle when no request or response is in progress. ReceivePacket() sets
+    /// Idle when it has read the last packet of a response.
     State state_ = State::Idle;
 };
 
@@ -365,6 +372,7 @@ void Client::Impl::BeginExecuteQuery(const Query& query, bool finalize) {
     if (options_.ping_before_query) {
         RetryGuard([this]() { Ping(); });
     }
+    EnsureConnected();
 
     query_ = query;
     events_ = static_cast<QueryEvents*>(&query_);
@@ -374,7 +382,7 @@ void Client::Impl::BeginExecuteQuery(const Query& query, bool finalize) {
         SendQuery(query_, finalize);
     }
     catch (...) {
-        ResetState();
+        HandleOperationFailure();
         throw;
     }
 }
@@ -408,7 +416,7 @@ std::optional<Block> Client::Impl::NextBlock() {
         }
     }
     catch (...) {
-        ResetState();
+        HandleOperationFailure();
         throw;
     }
 }
@@ -432,7 +440,7 @@ void Client::Impl::SelectWithExternalData(Query query, const ExternalTables& ext
         FinalizeQuery();
     }
     catch (...) {
-        ResetState();
+        HandleOperationFailure();
         throw;
     }
 
@@ -495,8 +503,7 @@ void Client::Impl::Insert(const std::string& table_name, const std::string& quer
     if (options_.ping_before_query) {
         RetryGuard([this]() { Ping(); });
     }
-
-    state_ = State::Inserting;
+    EnsureConnected();
 
     std::stringstream fields_section;
     const auto num_columns = block.GetColumnCount();
@@ -510,19 +517,28 @@ void Client::Impl::Insert(const std::string& table_name, const std::string& quer
     }
 
     Query query("INSERT INTO " + table_name + " ( " + fields_section.str() + " ) VALUES", query_id);
-    SendQuery(query);
 
-    // Wait for a data packet and return
-    uint64_t server_packet = 0;
-    while (ProcessPacket(&server_packet)) {
-        if (server_packet == ServerCodes::Data) {
-            SendData(block);
-            EndInsert();
-            return;
+    state_ = State::Inserting;
+
+    try {
+        SendQuery(query);
+
+        // Wait for a data packet and return
+        uint64_t server_packet = 0;
+        while (ProcessPacket(&server_packet)) {
+            if (server_packet == ServerCodes::Data) {
+                SendData(block);
+                EndInsert();
+                return;
+            }
         }
-    }
 
-    throw ProtocolError("fail to receive data packet");
+        throw ProtocolError("fail to receive data packet");
+    }
+    catch (...) {
+        HandleOperationFailure();
+        throw;
+    }
 }
 
 Block Client::Impl::BeginInsert(Query query) {
@@ -539,8 +555,7 @@ Block Client::Impl::BeginInsert(Query query) {
     if (options_.ping_before_query) {
         RetryGuard([this]() { Ping(); });
     }
-
-    state_ = State::Inserting;
+    EnsureConnected();
 
     // Create a callback to extract the block with the proper query columns.
     Block block;
@@ -549,17 +564,25 @@ Block Client::Impl::BeginInsert(Query query) {
         return true;
     });
 
-    SendQuery(query);
+    state_ = State::Inserting;
 
-    // Wait for a data packet and return
-    uint64_t server_packet = 0;
-    while (ProcessPacket(&server_packet)) {
-        if (server_packet == ServerCodes::Data) {
-            return block;
+    try {
+        SendQuery(query);
+
+        // Wait for a data packet and return
+        uint64_t server_packet = 0;
+        while (ProcessPacket(&server_packet)) {
+            if (server_packet == ServerCodes::Data) {
+                return block;
+            }
         }
-    }
 
-    throw ProtocolError("fail to receive data packet");
+        throw ProtocolError("fail to receive data packet");
+    }
+    catch (...) {
+        HandleOperationFailure();
+        throw;
+    }
 }
 
 void Client::Impl::SendInsertBlock(const Block& block) {
@@ -567,7 +590,13 @@ void Client::Impl::SendInsertBlock(const Block& block) {
         throw ValidationError("illegal to send insert data without first calling BeginInsert");
     }
 
-    SendData(block);
+    try {
+        SendData(block);
+    }
+    catch (...) {
+        HandleOperationFailure();
+        throw;
+    }
 }
 
 void Client::Impl::EndInsert() {
@@ -575,21 +604,27 @@ void Client::Impl::EndInsert() {
         return;
     }
 
-    // Send empty block as marker of end of data.
-    SendData(Block());
+    try {
+        // Send empty block as marker of end of data.
+        SendData(Block());
 
-    // Wait for EOS.
-    uint64_t eos_packet{0};
-    while (ProcessPacket(&eos_packet)) {
-        ;
-    }
+        // Wait for EOS.
+        uint64_t eos_packet{0};
+        while (ProcessPacket(&eos_packet)) {
+            ;
+        }
 
-    if (eos_packet != ServerCodes::EndOfStream && eos_packet != ServerCodes::Exception
-        && eos_packet != ServerCodes::Log && options_.rethrow_exceptions) {
-        throw ProtocolError(std::string{"unexpected packet from server while receiving end of query, expected (expected Exception, EndOfStream or Log, got: "}
-                            + (eos_packet ? std::to_string(eos_packet) : "nothing") + ")");
+        if (eos_packet != ServerCodes::EndOfStream && eos_packet != ServerCodes::Exception
+            && eos_packet != ServerCodes::Log && options_.rethrow_exceptions) {
+            throw ProtocolError(std::string{"unexpected packet from server while receiving end of query, expected (expected Exception, EndOfStream or Log, got: "}
+                                + (eos_packet ? std::to_string(eos_packet) : "nothing") + ")");
+        }
+        state_ = State::Idle;
     }
-    state_ = State::Idle;
+    catch (...) {
+        HandleOperationFailure();
+        throw;
+    }
 }
 
 void Client::Impl::Ping() {
@@ -597,14 +632,24 @@ void Client::Impl::Ping() {
         throw ValidationError("cannot execute query while executing another operation");
     }
 
-    WireFormat::WriteUInt64(*output_, ClientCodes::Ping);
-    output_->Flush();
+    EnsureConnected();
 
-    uint64_t server_packet;
-    const bool ret = ProcessPacket(&server_packet);
+    try {
+        WireFormat::WriteUInt64(*output_, ClientCodes::Ping);
+        output_->Flush();
 
-    if (!ret || server_packet != ServerCodes::Pong) {
-        throw ProtocolError("fail to ping server");
+        uint64_t server_packet;
+        const bool ret = ProcessPacket(&server_packet);
+
+        if (!ret || server_packet != ServerCodes::Pong) {
+            throw ProtocolError("fail to ping server");
+        }
+    }
+    catch (...) {
+        // Ping reads only one packet. After a failure, the Pong can still be
+        // in the stream.
+        CloseConnection();
+        throw;
     }
 }
 
@@ -612,8 +657,15 @@ void Client::Impl::ResetConnection() {
     InitializeStreams(socket_factory_->connect(options_, current_endpoint_.value()));
     state_ = State::Idle;
 
-    if (!Handshake()) {
-        throw ProtocolError("fail to connect to " + options_.host);
+    try {
+        if (!Handshake()) {
+            throw ProtocolError("fail to connect to " + options_.host);
+        }
+    }
+    catch (...) {
+        // A part of the server response to the handshake can stay unread.
+        CloseConnection();
+        throw;
     }
 }
 
@@ -712,6 +764,8 @@ DecodedPacket Client::Impl::ReceivePacket(uint64_t* server_packet) {
         if (!ReceiveException(ret)) {
             throw ProtocolError{"server reported an error, but the exception packet could not be decoded (error details lost)"};
         }
+        // The exception packet is the last packet of the response.
+        state_ = State::Idle;
 
         if (options_.rethrow_exceptions) {
             throw ret;
@@ -741,13 +795,16 @@ DecodedPacket Client::Impl::ReceivePacket(uint64_t* server_packet) {
     }
 
     case ServerCodes::Hello: {
-        return Hello{};
+        // Hello is valid only in the handshake (see ReceiveHello()). Its
+        // payload must not be read as more packets.
+        throw ProtocolError{"unexpected hello packet from server"};
     }
 
     case ServerCodes::EndOfStream: {
         if (events_) {
             events_->OnFinish();
         }
+        state_ = State::Idle;
         return EndOfStream{};
     }
 
@@ -798,6 +855,29 @@ void Client::Impl::ResetState()
     state_ = State::Idle;
     query_ = {};
     events_ = nullptr;
+}
+
+void Client::Impl::EnsureConnected() {
+    if (!socket_) {
+        ResetConnection();
+    }
+}
+
+void Client::Impl::CloseConnection() noexcept {
+    input_.reset();
+    output_.reset();
+    socket_.reset();
+}
+
+void Client::Impl::HandleOperationFailure() noexcept {
+    // The native protocol does not give the size of a packet. Thus, after a
+    // request or a response is partly transferred, the client cannot find
+    // where the next packet starts. A server exception is the last packet of
+    // a response, so after it the connection stays usable.
+    if (state_ != State::Idle) {
+        CloseConnection();
+    }
+    ResetState();
 }
 
 bool Client::Impl::ReadBlock(InputStream& input, Block* block) {
@@ -918,6 +998,12 @@ bool Client::Impl::ReceiveException(ServerError & error) {
         events_->OnServerException(*e);
     }
 
+    if (has_nested) {
+        // The client does not read nested exceptions. Their data stays in
+        // the stream, so the connection is not usable.
+        CloseConnection();
+    }
+
     error = ServerError(e);
 
     return true;
@@ -1007,7 +1093,13 @@ void Client::Impl::Cancel() {
     if (state_ != State::Selecting) {
         throw ValidationError("cannot cancel while not executing a query");
     }
-    SendCancel();
+    try {
+        SendCancel();
+    }
+    catch (...) {
+        HandleOperationFailure();
+        throw;
+    }
     while (NextBlock().has_value()) {
         ;
     }
@@ -1256,9 +1348,14 @@ void Client::Impl::RetryGuard(std::function<void()> func) {
 
     for (unsigned int i = 1; ; ++i) {
         try {
+            EnsureConnected();
             func();
             return;
         } catch (const std::system_error&) {
+            // After a network error the connection is not usable. The next
+            // attempt opens a new one.
+            CloseConnection();
+
             // if send_retries == 0 do not try anymore, throw right away
             if (options_.send_retries == 0) {
                 throw;
@@ -1270,12 +1367,7 @@ void Client::Impl::RetryGuard(std::function<void()> func) {
             }
 
             // otherwise sleep and try again
-            try {
-                socket_factory_->sleepFor(options_.retry_timeout);
-                ResetConnection();
-            } catch (const std::system_error&) {
-            }
-
+            socket_factory_->sleepFor(options_.retry_timeout);
         }
     }
 
