@@ -44,10 +44,13 @@ A security issue must not stay public with a description of how to reproduce
 it. This section applies when a reproduction or code inspection confirms a
 vulnerability that is not public yet (impact Security, part vulnerability, in
 section 2): a leak of credentials or data, a value that changes the meaning of
-a query, a TLS or identity check that is skipped or weakened, memory
-corruption, or input from the application's users that stops the client. A
-hang or a crash that only a hostile server or network causes is not one: rate
-it by the failure, as usual.
+a query, a TLS or identity check that is skipped or weakened, memory corruption
+(also when only a hostile server or network causes it), or input from the
+application's users that stops the client. A hang, or a crash with no memory
+corruption, that only a hostile server or network causes is not one: rate it by
+the failure, as usual. A crash while the client reads data from the server (for
+example an access violation or `SIGSEGV`) can be memory corruption: rule that
+out by code inspection before you rate it by the failure.
 
 - Report it in a private GitHub vulnerability report for this repository
   (**Security** → **Report a vulnerability**), never in a public issue,
@@ -91,7 +94,7 @@ every ClickHouse client repository. An issue has none, one, or more of them:
 
 | Impact         | Use when |
 | -------------- | -------- |
-| Security       | a **vulnerability**: a defect makes the protection weaker: it exposes credentials or data, lets a value change the meaning of a query, skips or weakens a TLS or identity check, corrupts memory (an out-of-bounds write, a use after free), or lets input that the application takes from its users stop the client (a hang or a crash that only a hostile server or network causes is Stability). Also **authentication**: an authentication method that does not work or is missing |
+| Security       | a **vulnerability**: a defect makes the protection weaker: it exposes credentials or data, lets a value change the meaning of a query, skips or weakens a TLS or identity check, corrupts memory (an out-of-bounds write, a use after free, also when only a hostile server or network causes it), or lets input that the application takes from its users stop the client (a hang, or a crash with no memory corruption, that only a hostile server or network causes is Stability). Also **authentication**: an authentication method that does not work or is missing |
 | Data integrity | data that the caller wrote, or a result that the caller reads, is missing, incomplete, or different from the value given or stored, and the client reports no error; this includes a failed operation that the client reports as a success |
 | Stability      | the process stops in a way that the caller cannot handle as a normal error, a call does not return, or a resource leaks until none is left |
 | Performance    | the result is correct, but the operation is too slow, or uses too much memory or CPU |
@@ -104,7 +107,7 @@ highest row applies:
 
 | Severity                | Use when |
 | ----------------------- | -------- |
-| Wrong data or security  | impact **Data integrity**: the client returns or stores wrong or incomplete data with no error (this includes a block stream that goes out of sync with no error), or reports success for a query that failed; or impact **Security** with a vulnerability: a security defect: a leak of credentials or data, a TLS verification that does not occur, SQL built from a caller value without escaping, or memory corruption (an out-of-bounds write, a use after free). A hang or a crash that only a hostile server or network causes does not use this row: rate it by the failure |
+| Wrong data or security  | impact **Data integrity**: the client returns or stores wrong or incomplete data with no error (this includes a block stream that goes out of sync with no error), or reports success for a query that failed; or impact **Security** with a vulnerability: a security defect: a leak of credentials or data, a TLS verification that does not occur, SQL built from a caller value without escaping, or memory corruption (an out-of-bounds write, a use after free). A hang, or a crash with no memory corruption, that only a hostile server or network causes does not use this row: rate it by the failure |
 | Broken, no workaround   | the feature fails (an exception, a hang, a crash, an abort, a leak that ends in a crash or in exhausted sockets), and the caller has no reasonable workaround; also a `Client` that stays unusable after an error, and a build that fails on a supported toolchain; also a wrong or incomplete error with no workaround: the failure is reported, but its type, code, or message is wrong or lost. The impact **Stability** (a hang, a crash, such a leak) uses this row when the caller has no reasonable workaround |
 | Workaround exists       | the feature fails, but the caller can avoid the failure with a small change in their own code or build flags (name the workaround in the reason); also impact **Performance**: a result that is correct but slow or uses too much memory |
 | Cosmetic, docs, feature | wrong log or message text, a compiler warning, documentation, a feature request (this includes support for a new type or a new package manager) |
