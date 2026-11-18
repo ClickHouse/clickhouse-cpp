@@ -97,7 +97,7 @@ highest row applies:
 
 | Severity                | Use when |
 | ----------------------- | -------- |
-| Wrong data or security  | impact **Data integrity**: the client returns or stores wrong or incomplete data with no error (this includes a block stream that goes out of sync with no error), or reports success for a query that failed; or impact **Security** with a vulnerability: a security defect: a leak of credentials or data, a TLS verification that does not occur, SQL built from a caller value without escaping, or memory corruption (an out-of-bounds write, a use after free). A hang, or a crash with no memory corruption, that only a hostile server or network causes does not use this row: rate it by the failure |
+| Wrong data or security  | impact **Data integrity**: the client returns or stores wrong or incomplete data with no error (this includes a block stream that goes out of sync with no error), or reports success for a query that failed; or impact **Security** with a vulnerability: a security defect: a leak of credentials or data, a TLS verification that does not occur, SQL built from a caller value without escaping, memory corruption (an out-of-bounds write, a use after free), or a vulnerable dependency in code that the client calls. A hang, or a crash with no memory corruption, that only a hostile server or network causes does not use this row: rate it by the failure |
 | Broken, no workaround   | the feature fails (an exception, a hang, a crash, an abort, a leak that ends in a crash or in exhausted sockets), and the caller has no reasonable workaround; also a `Client` that stays unusable after an error, and a build that fails on a supported toolchain; also a wrong or incomplete error with no workaround: the failure is reported, but its type, code, or message is wrong or lost. The impact **Stability** (a hang, a crash, such a leak) uses this row when the caller has no reasonable workaround |
 | Workaround exists       | the feature fails, but the caller can avoid the failure with a small change in their own code or build flags (name the workaround in the reason); also impact **Performance**: a result that is correct but slow or uses too much memory |
 | Cosmetic, docs, feature | wrong log or message text, a compiler warning, documentation, a feature request (this includes support for a new type or a new package manager) |
@@ -107,6 +107,14 @@ method that does not work or is missing) does not use the first row. Rate an
 authentication method that does not work by its failure ("Broken, no
 workaround" or "Workaround exists"), and a request for a missing method as a
 feature request.
+
+A request to make an operation faster has the impact Performance, but it is a
+feature request: use "Cosmetic, docs, feature". Only a defect with the impact
+Performance (a correct result that is too slow) uses "Workaround exists".
+
+A dependency with a published vulnerability (a CVE or GHSA) uses "Wrong data or
+security" when the client calls the vulnerable code. When it does not, the
+issue asks for a dependency update: use "Cosmetic, docs, feature".
 
 ## 3. Base level
 
