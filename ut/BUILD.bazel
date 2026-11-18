@@ -115,6 +115,8 @@ cc_test(
         "main.cpp",
         "roundtrip_column.cpp",
         "roundtrip_column.h",
+        "tcp_server.cpp",
+        "tcp_server.h",
         "utils.cpp",
         "utils.h",
         "utils_comparison.h",

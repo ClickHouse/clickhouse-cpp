@@ -2,14 +2,18 @@
 
 #include <clickhouse/base/socket.h>
 #include <clickhouse/base/wire_format.h>
+#include <clickhouse/client.h>
 #include <clickhouse/exceptions.h>
 #include <gtest/gtest.h>
 
 #include <cerrno>
+#include <chrono>
+#include <future>
 #include <iostream>
 #include <stdio.h>
 #include <string.h>
 #include <thread>
+#include <vector>
 
 // for EAI_* error codes
 #if defined(_win_)
@@ -72,6 +76,37 @@ TEST(Socketcase, timeoutrecv) {
 
     std::this_thread::sleep_for(std::chrono::seconds(1));
     server.stop();
+}
+
+TEST(Socketcase, ClientHandshakeTimesOutWithSilentServer) {
+    using namespace std::chrono_literals;
+    using Clock = std::chrono::steady_clock;
+
+    const int port = 19981;
+    // The server accepts connections (through the listen backlog), but never sends data.
+    LocalTcpServer server(port);
+    server.start();
+
+    const auto options = ClientOptions().SetHost("127.0.0.1").SetPort(port).SetSendRetries(1);
+    const std::vector<ClientOptions> cases = {
+        ClientOptions(options).SetConnectionHandshakeTimeout(500ms),
+        // The handshake uses the shorter of the two timeouts.
+        ClientOptions(options).SetConnectionHandshakeTimeout(60s).SetConnectionRecvTimeout(500ms),
+    };
+
+    for (size_t i = 0; i < cases.size(); ++i) {
+        SCOPED_TRACE("case " + std::to_string(i));
+        const auto start = Clock::now();
+        auto result = std::async(std::launch::async, [&options = cases[i]] { Client client(options); });
+        const bool returned = result.wait_for(10s) == std::future_status::ready;
+        if (!returned) {
+            // Closing the listening socket resets the connection, so that the client returns.
+            server.stop();
+        }
+        ASSERT_TRUE(returned) << "the client still waits for the Hello packet";
+        EXPECT_LT(Clock::now() - start, 5s);
+        EXPECT_THROW(result.get(), std::system_error);
+    }
 }
 
 TEST(Socketcase, gaierror) {

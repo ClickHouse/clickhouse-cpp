@@ -8,7 +8,9 @@
 
 #include "columns/factory.h"
 
+#include <algorithm>
 #include <cassert>
+#include <chrono>
 #include <memory>
 #include <optional>
 #include <sstream>
@@ -608,12 +610,40 @@ void Client::Impl::Ping() {
     }
 }
 
+namespace {
+
+/// The shorter of connection_handshake_timeout and connection_recv_timeout. Zero means no timeout.
+std::chrono::milliseconds HandshakeRecvTimeout(const ClientOptions& options) {
+    const auto handshake_timeout = options.connection_handshake_timeout;
+    const auto recv_timeout = options.connection_recv_timeout;
+    if (handshake_timeout.count() <= 0) {
+        return recv_timeout;
+    }
+    if (recv_timeout.count() <= 0) {
+        return handshake_timeout;
+    }
+    return std::min(handshake_timeout, recv_timeout);
+}
+
+}
+
 void Client::Impl::ResetConnection() {
     InitializeStreams(socket_factory_->connect(options_, current_endpoint_.value()));
     state_ = State::Idle;
 
+    // Without a receive timeout, a server that stops sending in the middle of its Hello packet blocks the client forever.
+    const auto handshake_recv_timeout = HandshakeRecvTimeout(options_);
+    const bool use_handshake_timeout = handshake_recv_timeout != options_.connection_recv_timeout;
+    if (use_handshake_timeout) {
+        socket_->SetRecvTimeout(handshake_recv_timeout);
+    }
+
     if (!Handshake()) {
         throw ProtocolError("fail to connect to " + options_.host);
+    }
+
+    if (use_handshake_timeout) {
+        socket_->SetRecvTimeout(options_.connection_recv_timeout);
     }
 }
 
