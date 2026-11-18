@@ -4,6 +4,9 @@
 #include "../base/output.h"
 #include "../base/wire_format.h"
 
+#include <limits>
+#include <type_traits>
+
 namespace clickhouse {
 
 template <typename T>
@@ -87,6 +90,27 @@ bool ColumnEnum<T>::LoadBody(InputStream* input, size_t rows) {
 
 template <typename T>
 void ColumnEnum<T>::SaveBody(OutputStream* output) {
+    SaveBody(output, nullptr);
+}
+
+template <typename T>
+void ColumnEnum<T>::SaveBody(OutputStream* output, const ColumnUInt8* nulls) {
+    // The server stores these bytes as they are, and then it cannot read a value
+    // that the type does not declare. A table of all values of T keeps the check cheap.
+    using Index = std::make_unsigned_t<T>;
+    std::vector<bool> declared(size_t(std::numeric_limits<Index>::max()) + 1);
+    const auto* enum_type = type_->As<EnumType>();
+    for (auto it = enum_type->BeginValueToName(); it != enum_type->EndValueToName(); ++it) {
+        if (static_cast<T>(it->first) == it->first) {
+            declared[static_cast<Index>(it->first)] = true;
+        }
+    }
+    for (size_t i = 0; i < data_.size(); ++i) {
+        if (!declared[static_cast<Index>(data_[i])] && !(nulls && nulls->At(i))) {
+            throw ValidationError("Enum type " + type_->GetName() + " doesn't have value " + std::to_string(data_[i]));
+        }
+    }
+
     WireFormat::WriteBytes(*output, data_.data(), data_.size() * sizeof(T));
 }
 
