@@ -933,7 +933,7 @@ TEST(ColumnsCase, EnumSaveDoesNotCheckNullRows) {
     nullable16->Append(std::nullopt);
     nullable16->Append(1000);
     EXPECT_EQ(EnumSaveError(*nullable16), "");
-    nullable16->Append(int16_t(0));
+    nullable16->Append(std::optional<int16_t>(0));
     EXPECT_EQ(EnumSaveError(*nullable16), "Enum type Enum16('Hi' = 1000) doesn't have value 0");
 }
 
