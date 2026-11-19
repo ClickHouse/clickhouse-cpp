@@ -1,5 +1,6 @@
 #include <clickhouse/client.h>
 #include <clickhouse/columns/bool.h>
+#include <clickhouse/columns/factory.h>
 
 #include "clickhouse/base/socket.h"
 #include "clickhouse/types/bignum.h"
@@ -968,6 +969,41 @@ TEST_P(ClientCase, Enum) {
         }
     );
     EXPECT_EQ(sizeof(TEST_DATA)/sizeof(TEST_DATA[0]), row);
+}
+
+// The table and the client column use the same Enum type name, and some names in it have no number.
+// The client must give each name the same number as the server.
+TEST_P(ClientCase, Enum_ImplicitValues) {
+    const std::string type_name = "Enum8('a' = -3, 'b', 'c')";
+    client_->Execute("DROP TEMPORARY TABLE IF EXISTS test_clickhouse_cpp_enum_implicit_values;");
+    client_->Execute("CREATE TEMPORARY TABLE IF NOT EXISTS test_clickhouse_cpp_enum_implicit_values (id UInt64, e " + type_name + ")");
+
+    const std::vector<std::string> names = {"c", "a", "b"};
+    const std::vector<int8_t> numbers    = {-1, -3, -2};
+    {
+        auto id = std::make_shared<ColumnUInt64>();
+        auto e  = CreateColumnByType(type_name);
+        ASSERT_NE(nullptr, e);
+        for (size_t i = 0; i < names.size(); ++i) {
+            id->Append(static_cast<uint64_t>(i));
+            e->As<ColumnEnum8>()->Append(names[i]);
+        }
+
+        Block block;
+        block.AppendColumn("id", id);
+        block.AppendColumn("e", e);
+        client_->Insert("test_clickhouse_cpp_enum_implicit_values", block);
+    }
+
+    size_t row = 0;
+    client_->Select("SELECT id, e, CAST(e AS Int8) FROM test_clickhouse_cpp_enum_implicit_values ORDER BY id", [&](const Block& block) {
+        for (size_t i = 0; i < block.GetRowCount(); ++i, ++row) {
+            ASSERT_LT(row, names.size());
+            EXPECT_EQ(names[row], block[1]->As<ColumnEnum8>()->NameAt(i));
+            EXPECT_EQ(numbers[row], block[2]->As<ColumnInt8>()->At(i));
+        }
+    });
+    EXPECT_EQ(names.size(), row);
 }
 
 // Live-server round-trip of escape sequences in an Enum type: hand-write a

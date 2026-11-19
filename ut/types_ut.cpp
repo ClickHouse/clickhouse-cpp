@@ -250,9 +250,18 @@ TEST(TypesCase, IsEqual) {
 TEST(TypesCase, ErrorEnumContent) {
     const std::string type_names[] = {
         "Enum8()",
-        "Enum8('ONE')",
-        "Enum8('ONE'=1,'TWO')",
         "Enum16('TWO'=,'TWO')",
+        // Some names after the first have a number and some do not.
+        "Enum8('a' = 5, 'b', 'c' = 10, 'd')",
+        "Enum8('a' = 1, 'b' = 2, 'c', 'd')",
+        "Enum8('a', 'b', 'c' = 5)",
+        "Enum8('a', 'b' = 5, 'c')",
+        // A name without quotes.
+        "Enum8(aa, 1)",
+        // An explicit or implicit number out of the range of the type.
+        "Enum8('a' = 128)",
+        "Enum8('a' = 126, 'b', 'c')",
+        "Enum16('a' = 32766, 'b', 'c')",
     };
 
     for (const auto& type_name : type_names) {
