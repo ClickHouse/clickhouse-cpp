@@ -175,6 +175,25 @@ TEST(Live, ValuesAndLineAsStringMatchServer) {
     }
 }
 
+TEST(Live, HeaderOfFormatMatchesServer) {
+    REQUIRE_LIVE();
+    // The header of a Raw format has no escapes, as its rows: the names, and
+    // the types (the Enum type name has quotes and a backslash). Contrast:
+    // TSVWithNames and TSVWithNamesAndTypes escape the header.
+    const std::string names                = "SELECT 1 AS `a\\tb\\\\c'd`, 'x' AS `\xC3\xA9\\nf` FORMAT ";
+    const std::string types                = "SELECT CAST('a' AS Enum8('a\\tb' = 1, 'a' = 2)) AS e FORMAT ";
+    const std::vector<std::string> queries = {
+        names + "TSVWithNames",         names + "TSVRawWithNames",         names + "TabSeparatedRawWithNamesAndTypes",
+        types + "TSVWithNamesAndTypes", types + "TSVRawWithNamesAndTypes",
+    };
+    for (const auto& query : queries) {
+        const auto want = ServerTSV(query);
+        const auto got  = RunShim(query);
+        EXPECT_EQ(0, got.code) << query << "\n" << got.err;
+        EXPECT_EQ(want, got.out) << query;
+    }
+}
+
 TEST(Live, SessionState) {
     REQUIRE_LIVE();
     // SET, temporary tables and inline INSERT data last for the whole

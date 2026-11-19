@@ -132,6 +132,9 @@ std::vector<std::string_view> TopLevelWords(std::string_view sql) {
             i = SkipLineComment(sql, i);
         } else if (StartsWithAt(sql, i, "/*")) {
             i = SkipBlockComment(sql, i);
+        } else if (c == '$') {
+            const size_t end = HeredocEnd(sql, i);
+            i                = end > 0 ? end : i + 1;
         } else if (c == '(' || c == '[') {
             ++depth;
             ++i;

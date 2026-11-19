@@ -202,12 +202,18 @@ void Runner::WriteBlock(const clickhouse::Block& block, const OutputFormat& form
     const size_t columns = block.GetColumnCount();
     if (!state.header_written) {
         state.header_written = true;
-        auto header          = [&](auto get) {
+        // A Raw format writes the header without escapes, as its rows
+        // (TabSeparatedRowOutputFormat::writeLine on the server).
+        auto header = [&](auto get) {
             for (size_t i = 0; i < columns; ++i) {
                 if (i > 0) {
                     result_ += '\t';
                 }
-                WriteEscapedString(result_, get(i), false);
+                if (format.raw) {
+                    result_ += get(i);
+                } else {
+                    WriteEscapedString(result_, get(i), false);
+                }
             }
             result_ += '\n';
         };

@@ -342,6 +342,8 @@ change this directory, the workflow, or the library (`clickhouse/`,
   `CLICKHOUSE_SKIP_USER_SETUP=1` and the host name of the runner (see
   [Run the tests locally](#run-the-tests-locally)). Shard 1 also runs the
   live tests of the harness.
+- A failed test fails the job: the script turns off the runner's own
+  retries (`--dont_retry_failures`), and CI does not set `RETRY_FAILED`.
 - The diffs of the failed tests are in the job log. A failed job also keeps
   the `.stdout` and `.stderr` files of its failed tests, the log of the
   program (`CLICKHOUSE_CLIENT_CLI_LOG`) and the error log of the server as
