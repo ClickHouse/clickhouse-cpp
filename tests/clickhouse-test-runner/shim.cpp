@@ -51,7 +51,7 @@ int RunMain(const std::vector<std::string>& argv, std::istream& in, std::ostream
     InvocationLog log;
     {
         std::string joined;
-        for (const auto& a : argv) {
+        for (const auto& a : RedactPassword(argv)) {
             joined += (joined.empty() ? "" : " ") + a;
         }
         log.Add("argv", joined);

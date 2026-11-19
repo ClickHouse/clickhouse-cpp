@@ -12,7 +12,11 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include <cstdio>
 #include <cstdlib>
+#include <fstream>
+#include <iterator>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -242,6 +246,41 @@ TEST(Live, StatementsWithoutResult) {
         "SELECT x FROM t WHERE 0 FORMAT TSVWithNames;");
     EXPECT_EQ(0, got.code) << got.err;
     EXPECT_EQ("x\nUInt8\n1\nx\n", got.out);
+}
+
+TEST(Live, LogHidesPassword) {
+    REQUIRE_LIVE();
+    // The log of CLICKHOUSE_CLIENT_CLI_LOG has no password value, in no record.
+    // The test checks only the log: the server can refuse the password.
+    std::string path = testing::TempDir() + "clickhouse-test-runner-log-XXXXXX";
+    const int fd     = mkstemp(path.data());
+    ASSERT_GE(fd, 0) << path;
+    close(fd);
+    const std::string password                = "pw-7f3a9c";
+    const std::string inline_password         = "pw-2b8e4d";
+    const char* env                           = std::getenv("CLICKHOUSE_CLIENT_CLI_LOG");
+    const std::optional<std::string> previous = env ? std::optional<std::string>(env) : std::nullopt;
+    setenv("CLICKHOUSE_CLIENT_CLI_LOG", path.c_str(), 1);
+    for (const auto& form : std::vector<std::vector<std::string>>{{"--password", password}, {"--password=" + inline_password}}) {
+        std::vector<std::string> argv = {"--host", Env("CLICKHOUSE_HOST", "localhost"), "--port", Env("CLICKHOUSE_PORT_TCP", "9000")};
+        argv.insert(argv.end(), form.begin(), form.end());
+        argv.insert(argv.end(), {"--query", "SELECT 1"});
+        std::istringstream in;
+        std::ostringstream out, err;
+        RunMain(argv, in, out, err);
+    }
+    if (previous) {
+        setenv("CLICKHOUSE_CLIENT_CLI_LOG", previous->c_str(), 1);
+    } else {
+        unsetenv("CLICKHOUSE_CLIENT_CLI_LOG");
+    }
+    std::ifstream file(path);
+    const std::string log((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    std::remove(path.c_str());
+    EXPECT_EQ(std::string::npos, log.find(password)) << log;
+    EXPECT_EQ(std::string::npos, log.find(inline_password)) << log;
+    EXPECT_NE(std::string::npos, log.find(" --password *** ")) << log;
+    EXPECT_NE(std::string::npos, log.find(" --password=*** ")) << log;
 }
 
 TEST(Live, InsertWithoutDataFailsAtOnce) {

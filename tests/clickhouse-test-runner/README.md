@@ -141,7 +141,7 @@ CLICKHOUSE_TEST_RUNNER_LIVE=1 tests/clickhouse-test-runner/.build/tests/clickhou
 | `CLICKHOUSE_TEST_RUNNER_BIN` | (none) | The absolute path of a program that is already built; the run script then does not build. |
 | `CLICKHOUSE_TEST_RUNNER_BUILD_DIR` | `.build` in this directory | The CMake build directory of `scripts/build.sh`, as an absolute path. |
 | `CMAKE_BUILD_TYPE`, `CMAKE_BUILD_PARALLEL_LEVEL` | `Release`, `4` | The build type (used only when the build directory is new) and the number of parallel jobs of `scripts/build.sh`. |
-| `CLICKHOUSE_CLIENT_CLI_LOG` | (none) | The absolute path of a file. Each invocation of the program adds its arguments, statements and errors to it. |
+| `CLICKHOUSE_CLIENT_CLI_LOG` | (none) | The absolute path of a file. Each invocation of the program adds its arguments (the `--password` value hidden), statements and errors to it. |
 | `CLICKHOUSE_TEST_RUNNER_RECEIVE_TIMEOUT` | `60` | Seconds that the program waits for a packet of the server (`ClientOptions::SetConnectionRecvTimeout`); `0` waits for ever. |
 | `CLICKHOUSE_HOST`, `CLICKHOUSE_PORT_TCP`, `CLICKHOUSE_PORT_HTTP` | `localhost`, `9000`, `8123` | The server. The runner gives `--host` and `--port=$CLICKHOUSE_PORT_TCP`; the run script and the live tests use the HTTP port to read the server version and the server's own output. |
 | `CLICKHOUSE_CONTAINER` | `clickhouse` | The server container in which `run-with-real-client.sh` runs the real `clickhouse-client`. |
