@@ -160,10 +160,6 @@ confidence is `LOW`, say what is missing.
 
 ## 7. Labels from earlier triage
 
-- `priority-high` and `priority-low` are older labels that a maintainer set.
-  When an issue has one, use its level (`High` or `Low`) instead of the table
-  value, and write "maintainer label `priority-…`" in the reason. Never add
-  these labels.
 - `pg_clickhouse` marks a request from the pg_clickhouse PostgreSQL extension.
   pg_clickhouse uses clickhouse-c instead of clickhouse-cpp from its v0.3.1
   release, so the label gives no modifier.
