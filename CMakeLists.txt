@@ -12,6 +12,7 @@ IF ("${CMAKE_CURRENT_SOURCE_DIR}" STREQUAL "${CMAKE_SOURCE_DIR}")
     OPTION (BUILD_BENCHMARK "Build benchmark" OFF)
     OPTION (BUILD_TESTS "Build tests" OFF)
     OPTION (BUILD_SHARED_LIBS "Build shared libs" OFF)
+    OPTION (BUILD_CLICKHOUSE_TEST_RUNNER "Build tests/clickhouse-test-runner, which runs the upstream ClickHouse SQL tests through the library" OFF)
 ENDIF ()
 OPTION (WITH_OPENSSL "Use OpenSSL for TLS connections" OFF)
 
@@ -147,6 +148,10 @@ IF (BUILD_TESTS)
         ut
     )
 ENDIF (BUILD_TESTS)
+
+IF (BUILD_CLICKHOUSE_TEST_RUNNER)
+    SUBDIRS (tests/clickhouse-test-runner)
+ENDIF (BUILD_CLICKHOUSE_TEST_RUNNER)
 
 if(DEBUG_DEPENDENCIES)
     function(print_target_properties target)
