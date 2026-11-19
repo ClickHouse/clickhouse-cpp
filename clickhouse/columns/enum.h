@@ -1,6 +1,7 @@
 #pragma once
 
 #include "column.h"
+#include "numeric.h"
 
 namespace clickhouse {
 
@@ -40,6 +41,7 @@ public:
     bool LoadBody(InputStream* input, size_t rows) override;
 
     /// Saves column data to output stream.
+    /// Throws ValidationError if a row has a value that the enum type does not declare.
     void SaveBody(OutputStream* output) override;
 
     /// Clear column data.
@@ -56,6 +58,12 @@ public:
     ItemView GetItem(size_t index) const override;
 
 private:
+    friend class ColumnNullable;
+
+    /// Same as SaveBody, but does not check the rows that `nulls` marks as NULL.
+    /// The value of a NULL row has no meaning, and the server itself sends 0 there.
+    void SaveBody(OutputStream* output, const ColumnUInt8* nulls);
+
     std::vector<T> data_;
 };
 

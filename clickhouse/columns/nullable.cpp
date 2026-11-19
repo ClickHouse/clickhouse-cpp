@@ -1,4 +1,5 @@
 #include "nullable.h"
+#include "enum.h"
 
 #include <assert.h>
 #include <stdexcept>
@@ -75,7 +76,13 @@ void ColumnNullable::SavePrefix(OutputStream* output) {
 
 void ColumnNullable::SaveBody(OutputStream* output) {
     nulls_->SaveBody(output);
-    nested_->SaveBody(output);
+    if (auto enum8 = nested_->As<ColumnEnum8>()) {
+        enum8->SaveBody(output, nulls_.get());
+    } else if (auto enum16 = nested_->As<ColumnEnum16>()) {
+        enum16->SaveBody(output, nulls_.get());
+    } else {
+        nested_->SaveBody(output);
+    }
 }
 
 size_t ColumnNullable::Size() const {

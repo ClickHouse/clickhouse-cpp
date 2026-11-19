@@ -866,6 +866,77 @@ TEST(ColumnsCase, EnumCheckValue) {
     EXPECT_EQ(column->At(0), 2);
 }
 
+// Saves the column and returns the message of the ValidationError that Save throws.
+// Returns an empty string if Save does not throw.
+static std::string EnumSaveError(Column& column) {
+    Buffer buffer;
+    BufferOutput output(&buffer);
+    try {
+        column.Save(&output);
+    } catch (const ValidationError& e) {
+        return e.what();
+    }
+    return {};
+}
+
+TEST(ColumnsCase, Enum8SaveRejectsUndeclaredValue) {
+    auto column = std::make_shared<ColumnEnum8>(Type::CreateEnum8({{"Min", -128}, {"Hi", 1}, {"Max", 127}}));
+    column->Append(-128);
+    column->Append("Hi");
+    column->Append(127);
+    EXPECT_EQ(EnumSaveError(*column), "");
+
+    // Append by number does not check the value by default.
+    column->Append(int8_t(0));
+    EXPECT_EQ(EnumSaveError(*column), "Enum type Enum8('Min' = -128, 'Hi' = 1, 'Max' = 127) doesn't have value 0");
+}
+
+TEST(ColumnsCase, Enum16SaveRejectsUndeclaredValue) {
+    auto column = std::make_shared<ColumnEnum16>(Type::CreateEnum16({{"Min", -32768}, {"Hi", 1000}, {"Max", 32767}}));
+    column->Append(-32768);
+    column->Append("Hi");
+    column->Append(32767);
+    EXPECT_EQ(EnumSaveError(*column), "");
+
+    column->SetAt(1, -1);
+    EXPECT_EQ(EnumSaveError(*column), "Enum type Enum16('Min' = -32768, 'Hi' = 1000, 'Max' = 32767) doesn't have value -1");
+}
+
+TEST(ColumnsCase, EnumSaveRejectsUndeclaredValueFromAnyPath) {
+    const auto type         = Type::CreateEnum8({{"Hi", 1}, {"Hello", 2}});
+    const std::string error = "Enum type Enum8('Hi' = 1, 'Hello' = 2) doesn't have value ";
+
+    auto from_vector = std::make_shared<ColumnEnum8>(type, std::vector<int8_t>{1, 5});
+    EXPECT_EQ(EnumSaveError(*from_vector), error + "5");
+
+    auto other = std::make_shared<ColumnEnum8>(Type::CreateEnum8({{"Other", 7}}));
+    other->Append("Other");
+    auto from_other_type = std::make_shared<ColumnEnum8>(type);
+    from_other_type->Append(other);
+    EXPECT_EQ(EnumSaveError(*from_other_type), error + "7");
+
+    auto array = std::make_shared<ColumnArray>(std::make_shared<ColumnEnum8>(type));
+    array->AppendAsColumn(std::make_shared<ColumnEnum8>(type, std::vector<int8_t>{2, 3}));
+    EXPECT_EQ(EnumSaveError(*array), error + "3");
+}
+
+TEST(ColumnsCase, EnumSaveDoesNotCheckNullRows) {
+    // ColumnNullableT appends 0 to the nested column for a NULL row, and the server sends 0 there too.
+    auto nullable8 = std::make_shared<ColumnNullableT<ColumnEnum8>>(std::make_shared<ColumnEnum8>(Type::CreateEnum8({{"Hi", 1}})));
+    nullable8->Append(std::nullopt);
+    nullable8->Append(1);
+    EXPECT_EQ(EnumSaveError(*nullable8), "");
+    nullable8->Append(4);
+    EXPECT_EQ(EnumSaveError(*nullable8), "Enum type Enum8('Hi' = 1) doesn't have value 4");
+
+    auto nullable16 = std::make_shared<ColumnNullableT<ColumnEnum16>>(std::make_shared<ColumnEnum16>(Type::CreateEnum16({{"Hi", 1000}})));
+    nullable16->Append(std::nullopt);
+    nullable16->Append(1000);
+    EXPECT_EQ(EnumSaveError(*nullable16), "");
+    nullable16->Append(std::optional<int16_t>(0));
+    EXPECT_EQ(EnumSaveError(*nullable16), "Enum type Enum16('Hi' = 1000) doesn't have value 0");
+}
+
 TEST(ColumnsCase, NullableSlice) {
     auto data = std::make_shared<ColumnUInt32>(MakeNumbers());
     auto nulls = std::make_shared<ColumnUInt8>(MakeBools());

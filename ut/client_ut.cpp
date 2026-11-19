@@ -911,6 +911,74 @@ TEST_P(ClientCase, Exception) {
         ServerException);
 }
 
+TEST_P(ClientCase, EnumUndeclaredValueIsNotInserted) {
+    // A regular table, because the test opens a new connection after the error,
+    // and a temporary table exists only in the connection that made it.
+    const std::string table = "test_clickhouse_cpp_enum_undeclared";
+    client_->Execute("DROP TABLE IF EXISTS " + table);
+    client_->Execute("CREATE TABLE " + table +
+                     " (id UInt64, e Enum8('One' = 1, 'Two' = 2), n Nullable(Enum16('Big' = 1000))) ENGINE = Memory");
+
+    const size_t rows = 10;
+
+    auto make_block = [&](int8_t last_value) {
+        auto id = std::make_shared<ColumnUInt64>();
+        auto e  = std::make_shared<ColumnEnum8>(Type::CreateEnum8({{"One", 1}, {"Two", 2}}));
+        auto n  = std::make_shared<ColumnNullableT<ColumnEnum16>>(std::make_shared<ColumnEnum16>(Type::CreateEnum16({{"Big", 1000}})));
+        for (size_t i = 0; i < rows; ++i) {
+            id->Append(i);
+            if (i + 1 == rows) {
+                e->Append(last_value);
+            } else if (i % 2) {
+                e->Append("Two");
+            } else {
+                e->Append(1);
+            }
+            n->Append(i % 2 ? std::optional<int16_t>(1000) : std::nullopt);
+        }
+        Block block;
+        block.AppendColumn("id", id);
+        block.AppendColumn("e", e);
+        block.AppendColumn("n", n);
+        return block;
+    };
+
+    try {
+        client_->Insert(table, make_block(3));
+        FAIL() << "expected ValidationError";
+    } catch (const ValidationError& e) {
+        EXPECT_STREQ(e.what(), "Enum type Enum8('One' = 1, 'Two' = 2) doesn't have value 3");
+    }
+    // The insert stopped in the middle of the block. The README says to reset the connection after an exception.
+    client_->ResetConnection();
+
+    size_t count = 0;
+    client_->Select("SELECT count() FROM " + table, [&](const Block& block) {
+        if (block.GetRowCount() > 0) {
+            count = block[0]->As<ColumnUInt64>()->At(0);
+        }
+    });
+    EXPECT_EQ(0u, count);
+
+    client_->Insert(table, make_block(2));
+
+    size_t row = 0;
+    client_->Select("SELECT id, e, n FROM " + table + " ORDER BY id", [&](const Block& block) {
+        for (size_t i = 0; i < block.GetRowCount(); ++i, ++row) {
+            EXPECT_EQ(row, block[0]->As<ColumnUInt64>()->At(i));
+            EXPECT_EQ(row % 2 ? "Two" : "One", block[1]->As<ColumnEnum8>()->NameAt(i));
+            auto n = block[2]->As<ColumnNullable>();
+            EXPECT_EQ(row % 2 == 0, n->IsNull(i));
+            if (!n->IsNull(i)) {
+                EXPECT_EQ("Big", n->Nested()->As<ColumnEnum16>()->NameAt(i));
+            }
+        }
+    });
+    EXPECT_EQ(rows, row);
+
+    client_->Execute("DROP TABLE IF EXISTS " + table);
+}
+
 TEST_P(ClientCase, Enum) {
     /// Create a table.
     client_->Execute(
