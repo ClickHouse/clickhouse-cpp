@@ -1,0 +1,213 @@
+name: Upstream SQL tests
+
+# Runs a curated subset of the ClickHouse core SQL tests
+# (tests/queries/0_stateless) through clickhouse-cpp. See
+# tests/clickhouse-test-runner/README.md.
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+    inputs:
+      clickhouse_version:
+        description: "ClickHouse version to try, with a v<version>-stable tag upstream, for example 26.11.1.10 (default: tests/clickhouse-test-runner/clickhouse-version)"
+        required: false
+        default: ""
+        type: string
+  schedule:
+    - cron: "0 3 * * *"
+  # The harness, the workflow, and the library that the shim builds against.
+  push:
+    branches:
+      - master
+    paths:
+      - "tests/clickhouse-test-runner/**"
+      - ".github/workflows/upstream-sql-tests.yml"
+      - "clickhouse/**"
+      - "contrib/**"
+      - "cmake/**"
+      - "CMakeLists.txt"
+  pull_request:
+    paths:
+      - "tests/clickhouse-test-runner/**"
+      - ".github/workflows/upstream-sql-tests.yml"
+      - "clickhouse/**"
+      - "contrib/**"
+      - "cmake/**"
+      - "CMakeLists.txt"
+
+# A new push to a pull request cancels the run of its old head. Nightly,
+# manual and master runs each have a group of their own, so that a merge does
+# not cancel a nightly run or a manual try of another version.
+concurrency:
+  group: "${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}"
+  cancel-in-progress: true
+
+jobs:
+  # Builds the shim and its unit tests once, with scripts/build.sh
+  # (-DBUILD_CLICKHOUSE_TEST_RUNNER=ON -DCH_USE_3X_API=ON), and runs the unit
+  # tests. The test jobs use the programs of this job.
+  build:
+    name: build and unit tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      # The shim writes DateTime values with the tz database of the system.
+      # tzdata-legacy has the old zone names that some tests use (US/Samoa).
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build tzdata tzdata-legacy
+
+      # The server version and the upstream tests are pinned together in
+      # tests/clickhouse-test-runner/clickhouse-version: the `.reference`
+      # files of another release do not match the output of the server. A
+      # new server release changes nothing here until a pull request bumps
+      # the pin. The `clickhouse_version` input of a manual run tries
+      # another version without a commit.
+      - name: Select the ClickHouse version
+        id: version
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.clickhouse_version }}
+        run: |
+          version="${INPUT_VERSION:-$(tests/clickhouse-test-runner/scripts/pinned-version.sh)}"
+          if ! [[ "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::clickhouse_version must be a full version such as 26.10.4.207 (got: '${version}')"
+            exit 1
+          fi
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+
+      # Generates error_codes_generated.inc from the checkout of the same
+      # version, so that the shim knows the error names of its test hints.
+      - name: Get the upstream tests of ClickHouse ${{ steps.version.outputs.version }}
+        run: tests/clickhouse-test-runner/scripts/fetch-upstream.sh "${{ steps.version.outputs.version }}"
+
+      - name: Build the shim
+        run: tests/clickhouse-test-runner/scripts/build.sh
+
+      # Without CLICKHOUSE_TEST_RUNNER_LIVE, the live tests are skipped.
+      # Shard 1 runs them against its server.
+      - name: Unit tests of the harness
+        run: tests/clickhouse-test-runner/.build/tests/clickhouse-test-runner/clickhouse-test-runner-ut
+
+      - name: Upload the shim
+        uses: actions/upload-artifact@v4
+        with:
+          name: upstream-sql-tests-shim
+          retention-days: 3
+          if-no-files-found: error
+          path: |
+            tests/clickhouse-test-runner/.build/tests/clickhouse-test-runner/clickhouse
+            tests/clickhouse-test-runner/.build/tests/clickhouse-test-runner/clickhouse-test-runner-ut
+
+  upstream-sql-tests:
+    name: native, shard ${{ matrix.shard }}
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        # Round-robin shards of the allowlist (10,004 tests), about 1,250
+        # tests each. A full run takes about 11 minutes at -j 6, so a shard
+        # takes a few minutes on a 4-vCPU runner. Change SHARD_TOTAL below
+        # together with this list.
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+    env:
+      CLICKHOUSE_VERSION: ${{ needs.build.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      # tests/clickhouse-test needs Python 3 and jinja2. For the tz database,
+      # see the build job.
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-jinja2 tzdata tzdata-legacy
+
+      # The stock server configuration. CLICKHOUSE_SKIP_USER_SETUP keeps the
+      # `default` user of the image's users.xml: network access, access
+      # management and named-collection control (tests create users, roles
+      # and named collections). Without it, the image allows the user
+      # without a password only from localhost in the container.
+      #
+      # The server gets the host name of the runner: tests/clickhouse-test
+      # replaces its own host name with `localhost` in the output of each
+      # test, and some `.reference` files have `localhost` for hostName().
+      - name: Start ClickHouse ${{ needs.build.outputs.version }}
+        run: |
+          docker run -d --name clickhouse -p 8123:8123 -p 9000:9000 \
+            --hostname "$(hostname)" \
+            -e CLICKHOUSE_SKIP_USER_SETUP=1 --ulimit nofile=262144:262144 \
+            "clickhouse/clickhouse-server:${CLICKHOUSE_VERSION}"
+          for _ in $(seq 1 60); do
+            if curl -fsS --data-binary 'SELECT 1' "localhost:8123/" > /dev/null 2>&1; then
+              echo "ClickHouse is ready"
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs clickhouse
+          echo "::error::ClickHouse did not start"
+          exit 1
+
+      - name: Get the upstream tests of ClickHouse ${{ needs.build.outputs.version }}
+        id: upstream
+        run: tests/clickhouse-test-runner/scripts/fetch-upstream.sh "${CLICKHOUSE_VERSION}"
+
+      - name: Download the shim
+        uses: actions/download-artifact@v4
+        with:
+          name: upstream-sql-tests-shim
+          path: ${{ runner.temp }}/shim
+
+      # An artifact does not keep the file mode.
+      - name: Make the shim executable
+        id: shim
+        run: chmod +x "${RUNNER_TEMP}/shim/clickhouse" "${RUNNER_TEMP}/shim/clickhouse-test-runner-ut"
+
+      - name: Run upstream SQL tests
+        env:
+          CLICKHOUSE_TEST_RUNNER_BIN: ${{ runner.temp }}/shim/clickhouse
+          CLICKHOUSE_CLIENT_CLI_LOG: ${{ github.workspace }}/upstream-run.log
+          SHARD_INDEX: ${{ matrix.shard }}
+          SHARD_TOTAL: 8
+        run: tests/clickhouse-test-runner/scripts/run-upstream-tests.sh -j 4
+
+      # After the upstream tests, so that a failed live test does not hide
+      # their results, and also when they fail.
+      - name: Live tests of the harness
+        if: ${{ !cancelled() && matrix.shard == 1 && steps.shim.outcome == 'success' }}
+        env:
+          CLICKHOUSE_TEST_RUNNER_LIVE: "1"
+        run: |
+          "${RUNNER_TEMP}/shim/clickhouse-test-runner-ut" --gtest_filter='Live.*'
+
+      - name: Get the error log of the server
+        if: failure()
+        run: docker cp clickhouse:/var/log/clickhouse-server/clickhouse-server.err.log . || true
+
+      - name: Upload test artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: upstream-sql-tests-${{ steps.upstream.outputs.ref }}-native-shard-${{ matrix.shard }}
+          retention-days: 14
+          if-no-files-found: ignore
+          path: |
+            upstream-run.log
+            clickhouse-server.err.log
+            tests/clickhouse-test-runner/.upstream/ClickHouse/tests/queries/**/*.stdout
+            tests/clickhouse-test-runner/.upstream/ClickHouse/tests/queries/**/*.stderr
+            tests/clickhouse-test-runner/.upstream/ClickHouse/tests/queries/**/*.diff
