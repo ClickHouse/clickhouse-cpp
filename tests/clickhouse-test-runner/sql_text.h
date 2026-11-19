@@ -39,7 +39,7 @@ bool HasSignificantToken(std::string_view text);
 /// and opening parentheses.
 std::string LeadingKeyword(std::string_view sql);
 
-/// The words of `sql` outside quotes, comments and parentheses.
+/// The words of `sql` outside quotes, heredocs, comments and parentheses.
 std::vector<std::string_view> TopLevelWords(std::string_view sql);
 
 /// SQL words that can follow a column or an alias named `format`. No input

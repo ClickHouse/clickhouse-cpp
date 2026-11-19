@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "split.h"
@@ -61,6 +62,9 @@ TEST(SplitStatements, Cases) {
         {"insert select with an implicit alias after format",
          "INSERT INTO t SELECT format x FROM s;\nSELECT 1;",
          {"INSERT INTO t SELECT format x FROM s;", "SELECT 1;"}},
+        {"insert select with a heredoc before a format alias",
+         "INSERT INTO t SELECT $$ FROM $$ AS x, format y FROM s;\nSELECT 1;",
+         {"INSERT INTO t SELECT $$ FROM $$ AS x, format y FROM s;", "SELECT 1;"}},
         {"insert select with format DIV",
          "INSERT INTO t SELECT format DIV 2 FROM s;\nSELECT 1;",
          {"INSERT INTO t SELECT format DIV 2 FROM s;", "SELECT 1;"}},
@@ -134,6 +138,22 @@ TEST(SqlText, LeadingKeyword) {
     EXPECT_EQ("SELECT", LeadingKeyword("  -- c\n/* d */ (select 1)"));
     EXPECT_EQ("INSERT", LeadingKeyword("insert into t values (1)"));
     EXPECT_EQ("", LeadingKeyword("-- only a comment"));
+}
+
+TEST(SqlText, TopLevelWordsSkipsLiteralsAndComments) {
+    const std::vector<std::pair<std::string, std::string>> cases = {
+        {"SELECT a, 'b c', `d`, \"e\", $$f g$$, $t$h$t$ -- i\nFROM (SELECT j) /* k */", "SELECT a FROM"},
+        {"INSERT INTO t SELECT $$x FROM y$$ FROM (SELECT z)", "INSERT INTO t SELECT FROM"},
+        // A `$` that does not start a heredoc is not skipped with the text after it.
+        {"SELECT $a$b$ FROM t", "SELECT a b FROM t"},
+    };
+    for (const auto& [sql, want] : cases) {
+        std::string got;
+        for (const auto w : TopLevelWords(sql)) {
+            got += (got.empty() ? "" : " ") + std::string(w);
+        }
+        EXPECT_EQ(want, got) << sql;
+    }
 }
 
 TEST(SqlText, TestTagsLength) {

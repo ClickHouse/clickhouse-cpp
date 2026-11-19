@@ -86,8 +86,8 @@ The script builds the program with [`scripts/build.sh`](scripts/build.sh)
 (CMake, in `.build`, with `-DBUILD_CLICKHOUSE_TEST_RUNNER=ON -DCH_USE_3X_API=ON`),
 links it as `.bin/clickhouse` and `.bin/clickhouse-client`, puts `.bin` first
 in `PATH` for the runner only, and starts `tests/clickhouse-test`. It gives
-the runner `--no-stateful --no-random-settings --no-random-merge-tree-settings`;
-other arguments go to the runner after these. `UPSTREAM_TEST_LIST` selects
+the runner `--no-stateful --no-random-settings --no-random-merge-tree-settings
+--dont_retry_failures`; other arguments go to the runner after these. `UPSTREAM_TEST_LIST` selects
 other tests, also tests that are not in the allowlist. For example, to run
 one test:
 
@@ -262,7 +262,8 @@ some tests read their own queries from `system.query_log`.
   to the server as it is, with its `FORMAT` clause: over the native protocol
   the server ignores the clause and sends `Native` blocks. The names and
   types of `...WithNames[AndTypes]` are `Block::GetColumnName` and
-  `Type::GetName` of the client. After `SET dialect` to another language
+  `Type::GetName` of the client; a Raw format writes them without escapes,
+  as its values. After `SET dialect` to another language
   (KQL, PRQL, ...), the program does not look for a `FORMAT` clause.
 - **Values.** The rendering follows the column type (`Column::Type()`).
   Strings are escaped at the top level and quoted inside `Array`, `Tuple`
@@ -342,6 +343,8 @@ change this directory, the workflow, or the library (`clickhouse/`,
   `CLICKHOUSE_SKIP_USER_SETUP=1` and the host name of the runner (see
   [Run the tests locally](#run-the-tests-locally)). Shard 1 also runs the
   live tests of the harness.
+- A failed test fails the job: the script turns off the runner's own
+  retries (`--dont_retry_failures`), and CI does not set `RETRY_FAILED`.
 - The diffs of the failed tests are in the job log. A failed job also keeps
   the `.stdout` and `.stderr` files of its failed tests, the log of the
   program (`CLICKHOUSE_CLIENT_CLI_LOG`) and the error log of the server as
