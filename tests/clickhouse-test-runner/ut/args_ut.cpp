@@ -10,6 +10,7 @@
 using namespace clickhouse_test_runner;
 
 using Settings = std::vector<std::pair<std::string, std::string>>;
+using Argv     = std::vector<std::string>;
 
 TEST(ParseArgs, SQLTestCommandLine) {
     // The command line that tests/clickhouse-test uses for a .sql test.
@@ -74,6 +75,32 @@ TEST(ParseArgs, SettingValues) {
 TEST(ParseArgs, Errors) {
     EXPECT_THROW(ParseArgs({"--port=abc"}), std::invalid_argument);
     EXPECT_THROW(ParseArgs({"--query"}), std::invalid_argument);
+}
+
+TEST(RedactPassword, HidesThePasswordOnly) {
+    EXPECT_EQ((Argv{"--user", "u", "--password", "***", "--password=***", "--query", "SELECT 1", "--password"}),
+              RedactPassword({"--user", "u", "--password", "secret", "--password=secret2", "--query", "SELECT 1", "--password"}));
+
+    struct Case {
+        Argv argv;
+        std::string password;  ///< The password that ParseArgs reads.
+        Argv want;
+    };
+    const std::vector<Case> cases = {
+        // An option that takes a value can take `--password` as its value. A
+        // setting (`--max_threads`) never does.
+        {{"-u", "--password", "--password", "secret"}, "secret", {"-u", "--password", "--password", "***"}},
+        {{"--host", "--password", "--password", "secret"}, "secret", {"--host", "--password", "--password", "***"}},
+        {{"--max_threads", "--password", "secret"}, "secret", {"--max_threads", "--password", "***"}},
+        {{"--max_threads", "-1", "--password", "secret"}, "secret", {"--max_threads", "-1", "--password", "***"}},
+        // Contrast: the value of another option stays.
+        {{"-u", "--password", "x"}, "", {"-u", "--password", "x"}},
+        {{"--host", "--password=x"}, "", {"--host", "--password=x"}},
+    };
+    for (const auto& c : cases) {
+        EXPECT_EQ(c.password, ParseArgs(c.argv).password) << testing::PrintToString(c.argv);
+        EXPECT_EQ(c.want, RedactPassword(c.argv)) << testing::PrintToString(c.argv);
+    }
 }
 
 TEST(RunMain, ExtractFromConfig) {

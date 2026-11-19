@@ -179,6 +179,34 @@ Options ParseArgs(const std::vector<std::string>& argv) {
     return opts;
 }
 
+std::vector<std::string> RedactPassword(const std::vector<std::string>& argv) {
+    // A setting (`--max_threads 1`) takes the next argument as its value only
+    // when it does not start with `-` or is a negative number. Such a value is
+    // never an option, so the walk can read it as an argument of its own.
+    std::vector<std::string> result;
+    result.reserve(argv.size());
+    for (size_t i = 0; i < argv.size(); ++i) {
+        const std::string& arg = argv[i];
+        const OptionSpec* o    = nullptr;
+        if (arg.rfind("--", 0) == 0) {
+            const auto eq = arg.find('=');
+            if (eq != std::string::npos) {
+                result.push_back(arg.compare(2, eq - 2, "password") == 0 ? "--password=***" : arg);
+                continue;
+            }
+            o = FindOption(arg.substr(2), "");
+        } else if (arg.size() > 1 && arg[0] == '-') {
+            o = FindOption("", arg.substr(1));
+        }
+        result.push_back(arg);
+        if (o && o->has_arg && i + 1 < argv.size()) {
+            ++i;
+            result.push_back(std::string(o->long_name) == "password" ? "***" : argv[i]);
+        }
+    }
+    return result;
+}
+
 const char kUsageText[] = R"(usage: clickhouse-client [options]
 
 A clickhouse-client imitation that runs queries through clickhouse-cpp, so
