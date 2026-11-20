@@ -16,6 +16,7 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <memory>
 #include <optional>
 #include <ostream>
@@ -552,22 +553,20 @@ TEST_P(ClientCase, InsertData) {
     client_->Execute(
             "CREATE TEMPORARY TABLE IF NOT EXISTS test_clickhouse_cpp_insert (id UInt64, name String, f Bool)");
 
-    const struct {
+    struct Row {
         uint64_t id;
         std::string name;
         bool f;
-    } TEST_DATA[] = {
+    };
+
+    const std::vector<Row> TEST_DATA = {
         { 1, "id", true },
         { 3, "foo", false },
         { 5, "bar", true },
         { 7, "name", false },
     };
 
-    const struct {
-        uint64_t id;
-        std::string name;
-        bool f;
-    } TEST_DATA2[] = {
+    const std::vector<Row> TEST_DATA2 = {
         { 2, "holden", true },
         { 4, "naomi", false },
         { 6, "amos", true },
@@ -610,33 +609,28 @@ TEST_P(ClientCase, InsertData) {
     }
 
     /// Select values inserted in the previous steps.
+    std::vector<Row> expected_rows(TEST_DATA);
+    expected_rows.insert(expected_rows.end(), TEST_DATA2.begin(), TEST_DATA2.end());
+    std::sort(expected_rows.begin(), expected_rows.end(), [](const Row& left, const Row& right) { return left.id < right.id; });
+
     size_t row = 0;
-    client_->Select("SELECT id, name, f FROM test_clickhouse_cpp_insert", [TEST_DATA, TEST_DATA2, &row](const Block& block)
+    client_->Select("SELECT id, name, f FROM test_clickhouse_cpp_insert ORDER BY id", [&expected_rows, &row](const Block& block)
         {
             if (block.GetRowCount() == 0) {
                 return;
             }
             EXPECT_EQ("id", block.GetColumnName(0));
             EXPECT_EQ("name", block.GetColumnName(1));
-            size_t block_two_row_num = sizeof(TEST_DATA)/sizeof(TEST_DATA[0]);
 
-            if (row < block_two_row_num) {
-                for (size_t c = 0; c < block.GetRowCount(); ++c, ++row) {
-                    EXPECT_EQ(TEST_DATA[row].id, (*block[0]->As<ColumnUInt64>())[c]);
-                    EXPECT_EQ(TEST_DATA[row].name, (*block[1]->As<ColumnString>())[c]);
-                    EXPECT_EQ(MakeClientBoolValue(TEST_DATA[row].f), (*block[2]->As<ClientBoolColumn>())[c]);
-                }
-            } else {
-                for (size_t c = 0; c < block.GetRowCount(); ++c, ++row) {
-                    EXPECT_EQ(TEST_DATA2[row-block_two_row_num].id, (*block[0]->As<ColumnUInt64>())[c]);
-                    EXPECT_EQ(TEST_DATA2[row-block_two_row_num].name, (*block[1]->As<ColumnString>())[c]);
-                    EXPECT_EQ(MakeClientBoolValue(TEST_DATA2[row-block_two_row_num].f), (*block[2]->As<ClientBoolColumn>())[c]);
-                }
+            for (size_t c = 0; c < block.GetRowCount(); ++c, ++row) {
+                ASSERT_LT(row, expected_rows.size());
+                EXPECT_EQ(expected_rows[row].id, (*block[0]->As<ColumnUInt64>())[c]);
+                EXPECT_EQ(expected_rows[row].name, (*block[1]->As<ColumnString>())[c]);
+                EXPECT_EQ(MakeClientBoolValue(expected_rows[row].f), (*block[2]->As<ClientBoolColumn>())[c]);
             }
         }
     );
-    auto exp = sizeof(TEST_DATA)/sizeof(TEST_DATA[0]) + sizeof(TEST_DATA2)/sizeof(TEST_DATA2[0]);
-    EXPECT_EQ(exp, row);
+    EXPECT_EQ(expected_rows.size(), row);
 }
 
 TEST_P(ClientCase, BeginInsertDoesNotAllowCallbacks) {
