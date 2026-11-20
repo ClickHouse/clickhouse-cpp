@@ -260,3 +260,16 @@ TEST(TypesCase, ErrorEnumContent) {
         EXPECT_THROW(clickhouse::CreateColumnByType(type_name)->Type(), ValidationError);
     }
 }
+TEST(TypesCase, EnumTypeRejectsDuplicateNames) {
+    EXPECT_THROW(
+        Type::CreateEnum8({{"RED", 1}, {"RED", 2}}),
+        ValidationError
+    );
+}
+
+TEST(TypesCase, EnumTypeRejectsDuplicateValues) {
+    EXPECT_THROW(
+        Type::CreateEnum8({{"RED", 1}, {"BLUE", 1}}),
+        ValidationError
+    );
+}
