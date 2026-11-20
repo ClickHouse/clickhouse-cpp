@@ -31,6 +31,7 @@ SET ( clickhouse-cpp-ut-src
 
     bignum_samples.cpp
     utils.cpp
+    allocation_tracker.cpp
     value_generators.cpp
     low_cardinality_nullable_tests.cpp
 

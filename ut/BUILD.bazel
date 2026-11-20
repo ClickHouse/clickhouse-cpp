@@ -51,6 +51,7 @@ cc_test(
         "types_ut.cpp",
         "utils_ut.cpp",
         # Test entry point and shared support code.
+        "allocation_tracker.cpp",
         "main.cpp",
         "tcp_server.cpp",
         "tcp_server.h",
