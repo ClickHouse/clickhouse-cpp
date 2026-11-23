@@ -126,3 +126,19 @@ TEST(ParseSetAssignments, Values) {
     EXPECT_EQ((Settings{{"dialect", "kusto"}, {"max_threads", "1"}, {"x", "(1, 2)"}}),
               ParseSetAssignments("SET dialect = 'kusto', max_threads=1, x = (1, 2);"));
 }
+
+TEST(ParseSetAssignments, Comments) {
+    EXPECT_EQ((Settings{{"max_block_size", "100"}, {"max_threads", "1"}}),
+              ParseSetAssignments("SET\n  max_block_size = 100,\n  -- one thread\n  max_threads = 1;"));
+    EXPECT_EQ((Settings{{"max_block_size", "100"}, {"max_insert_threads", "1"}}),
+              ParseSetAssignments("SET\n  -- don't use more threads\n  max_block_size = 100,\n  max_insert_threads = 1;"));
+    EXPECT_EQ((Settings{{"format_tsv_null_representation", "NULL"}}),
+              ParseSetAssignments("SET format_tsv_null_representation = 'NULL' /* text of NULL */;"));
+    EXPECT_EQ((Settings{{"dialect", "clickhouse"}}), ParseSetAssignments("SET dialect = 'clickhouse' -- back to SQL"));
+    EXPECT_EQ((Settings{{"max_threads", "1"}}), ParseSetAssignments("SET max_threads = 1 # a hash comment\n;"));
+}
+
+TEST(ParseSetAssignments, CommentMarkersInStrings) {
+    EXPECT_EQ((Settings{{"format_csv_delimiter", "#"}, {"x", "-- not a comment"}, {"y", "/* kept */"}}),
+              ParseSetAssignments("SET format_csv_delimiter = '#', x = '-- not a comment', y = '/* kept */';"));
+}
