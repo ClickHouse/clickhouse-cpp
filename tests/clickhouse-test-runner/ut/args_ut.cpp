@@ -142,3 +142,9 @@ TEST(ParseSetAssignments, CommentMarkersInStrings) {
     EXPECT_EQ((Settings{{"format_csv_delimiter", "#"}, {"x", "-- not a comment"}, {"y", "/* kept */"}}),
               ParseSetAssignments("SET format_csv_delimiter = '#', x = '-- not a comment', y = '/* kept */';"));
 }
+
+TEST(ParseSetAssignments, Heredocs) {
+    EXPECT_EQ((Settings{{"x", "$$-- not a comment$$"}, {"max_threads", "1"}}),
+              ParseSetAssignments("SET x = $$-- not a comment$$, max_threads = 1;"));
+    EXPECT_EQ((Settings{{"x", "$tag$a, /* b */ c$tag$"}, {"y", "2"}}), ParseSetAssignments("SET x = $tag$a, /* b */ c$tag$, y = 2;"));
+}

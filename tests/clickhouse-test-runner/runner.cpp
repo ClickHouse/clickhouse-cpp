@@ -277,16 +277,16 @@ void Runner::AfterSuccess(const std::string& sql) {
 
 namespace {
 
-// Replaces each comment that is not in a quoted string with one space.
+// Replaces each comment that is not in a quoted string or a heredoc with one space.
 std::string RemoveComments(std::string_view text) {
     std::string out;
     out.reserve(text.size());
     for (size_t i = 0; i < text.size();) {
-        const char c = text[i];
-        if (c == '\'' || c == '"' || c == '`') {
-            const size_t end = SkipQuoted(text, i);
-            out.append(text.substr(i, end - i));
-            i = end;
+        const char c       = text[i];
+        const size_t quote = c == '\'' || c == '"' || c == '`' ? SkipQuoted(text, i) : c == '$' ? HeredocEnd(text, i) : 0;
+        if (quote > 0) {
+            out.append(text.substr(i, quote - i));
+            i = quote;
         } else if (LineCommentAt(text, i)) {
             out += ' ';
             i = SkipLineComment(text, i);
@@ -332,6 +332,8 @@ std::vector<std::pair<std::string, std::string>> ParseSetAssignments(const std::
         const char c = body[j];
         if (c == '\'' || c == '"' || c == '`') {
             j = SkipQuoted(body, j) - 1;
+        } else if (c == '$' && HeredocEnd(body, j) > 0) {
+            j = HeredocEnd(body, j) - 1;
         } else if (c == '(' || c == '[') {
             ++depth;
         } else if (c == ')' || c == ']') {
