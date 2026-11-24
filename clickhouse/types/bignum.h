@@ -39,10 +39,11 @@
 
 #if CH_USE_ABSEIL_FOR_BIGNUM
 
-#ifdef CLICKHOUSE_CPP_INSTALLED_VENDORED_ABSEIL
-#include "../detail/absl/numeric/int128.h"
-#else
 #include "absl/numeric/int128.h"
+
+#if defined(CLICKHOUSE_CPP_INSTALLED_ABSEIL_WITHOUT_INLINE_NAMESPACE) && \
+    (!defined(ABSL_OPTION_USE_INLINE_NAMESPACE) || ABSL_OPTION_USE_INLINE_NAMESPACE != 0)
+#error "The installed clickhouse-cpp library requires matching Abseil headers without an inline namespace"
 #endif
 
 namespace clickhouse {

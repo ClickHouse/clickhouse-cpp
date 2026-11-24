@@ -54,9 +54,14 @@ The individual options can still be set one at a time for a gradual migration; h
 
 After `cmake --install`, the installed headers select the same Int128 types and
 `GetCurrentEndpoint()` return type as the installed library. Programs built without CMake
-can include these headers without defining the API options. The installation keeps any
-vendored Abseil headers under `include/clickhouse`. A build configured with
-`WITH_SYSTEM_ABSEIL=ON` uses the corresponding external Abseil headers and library.
+can include these headers without defining the API options.
+
+For an Abseil-backed library, use the same Abseil headers and library that were used to
+build clickhouse-cpp. For the bundled build, add `contrib/absl` from the matching source
+checkout to your compiler's include path. A bundled static build installs the
+`absl_int128` archive. With `WITH_SYSTEM_ABSEIL=ON`, use the system Abseil that
+clickhouse-cpp was built against. Set `CH_USE_ABSEIL_FOR_BIGNUM=OFF` when building
+clickhouse-cpp to use the self-contained 128-bit types.
 
 Please refer to the workflows for the reference on dependencies/build options
 - https://github.com/ClickHouse/clickhouse-cpp/blob/master/.github/workflows/linux.yml

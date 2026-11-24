@@ -58,6 +58,10 @@ from that same installation. The installed headers carry the API options used
 to build the library, so applications built outside CMake get the correct
 `Int128` types and `GetCurrentEndpoint()` return type.
 
+If the installation uses Abseil for 128-bit integers, add the matching Abseil
+headers and library to your application build. For the bundled build, the
+headers are under `contrib/absl` in the source checkout used to build the library.
+
 ## Examples {#examples}
 
 ### Setting the client object {#example-setup-client}

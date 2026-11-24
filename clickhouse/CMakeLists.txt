@@ -217,27 +217,13 @@ ENDIF()
 SET (CLICKHOUSE_CPP_INSTALLED_USE_ABSEIL_FOR_BIGNUM ${CH_USE_ABSEIL_FOR_BIGNUM})
 SET (CLICKHOUSE_CPP_INSTALLED_NON_OPTIONAL_CURRENT_ENDPOINT ${CH_NON_OPTIONAL_CURRENT_ENDPOINT})
 
+SET (CLICKHOUSE_CPP_INSTALLED_ABSEIL_WITHOUT_INLINE_NAMESPACE OFF)
 IF (CH_USE_ABSEIL_FOR_BIGNUM AND NOT WITH_SYSTEM_ABSEIL)
-    SET (CLICKHOUSE_CPP_INSTALLED_VENDORED_ABSEIL ON)
-    SET (absl_root "${PROJECT_SOURCE_DIR}/contrib/absl")
-    FILE (GLOB_RECURSE absl_headers CONFIGURE_DEPENDS RELATIVE "${absl_root}"
-        "${absl_root}/absl/*.h" "${absl_root}/absl/*.inc"
+    SET (absl_options "${PROJECT_SOURCE_DIR}/contrib/absl/absl/base/options.h")
+    SET_PROPERTY (DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${absl_options}")
+    FILE (STRINGS "${absl_options}" CLICKHOUSE_CPP_INSTALLED_ABSEIL_WITHOUT_INLINE_NAMESPACE
+        REGEX "^#define[ \t]+ABSL_OPTION_USE_INLINE_NAMESPACE[ \t]+0([ \t]|$)"
     )
-    # Keep the vendored headers under clickhouse's include directory. Use relative includes
-    # within that copy so consumers need only the normal installed include directory.
-    FOREACH (header IN LISTS absl_headers)
-        GET_FILENAME_COMPONENT (header_dir "${header}" DIRECTORY)
-        FILE (RELATIVE_PATH absl_include_root "${absl_root}/${header_dir}" "${absl_root}")
-        STRING (REGEX REPLACE "/+$" "" absl_include_root "${absl_include_root}")
-        SET_PROPERTY (DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${absl_root}/${header}")
-        FILE (READ "${absl_root}/${header}" contents)
-        STRING (REPLACE "#include \"absl/" "#include \"${absl_include_root}/absl/" contents "${contents}")
-        SET (installed_header "${CMAKE_CURRENT_BINARY_DIR}/installed_abseil/${header}")
-        FILE (GENERATE OUTPUT "${installed_header}" CONTENT "${contents}")
-        INSTALL (FILES "${installed_header}" DESTINATION "include/clickhouse/detail/${header_dir}")
-    ENDFOREACH ()
-ELSE ()
-    SET (CLICKHOUSE_CPP_INSTALLED_VENDORED_ABSEIL OFF)
 ENDIF ()
 
 CONFIGURE_FILE (installed_api.h.in installed_api.h @ONLY)
