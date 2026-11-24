@@ -53,6 +53,11 @@ After the dependency is made available, link your target against the exported li
 target_link_libraries(your-target PRIVATE clickhouse-cpp-lib)
 ```
 
+If you install the library with `cmake --install`, use the headers and library
+from that same installation. The installed headers carry the API options used
+to build the library, so applications built outside CMake get the correct
+`Int128` types and `GetCurrentEndpoint()` return type.
+
 ## Examples {#examples}
 
 ### Setting the client object {#example-setup-client}

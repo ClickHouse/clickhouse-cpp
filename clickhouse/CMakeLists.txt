@@ -214,11 +214,40 @@ IF (NOT BUILD_SHARED_LIBS)
     ENDIF()
 ENDIF()
 
+SET (CLICKHOUSE_CPP_INSTALLED_USE_ABSEIL_FOR_BIGNUM ${CH_USE_ABSEIL_FOR_BIGNUM})
+SET (CLICKHOUSE_CPP_INSTALLED_NON_OPTIONAL_CURRENT_ENDPOINT ${CH_NON_OPTIONAL_CURRENT_ENDPOINT})
+
+IF (CH_USE_ABSEIL_FOR_BIGNUM AND NOT WITH_SYSTEM_ABSEIL)
+    SET (CLICKHOUSE_CPP_INSTALLED_VENDORED_ABSEIL ON)
+    SET (absl_root "${PROJECT_SOURCE_DIR}/contrib/absl")
+    FILE (GLOB_RECURSE absl_headers CONFIGURE_DEPENDS RELATIVE "${absl_root}"
+        "${absl_root}/absl/*.h" "${absl_root}/absl/*.inc"
+    )
+    # Keep the vendored headers under clickhouse's include directory. Use relative includes
+    # within that copy so consumers need only the normal installed include directory.
+    FOREACH (header IN LISTS absl_headers)
+        GET_FILENAME_COMPONENT (header_dir "${header}" DIRECTORY)
+        FILE (RELATIVE_PATH absl_include_root "${absl_root}/${header_dir}" "${absl_root}")
+        STRING (REGEX REPLACE "/+$" "" absl_include_root "${absl_include_root}")
+        SET_PROPERTY (DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${absl_root}/${header}")
+        FILE (READ "${absl_root}/${header}" contents)
+        STRING (REPLACE "#include \"absl/" "#include \"${absl_include_root}/absl/" contents "${contents}")
+        SET (installed_header "${CMAKE_CURRENT_BINARY_DIR}/installed_abseil/${header}")
+        FILE (GENERATE OUTPUT "${installed_header}" CONTENT "${contents}")
+        INSTALL (FILES "${installed_header}" DESTINATION "include/clickhouse/detail/${header_dir}")
+    ENDFOREACH ()
+ELSE ()
+    SET (CLICKHOUSE_CPP_INSTALLED_VENDORED_ABSEIL OFF)
+ENDIF ()
+
+CONFIGURE_FILE (installed_api.h.in installed_api.h @ONLY)
+
 # general
 INSTALL(FILES block.h DESTINATION include/clickhouse/)
 INSTALL(FILES client.h DESTINATION include/clickhouse/)
 INSTALL(FILES error_codes.h DESTINATION include/clickhouse/)
 INSTALL(FILES exceptions.h DESTINATION include/clickhouse/)
+INSTALL(FILES "${CMAKE_CURRENT_BINARY_DIR}/installed_api.h" DESTINATION include/clickhouse/)
 INSTALL(FILES server_exception.h DESTINATION include/clickhouse/)
 INSTALL(FILES protocol.h DESTINATION include/clickhouse/)
 INSTALL(FILES query.h DESTINATION include/clickhouse/)

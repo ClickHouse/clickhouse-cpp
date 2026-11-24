@@ -52,6 +52,12 @@ Enabling this option is equivalent to setting the following individual options:
 The individual options can still be set one at a time for a gradual migration; however, when
 `CH_USE_3X_API=ON` is given, setting any of them to a conflicting value is a configuration error.
 
+After `cmake --install`, the installed headers select the same Int128 types and
+`GetCurrentEndpoint()` return type as the installed library. Programs built without CMake
+can include these headers without defining the API options. The installation keeps any
+vendored Abseil headers under `include/clickhouse`. A build configured with
+`WITH_SYSTEM_ABSEIL=ON` uses the corresponding external Abseil headers and library.
+
 Please refer to the workflows for the reference on dependencies/build options
 - https://github.com/ClickHouse/clickhouse-cpp/blob/master/.github/workflows/linux.yml
 - https://github.com/ClickHouse/clickhouse-cpp/blob/master/.github/workflows/windows_msvc.yml

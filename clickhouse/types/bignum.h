@@ -1,5 +1,9 @@
 #pragma once
 
+#if __has_include("../installed_api.h")
+#include "../installed_api.h"
+#endif
+
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -35,7 +39,11 @@
 
 #if CH_USE_ABSEIL_FOR_BIGNUM
 
+#ifdef CLICKHOUSE_CPP_INSTALLED_VENDORED_ABSEIL
+#include "../detail/absl/numeric/int128.h"
+#else
 #include "absl/numeric/int128.h"
+#endif
 
 namespace clickhouse {
 
