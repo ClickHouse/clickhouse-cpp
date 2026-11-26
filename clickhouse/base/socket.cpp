@@ -132,29 +132,24 @@ void SetNonBlock(SOCKET fd, bool value) {
 #endif
 }
 
-void SetTimeout(SOCKET fd, const SocketTimeoutParams& timeout_params) {
+/// Sets SO_RCVTIMEO or SO_SNDTIMEO.
+void SetTimeout(SOCKET fd, int option, std::chrono::milliseconds timeout) {
 #if defined(_unix_)
-    timeval recv_timeout{ static_cast<time_t>(timeout_params.recv_timeout.count() / 1000), static_cast<suseconds_t>(timeout_params.recv_timeout.count() % 1000 * 1000) };
-    auto recv_ret = setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &recv_timeout, sizeof(recv_timeout));
-
-    timeval send_timeout{ static_cast<time_t>(timeout_params.send_timeout.count() / 1000), static_cast<suseconds_t>(timeout_params.send_timeout.count() % 1000 * 1000) };
-    auto send_ret = setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &send_timeout, sizeof(send_timeout));
-
-    if (recv_ret == -1 || send_ret == -1) {
-        throw std::system_error(getSocketErrorCode(), getErrorCategory(), "fail to set socket timeout");
-    }
+    timeval value{ static_cast<time_t>(timeout.count() / 1000), static_cast<suseconds_t>(timeout.count() % 1000 * 1000) };
+    const bool failed = setsockopt(fd, SOL_SOCKET, option, &value, sizeof(value)) == -1;
 #else
-    DWORD recv_timeout = static_cast<DWORD>(timeout_params.recv_timeout.count());
-    auto recv_ret = setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&recv_timeout, sizeof(DWORD));
-   
-    DWORD send_timeout = static_cast<DWORD>(timeout_params.send_timeout.count());
-    auto send_ret = setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, (const char*)&send_timeout, sizeof(DWORD));
-    
-    if (recv_ret == SOCKET_ERROR || send_ret == SOCKET_ERROR) {
+    DWORD value = static_cast<DWORD>(timeout.count());
+    const bool failed = setsockopt(fd, SOL_SOCKET, option, (const char*)&value, sizeof(DWORD)) == SOCKET_ERROR;
+#endif
+    if (failed) {
         throw std::system_error(getSocketErrorCode(), getErrorCategory(), "fail to set socket timeout");
     }
-#endif
-};
+}
+
+void SetTimeout(SOCKET fd, const SocketTimeoutParams& timeout_params) {
+    SetTimeout(fd, SO_RCVTIMEO, timeout_params.recv_timeout);
+    SetTimeout(fd, SO_SNDTIMEO, timeout_params.send_timeout);
+}
 
 ssize_t Poll(struct pollfd* fds, int nfds, int timeout) noexcept {
 #if defined(_win_)
@@ -313,6 +308,8 @@ const std::string & NetworkAddress::Host() const {
 
 SocketBase::~SocketBase() = default;
 
+void SocketBase::SetRecvTimeout(std::chrono::milliseconds /*timeout*/) {}
+
 
 SocketFactory::~SocketFactory() = default;
 
@@ -382,6 +379,10 @@ void Socket::SetTcpNoDelay(bool nodelay) noexcept {
 #else
     setsockopt(handle_, IPPROTO_TCP, TCP_NODELAY, (const char*)&val, sizeof(val));
 #endif
+}
+
+void Socket::SetRecvTimeout(std::chrono::milliseconds timeout) {
+    SetTimeout(handle_, SO_RCVTIMEO, timeout);
 }
 
 std::unique_ptr<InputStream> Socket::makeInputStream() const {

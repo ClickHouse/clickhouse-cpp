@@ -8,6 +8,7 @@
 
 #include "readonly_client_test.h"
 #include "connection_failed_client_test.h"
+#include "tcp_server.h"
 #include "test_socket_factory_adapters.h"
 #include "ut/utils_comparison.h"
 #include "utils.h"
@@ -16,6 +17,7 @@
 
 #include <gtest/gtest.h>
 
+#include <future>
 #include <memory>
 #include <optional>
 #include <ostream>
@@ -1984,6 +1986,49 @@ TEST(ResetConnectionEndpointTest, ReconnectsCurrentBeforeFailover) {
     client.ResetConnectionEndpoint();
     EXPECT_EQ(primary, CurrentEndpoint(client));
     EXPECT_EQ((std::vector<Endpoint>{secondary, primary}), adapter->ConnectRequests());
+}
+
+TEST(HandshakeTimeoutTest, FailsOverFromSilentServer) {
+    using namespace std::chrono_literals;
+
+    const int port = 19982;
+    // The server accepts connections (through the listen backlog), but never sends data.
+    LocalTcpServer silent_server(port);
+    silent_server.start();
+
+    const Endpoint silent_endpoint{"127.0.0.1", static_cast<uint16_t>(port)};
+    const Endpoint actual_endpoint{LocalHostEndpoint.host, LocalHostEndpoint.port};
+    ClientOptions options(LocalHostEndpoint);
+    options.SetHost("");
+    options.SetEndpoints({silent_endpoint, actual_endpoint});
+    options.SetConnectionHandshakeTimeout(500ms);
+
+    auto result = std::async(std::launch::async, [&options] {
+        Client client(options);
+        return CurrentEndpoint(client);
+    });
+    const bool returned = result.wait_for(10s) == std::future_status::ready;
+    if (!returned) {
+        // Closing the listening socket resets the connection, so that the client returns.
+        silent_server.stop();
+    }
+    ASSERT_TRUE(returned) << "the client still waits for the Hello packet of the silent server";
+    EXPECT_EQ(actual_endpoint, result.get());
+}
+
+TEST(HandshakeTimeoutTest, DoesNotApplyAfterHandshake) {
+    using namespace std::chrono_literals;
+
+    Client client(ClientOptions(LocalHostEndpoint).SetConnectionHandshakeTimeout(200ms));
+
+    // With interactive_delay (in microseconds) longer than the query, the server sends no packet while the query runs.
+    Query query("SELECT sleep(1)");
+    query.SetSetting("interactive_delay", QuerySettingsField{"10000000", QuerySettingsField::IMPORTANT});
+    size_t rows = 0;
+    query.OnData([&rows](const Block& block) { rows += block.GetRowCount(); });
+
+    EXPECT_NO_THROW(client.Select(query));
+    EXPECT_EQ(1u, rows);
 }
 
 TEST_P(ResetConnectionTestCase, ResetConnectionTest) {

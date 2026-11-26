@@ -80,6 +80,10 @@ public:
 
     virtual std::unique_ptr<InputStream> makeInputStream() const = 0;
     virtual std::unique_ptr<OutputStream> makeOutputStream() const = 0;
+
+    /// Sets the timeout of each receive operation. If the timeout is zero, a receive operation never times out.
+    /// The client calls it to apply ClientOptions::connection_handshake_timeout. The default implementation does nothing.
+    virtual void SetRecvTimeout(std::chrono::milliseconds timeout);
 };
 
 
@@ -119,6 +123,8 @@ public:
 
     /// @params nodelay whether to enable TCP_NODELAY
     void SetTcpNoDelay(bool nodelay) noexcept;
+
+    void SetRecvTimeout(std::chrono::milliseconds timeout) override;
 
     std::unique_ptr<InputStream> makeInputStream() const override;
     std::unique_ptr<OutputStream> makeOutputStream() const override;

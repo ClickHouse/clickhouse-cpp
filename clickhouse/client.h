@@ -122,6 +122,14 @@ struct ClientOptions {
     DECLARE_FIELD(connection_recv_timeout, std::chrono::milliseconds, SetConnectionRecvTimeout, std::chrono::milliseconds(0));
     DECLARE_FIELD(connection_send_timeout, std::chrono::milliseconds, SetConnectionSendTimeout, std::chrono::milliseconds(0));
 
+    /** Receive timeout during the handshake (the exchange of Hello packets after the connection is established).
+     *  The timeout applies to each receive operation, like connection_recv_timeout. The handshake uses the shorter of the two
+     *  timeouts. If the timeout is set to zero, the handshake uses connection_recv_timeout only.
+     *  After the handshake, the client sets connection_recv_timeout again.
+     *  With a custom SocketFactory, the timeout has an effect only if its sockets override SocketBase::SetRecvTimeout().
+     */
+    DECLARE_FIELD(connection_handshake_timeout, std::chrono::milliseconds, SetConnectionHandshakeTimeout, std::chrono::seconds(10));
+
     /** It helps to ease migration of the old codebases, which can't afford to switch
     * to using ColumnLowCardinalityT or ColumnLowCardinality directly,
     * but still want to benefit from smaller on-wire LowCardinality bandwidth footprint.
