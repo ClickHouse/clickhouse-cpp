@@ -2,12 +2,16 @@
 #include <clickhouse/base/input.h>
 #include <clickhouse/base/output.h>
 #include <clickhouse/base/socket.h>
+#include <clickhouse/columns/numeric.h>
 #include <clickhouse/exceptions.h>
 
 #include <gtest/gtest.h>
 
+#include <chrono>
 #include <cstdint>
+#include <initializer_list>
 #include <memory>
+#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -19,9 +23,21 @@ using namespace clickhouse;
 /// and discards (but keeps) everything written by the client.
 class ScriptedSocket : public SocketBase {
 public:
-    explicit ScriptedSocket(std::vector<uint8_t> script)
+    /// If `open_sockets` is set, the socket increments it while it exists.
+    explicit ScriptedSocket(std::vector<uint8_t> script, size_t* open_sockets = nullptr)
         : script_(std::move(script))
-    {}
+        , open_sockets_(open_sockets)
+    {
+        if (open_sockets_) {
+            ++*open_sockets_;
+        }
+    }
+
+    ~ScriptedSocket() override {
+        if (open_sockets_) {
+            --*open_sockets_;
+        }
+    }
 
     std::unique_ptr<InputStream> makeInputStream() const override {
         return std::make_unique<ArrayInput>(script_.data(), script_.size());
@@ -34,6 +50,7 @@ public:
 private:
     const std::vector<uint8_t> script_;
     mutable std::vector<uint8_t> written_;
+    size_t* const open_sockets_;
 };
 
 class ScriptedSocketFactory : public SocketFactory {
@@ -63,6 +80,32 @@ public:
 private:
     const std::vector<std::vector<uint8_t>> scripts_;
     size_t next_ = 0;
+};
+
+struct ConnectionCounters {
+    size_t opened = 0;
+    size_t open   = 0;
+};
+
+/// Serves the scripts in order, one per connection, and counts the connections.
+/// The counters must outlive the factory.
+class CountingSocketFactory : public SocketFactory {
+public:
+    CountingSocketFactory(std::vector<std::vector<uint8_t>> scripts, ConnectionCounters& counters)
+        : scripts_(std::move(scripts))
+        , counters_(counters)
+    {}
+
+    std::unique_ptr<SocketBase> connect(const ClientOptions&, const Endpoint&) override {
+        if (counters_.opened >= scripts_.size()) {
+            throw std::system_error(std::make_error_code(std::errc::connection_refused));
+        }
+        return std::make_unique<ScriptedSocket>(scripts_[counters_.opened++], &counters_.open);
+    }
+
+private:
+    const std::vector<std::vector<uint8_t>> scripts_;
+    ConnectionCounters& counters_;
 };
 
 ClientOptions ScriptedClientOptions() {
@@ -113,6 +156,91 @@ const std::vector<uint8_t> kWellFormedExceptionPacket = {
     0x00,                         // stack_trace: "" (string, len 0)
     0x00,                         // has_nested = false (fixed, 1 byte)
 };
+
+const std::vector<uint8_t> kEndOfStreamPacket = {
+    0x05, // packet type: ServerCodes::EndOfStream (varint)
+};
+
+const std::vector<uint8_t> kPongPacket = {
+    0x04, // packet type: ServerCodes::Pong (varint)
+};
+
+/// A Progress packet as a server at revision 50000 sends it.
+const std::vector<uint8_t> kProgressPacket = {
+    0x03, // packet type: ServerCodes::Progress (varint)
+    0x00, // rows = 0 (varint)
+    0x00, // bytes = 0 (varint)
+    0x00, // total_rows = 0 (varint)
+};
+
+/// A Progress packet with a malformed `rows` varint: the continuation bit
+/// never clears.
+const std::vector<uint8_t> kCorruptProgressPacket = {
+    0x03,                                                       // packet type: ServerCodes::Progress (varint)
+    0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, // rows (varint, malformed)
+};
+
+/// Thrown by test callbacks. No library exception has this type.
+struct CallbackError {};
+
+/// A Data packet with one row in the UInt8 column `x`, as a server at
+/// revision 50000 sends it.
+std::vector<uint8_t> DataPacket(uint8_t x) {
+    return {
+        0x01,                                // packet type: ServerCodes::Data (varint)
+        0x01,                                // num_columns = 1 (varint)
+        0x01,                                // num_rows = 1 (varint)
+        0x01, 0x78,                          // column name: "x" (string, len 1)
+        0x05, 0x55, 0x49, 0x6E, 0x74, 0x38,  // column type: "UInt8" (string, len 5)
+        x,                                   // value (fixed, 1 byte)
+    };
+}
+
+std::vector<uint8_t> Concat(std::initializer_list<std::vector<uint8_t>> parts) {
+    std::vector<uint8_t> result;
+    for (const auto& part : parts) {
+        result.insert(result.end(), part.begin(), part.end());
+    }
+    return result;
+}
+
+/// Runs a Select and returns all values of the column `x`.
+std::vector<uint8_t> SelectX(Client& client) {
+    std::vector<uint8_t> values;
+    client.Select("SELECT x", [&values](const Block& block) {
+        for (size_t i = 0; i < block.GetRowCount(); ++i) {
+            values.push_back(block[0]->AsStrict<ColumnUInt8>()->At(i));
+        }
+    });
+    return values;
+}
+
+/// The first connection serves `first_script`, and `operation` must throw
+/// `ExpectedException`. A failure in the middle of a request or a response
+/// makes the connection unusable: the native protocol does not tell the size
+/// of a packet, so the client cannot find where the next packet starts.
+/// Thus, the client must close that connection at once, and the next query
+/// must get its response from a new connection.
+template <typename ExpectedException, typename Operation>
+void ExpectFailureClosesConnection(const std::vector<uint8_t>& first_script, Operation operation) {
+    ConnectionCounters connections;
+    Client client(ScriptedClientOptions(),
+                  std::make_unique<CountingSocketFactory>(
+                      std::vector<std::vector<uint8_t>>{
+                          first_script,
+                          Concat({kServerHello, DataPacket(2), kEndOfStreamPacket}),
+                      },
+                      connections));
+
+    EXPECT_THROW(operation(client), ExpectedException);
+    EXPECT_FALSE(client.IsSelecting());
+    EXPECT_FALSE(client.IsInserting());
+    EXPECT_EQ(connections.open, 0u);
+
+    EXPECT_EQ(SelectX(client), std::vector<uint8_t>{2});
+    EXPECT_EQ(connections.opened, 2u);
+    EXPECT_EQ(connections.open, 1u);
+}
 
 /// Performs the handshake against kServerHello, then runs a Select that
 /// receives `response` and expects a ProtocolError containing
@@ -337,4 +465,190 @@ TEST(ClientProtocol, ProfileInfoFlagsAcceptAnyNonZeroByte) {
     EXPECT_EQ(flags[0].second, 0u);
     EXPECT_EQ(flags[1].first, 0u);
     EXPECT_EQ(flags[1].second, 1u);
+}
+
+TEST(ClientProtocol, DataCallbackExceptionClosesConnection) {
+    // The callback fails on the first block. The second block and
+    // EndOfStream stay unread.
+    ExpectFailureClosesConnection<CallbackError>(
+        Concat({kServerHello, DataPacket(1), DataPacket(1), kEndOfStreamPacket}),
+        [](Client& client) {
+            client.Select("SELECT x", [](const Block&) { throw CallbackError{}; });
+        });
+}
+
+TEST(ClientProtocol, UnsupportedPacketClosesConnection) {
+    std::vector<uint8_t> totals = DataPacket(1);
+    totals[0] = 0x07; // packet type: ServerCodes::Totals (varint)
+    ExpectFailureClosesConnection<UnimplementedError>(
+        Concat({kServerHello, totals, kEndOfStreamPacket}),
+        [](Client& client) { SelectX(client); });
+}
+
+TEST(ClientProtocol, CorruptPacketClosesConnection) {
+    ExpectFailureClosesConnection<ProtocolError>(
+        Concat({kServerHello, kCorruptProgressPacket, DataPacket(1), kEndOfStreamPacket}),
+        [](Client& client) { SelectX(client); });
+}
+
+TEST(ClientProtocol, UnexpectedHelloPacketClosesConnection) {
+    // A Hello packet is valid only in the handshake. The client must not read
+    // its payload as more packets.
+    ExpectFailureClosesConnection<ProtocolError>(
+        Concat({kServerHello, kServerHello, DataPacket(1), kEndOfStreamPacket}),
+        [](Client& client) { SelectX(client); });
+}
+
+TEST(ClientProtocol, NestedServerExceptionClosesConnection) {
+    // The client does not read nested exceptions, so their data stays unread.
+    std::vector<uint8_t> exception = kWellFormedExceptionPacket;
+    exception.back() = 0x01; // has_nested = true
+    // The nested exception has the same fields, without the packet type.
+    const std::vector<uint8_t> nested(kWellFormedExceptionPacket.begin() + 1, kWellFormedExceptionPacket.end());
+    ExpectFailureClosesConnection<ServerException>(
+        Concat({kServerHello, exception, nested, DataPacket(1), kEndOfStreamPacket}),
+        [](Client& client) { SelectX(client); });
+}
+
+TEST(ClientProtocol, PingWithUnexpectedPacketClosesConnection) {
+    // Ping reads one packet. The Pong after the Progress packet stays unread.
+    ExpectFailureClosesConnection<ProtocolError>(
+        Concat({kServerHello, kProgressPacket, kPongPacket}),
+        [](Client& client) { client.Ping(); });
+}
+
+TEST(ClientProtocol, PartlySentQueryClosesConnection) {
+    // A server at revision 50000 does not support query settings. The client
+    // finds this when it has already written a part of the query.
+    ExpectFailureClosesConnection<UnimplementedError>(
+        Concat({kServerHello, DataPacket(1), kEndOfStreamPacket}),
+        [](Client& client) {
+            Query query("SELECT x");
+            query.SetSetting("max_threads", {"1"});
+            client.Select(query);
+        });
+}
+
+TEST(ClientProtocol, CorruptPacketInBeginInsertClosesConnection) {
+    ExpectFailureClosesConnection<ProtocolError>(
+        Concat({kServerHello, kCorruptProgressPacket, DataPacket(1), kEndOfStreamPacket}),
+        [](Client& client) { client.BeginInsert(Query("INSERT INTO t VALUES")); });
+}
+
+TEST(ClientProtocol, CorruptPacketInEndInsertClosesConnection) {
+    // The Data packet gives the structure of the table to BeginInsert.
+    ExpectFailureClosesConnection<ProtocolError>(
+        Concat({kServerHello, DataPacket(1), kCorruptProgressPacket, kEndOfStreamPacket}),
+        [](Client& client) {
+            client.BeginInsert(Query("INSERT INTO t VALUES"));
+            client.EndInsert();
+        });
+}
+
+TEST(ClientProtocol, FailedHandshakeInResetConnectionClosesConnection) {
+    const std::vector<uint8_t> corrupt_hello = {
+        0x00,                         // packet type: ServerCodes::Hello (varint)
+        0xFF, 0xFF, 0xFF, 0xFF, 0x0F, // server-name string length = 0xFFFFFFFF (varint),
+                                      // exceeds the 0x00FFFFFF limit in WireFormat::ReadString
+    };
+    ConnectionCounters connections;
+    Client client(ScriptedClientOptions(),
+                  std::make_unique<CountingSocketFactory>(
+                      std::vector<std::vector<uint8_t>>{
+                          kServerHello,
+                          Concat({corrupt_hello, DataPacket(1), kEndOfStreamPacket}),
+                          Concat({kServerHello, DataPacket(2), kEndOfStreamPacket}),
+                      },
+                      connections));
+
+    EXPECT_THROW(client.ResetConnection(), ProtocolError);
+    EXPECT_EQ(connections.open, 0u);
+
+    EXPECT_EQ(SelectX(client), std::vector<uint8_t>{2});
+    EXPECT_EQ(connections.opened, 3u);
+}
+
+TEST(ClientProtocol, ServerExceptionKeepsConnection) {
+    // An exception packet ends the response, so the connection stays usable.
+    // This applies to queries and to inserts.
+    const auto check = [](auto operation) {
+        ConnectionCounters connections;
+        Client client(ScriptedClientOptions(),
+                      std::make_unique<CountingSocketFactory>(
+                          std::vector<std::vector<uint8_t>>{
+                              Concat({kServerHello, kWellFormedExceptionPacket, DataPacket(1), kEndOfStreamPacket}),
+                          },
+                          connections));
+
+        EXPECT_THROW(operation(client), ServerException);
+        EXPECT_FALSE(client.IsSelecting());
+        EXPECT_FALSE(client.IsInserting());
+
+        EXPECT_EQ(SelectX(client), std::vector<uint8_t>{1});
+        EXPECT_EQ(connections.opened, 1u);
+    };
+
+    check([](Client& client) { SelectX(client); });
+    check([](Client& client) { client.BeginInsert(Query("INSERT INTO t VALUES")); });
+}
+
+TEST(ClientProtocol, PingBeforeQueryMakesOneConnectionAttemptPerRetry) {
+    // The first connection breaks after the handshake. All later connection
+    // attempts fail.
+    class ResetAfterHelloInput : public InputStream {
+    public:
+        ResetAfterHelloInput() : hello_(kServerHello.data(), kServerHello.size()) {}
+        bool Skip(size_t) override { return false; }
+
+    protected:
+        size_t DoRead(void* buf, size_t len) override {
+            if (const size_t read = hello_.Read(buf, len)) {
+                return read;
+            }
+            throw std::system_error(std::make_error_code(std::errc::connection_reset));
+        }
+
+    private:
+        ArrayInput hello_;
+    };
+
+    class ResetAfterHelloSocket : public SocketBase {
+    public:
+        std::unique_ptr<InputStream> makeInputStream() const override {
+            return std::make_unique<ResetAfterHelloInput>();
+        }
+        std::unique_ptr<OutputStream> makeOutputStream() const override {
+            return std::make_unique<BufferOutput>(&written_);
+        }
+
+    private:
+        mutable std::vector<uint8_t> written_;
+    };
+
+    class Factory : public SocketFactory {
+    public:
+        explicit Factory(size_t& connects) : connects_(connects) {}
+        std::unique_ptr<SocketBase> connect(const ClientOptions&, const Endpoint&) override {
+            if (connects_++ > 0) {
+                throw std::system_error(std::make_error_code(std::errc::connection_refused));
+            }
+            return std::make_unique<ResetAfterHelloSocket>();
+        }
+
+    private:
+        size_t& connects_;
+    };
+
+    const unsigned int send_retries = 3;
+    size_t connects = 0;
+    Client client(ScriptedClientOptions()
+                      .SetPingBeforeQuery(true)
+                      .SetSendRetries(send_retries)
+                      .SetRetryTimeout(std::chrono::seconds(0)),
+                  std::make_unique<Factory>(connects));
+
+    EXPECT_THROW(client.Execute("SELECT 1"), std::system_error);
+    // The first connection, (send_retries - 1) retries to the same endpoint,
+    // then send_retries attempts for the one endpoint during failover.
+    EXPECT_EQ(connects, 1u + (send_retries - 1) + send_retries);
 }

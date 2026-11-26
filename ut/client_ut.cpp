@@ -1816,6 +1816,31 @@ TEST_P(ClientCase, InteractiveSelect_WithCallbacks) {
     EXPECT_TRUE(progress_received);
 }
 
+TEST_P(ClientCase, CallbackExceptionDoesNotAffectNextQuery) {
+    // No library exception has this type.
+    struct CallbackError {};
+
+    // The callback fails on the first block, while most of the response is
+    // not received yet.
+    Query query("SELECT number FROM system.numbers LIMIT 100000");
+    query.SetSetting("max_block_size", {"100"});
+    query.OnData([](const Block& block) {
+        if (block.GetRowCount() > 0) {
+            throw CallbackError{};
+        }
+    });
+    EXPECT_THROW(client_->Execute(query), CallbackError);
+    EXPECT_FALSE(client_->IsSelecting());
+
+    std::vector<uint64_t> values;
+    client_->Select("SELECT toUInt64(42)", [&values](const Block& block) {
+        for (size_t i = 0; i < block.GetRowCount(); ++i) {
+            values.push_back(block[0]->AsStrict<ColumnUInt64>()->At(i));
+        }
+    });
+    EXPECT_EQ(values, std::vector<uint64_t>{42});
+}
+
 const auto LocalHostEndpoint = ClientOptions()
         .SetHost(           getEnvOrDefault("CLICKHOUSE_HOST",     "localhost"))
         .SetPort(   getEnvOrDefault<size_t>("CLICKHOUSE_PORT",     "9000"))

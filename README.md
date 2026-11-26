@@ -245,7 +245,9 @@ client->EndInsert();
 
 ## Retries
 If you wish to implement some retry logic atop of `clickhouse::Client` there are few simple rules to make you life easier:
-- If previous attempt threw an exception, then make sure to call `clickhouse::Client::ResetConnection()` before the next try.
+- You do not need to call `clickhouse::Client::ResetConnection()` before the next try. If an operation fails while a request or a response is partly transferred (for example, a network error occurs, a callback throws, or the client cannot decode a packet), the client closes the connection. The next operation opens a new connection to the same endpoint.
+- A server exception (`clickhouse::ServerException`) is the last packet of a response. Thus, after an operation fails with a server exception, the connection stays open.
+- A new connection does not keep the session state of the old one: temporary tables, the database set with `USE`, and settings set with `SET`. If your queries use this state, set it again before the next try.
 - For `clickhouse::Client::Insert()` you can reuse a block from previous try, no need to rebuild it from scratch.
 
 See https://github.com/ClickHouse/clickhouse-cpp/issues/184 for details.
