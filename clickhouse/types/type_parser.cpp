@@ -286,6 +286,11 @@ TypeParser::Token TypeParser::NextToken() {
                         scratch_ += '\'';
                         ++cur_;
                     }
+                    else if ('\'' == *cur_ && end_ - cur_ > 1 && *(cur_ + 1) == '\'') {
+                        // doubled quote is an escaped single quote
+                        scratch_ += '\'';
+                        ++cur_;
+                    }
                     else if ('\'' == *cur_) {
                         scratch_ += *(cur_++);
                         return Token{Token::QuotedString, StringView(scratch_)};

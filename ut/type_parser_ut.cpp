@@ -362,6 +362,19 @@ TEST(TypeParserCase, ParseTimezoneEscapedStrings) {
     }
 }
 
+TEST(TypeParserCase, ParseEnum_DoubledSingleQuote) {
+    TypeAst ast;
+    ASSERT_TRUE(TypeParser("Enum8('it''s' = 1, 'b' = 2)").Parse(&ast));
+    ASSERT_EQ(ast.meta, TypeAst::Enum);
+    ASSERT_EQ(ast.elements.size(), 4u);
+    EXPECT_EQ(ast.elements[0].value_string, "it's");
+    EXPECT_EQ(ast.elements[2].value_string, "b");
+
+    TypeAst edge;
+    ASSERT_TRUE(TypeParser("Enum8('''a''' = 1)").Parse(&edge));
+    EXPECT_EQ(edge.elements[0].value_string, "'a'");
+}
+
 TEST(TypeParserCase, ParseTimezone_AllEscapedBytes) {
     // {fragment as seen by the parser, expected decoded raw byte}
     const std::vector<std::pair<std::string, char>> cases = {
