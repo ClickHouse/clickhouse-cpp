@@ -275,13 +275,43 @@ void Runner::AfterSuccess(const std::string& sql) {
     }
 }
 
+namespace {
+
+// Replaces each comment that is not in a quoted string or a heredoc with one space.
+std::string RemoveComments(std::string_view text) {
+    std::string out;
+    out.reserve(text.size());
+    for (size_t i = 0; i < text.size();) {
+        const char c       = text[i];
+        const size_t quote = c == '\'' || c == '"' || c == '`' ? SkipQuoted(text, i) : c == '$' ? HeredocEnd(text, i) : 0;
+        if (quote > 0) {
+            out.append(text.substr(i, quote - i));
+            i = quote;
+        } else if (LineCommentAt(text, i)) {
+            out += ' ';
+            i = SkipLineComment(text, i);
+        } else if (text.substr(i, 2) == "/*") {
+            out += ' ';
+            i = SkipBlockComment(text, i);
+        } else {
+            out += c;
+            ++i;
+        }
+    }
+    return out;
+}
+
+}  // namespace
+
 std::vector<std::pair<std::string, std::string>> ParseSetAssignments(const std::string& sql) {
     std::vector<std::pair<std::string, std::string>> out;
     const size_t i = SkipWhitespaceAndComments(sql, 0) + 3;
     if (i > sql.size()) {
         return out;
     }
-    std::string_view body = TrimSpace(std::string_view(sql).substr(i));
+    // clickhouse-client ignores comments, also between the assignments.
+    const std::string text = RemoveComments(std::string_view(sql).substr(i));
+    std::string_view body  = TrimSpace(text);
     if (!body.empty() && body.back() == ';') {
         body.remove_suffix(1);
     }
@@ -302,6 +332,8 @@ std::vector<std::pair<std::string, std::string>> ParseSetAssignments(const std::
         const char c = body[j];
         if (c == '\'' || c == '"' || c == '`') {
             j = SkipQuoted(body, j) - 1;
+        } else if (c == '$' && HeredocEnd(body, j) > 0) {
+            j = HeredocEnd(body, j) - 1;
         } else if (c == '(' || c == '[') {
             ++depth;
         } else if (c == ')' || c == ']') {
