@@ -25,6 +25,8 @@
 
 #include "../exceptions.h"
 
+#include <limits>
+#include <optional>
 #include <stdexcept>
 #include <string>
 
@@ -157,6 +159,53 @@ static ColumnRef CreateTerminalColumn(const TypeAst& ast) {
     }
 }
 
+// Kept out of CreateColumnFromAst, which calls itself once per nesting level. The locals here would make
+// every level of that recursion use more stack in a build without optimization.
+static ColumnRef CreateEnumColumn(const TypeAst& ast) {
+    // The parser gives one flat list. Each quoted name is followed by its number if the name has one.
+    std::vector<std::pair<std::string, std::optional<int64_t>>> items;
+    for (const auto& element : ast.elements) {
+        if (element.meta == TypeAst::Terminal && element.code == Type::String && element.name.empty()) {
+            items.emplace_back(element.value_string, std::nullopt);
+        } else if (element.meta == TypeAst::Number && !items.empty() && !items.back().second.has_value()) {
+            items.back().second = element.value;
+        } else {
+            throw ValidationError(ast.name + " content is not correct");
+        }
+    }
+
+    // Do the same as the server. A name without a number gets the number of the first name plus its position.
+    // If the first name has no number, the count starts at 1. The names after the first must all have a number
+    // or all have no number.
+    const int64_t min_value = ast.code == Type::Enum8 ? std::numeric_limits<int8_t>::min() : std::numeric_limits<int16_t>::min();
+    const int64_t max_value = ast.code == Type::Enum8 ? std::numeric_limits<int8_t>::max() : std::numeric_limits<int16_t>::max();
+    std::vector<Type::EnumItem> enum_items;
+    enum_items.reserve(items.size());
+    for (size_t i = 0; i < items.size(); ++i) {
+        if (i > 1 && items[i].second.has_value() != items[1].second.has_value()) {
+            throw ValidationError(ast.name + " content is not correct");
+        }
+        // When i was 0, the range check ran for the first name, so this sum cannot overflow.
+        const int64_t value = items[i].second ? *items[i].second : items[0].second.value_or(1) + static_cast<int64_t>(i);
+        if (value < min_value || value > max_value) {
+            throw ValidationError("Value " + std::to_string(value) + " for '" + items[i].first + "' is out of range for " +
+                                  ast.name);
+        }
+        enum_items.emplace_back(items[i].first, static_cast<int16_t>(value));
+    }
+
+    if (ast.code == Type::Enum8) {
+        return std::make_shared<ColumnEnum8>(
+            Type::CreateEnum8(enum_items)
+        );
+    } else if (ast.code == Type::Enum16) {
+        return std::make_shared<ColumnEnum16>(
+            Type::CreateEnum16(enum_items)
+        );
+    }
+    return nullptr;
+}
+
 static ColumnRef CreateColumnFromAst(const TypeAst& ast, CreateColumnByTypeSettings settings) {
     switch (ast.meta) {
         case TypeAst::Array: {
@@ -202,32 +251,9 @@ static ColumnRef CreateColumnFromAst(const TypeAst& ast, CreateColumnByTypeSetti
             return std::make_shared<ColumnTuple>(columns);
         }
 
-        case TypeAst::Enum: {
-            std::vector<Type::EnumItem> enum_items;
-            //ast.elements.size() minimum is 1.
-            if ((ast.elements.size() % 2) != 0) {
-                throw ValidationError(ast.name + " content is not correct");
-            }
+        case TypeAst::Enum:
+            return CreateEnumColumn(ast);
 
-            enum_items.reserve(ast.elements.size() / 2);
-            for (size_t i = 0; i < ast.elements.size(); i += 2) {
-                enum_items.push_back(Type::EnumItem{
-                    ast.elements[i].value_string,
-                    static_cast<int16_t>(ast.elements[i + 1].value)
-                });
-            }
-
-            if (ast.code == Type::Enum8) {
-                return std::make_shared<ColumnEnum8>(
-                    Type::CreateEnum8(enum_items)
-                );
-            } else if (ast.code == Type::Enum16) {
-                return std::make_shared<ColumnEnum16>(
-                    Type::CreateEnum16(enum_items)
-                );
-            }
-            break;
-        }
         case TypeAst::LowCardinality: {
             const auto& nested = GetASTChildElement(ast, 0);
             if (settings.low_cardinality_as_wrapped_column) {

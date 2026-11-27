@@ -1,5 +1,6 @@
 #include <clickhouse/columns/bool.h>
 #include <clickhouse/columns/date.h>
+#include <clickhouse/columns/enum.h>
 #include <clickhouse/columns/factory.h>
 #include <clickhouse/columns/json.h>
 #include <clickhouse/columns/lowcardinality.h>
@@ -304,6 +305,58 @@ TEST(CreateColumnByType, EnumEscapedNames) {
     auto col                                     = CreateColumnByType("Enum8('can\\'t' = 1, 'a\\\\b' = 2, 'a,b=(c)' = 3, '' = 4)");
     ASSERT_NE(nullptr, col);
     ASSERT_TRUE(col->Type()->IsEqual(Type::CreateEnum8(enum_items)));
+}
+
+// Enum type names in which some or all names have no number. The expected type name is what the server
+// gives for the same text with SELECT toTypeName(defaultValueOfTypeName(type_name)).
+class CreateColumnByEnumTypeWithImplicitValues
+    : public ::testing::TestWithParam<std::tuple<const char* /*type*/, const char* /*expected type name*/>> {};
+
+TEST_P(CreateColumnByEnumTypeWithImplicitValues, CreateColumnByType) {
+    const auto& [type_name, expected_name] = GetParam();
+    const auto col                         = CreateColumnByType(type_name);
+    ASSERT_NE(nullptr, col) << "CreateColumnByType returned nullptr for " << type_name;
+    EXPECT_EQ(expected_name, col->GetType().GetName());
+}
+
+INSTANTIATE_TEST_SUITE_P(Enum, CreateColumnByEnumTypeWithImplicitValues,
+                         ::testing::Values(std::make_tuple("Enum8('ONE')", "Enum8('ONE' = 1)"),
+                                           std::make_tuple("Enum8('a', 'b')", "Enum8('a' = 1, 'b' = 2)"),
+                                           std::make_tuple("Enum8('a', 'b', 'c')", "Enum8('a' = 1, 'b' = 2, 'c' = 3)"),
+                                           std::make_tuple("Enum16('a', 'b')", "Enum16('a' = 1, 'b' = 2)"),
+                                           std::make_tuple("Enum8('ONE'=1,'TWO')", "Enum8('ONE' = 1, 'TWO' = 2)"),
+                                           std::make_tuple("Enum8('a' = 5, 'b', 'c')", "Enum8('a' = 5, 'b' = 6, 'c' = 7)"),
+                                           std::make_tuple("Enum8('a' = -3, 'b')", "Enum8('a' = -3, 'b' = -2)"),
+                                           std::make_tuple("Enum8('a' = -3, 'b', 'c')", "Enum8('a' = -3, 'b' = -2, 'c' = -1)"),
+                                           std::make_tuple("Enum8('a' = 0, 'b')", "Enum8('a' = 0, 'b' = 1)"),
+                                           std::make_tuple("Enum8('a', 'b' = 5)", "Enum8('a' = 1, 'b' = 5)"),
+                                           std::make_tuple("Enum8('a', 'b' = -1)", "Enum8('b' = -1, 'a' = 1)"),
+                                           std::make_tuple("Enum8('a' = 126, 'b')", "Enum8('a' = 126, 'b' = 127)"),
+                                           std::make_tuple("Enum8('a' = -128, 'b')", "Enum8('a' = -128, 'b' = -127)"),
+                                           std::make_tuple("Enum16('a' = 127, 'b')", "Enum16('a' = 127, 'b' = 128)"),
+                                           std::make_tuple("Enum16('a' = 32766, 'b')", "Enum16('a' = 32766, 'b' = 32767)"),
+                                           std::make_tuple("Enum8('A', 'a')", "Enum8('A' = 1, 'a' = 2)"),
+                                           std::make_tuple("Enum8('x=y', 'b')", "Enum8('x=y' = 1, 'b' = 2)"),
+                                           std::make_tuple("Enum8('a' = 1, 'x=y')", "Enum8('a' = 1, 'x=y' = 2)"),
+                                           std::make_tuple("Enum8('it\\'s', 'b')", "Enum8('it\\'s' = 1, 'b' = 2)"),
+                                           std::make_tuple("Nullable(Enum8('a', 'b'))", "Nullable(Enum8('a' = 1, 'b' = 2))"),
+                                           std::make_tuple("Array(Enum8('a', 'b'))", "Array(Enum8('a' = 1, 'b' = 2))"),
+                                           std::make_tuple("Map(String, Enum8('a', 'b'))", "Map(String, Enum8('a' = 1, 'b' = 2))"),
+                                           std::make_tuple("Tuple(Enum8('a', 'b'), Enum16('c' = 300, 'd'))",
+                                                           "Tuple(Enum8('a' = 1, 'b' = 2), Enum16('c' = 300, 'd' = 301))")));
+
+TEST(CreateColumnByType, EnumImplicitValuesAppend) {
+    const auto col = CreateColumnByType("Enum8('a' = -3, 'b', 'c')");
+    ASSERT_NE(nullptr, col);
+    const auto e = col->As<ColumnEnum8>();
+    ASSERT_NE(nullptr, e);
+
+    e->Append(std::string("c"));
+    e->Append(std::string("b"));
+    EXPECT_EQ(-1, e->At(0));
+    EXPECT_EQ("c", e->NameAt(0));
+    EXPECT_EQ(-2, e->At(1));
+    EXPECT_EQ("b", e->NameAt(1));
 }
 
 // Round-trip: build a Type from raw values, render it via GetName() (escape),
