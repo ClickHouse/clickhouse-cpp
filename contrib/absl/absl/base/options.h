@@ -72,6 +72,12 @@
 #ifdef __cplusplus
 #if __cplusplus >= 202002L
 #include <version>
+#elif defined(__has_include)
+#if __has_include(<version>)
+#include <version>
+#else
+#include <ciso646>
+#endif
 #else
 #include <ciso646>
 #endif
