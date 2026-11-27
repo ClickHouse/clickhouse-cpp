@@ -165,8 +165,16 @@ private:
         if constexpr (index == 0) {
             return;
         } else {
-            std::get<index - 1>(typed_columns_)->Append(std::move(std::get<index - 1>(value)));
-            AppendTuple<T, index - 1>(std::move(value));
+            auto& column = *std::get<index - 1>(typed_columns_);
+            const size_t initial_size = column.Size();
+            column.Append(std::move(std::get<index - 1>(value)));
+            try {
+                AppendTuple<T, index - 1>(std::move(value));
+            } catch (...) {
+                auto restored = column.Slice(0, initial_size);
+                column.Swap(*restored);
+                throw;
+            }
         }
     }
 

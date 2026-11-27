@@ -1,4 +1,5 @@
 #include <clickhouse/columns/array.h>
+#include <clickhouse/columns/map.h>
 #include <clickhouse/columns/tuple.h>
 #include <clickhouse/columns/date.h>
 #include <clickhouse/columns/time.h>
@@ -50,6 +51,78 @@ TEST(ColumnNullableT, AppendRollsBackNullFlagWhenNestedAppendThrows) {
     EXPECT_EQ(0u, column->Size());
     EXPECT_EQ(0u, column->Nulls()->Size());
     EXPECT_EQ(0u, column->Nested()->Size());
+}
+
+TEST(ColumnArrayT, AppendRollsBackNestedElementsWhenElementAppendThrows) {
+    auto column = std::make_shared<ColumnArrayT<ColumnFixedString>>(2);
+
+    column->Append(std::vector<std::string>{"aa"});
+    EXPECT_THROW(column->Append(std::vector<std::string>{"bb", "xxx"}), ValidationError);
+
+    EXPECT_EQ(1u, column->Size());
+    EXPECT_EQ(1u, column->GetData()->Size());
+
+    column->Append(std::vector<std::string>{"cc"});
+    EXPECT_EQ(2u, column->Size());
+    EXPECT_EQ(2u, column->GetData()->Size());
+    ASSERT_EQ(1u, column->At(1).size());
+    EXPECT_EQ("cc", column->At(1)[0]);
+
+    Buffer buf;
+    {
+        BufferOutput output(&buf);
+        ASSERT_NO_THROW(column->Save(&output));
+        output.Flush();
+    }
+
+    auto loaded = std::make_shared<ColumnArrayT<ColumnFixedString>>(2);
+    {
+        ArrayInput input(buf.data(), buf.size());
+        ASSERT_TRUE(loaded->Load(&input, column->Size()));
+        EXPECT_EQ(0u, input.Avail());
+    }
+    ASSERT_EQ(2u, loaded->Size());
+    EXPECT_EQ("aa", loaded->At(0)[0]);
+    EXPECT_EQ("cc", loaded->At(1)[0]);
+}
+
+TEST(ColumnTupleT, AppendRollsBackAppendedElementsWhenElementAppendThrows) {
+    auto column = std::make_shared<ColumnTupleT<ColumnFixedString, ColumnUInt8>>(
+        std::make_tuple(std::make_shared<ColumnFixedString>(2), std::make_shared<ColumnUInt8>()));
+
+    column->Append(std::make_tuple(std::string_view("aa"), uint8_t(10)));
+    EXPECT_THROW(column->Append(std::make_tuple(std::string_view("xxx"), uint8_t(20))), ValidationError);
+
+    EXPECT_EQ(1u, column->Size());
+    EXPECT_EQ(1u, column->ColumnTuple::At(0)->Size());
+    EXPECT_EQ(1u, column->ColumnTuple::At(1)->Size());
+
+    column->Append(std::make_tuple(std::string_view("cc"), uint8_t(30)));
+    EXPECT_EQ(2u, column->Size());
+    EXPECT_EQ(std::make_tuple(std::string_view("cc"), uint8_t(30)), column->At(1));
+
+    auto reversed = std::make_shared<ColumnTupleT<ColumnUInt8, ColumnFixedString>>(
+        std::make_tuple(std::make_shared<ColumnUInt8>(), std::make_shared<ColumnFixedString>(2)));
+    EXPECT_THROW(reversed->Append(std::make_tuple(uint8_t(10), std::string_view("xxx"))), ValidationError);
+    EXPECT_EQ(0u, reversed->Size());
+    EXPECT_EQ(0u, reversed->ColumnTuple::At(0)->Size());
+    EXPECT_EQ(0u, reversed->ColumnTuple::At(1)->Size());
+}
+
+TEST(ColumnMapT, AppendRollsBackNestedEntriesWhenEntryAppendThrows) {
+    auto column = std::make_shared<ColumnMapT<ColumnFixedString, ColumnUInt8>>(
+        std::make_shared<ColumnFixedString>(2), std::make_shared<ColumnUInt8>());
+
+    column->Append(std::map<std::string, uint8_t>{{"aa", 1}});
+    const std::map<std::string, uint8_t> invalid{{"bb", 2}, {"xxx", 3}};
+    EXPECT_THROW(column->Append(invalid), ValidationError);
+
+    EXPECT_EQ(1u, column->Size());
+
+    column->Append(std::map<std::string, uint8_t>{{"cc", 4}});
+    EXPECT_EQ(2u, column->Size());
+    ASSERT_EQ(1u, column->At(1).size());
+    EXPECT_EQ(4u, column->At(1).At("cc"));
 }
 
 
