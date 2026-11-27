@@ -46,7 +46,8 @@ enum IndexFlag {
     NeedUpdateDictionary = 1u << 10u
 };
 
-ColumnRef createIndexColumn(IndexType type) {
+ColumnRef createIndexColumn(uint64_t type) {
+    // Switch on the raw wire value: converting an out-of-range value to IndexType is undefined.
     switch (type) {
         case IndexType::UInt8:
             return std::make_shared<ColumnUInt8>();
@@ -58,7 +59,33 @@ ColumnRef createIndexColumn(IndexType type) {
             return std::make_shared<ColumnUInt64>();
     }
 
-    throw ValidationError("Invalid LowCardinality index type value: " + std::to_string(static_cast<uint64_t>(type)));
+    throw ValidationError("Invalid LowCardinality index type value: " + std::to_string(type));
+}
+
+template <typename IndexColumnType>
+void validateIndexes(Column& index_column, size_t dictionary_size) {
+    const auto& indexes = static_cast<IndexColumnType&>(index_column).GetWritableData();
+    for (size_t i = 0, rows = indexes.size(); i < rows; ++i) {
+        if (indexes[i] >= dictionary_size) {
+            throw ProtocolError("LowCardinality index " + std::to_string(indexes[i]) + " at row " + std::to_string(i) +
+                                " is out of range for a dictionary of " + std::to_string(dictionary_size) + " items");
+        }
+    }
+}
+
+void validateIndexes(Column& index_column, size_t dictionary_size) {
+    switch (index_column.Type()->GetCode()) {
+        case Type::UInt8:
+            return validateIndexes<ColumnUInt8>(index_column, dictionary_size);
+        case Type::UInt16:
+            return validateIndexes<ColumnUInt16>(index_column, dictionary_size);
+        case Type::UInt32:
+            return validateIndexes<ColumnUInt32>(index_column, dictionary_size);
+        case Type::UInt64:
+            return validateIndexes<ColumnUInt64>(index_column, dictionary_size);
+        default:
+            throw ValidationError("Invalid index column type for LowCardinality column:" + index_column.Type()->GetName());
+    }
 }
 
 IndexType indexTypeFromIndexColumn(const Column & index_column) {
@@ -426,7 +453,7 @@ auto Load(ColumnRef new_dictionary_column, InputStream& input, size_t rows) {
     if (!WireFormat::ReadFixed(input, &index_serialization_type))
         throw ProtocolError("Failed to read index serializaton type.");
 
-    auto new_index_column = createIndexColumn(static_cast<IndexType>(index_serialization_type & IndexTypeMask));
+    auto new_index_column = createIndexColumn(index_serialization_type & IndexTypeMask);
     if (index_serialization_type & IndexFlag::NeedGlobalDictionaryBit)
         throw UnimplementedError("Global dictionary is not supported.");
 
@@ -452,7 +479,12 @@ auto Load(ColumnRef new_dictionary_column, InputStream& input, size_t rows) {
     if (number_of_rows != rows)
         throw AssertionError("LowCardinality column must be read in full.");
 
-    new_index_column->LoadBody(&input, number_of_rows);
+    if (!new_index_column->LoadBody(&input, number_of_rows)) {
+        throw ProtocolError("Failed to read values of index column.");
+    }
+
+    // GetItem() dereferences the dictionary with these indexes unchecked.
+    validateIndexes(*new_index_column, dataColumn->Size());
 
     if (auto nullable = new_dictionary_column->As<ColumnNullable>()) {
         nullable->Append(true);
