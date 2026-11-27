@@ -153,17 +153,31 @@ bool ColumnArray::LoadPrefix(InputStream* input, size_t rows) {
 
 bool ColumnArray::LoadBody(InputStream* input, size_t rows) {
     if (!rows) {
+        Clear();
         return true;
     }
     if (!offsets_->LoadBody(input, rows)) {
         return false;
     }
-    const auto nested_rows = (*offsets_)[rows - 1];
+    std::uint64_t nested_rows = 0;
+    for (size_t i = 0; i < rows; ++i) {
+        const auto offset = (*offsets_)[i];
+        if (offset < nested_rows) {
+            throw ProtocolError("Array offsets must be non-decreasing: offset " + std::to_string(offset) + " at row " + std::to_string(i) +
+                                " follows " + std::to_string(nested_rows));
+        }
+        nested_rows = offset;
+    }
     if (nested_rows == 0) {
+        data_->Clear();
         return true;
     }
     if (!data_->LoadBody(input, nested_rows)) {
         return false;
+    }
+    if (data_->Size() != nested_rows) {
+        throw ProtocolError("Array nested column loaded " + std::to_string(data_->Size()) + " values, offsets expect " +
+                            std::to_string(nested_rows));
     }
     return true;
 }
