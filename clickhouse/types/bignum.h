@@ -1,5 +1,9 @@
 #pragma once
 
+#if __has_include("../installed_api.h")
+#include "../installed_api.h"
+#endif
+
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -36,6 +40,11 @@
 #if CH_USE_ABSEIL_FOR_BIGNUM
 
 #include "absl/numeric/int128.h"
+
+#if defined(CLICKHOUSE_CPP_INSTALLED_ABSEIL_WITHOUT_INLINE_NAMESPACE) && \
+    (!defined(ABSL_OPTION_USE_INLINE_NAMESPACE) || ABSL_OPTION_USE_INLINE_NAMESPACE != 0)
+#error "The installed clickhouse-cpp library requires matching Abseil headers without an inline namespace"
+#endif
 
 namespace clickhouse {
 

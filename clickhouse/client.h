@@ -1,5 +1,9 @@
 #pragma once
 
+#if __has_include("installed_api.h")
+#include "installed_api.h"
+#endif
+
 #include "query.h"
 #include "exceptions.h"
 
