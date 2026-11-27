@@ -304,16 +304,25 @@ public:
     template <typename Begin, typename End>
     inline void Append(Begin begin, End end) {
         auto & nested_data = *typed_nested_data_;
+        const size_t initial_size = nested_data.Size();
         size_t counter = 0;
 
-        while (begin != end) {
-            nested_data.Append(*begin);
-            ++begin;
-            ++counter;
-        }
+        try {
+            while (begin != end) {
+                nested_data.Append(*begin);
+                ++begin;
+                ++counter;
+            }
 
-        // Even if there are 0 items, increase counter, creating empty array item.
-        AddOffset(counter);
+            // Even if there are 0 items, increase counter, creating empty array item.
+            AddOffset(counter);
+        } catch (...) {
+            if (nested_data.Size() > initial_size) {
+                auto restored = nested_data.Slice(0, initial_size);
+                nested_data.Swap(*restored);
+            }
+            throw;
+        }
     }
 
     ColumnRef Slice(size_t begin, size_t size) const override {
