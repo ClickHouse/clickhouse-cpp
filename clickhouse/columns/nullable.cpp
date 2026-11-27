@@ -66,6 +66,9 @@ bool ColumnNullable::LoadBody(InputStream* input, size_t rows) {
     if (!nested_->LoadBody(input, rows)) {
         return false;
     }
+    if (nested_->Size() != rows) {
+        throw ProtocolError("Nullable nested column loaded " + std::to_string(nested_->Size()) + " rows, expected " + std::to_string(rows));
+    }
     return true;
 }
 
